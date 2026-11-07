@@ -18,13 +18,17 @@ npm run build && node dist/cli.js   # run the compiled CLI
 | `--base-url` | `OPENCODE_BASE_URL`        | `http://127.0.0.1:4096`                       |
 | `--username` | `OPENCODE_SERVER_USERNAME` | `opencode` (used when only a password is set) |
 | `--password` | `OPENCODE_SERVER_PASSWORD` | —                                             |
+| `--agent`    | `OPENCODE_AGENT`           | the server's default agent                    |
 
 When a password is present (via flag or environment variable), every request is
 sent with HTTP Basic auth (`Authorization: Basic base64(<username>:<password>)`).
 
 ## Behaviour
 
-1. `session.create` makes a session titled "SDK connection test".
+1. `session.create` makes a session titled "SDK connection test". When `--agent`
+   (or `$OPENCODE_AGENT`) is set, that agent is bound to the session and
+   therefore processes the prompt — in the v2 API the agent belongs to the
+   session, not to the individual prompt.
 2. `session.prompt` enqueues the sample prompt, which asks the model to reply
    with a one-field JSON object.
 3. The CLI polls `message.list` every 250 ms (up to 30 s) until a completed

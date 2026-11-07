@@ -17,6 +17,7 @@ interface CliConfig {
   baseUrl: string;
   username?: string;
   password?: string;
+  agent?: string;
 }
 
 /**
@@ -26,6 +27,7 @@ interface CliArgs {
   'base-url': string;
   username?: string;
   password?: string;
+  agent?: string;
 }
 
 /**
@@ -44,6 +46,7 @@ function configFromEnv(): CliConfig {
     baseUrl: process.env.OPENCODE_BASE_URL ?? DEFAULT_BASE_URL,
     username: process.env.OPENCODE_SERVER_USERNAME,
     password: process.env.OPENCODE_SERVER_PASSWORD,
+    agent: process.env.OPENCODE_AGENT,
   };
 }
 
@@ -70,6 +73,11 @@ function parseArgs(argv: string[]): CliArgs {
       describe: 'Password for HTTP basic auth (default: $OPENCODE_SERVER_PASSWORD)',
       default: env.password,
     })
+    .option('agent', {
+      type: 'string',
+      describe: 'OpenCode agent that processes the prompt (default: the server default)',
+      default: env.agent,
+    })
     .parseSync();
 }
 
@@ -82,15 +90,20 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     baseUrl: args['base-url'],
     username: args.username,
     password: args.password,
+    agent: args.agent,
   };
-  const client = createClient(config.baseUrl, config);
+  const client = createClient(config.baseUrl, {
+    username: config.username,
+    password: config.password,
+  });
 
-  console.log(`Calling OpenCode at ${config.baseUrl} with a sample prompt...`);
+  const agentNote = config.agent ? ` using agent "${config.agent}"` : '';
+  console.log(`Calling OpenCode at ${config.baseUrl} with a sample prompt${agentNote}...`);
   if (!config.password) {
     console.log('Note: no password was provided (via --password or OPENCODE_SERVER_PASSWORD).');
   }
 
-  const result = await runPrompt(client, FunFactSchema, SAMPLE_PROMPT);
+  const result = await runPrompt(client, FunFactSchema, SAMPLE_PROMPT, { agent: config.agent });
   console.log(`\nOpenCode replied:\n${JSON.stringify(result, null, 2)}`);
 }
 

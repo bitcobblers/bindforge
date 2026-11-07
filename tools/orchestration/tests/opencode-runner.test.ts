@@ -159,6 +159,25 @@ describe('runPrompt', () => {
     expect(result.reply.finish).toBe('stop');
   });
 
+  it('creates the session with the given agent and reports it in the result', async () => {
+    const create = vi.fn().mockResolvedValue({ ...fakeSession, agent: 'explore' });
+    const client = stubClient({ create });
+
+    const result = await runPrompt(client, FactSchema, 'say hi', { agent: 'explore' });
+
+    expect(create).toHaveBeenCalledWith({ title: 'SDK connection test', agent: 'explore' });
+    expect(result.session.agent).toBe('explore');
+  });
+
+  it('creates the session without an agent when none is given', async () => {
+    const create = vi.fn().mockResolvedValue(fakeSession);
+
+    const result = await runPrompt(stubClient({ create }), FactSchema, 'say hi');
+
+    expect(create).toHaveBeenCalledWith({ title: 'SDK connection test' });
+    expect(result.session.agent).toBeUndefined();
+  });
+
   it('uses the sample prompt by default', async () => {
     const result = await runPrompt(stubClient(), FactSchema);
     expect(result.prompt).toBe(SAMPLE_PROMPT);

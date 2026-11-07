@@ -91,6 +91,22 @@ export function parseContent<T extends z.ZodTypeAny>(schema: T, json: string): z
 // ---------------------------------------------------------------------------
 
 /**
+ * Options for a single prompt run.
+ */
+export interface PromptOptions {
+  /**
+   * The agent that should process the prompt, e.g. `build` or `explore`. When
+   * omitted the server uses its default agent.
+   *
+   * The v2 API binds an agent to the session rather than to a single message:
+   * `session.create` accepts an `agent`, while `session.prompt` does not. The
+   * agent is therefore set when the session is created, and the prompt is then
+   * handled by it.
+   */
+  agent?: string;
+}
+
+/**
  * A structured, JSON-serializable summary of a prompt run: the session that
  * handled it, the prompt that was sent, and the assistant's reply. The reply
  * `content` is the reply text deserialized as JSON into type `T`.
@@ -99,6 +115,7 @@ export interface PromptResult<T> {
   session: {
     id: string;
     title?: string;
+    agent?: string;
     projectID: string;
     model?: ModelRef;
     created: number;
@@ -121,9 +138,12 @@ export interface PromptResult<T> {
  * Create a session, wrapping any failure (including a missing session id) in
  * a descriptive error.
  */
-async function createSession(client: OpenCodeClient): Promise<SessionInfo> {
+async function createSession(client: OpenCodeClient, agent?: string): Promise<SessionInfo> {
   try {
-    const session = await client.session.create({ title: SESSION_TITLE });
+    const session = await client.session.create({
+      title: SESSION_TITLE,
+      ...(agent ? { agent } : {}),
+    });
     if (!session.id) {
       throw new Error('the server did not return a session id');
     }
@@ -139,6 +159,9 @@ async function createSession(client: OpenCodeClient): Promise<SessionInfo> {
  * deserialized as JSON and validated against `schema`, which determines the
  * reply's `content` type.
  *
+ * Pass `options.agent` to have a specific agent process the prompt; see
+ * {@link PromptOptions} for why it is applied when the session is created.
+ *
  * In the v2 client, `session.prompt` only enqueues the user's message; the
  * assistant's reply is produced asynchronously. We therefore poll
  * `message.list` until a completed assistant message is available.
@@ -147,8 +170,9 @@ export async function runPrompt<T extends z.ZodTypeAny>(
   client: OpenCodeClient,
   schema: T,
   prompt: string = SAMPLE_PROMPT,
+  options: PromptOptions = {},
 ): Promise<PromptResult<z.infer<T>>> {
-  const session = await createSession(client);
+  const session = await createSession(client, options.agent);
   await client.session.prompt({ sessionID: session.id, text: prompt });
 
   const reply = await waitForReply(client, session.id);
@@ -160,6 +184,7 @@ export async function runPrompt<T extends z.ZodTypeAny>(
     session: {
       id: session.id,
       title: session.title,
+      agent: session.agent,
       projectID: session.projectID,
       model: session.model,
       created: session.time.created,
