@@ -11,7 +11,7 @@ import {
   extractText,
   parseContent,
   runPrompt,
-} from '../src/cli.js';
+} from '../src/opencode-runner.js';
 
 const FactSchema = z.object({ fact: z.string() });
 
