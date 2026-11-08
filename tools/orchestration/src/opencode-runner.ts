@@ -10,8 +10,6 @@ import type {
 } from '@opencode/client';
 import { z } from 'zod';
 
-import type { ClientAuth } from './types.js';
-
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
@@ -20,10 +18,8 @@ import type { ClientAuth } from './types.js';
 // `session.create` uses `/api/session`), so the base URL must point at the
 // server root — not at `/api` — to avoid a doubled `/api/api` path.
 export const DEFAULT_BASE_URL = 'http://127.0.0.1:4096';
-export const SAMPLE_PROMPT =
-  'Reply with a single JSON object of the form {"fact": "<one fun fact about TypeScript>"}';
 
-const SESSION_TITLE = 'SDK connection test';
+const SESSION_TITLE = 'Untitled Session';
 
 // Polling settings used to wait for the assistant's reply after sending a prompt.
 const POLL_INTERVAL_MS = 250;
@@ -32,6 +28,15 @@ const POLL_TIMEOUT_MS = 30_000;
 // ---------------------------------------------------------------------------
 // Client
 // ---------------------------------------------------------------------------
+
+/**
+ * HTTP basic auth credentials for the server connection. The username is
+ * optional; without a password, requests are sent unauthenticated.
+ */
+export interface ClientAuth {
+  username?: string;
+  password?: string;
+}
 
 /**
  * Create an OpenCode client pointed at the given server. When a password is
@@ -104,12 +109,18 @@ export interface PromptOptions {
    * handled by it.
    */
   agent?: string;
+
+  /**
+   * The title of the created session. Defaults to `Untitled Session`.
+   */
+  title?: string;
 }
 
 /**
  * A structured, JSON-serializable summary of a prompt run: the session that
- * handled it, the prompt that was sent, and the assistant's reply. The reply
- * `content` is the reply text deserialized as JSON into type `T`.
+ * handled it, the full prompt that was sent (including the generated
+ * reply-format instruction), and the assistant's reply. The reply `content`
+ * is the reply text deserialized as JSON into type `T`.
  */
 export interface PromptResult<T> {
   session: {
@@ -135,13 +146,27 @@ export interface PromptResult<T> {
 }
 
 /**
- * Create a session, wrapping any failure (including a missing session id) in
- * a descriptive error.
+ * Return the deserialized reply content of a prompt run: the reply text that
+ * `runPrompt` parsed as JSON and validated against its schema, typed as that
+ * schema's inferred type `T`.
  */
-async function createSession(client: OpenCodeClient, agent?: string): Promise<SessionInfo> {
+export function extractReply<T>(result: PromptResult<T>): T {
+  return result.reply.content;
+}
+
+/**
+ * Create a session, optionally with a specific agent and title (defaulting to
+ * {@link SESSION_TITLE}), wrapping any failure (including a missing session
+ * id) in a descriptive error.
+ */
+async function createSession(
+  client: OpenCodeClient,
+  agent?: string,
+  title?: string,
+): Promise<SessionInfo> {
   try {
     const session = await client.session.create({
-      title: SESSION_TITLE,
+      title: title ?? SESSION_TITLE,
       ...(agent ? { agent } : {}),
     });
     if (!session.id) {
@@ -154,10 +179,26 @@ async function createSession(client: OpenCodeClient, agent?: string): Promise<Se
 }
 
 /**
+ * Build the reply-format instruction that is appended to every prompt. It is
+ * derived from `schema` via Zod's native JSON Schema conversion, so the
+ * format the model is asked for always matches the format the reply is
+ * validated against.
+ */
+function replyFormat(schema: z.ZodType): string {
+  const jsonSchema = JSON.stringify(z.toJSONSchema(schema));
+  return [
+    'Respond with exactly one JSON object that validates against this JSON Schema.',
+    'Output only the JSON object, with no markdown fences and no other text.',
+    `JSON Schema: ${jsonSchema}`,
+  ].join('\n');
+}
+
+/**
  * Create a session, send a prompt, and return a structured summary of the run
- * (session, prompt, and the assistant's reply). The reply's text content is
- * deserialized as JSON and validated against `schema`, which determines the
- * reply's `content` type.
+ * (session, prompt, and the assistant's reply). A reply-format instruction
+ * generated from `schema` is appended to `prompt` before sending; the reply's
+ * text content is then deserialized as JSON and validated against the same
+ * `schema`, which determines the reply's `content` type.
  *
  * Pass `options.agent` to have a specific agent process the prompt; see
  * {@link PromptOptions} for why it is applied when the session is created.
@@ -168,12 +209,13 @@ async function createSession(client: OpenCodeClient, agent?: string): Promise<Se
  */
 export async function runPrompt<T extends z.ZodType>(
   client: OpenCodeClient,
+  options: PromptOptions,
   schema: T,
-  prompt: string = SAMPLE_PROMPT,
-  options: PromptOptions = {},
+  prompt: string,
 ): Promise<PromptResult<z.infer<T>>> {
-  const session = await createSession(client, options.agent);
-  await client.session.prompt({ sessionID: session.id, text: prompt });
+  const session = await createSession(client, options.agent, options.title);
+  const text = `${prompt}\n\n${replyFormat(schema)}`;
+  await client.session.prompt({ sessionID: session.id, text });
 
   const reply = await waitForReply(client, session.id);
   if (!reply) {
@@ -190,7 +232,7 @@ export async function runPrompt<T extends z.ZodType>(
       created: session.time.created,
       updated: session.time.updated,
     },
-    prompt,
+    prompt: text,
     reply: {
       messageID: reply.id,
       content: parseContent(schema, extractText(reply.content)),

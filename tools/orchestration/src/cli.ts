@@ -4,7 +4,7 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { z } from 'zod';
 
-import { DEFAULT_BASE_URL, SAMPLE_PROMPT, createClient, runPrompt } from './opencode-runner.js';
+import { DEFAULT_BASE_URL, createClient, extractReply, runPrompt } from './opencode-runner.js';
 
 // ---------------------------------------------------------------------------
 // CLI entry point
@@ -29,6 +29,12 @@ interface CliArgs {
   password?: string;
   agent?: string;
 }
+
+/**
+ * The sample prompt sent to OpenCode. `runPrompt` derives the expected reply
+ * format from `FunFactSchema` and appends it to this prompt.
+ */
+const SAMPLE_PROMPT = 'Share one fun fact about TypeScript.';
 
 /**
  * The JSON shape the sample prompt asks the model to return.
@@ -103,8 +109,9 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     console.log('Note: no password was provided (via --password or OPENCODE_SERVER_PASSWORD).');
   }
 
-  const result = await runPrompt(client, FunFactSchema, SAMPLE_PROMPT, { agent: config.agent });
-  console.log(`\nOpenCode replied:\n${JSON.stringify(result, null, 2)}`);
+  const result = await runPrompt(client, { agent: config.agent }, FunFactSchema, SAMPLE_PROMPT);
+  const fact = extractReply(result);
+  console.log(`\nOpenCode replied:\n${JSON.stringify(fact, null, 2)}`);
 }
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);

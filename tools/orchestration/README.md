@@ -42,7 +42,6 @@ sent with HTTP Basic auth (`Authorization: Basic base64(<username>:<password>)`)
 | ------------------------ | -------------------------------------------------------------- |
 | `src/cli.ts`             | Option parsing, environment defaults, printing the result      |
 | `src/opencode-runner.ts` | Everything that talks to the OpenCode SDK (client, prompt run) |
-| `src/types.ts`           | Shared types (`ClientAuth`)                                    |
 
 ## Development
 

@@ -4,18 +4,13 @@ import type { OpenCodeClient } from '@opencode/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
-import {
-  DEFAULT_BASE_URL,
-  SAMPLE_PROMPT,
-  createClient,
-  runPrompt,
-} from '../src/opencode-runner.js';
+import { DEFAULT_BASE_URL, createClient, extractReply, runPrompt } from '../src/opencode-runner.js';
 
 const FactSchema = z.object({ fact: z.string() });
 
 const fakeSession = {
   id: 'ses_test',
-  title: 'SDK connection test',
+  title: 'Untitled Session',
   projectID: 'project-test',
   time: { created: 1000, updated: 2000 },
 };
@@ -107,40 +102,60 @@ describe('runPrompt', () => {
     const list = vi.fn().mockResolvedValue({ data: [fakeReply] });
     const client = stubClient({ create, prompt, list });
 
-    const result = await runPrompt(client, FactSchema, 'say hi');
+    const result = await runPrompt(client, {}, FactSchema, 'say hi');
 
     expect(create).toHaveBeenCalledTimes(1);
-    expect(prompt).toHaveBeenCalledWith({ sessionID: 'ses_test', text: 'say hi' });
+    expect(prompt).toHaveBeenCalledTimes(1);
     expect(result.session.id).toBe('ses_test');
     expect(result.session.projectID).toBe('project-test');
-    expect(result.prompt).toBe('say hi');
     expect(result.reply.messageID).toBe('msg_test');
     expect(result.reply.content).toEqual({ fact: 'tsc is fast' });
     expect(result.reply.finish).toBe('stop');
+  });
+
+  it('appends a reply-format instruction derived from the schema', async () => {
+    const prompt = vi.fn().mockResolvedValue({});
+
+    const result = await runPrompt(stubClient({ prompt }), {}, FactSchema, 'say hi');
+
+    const [{ text }] = prompt.mock.calls[0] as [{ text: string }];
+    const schemaJson = JSON.stringify(z.toJSONSchema(FactSchema));
+    expect(text.startsWith('say hi\n\n')).toBe(true);
+    expect(text).toContain(schemaJson);
+    expect(result.prompt).toBe(text);
+  });
+
+  it('extracts the deserialized reply content from a result', async () => {
+    const result = await runPrompt(stubClient(), {}, FactSchema, 'say hi');
+
+    expect(extractReply(result)).toEqual({ fact: 'tsc is fast' });
   });
 
   it('creates the session with the given agent and reports it in the result', async () => {
     const create = vi.fn().mockResolvedValue({ ...fakeSession, agent: 'explore' });
     const client = stubClient({ create });
 
-    const result = await runPrompt(client, FactSchema, 'say hi', { agent: 'explore' });
+    const result = await runPrompt(client, { agent: 'explore' }, FactSchema, 'say hi');
 
-    expect(create).toHaveBeenCalledWith({ title: 'SDK connection test', agent: 'explore' });
+    expect(create).toHaveBeenCalledWith({ title: 'Untitled Session', agent: 'explore' });
     expect(result.session.agent).toBe('explore');
   });
 
   it('creates the session without an agent when none is given', async () => {
     const create = vi.fn().mockResolvedValue(fakeSession);
 
-    const result = await runPrompt(stubClient({ create }), FactSchema, 'say hi');
+    const result = await runPrompt(stubClient({ create }), {}, FactSchema, 'say hi');
 
-    expect(create).toHaveBeenCalledWith({ title: 'SDK connection test' });
+    expect(create).toHaveBeenCalledWith({ title: 'Untitled Session' });
     expect(result.session.agent).toBeUndefined();
   });
 
-  it('uses the sample prompt by default', async () => {
-    const result = await runPrompt(stubClient(), FactSchema);
-    expect(result.prompt).toBe(SAMPLE_PROMPT);
+  it('creates the session with the given title', async () => {
+    const create = vi.fn().mockResolvedValue(fakeSession);
+
+    await runPrompt(stubClient({ create }), { title: 'my session' }, FactSchema, 'say hi');
+
+    expect(create).toHaveBeenCalledWith({ title: 'my session' });
   });
 
   it('polls message.list until a completed assistant reply appears', async () => {
@@ -150,7 +165,7 @@ describe('runPrompt', () => {
       .mockResolvedValueOnce({ data: [{ id: 'msg_user', type: 'user' }] })
       .mockResolvedValue({ data: [fakeReply] });
 
-    const result = await runPrompt(stubClient({ list }), FactSchema);
+    const result = await runPrompt(stubClient({ list }), {}, FactSchema, 'say hi');
 
     expect(list).toHaveBeenCalledTimes(3);
     expect(result.reply.messageID).toBe('msg_test');
@@ -169,7 +184,9 @@ describe('runPrompt', () => {
 
     const result = await runPrompt(
       stubClient({ list: async () => ({ data: [reply] }) }),
+      {},
       FactSchema,
+      'say hi',
     );
 
     expect(result.reply.content).toEqual({ fact: 'tsc is fast' });
@@ -178,7 +195,12 @@ describe('runPrompt', () => {
   it('rejects with a SyntaxError when the reply is not valid JSON', async () => {
     const reply = { ...fakeReply, content: [{ type: 'text', text: 'not json' }] };
 
-    const pending = runPrompt(stubClient({ list: async () => ({ data: [reply] }) }), FactSchema);
+    const pending = runPrompt(
+      stubClient({ list: async () => ({ data: [reply] }) }),
+      {},
+      FactSchema,
+      'say hi',
+    );
 
     await expect(pending).rejects.toThrow(SyntaxError);
   });
@@ -186,7 +208,12 @@ describe('runPrompt', () => {
   it('rejects with a ZodError when the reply does not match the schema', async () => {
     const reply = { ...fakeReply, content: [{ type: 'text', text: '{"fact":42}' }] };
 
-    const pending = runPrompt(stubClient({ list: async () => ({ data: [reply] }) }), FactSchema);
+    const pending = runPrompt(
+      stubClient({ list: async () => ({ data: [reply] }) }),
+      {},
+      FactSchema,
+      'say hi',
+    );
 
     await expect(pending).rejects.toThrow(z.ZodError);
   });
@@ -198,7 +225,7 @@ describe('runPrompt', () => {
       },
     });
 
-    await expect(runPrompt(client, FactSchema)).rejects.toThrow(
+    await expect(runPrompt(client, {}, FactSchema, 'say hi')).rejects.toThrow(
       'Failed to create a session: connection refused',
     );
   });
@@ -208,7 +235,7 @@ describe('runPrompt', () => {
       create: async () => ({ ...fakeSession, id: undefined }),
     });
 
-    await expect(runPrompt(client, FactSchema)).rejects.toThrow(
+    await expect(runPrompt(client, {}, FactSchema, 'say hi')).rejects.toThrow(
       'Failed to create a session: the server did not return a session id',
     );
   });
@@ -217,7 +244,7 @@ describe('runPrompt', () => {
     vi.useFakeTimers();
     try {
       const list = vi.fn().mockResolvedValue({ data: [] });
-      const pending = runPrompt(stubClient({ list }), FactSchema);
+      const pending = runPrompt(stubClient({ list }), {}, FactSchema, 'say hi');
       void pending.catch(() => undefined);
 
       await vi.advanceTimersByTimeAsync(31_000);
