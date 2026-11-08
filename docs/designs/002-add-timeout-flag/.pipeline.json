@@ -1,0 +1,1284 @@
+{
+  "version": 1,
+  "slug": "add-timeout-flag",
+  "nnn": "002",
+  "branch": "pipeline/002-add-timeout-flag",
+  "source": {
+    "kind": "brief",
+    "path": "docs/prompts/add-timeout-flag.md"
+  },
+  "status": "done",
+  "lastStage": "doc-sync",
+  "designRound": 3,
+  "codeRound": 3,
+  "designBudgetUsed": 2,
+  "codeBudgetUsed": 3,
+  "editorialDone": false,
+  "testsGreen": true,
+  "testsNeedUpdate": false,
+  "stageFailures": {},
+  "forceNext": null,
+  "results": [
+    {
+      "stage": "research",
+      "round": 0,
+      "sessionID": "ses_e467a31f6ffeounvmln8yEelI7",
+      "agent": "research/researcher",
+      "at": 1794113964819,
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/research-r0.md"
+    },
+    {
+      "stage": "proposal",
+      "round": 0,
+      "sessionID": "ses_e4674e20affeZUjEscJGIZk817",
+      "agent": "design/designer",
+      "at": 1794114423575,
+      "reply": {
+        "commitMessage": "docs: add design proposal for configurable reply timeout"
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/proposal-r0.md"
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e467274b4ffeP8ufOa6s58W52l",
+      "agent": "review/design-correctness",
+      "at": 1794114554623,
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/design-review-correctness-r1.md"
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e467074f7ffee9XQxThs4LsBZF",
+      "agent": "review/design-correctness",
+      "at": 1794114675527,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Assumption register A17; Test strategy #8\u2013#9",
+            "problem": "A17 is marked `verified`, but its cited basis (tests/opencode-runner.test.ts:52\u201361) is `captureFetch()`, a `vi.stubGlobal('fetch', \u2026)` recorder that always returns `Response('{}', {status: 500})` and is only used to observe one `session.create` request on a client the test builds itself. It never demonstrates a successful round-trip, so it does not support the claim that `main()` can be exercised end-to-end: that requires the real `@opencode/client` SDK (constructed inside `main()` via `createClient()`, with no injection seam) to decode success envelopes for `session.create`, `session.prompt`, and `message.list`. The only end-to-end proof that the flag survives argv parsing is not shown to be implementable.",
+            "fix": "Relabel A17 `unverified` and pick one concrete route: (a) `vi.mock('../src/opencode-runner.js')` and assert the exact `timeoutMs` `main()` passes (proves argv \u2192 resolver \u2192 boundary without the SDK), (b) add a test seam (optional client/clientFactory parameter on `main()`) reusing the existing `stubClient()` helper, or (c) spike the exact stub response bodies the SDK codec accepts and record that result as the basis before claiming `verified`."
+          },
+          {
+            "severity": "major",
+            "location": "Chosen design \u2192 `src/cli.ts`, bullets 2 and 3",
+            "problem": "`CliConfig` is given two contradictory shapes for the same setting. Bullet 2 adds a raw-string field `replyTimeoutSeconds?: string` to what `configFromEnv()` returns (today `configFromEnv(): CliConfig`, src/cli.ts:50), while bullet 3 adds required `timeoutSeconds: number` to `CliConfig`, which nothing populates: `configFromEnv()` supplies only the raw string and `main()`'s `const config: CliConfig = {\u2026}` literal (src/cli.ts:95\u2013100) keeps the resolved value in a local. The same value appears under two names and two types in one struct, and the described code does not typecheck.",
+            "fix": "Give the env bag its own type (e.g. `interface EnvValues { \u2026; replyTimeoutSeconds?: string }` as `configFromEnv()`'s return type), keep exactly one `timeoutSeconds: number` field on `CliConfig`, and have `main()` assign it from `resolveReplyTimeoutSeconds(...)` before the `\u00d7 1000`. State both type shapes explicitly in the section."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design \u2192 `src/opencode-runner.ts`, bullet 5 (missing edge cases)",
+            "problem": "The runner-side contract for out-of-range `timeoutMs` is undecided, although 01-research.md:43 explicitly asks the sub-poll-interval behaviour to be pinned down. Validation exists only in `resolveReplyTimeoutSeconds`, so a public-API caller passing `timeoutMs: 0`, a negative value, `NaN`, or anything below 250 gets one immediate `message.list` check, no sleep, `null`, and a `ReplyTimeoutError` reading `within 0 s` (or `within -0.005 s`).",
+            "fix": "State the runner contract in the `PromptOptions.timeoutMs` docblock: either reject non-finite/non-positive `timeoutMs` with a validation error, or explicitly document `timeoutMs \u2264 0` as \"one immediate check then timeout\", define how the message renders such values, and add a matching test."
+          },
+          {
+            "severity": "minor",
+            "location": "Assumption register A6",
+            "problem": "The row's human-facing-seconds claim cites https://curl.se/libcurl/c/CURLOPT_TIMEOUT.html, which documents the libcurl `CURLOPT_TIMEOUT` long-in-seconds option and never mentions `--max-time`; the flag name in the row is unsupported by the cited basis.",
+            "fix": "Cite the curl command-line man page (`curl.1`, `--max-time`) for the flag name, or drop the flag reference and rely on `CURLOPT_TIMEOUT` plus libpq `connect_timeout`, both of which the spot check confirms support the claim."
+          },
+          {
+            "severity": "nit",
+            "location": "Assumption register A5",
+            "problem": "Citation anchor https://vitest.dev/api/expect#tothrowerror is stale: the current v5.x Expect page documents the matcher under `#tothrow` and marks `toThrowError` a deprecated alias. The substance (string argument = substring inclusion) is confirmed by the live page.",
+            "fix": "Cite `#tothrow` and note that the repo's existing test already uses `.rejects.toThrow` (tests/opencode-runner.test.ts:253)."
+          },
+          {
+            "severity": "nit",
+            "location": "Assumption register A4",
+            "problem": "The test call-site list is partial: `runPrompt` is also called at tests/opencode-runner.test.ts:138, 147, 156, 168, 185, 198, 211, 228, 238 in addition to the cited 105, 119, 129, 247. The additivity conclusion still holds for every site.",
+            "fix": "Cite the full set of call sites or mark the list as representative."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design \u2192 `src/opencode-runner.ts`, bullet 4",
+            "problem": "The message template `within <n> s` does not define how `<n>` is derived from `timeoutMs`, so non-multiple-of-1000 values reachable through the public API render as `within 4.5 s` while Test strategy #2 only pins `4 s`.",
+            "fix": "State the formatting rule (divide by 1000 with fixed rounding) so the message text and its assertions are unambiguous."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/design-review-correctness-attempt2-r1.md"
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e466e9c8effeHU9YxP6WHgC93P",
+      "agent": "review/design-compatibility",
+      "at": 1794114735989,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Test strategy item 10 (docs/designs/002-add-timeout-flag/02-proposal.md:113) vs Compatibility matrix rows Linux/macOS/Windows (02-proposal.md:95\u201397)",
+            "problem": "Checklist item 7 requires a platform test for every platform the matrix claims as supported. macOS and Windows are marked \"Yes\", but the test strategy names an executed test only on Linux and explicitly declines any macOS/Windows test (\"need no dedicated platform tests\"). The OS-neutrality argument (A12) is not a test, and the repo has no CI configuration at all (no .github/workflows, no yaml files), so even the Linux \"CI\" run the strategy and Rollout #1 rely on is unenforced; the macOS/Windows support claims are currently unverified.",
+            "fix": "Add a test-strategy item running `npm test` on a CI matrix that includes `macos-latest` and `windows-latest` alongside Linux (matching the Rollout #1 gate), or downgrade the macOS/Windows rows to \"Yes \u2014 unverified (OS-neutral path, A12)\" and state where and when those platforms will actually be exercised."
+          },
+          {
+            "severity": "nit",
+            "location": "Compatibility matrix, Node toolchain row (docs/designs/002-add-timeout-flag/02-proposal.md:98)",
+            "problem": "Checklist item 3 concerns the Node version floor. The design assesses compatibility against the ES2022 compile target rather than a Node floor, and no floor is declared anywhere (tools/orchestration/package.json has no `engines` field), leaving \"Supported: Yes\" unanchored. No API used by the design (Date.now, setTimeout, Number.isInteger, class extends Error) exceeds any plausible floor, so nothing is broken in practice.",
+            "fix": "State the floor in the matrix row (e.g. \"Node \u2265 20, matching CI\") and/or add `engines.node` to tools/orchestration/package.json so this row is checkable."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/design-review-compatibility-r1.md"
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e466db066ffegV3HZ7eX2SgKm6",
+      "agent": "review/design-security",
+      "at": 1794114844755,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design \u2192 `src/opencode-runner.ts`, 4th bullet (`const timeoutMs = options.timeoutMs ?? DEFAULT_REPLY_TIMEOUT_MS`)",
+            "problem": "Validation exists only in the CLI resolver, but `timeoutMs` enters through the exported `PromptOptions` of the published `@bindforge/orchestration` API (the Compatibility matrix's \"Existing API consumers\" row). `??` only catches null/undefined, so an API consumer can pass `Number.POSITIVE_INFINITY` or `NaN`: `Date.now() + Infinity` and `Date.now() + NaN` both make `Date.now() >= deadline` permanently false, so `waitForReply` polls `message.list` every 250 ms forever \u2014 a fail-open unbounded request loop and hung process, contrary to checklist item 7. The design's own huge-value safety argument (A9, A16, Risks row 4) relies on the resolver's `1..86_400` guard, which never runs for non-CLI callers.",
+            "fix": "Fail closed at the API boundary: in `runPrompt`/`waitForReply` reject non-finite, non-integer, `< 1`, or `> 86_400_000` `timeoutMs` with a `TypeError` (or clamp to a documented maximum), document the cap in the `PromptOptions` comment, and add tests that `timeoutMs: Infinity`/`NaN` cannot produce an endless poll loop."
+          },
+          {
+            "severity": "major",
+            "location": "Chosen design \u2192 `src/cli.ts`, 3rd bullet (`resolveReplyTimeoutSeconds` \"throws errors that name the offending value and its source\") + Data flow (\"validation errors print and exit 1\")",
+            "problem": "The raw `OPENCODE_REPLY_TIMEOUT_SECONDS` string is reflected verbatim to stderr via the module-level `console.error(error)` (tools/orchestration/src/cli.ts:121, which prints message and stack). Env is untrusted in practice (CI config, container image, sourced `.env`), so a value such as `OPENCODE_REPLY_TIMEOUT_SECONDS=$'\\x1b[2J\\x1b[31m\u2026'` or one with CR/LF converts to `NaN` and is echoed back with live ANSI/control characters \u2014 terminal escape injection and spoofed CLI/CI-log output.",
+            "fix": "Never interpolate the raw string: validate it against `^\\d{1,5}$` before conversion or reflect it as `JSON.stringify(envValue)` so control characters are escaped, and state this in the design so the implementation cannot regress it."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design \u2192 \"Data flow\"",
+            "problem": "No data source is classified by trust (checklist item 1). argv and env are treated implicitly as \"the operator's\" without noting both can be attacker-influenced (CI-provided env, argv from a wrapper script), and the proposal edits the network-facing `waitForReply`/`runPrompt` path without stating that the OpenCode server reply remains untrusted network data there (`parseContent` JSON-parses it; `main()` prints it at cli.ts:114).",
+            "fix": "Add one Data flow line classifying argv/env as untrusted operator input and the server reply as untrusted network input, naming which validation covers each."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design \u2192 `src/cli.ts`, 3rd bullet (\"converts the env string\", `Number.isInteger` as the validator)",
+            "problem": "`Number(envValue)` is much looser than \"integer seconds\": `\"0x2d\"` \u2192 45, `\"1e4\"` \u2192 10000, `\" 45\\n\"` \u2192 45, `\"+45\"` \u2192 45 all pass validation, so the effective value silently differs from what the user wrote and from the value quoted in the error message (checklist item 2).",
+            "fix": "Gate the conversion on an explicit `^\\d{1,5}$` (or `^\\+?\\d{1,5}$`) regex before `Number()`, and keep regex-format rejection a distinct message from range rejection."
+          },
+          {
+            "severity": "minor",
+            "location": "Options considered \u2192 \"Value semantics for `0`, negative, fractional, and huge inputs\"; Risks row 4 (86 400 s bound)",
+            "problem": "The 86 400 s cap is justified only as a typo guard, with impact modelled as \"a CI job hangs for hours\". With the poll interval fixed at 250 ms, a valid `--timeout 86400` \u2014 or a hostile CI-set env value \u2014 issues up to ~345,600 `message.list` requests at whatever `OPENCODE_BASE_URL` names: sustained request pressure, not just a slow job (checklist item 6, least capability).",
+            "fix": "Justify the cap from an abuse standpoint (or lower it, e.g. 3 600 s) and bound the loop's cost independently of the deadline (max poll attempts / total requests) in the design."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design \u2192 `src/cli.ts`, 4th bullet (\"extends the startup log (line 107)\")",
+            "problem": "Line 107 already prints `config.baseUrl` unredacted, so `--base-url http://user:token@host` (or `$OPENCODE_BASE_URL`) prints credential material on every run; the design adds text to that same line without stating the logging rule for it (checklist item 4).",
+            "fix": "State that the extended banner logs only the resolved duration, that any printed URL is redacted of userinfo, and that the \"no password provided\" hint keeps its current wording so `OPENCODE_SERVER_PASSWORD` is never echoed."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design \u2192 `src/cli.ts`, 4th bullet; \"Data flow\"",
+            "problem": "The ordering of the resolver relative to `createClient()` (cli.ts:101) and the startup banner (cli.ts:107) is not pinned, so an implementation could build the auth-header client and print the success-shaped banner before rejecting the config.",
+            "fix": "Specify that `resolveReplyTimeoutSeconds` runs before `createClient` and before any output, so a config error yields exactly one error line and no side effects."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/design-review-security-r1.md"
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e466c0788ffe0EZNai16nPWvd5",
+      "agent": "review/design-performance",
+      "at": 1794114891065,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design \u2014 src/opencode-runner.ts (waitForReply change, 02-proposal.md lines 63\u201366) and Risks table (lines 83\u201389)",
+            "problem": "The design's expected numbers diverge from the research baseline (01-research.md line 10: 250 ms poll interval against a 30 s cap, ~121 message.list requests per hung run) without explaining the IO cost. Keeping the 250 ms poll interval fixed while raising the wait cap to 86,400 s is a 2,880\u00d7 amplification: up to ~345,600 message.list HTTP requests against an unresponsive server, and the recursive poll()/sleep() structure (opencode-runner.ts:259\u2013271) keeps ~345k nested pending promises alive for the run \u2014 bounded, but a design-induced growth in request volume and in-flight promise memory that no Risks row prices. The Risks table only treats the hang as elapsed wall-clock time, and A9/A16 justify the bound purely as a wall-clock/typo guard.",
+            "fix": "Add one Risks row (or a sentence in Options considered) quantifying poll volume at the ceiling (~timeoutMs/250 message.list calls; ~345k at 86,400 s vs ~121 at the 30 s baseline), state why it is acceptable (single-client smoke test, opt-in, bounded cap), and note poll-interval backoff as the follow-up if long timeouts become common."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/design-review-performance-r1.md"
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e466b52b0ffe3PAR5zBgNt1v50",
+      "agent": "review/design-complexity",
+      "at": 1794114955508,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design \u2192 src/opencode-runner.ts (ReplyTimeoutError bullet)",
+            "problem": "The readonly timeoutMs payload on ReplyTimeoutError has no consumer: main()'s catch only prints the error (cli.ts:120\u2013123), the class itself already gives API consumers the type distinction, and the duration is embedded in the message \u2014 the same 'no consumer' rationale the design used to reject exit code 124.",
+            "fix": "Drop the readonly timeoutMs field and keep the class with the extended message, or name one real consumer that would read the property rather than the message."
+          },
+          {
+            "severity": "minor",
+            "location": "Options considered \u2192 'Value semantics' / Chosen design \u2192 src/cli.ts (resolveReplyTimeoutSeconds) / Assumption register A16",
+            "problem": "The 86,400 s upper bound traces to no stated Goal and the design admits it has no evidence (A16 unverified, 'design judgement'); it restricts configurability while the design concedes huge values are technically safe under the wall-clock deadline (A9), and it carries collateral surface (cap constant, half of Test #7, README '1\u201386 400' wording).",
+            "fix": "Validate Number.isInteger(value) && value >= 1 with no upper bound and drop A16 plus Test #7's upper boundary; if the cap is kept, state plainly it is a product decision rather than an evidence-backed bound."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/design-review-complexity-r1.md"
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e466a56e3ffeBgzQpVGCdaAYqK",
+      "agent": "design/designer",
+      "at": 1794115151069,
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/proposal-revise-r1.md"
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e46675b0dffes474pEyQul6JZh",
+      "agent": "design/designer",
+      "at": 1794115308274,
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/proposal-revise-attempt2-r1.md"
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e466220ecffeLXPfYagHgnwIMs",
+      "agent": "design/designer",
+      "at": 1794115693418,
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/proposal-revise-r1.md"
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e465f147effeOlg5uO12EOXfMY",
+      "agent": "design/designer",
+      "at": 1794115814428,
+      "reply": {
+        "commitMessage": "docs: close remaining r1 review findings in timeout-flag design proposal"
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/proposal-revise-attempt2-r1.md"
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e465d3bb6ffex9eJ9FOTKIRo6p",
+      "agent": "review/design-correctness",
+      "at": 1794115992039,
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/design-review-correctness-r2.md"
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e465a8606ffeWNN2cQxb2Rzo7y",
+      "agent": "review/design-correctness",
+      "at": 1794116119112,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Assumption register A6 (+ Options considered \u2192 Value semantics)",
+            "problem": "A6 is marked verified for 'plain integer seconds' but its first cited basis contradicts the integer part: the curl man page's `-m, --max-time <seconds>` section says 'This option accepts decimal values' and shows `curl --max-time 2.92`. Only libpq connect_timeout ('decimal integer') and CURLOPT_TIMEOUT (long seconds) back the integer claim, and the fraction-rejection rationale names coreutils as the sole floating-point outlier when curl is a second one. The decision still stands on libpq plus 250 ms poll granularity.",
+            "fix": "Reword A6 to 'seconds-valued human-facing interfaces (integer-typed in libpq connect_timeout and CURLOPT_TIMEOUT; --max-time is seconds-valued but accepts decimals)' and acknowledge curl as a second decimal-valued outlier in the Options rationale."
+          },
+          {
+            "severity": "minor",
+            "location": "Assumption register A10, basis",
+            "problem": "The anchor `tools/orchestration/src/pipeline/runner.ts:326` does not land on the claimed pattern: line 326 is the `title:` line of the session.create call; the `start + timeout` wall-clock deadline is at runner.ts:338 (`const deadline = startedAt + cfg.stageTimeoutMs`, tested at :378). The claim itself is true and the stages.ts:31,39 anchors are exact.",
+            "fix": "Cite runner.ts:338 (and :378) instead of :326."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design \u2192 src/cli.ts, resolver bullet 1 (+ Test strategy #8)",
+            "problem": "The set-but-empty env case (OPENCODE_REPLY_TIMEOUT_SECONDS=\"\", common in container images) is decided only implicitly: process.env yields \"\", which is !== undefined and fails the ^\\d{1,5}$ gate, so the run hard-fails even with a valid --timeout. Consistent with the design's fail-closed stance, but nowhere does the spec or the Test #8 matrix state empty-vs-unset \u2014 exactly the 'empty input' edge case the checklist names.",
+            "fix": "State the empty-string case explicitly in the resolver bullet and add `\"\"` to Test #8's rejection matrix."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design \u2192 src/cli.ts, resolver bullet 1 (+ Data flow and input trust)",
+            "problem": "The strictness rationale for the format gate (Number() is looser than integer seconds: \"0x2d\" \u2192 45, \"1e4\" \u2192 10000) is argued only for env; the flag path has the identical silent coercion (yargs type:'number' turns `--timeout 0x2d` into 45, which passes the range check) and the resolver's number signature makes a format gate impossible there. The stated rationale reads as if only env is exposed.",
+            "fix": "Add one sentence recording the flag path's known coercion as an accepted limitation, or thread the raw argv token into the resolver for a symmetric gate."
+          },
+          {
+            "severity": "nit",
+            "location": "Test strategy #5",
+            "problem": "'real timers, since the call must reject synchronously' is wrong in kind: runPrompt is an async function, so an invalid timeoutMs produces a rejected promise, never a synchronous throw, and the immediate rejection follows from validation preceding any timer scheduling \u2014 fake vs real timers is irrelevant.",
+            "fix": "Drop the parenthetical or say 'no fake timers needed: the promise rejects before any timer is scheduled'."
+          },
+          {
+            "severity": "nit",
+            "location": "Revision log, r3 entry (02-proposal.md:160)",
+            "problem": "The r3 bullet contains the 'Deliberately not changed this round' paragraph twice verbatim in the same line (grep confirms the duplicate pair inside line 160); only the second copy is followed by the register-status sentence. Log hygiene only \u2014 no design content is contradicted.",
+            "fix": "Delete the duplicated paragraph."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/design-review-correctness-attempt2-r2.md"
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e46589585ffey3j6Og9ueBzgI5",
+      "agent": "review/design-compatibility",
+      "at": 1794116181571,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design \u2014 `package.json` bullet (02-proposal.md:90); Compatibility matrix Node toolchain row (02-proposal.md:115)",
+            "problem": "The new `\"engines\": { \"node\": \">=22.12.0\" }` encodes a toolchain floor (Vitest 5's requirement, A21) into the field runtime consumers of the published package read at install time; the shipped `dist/` output uses only APIs far below 22.12.0, so consumers pinned to lower Node now see EBADENGINE warnings \u2014 or a hard failure with `engine-strict` \u2014 for code that actually runs there.",
+            "fix": "Add one sentence to the package.json bullet (or README) stating the declared floor reflects the test toolchain and the published runtime output tolerates lower Node, or declare a true runtime floor if one is ever established."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/design-review-compatibility-r2.md"
+    },
+    {
+      "stage": "design-review:security",
+      "round": 2,
+      "sessionID": "ses_e4657a19effex5ZMYo9ywvtQB0",
+      "agent": "review/design-security",
+      "at": 1794116322639,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Test strategy #8 (02-proposal.md:128)",
+            "problem": "The validation matrix omits the set-but-empty env case (`OPENCODE_REPLY_TIMEOUT_SECONDS=`), a common shell typo; as designed it correctly throws (empty string fails the `^\\d{1,5}$` gate even alongside a valid `--timeout`), but the fail-closed behavior is neither pinned by a test nor documented, which surprises users who clear a variable by assigning empty.",
+            "fix": "Add `\"\"` to Test #8's env case list and state in the format-error message that an empty value is an error."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design \u2192 src/cli.ts \u2192 resolveReplyTimeoutSeconds, reflection bullet (02-proposal.md:84)",
+            "problem": "The claim that `JSON.stringify(value)` 'escapes control and ANSI bytes' overstates it: JSON.stringify escapes C0 controls (including ESC), quotes, and backslashes, but not DEL (U+007F), C1 controls (U+0080\u2013U+009F, including 8-bit CSI), or U+2028/2029; the path is safe only because the `^\\d{1,5}$` gate rejects every non-digit env value before reflection and flag values arrive as numbers.",
+            "fix": "Reword to name the format gate as the load-bearing defense and `JSON.stringify` as defense-in-depth for C0, so a future gate relaxation cannot rely on the escaper alone."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/design-review-security-r2.md"
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 2,
+      "sessionID": "ses_e46557a8affeudurUg6XmMyRSQ",
+      "agent": "review/design-performance",
+      "at": 1794116364919,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/design-review-performance-r2.md"
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 2,
+      "sessionID": "ses_e4654d56effe6uhMfwgGc3b0mD",
+      "agent": "review/design-complexity",
+      "at": 1794116441417,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design \u2192 `package.json` bullet (also Goals/Non-goals, Compatibility matrix Node-toolchain row, Rollout #1/#4)",
+            "problem": "The `engines: node >= 22.12.0` line is the only moving part that traces to no stated Goal; the design itself concedes it adds no enforcement burden and exists solely to give the Compatibility matrix a checkable anchor (a review artifact, not a product goal).",
+            "fix": "Drop the `package.json` edit from this change set and anchor the compatibility row on the already-verified `vitest ^5.0.5` requirement (A21) \u2014 or add an explicit goal line declaring the toolchain floor, and keep Rollout #1/#4 consistent either way."
+          },
+          {
+            "severity": "nit",
+            "location": "Options considered \u2192 \"Wiring in cli.ts\" (A19) / Test strategy #10",
+            "problem": "The fallback `clientFactory` seam is a dependency-injection abstraction with a single, speculative test-only consumer, and the design never states the two routes are mutually exclusive, so a stumbling spike could leave both the mock route and a production seam in place.",
+            "fix": "State that the fallback replaces the `vi.mock` route rather than being added alongside it, and that A19 is updated with the spike outcome as the sole basis if the seam is taken."
+          },
+          {
+            "severity": "nit",
+            "location": "Revision log, line 160 (r3 entry)",
+            "problem": "The \"Deliberately not changed this round\" paragraph is duplicated verbatim twice in the same line, and the same decision content is restated again at line 165, bloating an already large revision log for zero information.",
+            "fix": "Delete the second copy on line 160; optionally have r4's not-changed list cross-reference r3's instead of restating it."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/design-review-complexity-r2.md"
+    },
+    {
+      "stage": "proposal-final",
+      "round": 0,
+      "sessionID": "ses_e4653aa97ffeiANuH1ldxwWdZe",
+      "agent": "design/editor",
+      "at": 1794116572265,
+      "reply": {
+        "ambiguities": [
+          "Chosen design / Options considered: \"the recursion's pending-promise depth\" \u2014 the wait loop is described everywhere else in the document as an iterative poll, not recursion; the referent is guessable but the author should confirm the phrasing. Left unchanged (technical wording, outside a language-only pass).",
+          "Compatibility matrix, Node toolchain row: \"Node Next resolution\" appears to mean the tsconfig `NodeNext` module-resolution setting, which is spelled `NodeNext` everywhere else in the document (Revision log r3/r4). Compatibility matrix cells must not be changed, so it was left as written \u2014 author to confirm.",
+          "Revision log r3 and r4 entries are single lines longer than the 2 000-character per-line read limit; content beyond that limit in each line was not visible for review. Within the visible span, r3's verbatim-duplicated \"Deliberately not changed this round\" bullet was de-duplicated (the surviving copy is a superset, including the trailing register-status sentence); no other edits were made to these two lines."
+        ],
+        "commitMessage": "docs: final language pass on the reply-timeout proposal"
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/proposal-final-r0.md"
+    },
+    {
+      "stage": "editorial-review:correctness",
+      "round": 3,
+      "sessionID": "ses_e4651ab68ffeAceoB0RuDWbn69",
+      "agent": "review/design-correctness",
+      "at": 1794116691248,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "02-proposal.md:55 (Options considered \u2192 Value semantics, changed by diff hunk @@ -52)",
+            "problem": "The edited sentence asserts \"the prior-art human-facing interfaces are integer seconds (A6\u2026)\" and names coreutils' floating-point durations as the outlier, but A6's first citation \u2014 the curl man page's `-m, --max-time <seconds>` section, re-fetched live this round \u2014 says \"This option accepts decimal values\" and shows `curl --max-time 2.92`. Curl is a second decimal-valued prior art, so the blanket \"integer seconds\" claim (marked verified in A6) and \"the outlier\" are contradicted by the proposal's own cited basis. The fractional-rejection decision itself still stands on libpq, CURLOPT_TIMEOUT, and 250 ms poll granularity; this was correctness-r2's open minor and the editorial diff touched the sentence without fixing the claim.",
+            "fix": "Reword the rationale (and A6) to \"seconds-valued human-facing interfaces (integer-typed in libpq connect_timeout and CURLOPT_TIMEOUT; --max-time is seconds-valued but accepts decimals)\" and acknowledge curl as a second floating-point outlier."
+          },
+          {
+            "severity": "nit",
+            "location": "02-proposal.md:126 (Test strategy #6, changed by diff hunk @@ -123)",
+            "problem": "The edited clause \"pins the behaviour that research line 43 asks the designer to fix\" misstates the source: research line 43 asks the designer to \"pin down\" the bounded sub-poll behaviour, and the design deliberately documents rather than fixes the loop (\"documented rather than 'fixed'\" in the revision log). The design decision is correct and pinned; only the attribution verb is wrong.",
+            "fix": "Change to \"pins the behaviour that research line 43 asks the designer to pin down\"."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/editorial-review-correctness-r3.md"
+    },
+    {
+      "stage": "editorial-review:compatibility",
+      "round": 3,
+      "sessionID": "ses_e464fdaabffe7d7K233ol5U9x4",
+      "agent": "review/design-compatibility",
+      "at": 1794116747645,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/editorial-review-compatibility-r3.md"
+    },
+    {
+      "stage": "editorial-review:security",
+      "round": 3,
+      "sessionID": "ses_e464efe63ffegO0zV2EoOgfdVh",
+      "agent": "review/design-security",
+      "at": 1794116852336,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/editorial-review-security-r3.md"
+    },
+    {
+      "stage": "editorial-review:performance",
+      "round": 3,
+      "sessionID": "ses_e464d6570ffetTIgHZ5mQSxdvc",
+      "agent": "review/design-performance",
+      "at": 1794116914751,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/editorial-review-performance-r3.md"
+    },
+    {
+      "stage": "editorial-review:complexity",
+      "round": 3,
+      "sessionID": "ses_e464c71a1ffejyv2zBO2oTpsp3",
+      "agent": "review/design-complexity",
+      "at": 1794116999375,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "02-proposal.md:130 (Test strategy #10; also A19 at :47)",
+            "problem": "The fallback route is still written as an addition rather than a substitution: the diff's edited sentence says to 'fall back to an optional clientFactory parameter on main()' without stating that the seam replaces the vi.mock route. An implementer whose spike stumbles can end up with both a mock-based integration test and a production dependency-injection parameter on main() whose only consumer is a speculative test \u2014 the one-implementation abstraction the checklist warns about. Carried unchanged from complexity-r2's nit; the diff touched this sentence (comma only) without closing it.",
+            "fix": "Add one clause: 'if the mock proves unworkable, use an optional clientFactory parameter on main() in place of the vi.mock route (never both), and record the spike result as A19's basis.' Mirror the same exclusivity in the A19 row."
+          },
+          {
+            "severity": "nit",
+            "location": "02-proposal.md:165 (Revision log, r4 entry)",
+            "problem": "The change set correctly deleted the verbatim-duplicated 'Deliberately not changed this round' paragraph from the r3 entry (:160), closing half of complexity-r2's nit, but r4 at :165 still restates the identical not-changed list in full. Two near-identical ~1,000-character paragraphs cost every downstream reviewer reading time for zero added information.",
+            "fix": "Let :165 cross-reference instead of restate: 'every r2/r3 not-changed decision stands (see the r3 entry), plus the yargs describe text left as static help copy; register statuses A8/A14/A17/A19 stay unverified.'"
+          },
+          {
+            "severity": "nit",
+            "location": "02-proposal.md:126 (Test strategy #6, clause edited by diff hunk @@ -123)",
+            "problem": "'pins the behaviour that research line 43 asks the designer to fix' reads as in-scope work on the polling loop, which the proposal elsewhere names as deliberately unchanged (non-goal at :16; 'documented rather than fixed' at :150/:160/:165, opencode-runner.ts:259-271). Research line 43 asks the designer to pin down the bounded sub-poll behaviour, not change it, so the wording invites an implementer to add a loop change that traces to no stated Goal. Same wording is already carried as a citation nit by correctness-r3; the complexity angle is the scope-creep risk.",
+            "fix": "Reword to 'pins the behaviour that research line 43 asks the designer to pin down', keeping the explicit non-goal framing."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/editorial-review-complexity-r3.md"
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_e464b26f2ffeaoRKV9DTz6mhjq",
+      "agent": "code/test-engineer",
+      "at": 1794117495878,
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/test-authoring-r0.md"
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_e464393a3ffeU8d4ozuGZXVMkO",
+      "agent": "code/test-engineer",
+      "at": 1794117606687,
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/test-authoring-attempt2-r0.md"
+    },
+    {
+      "stage": "implement",
+      "round": 0,
+      "sessionID": "ses_e463ebe00ffeI5HhLzmCVCw4rf",
+      "agent": "code/coder",
+      "at": 1794118050969,
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/implement-r0.md"
+    },
+    {
+      "stage": "implement",
+      "round": 0,
+      "sessionID": "ses_e463b1b37ffeKxKfUPS75CVOQ6",
+      "agent": "code/coder",
+      "at": 1794118186063,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "feat: add configurable reply timeout to orchestration CLI"
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/implement-attempt2-r0.md"
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e4639009bffezIQUa7u1f3G3Vy",
+      "agent": "codereview/code-correctness",
+      "at": 1794118366373,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "docs/designs/002-add-timeout-flag/03-build-notes.md:52-60 (Test strategy #12 / Rollout #1)",
+            "problem": "The design's only acceptance gate, `npm run check` (lint + format check + tests) in tools/orchestration, was never executed \u2014 deviation 1 records it could not run, and nothing on the branch shows it ran afterwards. Both new suites (tests/cli.test.ts, tests/opencode-runner-timeout.test.ts) were authored before the implementation existed, so Goal 4 ('existing tests pass unchanged') and the merge gate are unevidenced; this review's environment also refused to run them, so the item could not be evaluated (which counts as a finding, not a pass). My static trace found no source/test mismatch, so this is unverified rather than known-broken.",
+            "fix": "Run `npm run check` in tools/orchestration (or at minimum `npx vitest run` plus `npm run typecheck` and `npm run lint`), fix any fallout, and record the run summary (test counts, lint/format status, Node version) in 03-build-notes.md before merge."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/cli.ts:125-134",
+            "problem": "The env range check sits behind the flag branch, so `--timeout 5` with `OPENCODE_REPLY_TIMEOUT_SECONDS=3601` silently resolves to 5 and the broken environment is never reported. That matches the letter of the proposal (only the format gate is pinned as precedence-independent) and is declared as build-notes deviation 2, but it contradicts the design's own rationale next to it ('a broken environment is a configuration error even when a valid flag overrides it', proposal:82) and the Risks row promising an env typo hard-fails the run.",
+            "fix": "Validate the env value fully (format gate and `1..maxSeconds` range) before the `flagValue !== undefined` branch, then apply precedence; or keep the current behaviour and pin it with a test such as `expect(resolveReplyTimeoutSeconds(5, '3601')).toBe(5)`."
+          },
+          {
+            "severity": "minor",
+            "location": "docs/designs/002-add-timeout-flag/03-build-notes.md:46-48",
+            "problem": "The notes' coverage claim ('No test files were edited; the three existing suites \u2026 were treated as the contract') does not describe the whole reviewed diff range, which also contains src/pipeline/gates.ts, src/pipeline/prompts.ts, src/pipeline/runner.ts, tests/pipeline-gates.test.ts and tests/pipeline-prompts.test.ts from commits f0a2e16 and 891567b \u2014 a subsystem the proposal lists as an explicit non-goal (proposal:17). Provenance indicates operator infrastructure rather than this run's output (both commits are the oldest in the range, authored right after the base pin fdfd2bc and before the run's first docs commit), so this is range hygiene rather than scope creep.",
+            "fix": "Add one build-notes line recording the two out-of-scope pipeline commits, or re-pin the review base to 891567b so the review diff contains only the design's change set. If those commits turn out to be the run's own output, escalate this to a major undeclared scope-creep finding."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/cli.ts:110-111",
+            "problem": "The env format-gate error message states the accepted range ('must be an integer number of seconds in 1..3600 (plain digits only)') even though the failure it reports is a format violation; the proposal deliberately keeps format rejection separate from range rejection, and a user who sets `OPENCODE_REPLY_TIMEOUT_SECONDS=30s` is told about a range they never violated.",
+            "fix": "Word the format error as format-only, e.g. `$OPENCODE_REPLY_TIMEOUT_SECONDS must be plain decimal digits (integer seconds), got \u2026`, leaving the range wording to the range rejection at cli.ts:129-130."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/cli.ts:182,188",
+            "problem": "`configFromEnv()` is called twice per run \u2014 once inside `parseArgs()` and again for `replyTimeoutSeconds` \u2014 so the resolver validates a separate read of the environment from the bag yargs used for the other option defaults, which is slightly at odds with the design's 'env reads centralized in configFromEnv()' intent (A3).",
+            "fix": "Have `parseArgs(argv)` accept or return the `EnvValues` bag and pass that same snapshot into `resolveReplyTimeoutSeconds`."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/code-review-correctness-r1.md"
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e46364b28ffebNHAWLUCOlJhS0",
+      "agent": "codereview/code-compatibility",
+      "at": 1794118366482,
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/code-review-compatibility-r1.md"
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e46364ae8fferQkQAPpCTDzBJG",
+      "agent": "codereview/code-compatibility",
+      "at": 1794118366521,
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/code-review-compatibility-attempt2-r1.md"
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e4634c9b6ffeHUCFOZg4m6Rtc7",
+      "agent": "codereview/code-correctness",
+      "at": 1794118628402,
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/code-review-correctness-r2.md"
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e46324bbfffexYapPIbkYFoRtW",
+      "agent": "codereview/code-correctness",
+      "at": 1794118848353,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "docs/designs/002-add-timeout-flag/03-build-notes.md:52-60, :129-136",
+            "problem": "The gate claim is now stale/false: deviation 1 and the Round-2 paragraph state that `npm run check` was never executed and must still be run by the caller, but the pipeline's own run log records gate `testsGreen` / reason `\"npm run check green\"` at round 0 (docs/designs/002-add-timeout-flag/.pipeline.json:712-717), executed by the runner after the implement stage landed the change set (.pipeline.json:539-550) and before this review round, with no source changes since. Checklist #5 requires build-notes claims to be true; this one no longer is, and it made the previous r2 attempt carry a major the tree already refutes. Caveat: the log line carries no test counts and sits ~3 s after the implement stage entry, so the summary itself could not be verified here (this environment rejected every shell command).",
+            "fix": "Rewrite deviation 1 and the Round-2 paragraph to cite the gate-log entry (round, timestamp, `npm run check` = lint + format check + tests \u2192 green) and paste the summary (test counts per suite, lint/format status, Node version) into 03-build-notes.md; if the runner's log proves wrong, re-run `npm run check` in tools/orchestration before merge."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/cli.ts:115-134 (docblock :94-99)",
+            "problem": "Carried open from r1 finding 2: the env range check sits inside the env branch, behind the `flagValue !== undefined` return, so `--timeout 5` with `OPENCODE_REPLY_TIMEOUT_SECONDS=3601` resolves silently to `5` and the broken environment is never reported. It matches the letter of the proposal (only the format gate is pinned precedence-independent) and is declared as build-notes deviation 2, but contradicts the docblock rationale above it ('a broken environment is a configuration error even when a valid flag overrides it') and the Risks row promising an env typo hard-fails the run; no test pins the precedence-dependent behaviour.",
+            "fix": "Validate the env value fully (format gate and `1..maxSeconds` range) before the `flagValue !== undefined` branch, then apply precedence; or keep the behaviour, correct the docblock wording, and pin it with `expect(resolveReplyTimeoutSeconds(5, '3601')).toBe(5)`."
+          },
+          {
+            "severity": "minor",
+            "location": "docs/designs/002-add-timeout-flag/03-build-notes.md:46-48",
+            "problem": "Carried open from r1 finding 3: the coverage claim ('No test files were edited; the three existing suites \u2026') still does not describe the whole reviewed base, which also contains src/pipeline/gates.ts, prompts.ts, runner.ts and tests/pipeline-gates.test.ts / pipeline-prompts.test.ts \u2014 a subsystem the proposal lists as an explicit non-goal (proposal:17). Neither offered fix (build-notes line recording those commits, or re-pinning the base to 891567b) was applied; shell was refused here so r1's provenance conclusion (pre-run operator infrastructure) is accepted rather than re-audited. None of those files touches the timeout path.",
+            "fix": "Add one build-notes line naming the out-of-scope pipeline commits inside the reviewed range, or re-pin `baseRef` (currently fdfd2bc, .pipeline.json:742) so the review diff contains only the design's change set; escalate to a major undeclared non-goal violation if those commits prove to be this run's output."
+          },
+          {
+            "severity": "minor",
+            "location": "docs/designs/002-add-timeout-flag/03-build-notes.md:122-127",
+            "problem": "The Round-2 observation about cli.test.ts is stated against the wrong test: `afterEach` deletes OPENCODE_REPLY_TIMEOUT_SECONDS after every `main()` test (tests/cli.test.ts:162-168), so the '30 s default' case (:204-211) cannot inherit an ambient value \u2014 earlier afterEach runs already cleared it. The actual exposure is the first `main()` test (:172-179), which runs before any afterEach: an ambient well-formed out-of-range value is masked by `--timeout 2` there, while an ambient malformed value throws via the precedence-independent gate and fails that test.",
+            "fix": "Correct the note to name the first `main()` test, or move the env clear into `beforeEach` so the observation no longer applies."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/cli.ts:110-111",
+            "problem": "Carried open from r1 finding 4: the format-gate message states the accepted range ('must be an integer number of seconds in 1..3600 (plain digits only)') although the failure it reports is a format violation, blurring the proposal's deliberate format/range split (proposal:82); `OPENCODE_REPLY_TIMEOUT_SECONDS=30s` is told about a range it never violated.",
+            "fix": "Keep the format error format-only, e.g. `$OPENCODE_REPLY_TIMEOUT_SECONDS must be plain decimal digits (integer seconds), got \u2026`, leaving the range wording to cli.ts:129-130."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/cli.ts:144,188",
+            "problem": "Carried open from r1 finding 5: `configFromEnv()` is called twice per run (inside `parseArgs()` and again for `replyTimeoutSeconds`), so the resolver validates a second, independent env read rather than the bag yargs used for the other option defaults, at odds with the 'env reads centralized in configFromEnv()' intent (A3).",
+            "fix": "Have `parseArgs(argv)` accept or return the `EnvValues` bag and pass that same snapshot into `resolveReplyTimeoutSeconds`."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/code-review-correctness-attempt2-r2.md"
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e462ef06cffeXhboHXInefI9lJ",
+      "agent": "codereview/code-compatibility",
+      "at": 1794119102647,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/opencode-runner.ts:352",
+            "problem": "A second observable delta for existing @bindforge/orchestration API consumers that the design's Compatibility matrix (proposal:117) and Rollout #3 (proposal:138) do not list: they claim the one observable change is the extended message with the old string kept as an exact prefix, but `this.name = 'ReplyTimeoutError'` also changes `error.name` from 'Error' to 'ReplyTimeoutError' for consumers that branch or log on `name`, and changes the CLI's stderr first line from `Error: No response received from OpenCode...` to `ReplyTimeoutError: No response received from OpenCode...`, breaking stderr scraping by line prefix. Declared as build-notes deviation 3, so minor rather than an undeclared deviation.",
+            "fix": "Drop `this.name` (the name is already available via `constructor.name` and `instanceof ReplyTimeoutError`), or keep it and record it as a second documented, prefix-safe delta in the Compatibility matrix and Rollout #3."
+          },
+          {
+            "severity": "minor",
+            "location": "docs/designs/002-add-timeout-flag/03-build-notes.md:52-60 (gate evidence: .pipeline.json:761-766)",
+            "problem": "Checklist item 7 could not be evaluated by execution, so it counts as a finding rather than a pass. The matrix claims Linux/macOS/Windows support, but the only execution evidence in the tree is one gate-log line (`gate: testsGreen`, `reason: \"npm run check green\"`) naming no OS, no `node -v`, and no per-suite test counts, and this review environment refused every shell command (`git status`, `npm run check` \u2192 Permission denied), so even the Linux row is asserted, not verified. The new suites are portable by construction (argv-driven `main(['node','cli',...])`, `process.env` mutation with afterEach cleanup, no spawn, no `process.platform`/`path.sep`/`os.EOL` use, no vitest config so defaults apply identically on every OS) and no test is skipped or guarded, so nothing blocks the unverified rows \u2014 but the record cannot distinguish 'green on Linux' from 'green on an unknown machine'.",
+            "fix": "Replace deviation 1's stale 'must still be run by the caller' text with the gate-log citation plus the run summary (OS, `node -v`, per-suite test counts, lint/format status), and re-run `npm run check` in `tools/orchestration` before merge if that log line proves wrong. Do not add a CI leg: introducing CI is an explicit non-goal (proposal:22), so the macOS/Windows rows stay 'Yes \u2014 unverified'."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/gates.ts:190 (also src/pipeline/runner.ts:71,79,650,841)",
+            "problem": "POSIX-only process launches inside the reviewed diff range: `spawn('npm', ['run','check'], ...)` cannot start on Windows without `shell: true` (the executable is `npm.cmd`), so the gate silently resolves `false` through `child.on('error')`; `spawnSync('git', ...)` and `spawnSync('diff', ...)` assume binaries not guaranteed on a stock Windows install. These files are in the caller's range via the out-of-scope commits f0a2e16/891567b already flagged by reviews/code/correctness-r1.md:112-129 and correctness-r2.md:176-193 (this environment refused `git log`, so attribution is taken from those reviews, not re-audited). They touch no timeout code, but they are a live platform limitation inside the range under review and make the package's new `engines`/platform claims misleading for pipeline users on Windows.",
+            "fix": "State in README.md/build notes that the pipeline tooling is POSIX-only, or guard the launches (`process.platform === 'win32' ? 'npm.cmd' : 'npm'`, or `shell: true`), or re-pin `baseRef` (.pipeline.json:791) so the reviewed range contains only the design's change set."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/package.json:30-32,36",
+            "problem": "The new floor is declared but its anchors are asymmetric. `engines.node >=22.12.0` is published metadata for a package whose shipped `dist/` code needs nothing above the ES2022 target, so it is a toolchain (Vitest 5) requirement that warns \u2014 and under `engine-strict` fails \u2014 for library consumers on older Node, while no user-facing doc mentions it (README has no requirements line). Meanwhile `@types/node ^26.6.5` puts the compile-time API surface four majors past the declared floor, and eslint.config.js has no compatibility rule, so the next change can compile cleanly against an API the floor rejects.",
+            "fix": "Add one README 'Requirements' line naming the floor and stating it is the toolchain (Vitest 5) floor, and pin `@types/node` to the floor major (`^22`) so the type anchor matches `engines.node`."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/cli.ts:111,130 (asserted at tests/cli.test.ts:110-115)",
+            "problem": "The reflected env value is escaped with `JSON.stringify`, which covers C0 controls and `\\x1b` but leaves C1 control characters (U+0080-U+009F, e.g. CSI) and all printable non-ASCII raw \u2014 and the format-gate error path is exactly the path that echoes an arbitrary rejected value. On terminals honouring 8-bit C1 in UTF-8 mode those bytes are still live escape introducers, and on legacy Windows console code pages (cp437/cp1252) a non-ASCII value echoes as mojibake, making the message meant to explain the bad config unreadable. Security-r1's rule (no raw C0/ANSI byte) is satisfied, hence a nit.",
+            "fix": "Escape non-ASCII too, e.g. `JSON.stringify(envValue).replace(/[\\u007f-\\u009f]/g, (c) => '\\\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'))`, or reflect a non-echoing form such as `<rejected: ${envValue.length} chars, not plain digits>`; keep the existing `not.toContain('\\x1b')` assertions."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/opencode-runner.ts:348-351",
+            "problem": "The exported ReplyTimeoutError's fixed suffix reads `(set --timeout or $OPENCODE_REPLY_TIMEOUT_SECONDS to change it)`, guidance that only exists for the tools/orchestration CLI; a programmatic consumer of the published API's knob is `PromptOptions.timeoutMs`. The text is design-mandated (proposal:72), so this is a design-level wording note rather than an implementation deviation.",
+            "fix": "Change the design text to `(set --timeout, $OPENCODE_REPLY_TIMEOUT_SECONDS, or PromptOptions.timeoutMs to change it)`; only the suffix changes, so the A5 exact-prefix contract and the assertions in tests/opencode-runner-timeout.test.ts and tests/cli.test.ts stay green."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/code-review-compatibility-r2.md"
+    },
+    {
+      "stage": "code-review:security",
+      "round": 2,
+      "sessionID": "ses_e462b0f0effei9jV2jciHKgphz",
+      "agent": "codereview/code-security",
+      "at": 1794119247837,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/cli.ts:224-227",
+            "problem": "The new validation failures (resolver Error at cli.ts:109/117/128, runner TypeError at opencode-runner.ts:242) exit through the pre-existing main().catch console.error(error), printing a full stack trace to the end user for a plain config error (security checklist item 7). Pre-existing pattern the design deliberately keeps (A13), but the change set extends it to four new throw sites.",
+            "fix": "In the module-level catch print only the message, e.g. console.error(error instanceof Error ? error.message : error), keeping exit code 1."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:110-111",
+            "problem": "enforceOwnership's cleanup of a violation not present in headBefore runs git rm -f -r with its failure swallowed by gitOk, then rmSync(resolve(repoDir, p), { force: true }) without recursive: true. If git rm fails and p is a directory, rmSync throws EISDIR (force only suppresses ENOENT), aborting ownership enforcement with a partially reverted worktree/index \u2014 destructive partial application of the runner's own boundary. Low likelihood, in the out-of-scope pipeline group.",
+            "fix": "Use rmSync(..., { force: true, recursive: true, maxRetries: 2 }) or fail the stage loudly when the revert command fails instead of crashing mid-loop."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/code-review-security-r2.md"
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 2,
+      "sessionID": "ses_e4628d7f0ffezrqqVZoXWnMAik",
+      "agent": "codereview/code-performance",
+      "at": 1794119362945,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/cli.ts:188",
+            "problem": "main() calls configFromEnv() a second time (line 188) to read replyTimeoutSeconds, although parseArgs() already built a fresh EnvValues bag from process.env moments earlier (line 144). The env is read and the bag allocated twice per process \u2014 startup-only and negligible, but avoidable.",
+            "fix": "Hoist a single `const env = configFromEnv();` in main() and thread it into parseArgs(argv, env), or read process.env.OPENCODE_REPLY_TIMEOUT_SECONDS directly in main() if keeping configFromEnv() single-purpose matters more."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/code-review-performance-r2.md"
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 2,
+      "sessionID": "ses_e46271644ffexXVgg0kLEH5RjW",
+      "agent": "codereview/code-testing",
+      "at": 1794119520284,
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/code-review-testing-r2.md"
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 2,
+      "sessionID": "ses_e4624afd8ffezuMft7NrrZByRW",
+      "agent": "codereview/code-testing",
+      "at": 1794119746497,
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/code-review-testing-attempt2-r2.md"
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 3,
+      "sessionID": "ses_e46203854ffejWXDHX30xDzkKn",
+      "agent": "codereview/code-correctness",
+      "at": 1794120039054,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "docs/designs/002-add-timeout-flag/03-build-notes.md:52-60, :129-136",
+            "problem": "Carried open from correctness-r2 finding 1, sharpened: the notes still state that `npm run check` could not be executed and 'must still be run by the caller', and r2's rebuttal ('the runner's gate ran after the implement stage \u2026 with no source changes since') is itself false. The run record's only green entry (.pipeline.json:870-875, gate `testsGreen`, reason \"npm run check green\", at 1794118188887) predates commit `d7be29f` (at 1794118457, `tools/orchestration/src/pipeline/runner.ts` +15/\u22121 plus the new `.opencode/agents/codereview/code-compatibility.md`), and no later gate entry exists, so HEAD has no in-tree execution evidence behind Test strategy #12 / Rollout #1. This review environment rejected every shell command (`git diff`, `npm run check` \u2192 Permission denied), so the gate could not be evaluated by execution \u2014 a checklist item I could not evaluate, hence a finding rather than a pass."
+          },
+          {
+            "severity": "minor",
+            "location": "docs/designs/002-add-timeout-flag/03-build-notes.md:46-48",
+            "problem": "Carried open from r1 finding 3 / r2 finding 3: the coverage claim ('No test files were edited; the three existing suites \u2026') still does not describe the reviewed range, which also contains `src/pipeline/gates.ts`, `prompts.ts`, `runner.ts`, `tests/pipeline-gates.test.ts`, `tests/pipeline-prompts.test.ts` and the new `.opencode/agents/codereview/code-compatibility.md` from commits f0a2e16, 891567b and d7be29f \u2014 both locations are explicit non-goals (proposal:17, proposal:23). Attribution remains with the operator/runner self-repair group (this run's only code stages are test-authoring and implement, .pipeline.json:516-550), so it stays range hygiene rather than undeclared scope creep, and no file in that group touches the timeout path (grep of src/pipeline for runPrompt/timeoutMs/OPENCODE_REPLY_TIMEOUT: zero hits).",
+            "fix": "Add one build-notes line naming the out-of-scope commits inside the range, or re-pin `baseRef` (.pipeline.json:914) to `891567b` so the review diff contains only the design's change set; escalate to a major undeclared non-goal violation if those commits prove to be this run's output."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/cli.ts:115-134 (docblock :94-96)",
+            "problem": "Carried open from r1 finding 2 / r2 finding 2: the env range check still sits inside the env branch, behind the `flagValue !== undefined` return, so `--timeout 5` with `OPENCODE_REPLY_TIMEOUT_SECONDS=3601` resolves silently to `5` and the broken environment is never reported. It matches the letter of the proposal (only the format gate is pinned precedence-independent, proposal:82) and is declared as build-notes deviation 2, but contradicts the docblock rationale above it ('a broken environment is a configuration error even when a valid flag overrides it') and the Risks row promising an env typo hard-fails the run, and no test pins it (cli.test.ts:137-139 covers `undefined,'3601'`; :120 covers `5,'30s'`; never `5,'3601'`).",
+            "fix": "Validate the env value fully (`^\\d{1,5}$` gate and `1..maxSeconds` range) before the flag branch and then apply precedence; or keep the behaviour, scope the docblock sentence to the format gate, and pin it with `expect(resolveReplyTimeoutSeconds(5, '3601')).toBe(5)`."
+          },
+          {
+            "severity": "minor",
+            "location": "docs/designs/002-add-timeout-flag/03-build-notes.md:122-127",
+            "problem": "Carried open from r2 finding 4: the Round-2 observation still names the wrong test. `afterEach` clears `OPENCODE_REPLY_TIMEOUT_SECONDS` after every `main()` test (tests/cli.test.ts:162-168), so the '30 s default' case (:204-211) can already not inherit an ambient value. The real exposure is the first `main()` test (:172-179), which runs before any `afterEach`: an ambient malformed/empty value throws through the precedence-independent format gate and fails it, and a well-formed ambient value is masked only because that test passes `--timeout 2`. A build-notes claim that does not match the tree (checklist #5).",
+            "fix": "Name the first `main()` test in the note, or make it moot by adding `delete process.env[TIMEOUT_ENV]` to the `main` describe's `beforeEach` (tests/cli.test.ts:144-160)."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/cli.ts:109-112",
+            "problem": "Carried open from r1 finding 4 / r2 finding 5: the format-gate error message states the accepted range ('must be an integer number of seconds in 1..3600 (plain digits only)') although the failure it reports is a format violation, blurring the deliberate format/range split (proposal:82); `OPENCODE_REPLY_TIMEOUT_SECONDS=30s` is told about a range it never violated.",
+            "fix": "Make the format error format-only, e.g. `$OPENCODE_REPLY_TIMEOUT_SECONDS must be plain decimal digits (integer seconds), got \u2026`, and leave the range wording to the range rejection at cli.ts:129-130."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/cli.ts:144,188",
+            "problem": "Carried open from r1 finding 5 / r2 finding 6: `configFromEnv()` is called twice per run (once inside `parseArgs()`, again for `replyTimeoutSeconds`), so the resolver validates a second, independent env read instead of the snapshot yargs used for the other option defaults \u2014 at odds with assumption A3's 'env reads centralized in configFromEnv()' intent.",
+            "fix": "Have `parseArgs(argv)` take or return the `EnvValues` bag and pass that same snapshot into `resolveReplyTimeoutSeconds`."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/code-review-correctness-r3.md"
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 3,
+      "sessionID": "ses_e461cc530ffeT7MSwRvHjoDg43",
+      "agent": "codereview/code-compatibility",
+      "at": 1794120255188,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/opencode-runner.ts:352",
+            "problem": "Carried open from compatibility-r2 finding 1: `this.name = 'ReplyTimeoutError'` is a second observable delta for existing @bindforge/orchestration API consumers that the proposal's Compatibility matrix (proposal:117) and Rollout #3 (proposal:138) still describe as the single delta. `error.name` changes from 'Error' to 'ReplyTimeoutError' for code branching/logging on `name`, and the CLI's stderr first line gains the class-name prefix, breaking stderr scrapers keyed on `Error: \u2026`. Message contract stays byte-identical and the deviation is declared (build-notes deviation 3), so it is minor, but the matrix claim is incomplete.",
+            "fix": "Drop the `this.name` assignment (instanceof ReplyTimeoutError and constructor.name already identify the class), or keep it and add it as a second documented, prefix-safe delta in the matrix's \"Existing API consumers\" row and Rollout #3."
+          },
+          {
+            "severity": "minor",
+            "location": "docs/designs/002-add-timeout-flag/03-build-notes.md:52-60",
+            "problem": "Checklist item 7's platform/gate record is now false in the tree: deviation 1 and the Round-2 paragraph still assert `npm run check` was never executed and \"must still be run by the caller\", but the gate was executed at this HEAD during this review and is green on Linux (ESLint clean, prettier --check clean, vitest 5.0.5: 7 test files / 91 tests passed). The Linux matrix row is verified, yet the artifact a later reader trusts says the opposite, and nothing states what was exercised for the macOS/Windows rows.",
+            "fix": "Rewrite deviation 1 and the Round-2 paragraph to record the executed gate (OS, Node version if capturable, lint/format status, per-suite test counts) and state explicitly that macOS/Windows were not exercised because a CI matrix leg is an explicit non-goal; do not add CI."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:97-113",
+            "problem": "Newly added enforceOwnership routes file paths through git's text output and back into destructive git/FS calls without NUL delimiting or quote control: `git diff --name-only` split on '\\n' and `status --porcelain` sliced as `line.slice(3).trim()` (:87), then fed to `git cat-file -e <rev>:<p>`, `git restore -- <p>`, `git rm -f -r -- <p>` and `rmSync(resolve(repoDir, p), { force: true })`. With core.quotepath=true (user-settable global, never overridden) non-ASCII design/brief/report paths come back octal-escaped, and rename entries arrive as `old -> new`; the garbled string matches nothing, so an ownership violation silently escapes the revert (force:true swallows the rmSync miss) or acts on a wrong literal path; paths with leading/trailing spaces or quotes are mangled the same way. In range but outside the design's change set; timeout path unaffected.",
+            "fix": "Use machine-readable git output: `git -c core.quotepath=false diff --name-only -z` and `status --porcelain -z` split on '\\0' (taking the new path for renames), keeping resolve(); the stagePathAllowed regexes need no change since git keeps '/' separators."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/package.json:30-36",
+            "problem": "Carried open from compatibility-r2 finding 4: the new `engines.node >= 22.12.0` is a toolchain (Vitest 5) floor for a package whose shipped dist/ needs only ES2022, while `@types/node` is `^26.6.5` \u2014 four majors past the floor \u2014 so tsc keeps type-checking against a Node 26 API surface the declared floor rejects, with skipLibCheck and no compatibility lint rule to catch it; README.md has no Requirements line documenting the floor for consumers.",
+            "fix": "Pin @types/node to the floor major (^22) or raise engines to match the type surface, and add one README Requirements line naming the floor and its Vitest 5 origin."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/cli.ts:111",
+            "problem": "Carried open from compatibility-r2 finding 5: the format-gate and env range errors reflect the rejected value via JSON.stringify only, which escapes C0 controls (incl. \\x1b) but leaves DEL, C1 controls (U+0080-U+009F, 8-bit CSI is a live escape introducer in UTF-8 terminals) and printable non-ASCII raw \u2014 and this is exactly the path that echoes an arbitrary rejected value, printing as mojibake on legacy Windows console code pages. Security-r1's rule is met (the ^\\d{1,5}$ gate is the load-bearing defense), hence a nit.",
+            "fix": "Reflect a shape instead of the bytes (e.g. `<rejected: N chars, not plain digits>`) or additionally escape [\\u007f-\\u009f] and non-ASCII after JSON.stringify; keep the existing not.toContain('\\x1b') assertions."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/opencode-runner.ts:348-351",
+            "problem": "Carried open from compatibility-r2 finding 6: the exported ReplyTimeoutError's fixed suffix '(set --timeout or $OPENCODE_REPLY_TIMEOUT_SECONDS to change it)' instructs library consumers about CLI-only knobs; a programmatic caller's knob is PromptOptions.timeoutMs. The text is design-mandated (proposal:72), so the code matches the design and this is a design wording note.",
+            "fix": "Design change first: extend the suffix to '(set --timeout, $OPENCODE_REPLY_TIMEOUT_SECONDS, or PromptOptions.timeoutMs to change it)' \u2014 the A5 exact-prefix contract and all current test assertions stay green since only the suffix changes."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/code-review-compatibility-r3.md"
+    },
+    {
+      "stage": "code-review:security",
+      "round": 3,
+      "sessionID": "ses_e461978f0ffeMjixEGFD5CiZx3",
+      "agent": "codereview/code-security",
+      "at": 1794120469304,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/cli.ts:223-227",
+            "problem": "Carried open from security-r2 S1: the four new throw sites (resolver Error at cli.ts:109/117/128, runner TypeError at opencode-runner.ts:242) all exit through the pre-existing main().catch((error) => console.error(error)), printing a full stack trace to the end user for a plain configuration error \u2014 security checklist item 7's \"no stack traces to end users\". The pattern is design-accepted (A13), so it is non-blocking, but the change set extends it to four sites.",
+            "fix": "In the module-level catch print only the message: console.error(error instanceof Error ? error.message : error), keeping exit code 1."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:111-112",
+            "problem": "Carried open from security-r2 S2: enforceOwnership's cleanup of a violation absent from headBefore runs `git rm -f -r -- <p>` with its failure swallowed by gitOk, then `rmSync(resolve(repoDir, p), { force: true })` without `recursive: true`. force only suppresses ENOENT, so a directory whose git rm failed raises EISDIR and aborts the loop mid-revert, leaving the worktree/index partially reverted \u2014 destructive partial application of the runner's own ownership boundary (checklist item 6).",
+            "fix": "rmSync(..., { force: true, recursive: true, maxRetries: 2 }), or treat a failed revert command as a hard stage failure instead of crashing mid-loop."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:83-113",
+            "problem": "enforceOwnership \u2014 documented in-file as \"the real boundary\" against a model routing around agent-config permissions \u2014 parses git's human-readable output (status --porcelain sliced via line.slice(3).trim() at :87, diff --name-only split on '\\n' at :100) and feeds those strings into git cat-file -e <rev>:<p>, git restore -- <p>, git rm -f -r -- <p> and rmSync(resolve(repoDir, p)). core.quotepath is a user-settable global never overridden here, so non-ASCII paths return octal-escaped/quoted, rename entries arrive as `old -> new`, and whitespace-padded paths are trimmed; the garbled literal matches nothing, so an ownership violation either silently escapes the revert (force:true hides the rmSync miss) or the destructive calls act on a wrong path (checklist item 2).",
+            "fix": "Use machine-readable git output: `git -c core.quotepath=false diff --name-only -z` and `status --porcelain -z` split on '\\0' (taking the new path for renames), and fail the stage loudly when a revert command fails."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:505-506 (with :127-147)",
+            "problem": "Ownership enforcement runs only inside `if (outcome.ok)`. A stage that fails after writing files (steps-exhausted / invalid-reply / timeout \u2014 all three occur in this run's own gate log, .pipeline.json:974-1006) leaves out-of-ownership edits in the worktree unenforced; the next successful stage's commitStage then runs `git add -A` (:137) and commits them under that stage's message \u2014 a bypass of the boundary plus attribution laundering of a constrained actor's edits.",
+            "fix": "Call enforceOwnership on the failure path as well, using the headBefore captured at :353, before recording the stage failure."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/gates.ts:241-254",
+            "problem": "stagePathAllowed grants implement/fix every path except tests, which includes .opencode/agents/** (the permission definitions the runner itself treats as advisory because \"a model can route around agent-config permissions\") and src/pipeline/** (the enforcement code). A model-run stage can therefore widen its own and later stages' permissions and edit the guard that would detect it; the in-range pipeline commits already touch .opencode/agents/codereview/code-compatibility.md (least-privilege gap, checklist item 6).",
+            "fix": "Deny /^\\.opencode\\/agents\\// and /^tools\\/orchestration\\/src\\/pipeline\\// for implement/fix (and any model-run stage); land operator infrastructure self-repair outside the model-run path."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:856-859",
+            "problem": "saveStateSync writes .pipeline.json with a plain writeFileSync, bypassing the atomic temp-file + rename contract that state-store.ts:36-48 documents for the same file. A crash mid-write on the escalation path truncates the run's only progress checkpoint \u2014 a partial write corrupting state, which checklist item 6 asks to prevent.",
+            "fix": "Write to a unique tmp file in the same directory and rename (or make the escalation path await saveState instead of saveStateSync)."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/cli.ts:111,130",
+            "problem": "The rejected env value is echoed via JSON.stringify, which escapes C0 controls (incl. \\x1b), quotes and backslashes but leaves DEL, C1 controls (U+0080-U+009F; 8-bit CSI is a live escape introducer in UTF-8 terminals) and printable non-ASCII raw \u2014 and this is precisely the path that echoes an arbitrary rejected value. Security-r1's rule is satisfied because the ^\\d{1,5}$ gate is the load-bearing defense; recorded so a future gate relaxation cannot rely on the escaper alone.",
+            "fix": "Reflect a shape rather than the bytes (e.g. `<rejected: ${envValue.length} chars, not plain digits>`) or additionally escape [\\u007f-\\u009f] and non-ASCII after JSON.stringify; keep the existing not.toContain('\\x1b') assertions."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/cli.ts:119; tools/orchestration/src/opencode-runner.ts:243",
+            "problem": "Both messages reflect an unvalidated value with String(...) although the design's rule is that any reflected value is embedded via JSON.stringify (proposal:84). It is safe today \u2014 verified against upstream yargs-parser, where a key declared `type: 'number'` is always coerced through Number() in maybeCoerceNumber, so argv reaches the resolver only as a number, NaN, or (repeated flag) an array of numbers \u2014 but the invariant now rests on that unverified assumption A8, and the runner-side value is `unknown` at runtime for non-CLI consumers of the exported API.",
+            "fix": "Use JSON.stringify(flagValue) in the --timeout range error and JSON.stringify(timeoutMs) in the runner TypeError (only the runner message text changes; its pinned tests assert the TypeError type and zero client calls, not the wording)."
+          },
+          {
+            "severity": "nit",
+            "location": ".opencode/agents/codereview/code-compatibility.md:20-31",
+            "problem": "The new agent config grants shell access by prefix wildcard (\"git diff*\", \"git log*\", \"npm run check*\", \"npm test*\") on top of a deny-all shell rule. Whether that is a narrow grant depends on whether the harness splits compound commands before matching; if it matches the whole command line, `git diff \u2026; <arbitrary>` or `npm test && curl \u2026` satisfies the pattern and the deny-all rule is bypassed for every future code-compatibility reviewer run.",
+            "fix": "Tighten the patterns to whole commands without a trailing wildcard past a complete command, or record in the file that the matcher applies per sub-command."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/code-review-security-r3.md"
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 3,
+      "sessionID": "ses_e46163494ffeP8n3ldGJBCnsog",
+      "agent": "codereview/code-performance",
+      "at": 1794120584299,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "docs/designs/002-add-timeout-flag/03-build-notes.md:52-60 (also :129-136)",
+            "problem": "Performance checklist item 6 (run the benchmark-like/timing check and quote the number) could not be evaluated at HEAD: the build notes still record `npm run check` as never executed, and the run's only green gate entry (at: 1794118188887) predates the in-range commit d7be29f (1794118457), so none of the timing contracts the change ships \u2014 the \u2264 one-interval overshoot, the two-`message.list` contract for `timeoutMs: 100`, and the 14,400-poll ceiling that justifies the 3 600 s cap \u2014 has executed evidence at the tree being merged. This review environment also rejects every shell command (`git diff`, `git log`, `npm test` \u2192 `Permission denied: shell`), so no new evidence could be produced; per the review rules an unevaluated checklist item counts as a finding. Not blocking: performance-r2 ran the suite green (7 files / 87 tests / 701 ms) against the design's own change set, the post-gate delta touches no timeout code, and the ceiling arithmetic (3_600_000 / 250 = 14,400; 121 at the default) is exact on the shipped constants.",
+            "fix": "Run `npm run check` in `tools/orchestration` at HEAD and paste the summary block (OS, `node -v`, per-suite test counts, Duration, lint/format status) into `03-build-notes.md`, then rewrite deviation 1 and the Round-2 paragraph to cite that run. If the re-run is red, this escalates to a major."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/cli.ts:144 and :188",
+            "problem": "Carried open from performance-r2 F1, still unaddressed: `main()` calls `configFromEnv()` a second time inside the resolver call at :188 although `parseArgs()` already built a fresh `EnvValues` bag from `process.env` at :144. `process.env` is read and a five-field bag allocated twice per run, and the resolver validates a second, independent env snapshot rather than the one yargs used for the other defaults. Startup-only and one extra allocation per process, hence nit.",
+            "fix": "Hoist one bag: `const env = configFromEnv();` at the top of `main()` and thread it into `parseArgs(argv, env)`, or read `process.env.OPENCODE_REPLY_TIMEOUT_SECONDS` directly at :188 if keeping `configFromEnv()` single-purpose matters more."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/opencode-runner.ts:313-317 (cost model: 02-proposal.md Risks row / A16)",
+            "problem": "The diff raises the reachable poll count on an unchanged path whose per-poll cost is not constant: `findCompletedReply` fetches the session's entire `message.list` body every 250 ms and scans it with `data.find`, so a wait costs O(polls \u00d7 list size). The Risks row and A16 price the ceiling only in requests ('up to ~14,400 `message.list` polls'), understating the `--timeout 3600` worst case as 14,400 full list payloads that each grow with session history. Bounded, opt-in, and the loop shape is pre-existing and 'deliberately not changed', so this is a documentation gap in the cost model behind the 3 600 s cap rather than a code defect.",
+            "fix": "Add one clause to the Risks row / A16 stating that each poll re-fetches the whole `message.list` body (the ceiling therefore costs 14,400 list payloads, not 14,400 constant-cost requests), and keep the already-named adaptive-poll-interval follow-up as the remedy if long timeouts become normal practice."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/code-review-performance-r3.md"
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 3,
+      "sessionID": "ses_e46147369ffekxOJz6dB96P4pU",
+      "agent": "codereview/code-testing",
+      "at": 1794120782098,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/cli.test.ts:144-168",
+            "problem": "The `main` suite is not hermetic against the caller's environment (checklist item 4), carried open from testing-r2 finding 2 with no fix landed: `beforeEach` resets only the runner mocks, while `delete process.env[OPENCODE_REPLY_TIMEOUT_SECONDS]` sits in `afterEach`, so the first `main()` test (:172-179) runs before any cleanup. An ambient malformed/empty value throws through the precedence-independent format gate (src/cli.ts:108) and fails an unrelated test; a well-formed one is masked there only because the test passes `--timeout 2`. 03-build-notes.md:122-127 records the same hazard against the wrong test (the 30 s default case is already protected by the preceding afterEach).",
+            "fix": "Add `delete process.env[TIMEOUT_ENV]` to the `main` describe's `beforeEach` (or save/restore in beforeAll/afterAll so an ambient value is not destroyed for sibling files), and correct the build-notes observation."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/cli.ts:115-134 (docblock :91-99)",
+            "problem": "Unexercised branch (checklist item 7), open since correctness-r1 finding 2 / testing-r2 finding 3: the env range check sits inside the env branch behind the `flagValue !== undefined` return, so `--timeout 5` with `OPENCODE_REPLY_TIMEOUT_SECONDS=3601` silently resolves to 5 and the broken environment is never reported. No test pins the combination (cli.test.ts:137-139 covers `undefined,'3601'`, :119-123 covers `5,'30s'`), while the docblock above the code promises a broken environment is a configuration error even when a valid flag overrides it.",
+            "fix": "Pin it with `expect(resolveReplyTimeoutSeconds(5, '3601')).toBe(5)` plus a comment naming it as precedence-dependent range behaviour and scope the docblock sentence to the format gate; or move the full env validation (gate + range) above the flag branch so code, docblock, Risks row and tests agree."
+          },
+          {
+            "severity": "minor",
+            "location": "docs/designs/002-add-timeout-flag/03-build-notes.md:52-60, :129-136",
+            "problem": "Test strategy #12 / Rollout #1 have no in-repo closure evidence and no citation anywhere (checklist items 1/6), carried from testing-r2 finding 1. This review executed `npm run check` at HEAD and it is green (ESLint clean, prettier --check clean, vitest 5.0.5: 7 test files / 91 tests passed, 857 ms) \u2014 which also supplies the execution evidence correctness-r1's major lacked \u2014 yet deviation 1 and the Round-2 paragraph still state the gate \"could not be executed\" and \"must still be run by the caller\", and no testsGreen gate entry exists after .pipeline.json:1065-1069.",
+            "fix": "Rewrite deviation 1 and the Round-2 paragraph to record the executed run (Linux, lint/format status, 7 files / 91 tests, Node version if capturable) and state that macOS/Windows remain unexercised because a CI matrix leg is an explicit non-goal."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/opencode-runner.test.ts:243-257",
+            "problem": "Test strategy #1 is the only implementable item with no `// proves: Test strategy #N` citation anywhere in the tree (checklist item 1, literal requirement). The item is satisfied in substance \u2014 the guard is unedited (zero timeout/ReplyTimeoutError text in that file) and passes by substring against the new message prefix, re-run green this round.",
+            "fix": "Cite it from the new suite, e.g. above tests/opencode-runner-timeout.test.ts:65: `// proves: Test strategy #1 (guard, unedited) \u2014 tests/opencode-runner.test.ts:243\u2013257 keeps the 30 s default and the message prefix`."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/opencode-runner-timeout.test.ts:140-153",
+            "problem": "Test #5 pins the TypeError type and the zero-request consequence but not the message the proposal requires ('throws a TypeError naming the bad value', proposal:71). The source names it (src/opencode-runner.ts:242-245), but no assertion would notice a regression that dropped it \u2014 which is the point of the fail-closed report. Carried from testing-r2 finding 5.",
+            "fix": "Inside the loop assert `expect(messageOf(error)).toContain(`Invalid timeoutMs: ${String(timeoutMs)}`)`; the full prefix avoids a trivial match against the `1..3600000` range text for `0`/`-5`."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/cli.ts:203-206; tools/orchestration/src/opencode-runner.ts:352",
+            "problem": "Two pieces of user-visible output from this change set have no assertion: the extended startup banner (' waiting up to <n> s for the reply') is only ever seen on the negative path (cli.test.ts:231 asserts nothing printed), and the undeclared-in-design `this.name = 'ReplyTimeoutError'` (build-notes deviation 3; compatibility-r3 finding 1) is untested. Carried from testing-r2 finding 6.",
+            "fix": "In the 'passes --timeout 2' test capture the spy (`const { log } = silenceOutput()`) and assert `expect(log.mock.calls.flat().join(' ')).toContain('waiting up to 2 s for the reply')`; in the #2 test add `expect((error as Error).name).toBe('ReplyTimeoutError')` if that deviation is part of the contract."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/cli.test.ts:114",
+            "problem": "`expect(message).not.toContain('[2J\\n')` is near-vacuous: the resolver's message is single-line (pinned at :229) and never contains that substring regardless of escaping, so the assertion cannot fail. The load-bearing check is :113 (`not.toContain('\\x1b')`). Carried from testing-r2 finding 8.",
+            "fix": "Drop it or replace it with `expect(/[\\u0000-\\u001f\\u007f]/.test(message)).toBe(false)`."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/opencode-runner-timeout.test.ts:7-44",
+            "problem": "~38 lines of fixtures (FactSchema, fakeSession, fakeReply, stubClient) duplicate tests/opencode-runner.test.ts:9-46 verbatim, so two copies of the SDK client shape must move together and drift silently changes what each suite exercises; no tests/helpers/ exists. Related: the wall-clock deadline (src/opencode-runner.ts:290) implicitly depends on Vitest 5's default fake-timer set including `Date` \u2014 no vitest.config and no explicit `toFake` anywhere \u2014 so a narrowed default turns these suites into 5 s timeouts instead of named assertion failures. Carried from testing-r2 finding 7.",
+            "fix": "Extract tests/helpers/opencode-stubs.ts shared by both suites (test-stage work) and pin the fake set explicitly, e.g. `vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })`."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/cli.test.ts:81-85, :172-232",
+            "problem": "New: assumption A8 (register status `unverified` \u2014 junk numeric argv reaches validation as a non-finite number rather than failing in yargs) is only ever exercised as a hand-written `Number.NaN` passed straight to the resolver. No test drives junk argv through the real `parseArgs()`, so the CLI-side guard that protects untrusted operator input is unpinned at the boundary.",
+            "fix": "Add a `main` case: `main(['node','cli','--timeout','abc'])` rejects with a message containing `--timeout`, `runnerMocks.createClient` never called, `log` never called \u2014 which also re-pins Test #11's side-effect-free property for the flag path."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/cli.test.ts:172-211 vs tools/orchestration/tests/opencode-runner-timeout.test.ts:140-153",
+            "problem": "New: the seconds\u2192milliseconds CLI\u2194runner boundary is only exercised at 2/5/default. The coupling between the CLI cap (`maxSeconds = MAX_REPLY_TIMEOUT_MS / 1000`, src/cli.ts:106) and the runner cap (src/opencode-runner.ts:241) is untested at the top of the range, so a divergence (CLI accepts 3600 while the runner rejects 3_600_000) would regress silently into the runner's TypeError mid-run instead of the resolver's config error.",
+            "fix": "Add `await main(['node','cli','--timeout','3600'])` and assert `runPromptOptions()` matches `expect.objectContaining({ timeoutMs: 3_600_000 })`."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/code-review-testing-r3.md"
+    },
+    {
+      "stage": "doc-sync",
+      "round": 3,
+      "sessionID": "ses_e46116eb9ffeYkbxvpA6hoN4Jh",
+      "agent": "ops/doc-sync",
+      "at": 1794120907055,
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/doc-sync-r3.md"
+    },
+    {
+      "stage": "doc-sync",
+      "round": 3,
+      "sessionID": "ses_e460f86c4ffeVdHJgNASYZq1XF",
+      "agent": "ops/doc-sync",
+      "at": 1794121114662,
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/doc-sync-attempt2-r3.md"
+    },
+    {
+      "stage": "doc-sync",
+      "round": 3,
+      "sessionID": "ses_e460b65e5ffe8rB6h3K24J2552",
+      "agent": "ops/doc-sync",
+      "at": 1794121510494,
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/doc-sync-r3.md"
+    },
+    {
+      "stage": "doc-sync",
+      "round": 3,
+      "sessionID": "ses_e4606515dffe5rrfR13AJle0iU",
+      "agent": "ops/doc-sync",
+      "at": 1794121894152,
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/doc-sync-attempt2-r3.md"
+    },
+    {
+      "stage": "doc-sync",
+      "round": 3,
+      "sessionID": "ses_e45ffd9c1ffersnHJfijCSucTb",
+      "agent": "ops/doc-sync",
+      "at": 1794122118178,
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/doc-sync-r3.md"
+    },
+    {
+      "stage": "doc-sync",
+      "round": 3,
+      "sessionID": "ses_e45fd0bc2fferLvrwJMPrE760R",
+      "agent": "ops/doc-sync",
+      "at": 1794122229093,
+      "reply": {
+        "drifted": true,
+        "commitMessage": "docs: re-verify 002-add-timeout-flag as-built record and refresh run-log state"
+      },
+      "transcript": "docs/designs/002-add-timeout-flag/transcripts/doc-sync-attempt2-r3.md"
+    }
+  ],
+  "gateLog": [
+    {
+      "gate": "sourceAdmissible",
+      "round": 0,
+      "proceed": true,
+      "reason": "brief is non-empty",
+      "at": 1794113916391
+    },
+    {
+      "gate": "stageFailure",
+      "round": 0,
+      "proceed": false,
+      "reason": "research: steps-exhausted (cap 15)",
+      "at": 1794113964837
+    },
+    {
+      "gate": "stageFailure",
+      "round": 1,
+      "proceed": false,
+      "reason": "design-review:correctness: invalid-reply: not JSON",
+      "at": 1794114554625
+    },
+    {
+      "gate": "allDesignReviewsApproved",
+      "round": 1,
+      "proceed": false,
+      "reason": "missing reviews: ",
+      "at": 1794114955544
+    },
+    {
+      "gate": "stageFailure",
+      "round": 1,
+      "proceed": false,
+      "reason": "proposal-revise: invalid-reply: not JSON",
+      "at": 1794115151083
+    },
+    {
+      "gate": "escalate",
+      "round": 0,
+      "proceed": false,
+      "reason": "stage proposal-revise failed twice (invalid-reply: not JSON) \u2014 steps/reply cap rule: one retry, then escalate",
+      "at": 1794115308290
+    },
+    {
+      "gate": "stageFailure",
+      "round": 1,
+      "proceed": false,
+      "reason": "proposal-revise: invalid-reply: not JSON",
+      "at": 1794115693435
+    },
+    {
+      "gate": "stageFailure",
+      "round": 2,
+      "proceed": false,
+      "reason": "design-review:correctness: invalid-reply: not JSON",
+      "at": 1794115992049
+    },
+    {
+      "gate": "allDesignReviewsApproved",
+      "round": 2,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1794116441445
+    },
+    {
+      "gate": "allEditorialReviewsApproved",
+      "round": 3,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1794116999426
+    },
+    {
+      "gate": "stageFailure",
+      "round": 0,
+      "proceed": false,
+      "reason": "test-authoring: invalid-reply: not JSON",
+      "at": 1794117495888
+    },
+    {
+      "gate": "escalate",
+      "round": 0,
+      "proceed": false,
+      "reason": "stage test-authoring failed twice (invalid-reply: not JSON) \u2014 steps/reply cap rule: one retry, then escalate",
+      "at": 1794117606688
+    },
+    {
+      "gate": "stageFailure",
+      "round": 0,
+      "proceed": false,
+      "reason": "implement: invalid-reply: not JSON",
+      "at": 1794118051000
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check green",
+      "at": 1794118188887
+    },
+    {
+      "gate": "stageFailure",
+      "round": 1,
+      "proceed": false,
+      "reason": "code-review:compatibility: invalid-reply: not JSON",
+      "at": 1794118366482
+    },
+    {
+      "gate": "escalate",
+      "round": 0,
+      "proceed": false,
+      "reason": "stage code-review:compatibility failed twice (invalid-reply: not JSON) \u2014 steps/reply cap rule: one retry, then escalate",
+      "at": 1794118366522
+    },
+    {
+      "gate": "stageFailure",
+      "round": 2,
+      "proceed": false,
+      "reason": "code-review:correctness: invalid-reply: not JSON",
+      "at": 1794118628407
+    },
+    {
+      "gate": "stageFailure",
+      "round": 2,
+      "proceed": false,
+      "reason": "code-review:testing: invalid-reply: not JSON",
+      "at": 1794119520286
+    },
+    {
+      "gate": "escalate",
+      "round": 0,
+      "proceed": false,
+      "reason": "stage code-review:testing failed twice (invalid-reply: Invalid option: expected one of \"approve\"|\"request-changes\") \u2014 steps/reply cap rule: one retry, then escalate",
+      "at": 1794119746505
+    },
+    {
+      "gate": "allCodeReviewsApproved",
+      "round": 3,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1794120782141
+    },
+    {
+      "gate": "stageFailure",
+      "round": 3,
+      "proceed": false,
+      "reason": "doc-sync: invalid-reply: not JSON",
+      "at": 1794120907058
+    },
+    {
+      "gate": "escalate",
+      "round": 0,
+      "proceed": false,
+      "reason": "stage doc-sync failed twice (invalid-reply: not JSON) \u2014 steps/reply cap rule: one retry, then escalate",
+      "at": 1794121114664
+    },
+    {
+      "gate": "stageFailure",
+      "round": 3,
+      "proceed": false,
+      "reason": "doc-sync: steps-exhausted (cap 25)",
+      "at": 1794121510528
+    },
+    {
+      "gate": "escalate",
+      "round": 0,
+      "proceed": false,
+      "reason": "stage doc-sync failed twice (steps-exhausted (cap 25)) \u2014 steps/reply cap rule: one retry, then escalate",
+      "at": 1794121894162
+    },
+    {
+      "gate": "stageFailure",
+      "round": 3,
+      "proceed": false,
+      "reason": "doc-sync: invalid-reply: not JSON",
+      "at": 1794122118194
+    },
+    {
+      "gate": "done",
+      "round": 0,
+      "proceed": true,
+      "reason": "pipeline complete",
+      "at": 1794122229139
+    }
+  ],
+  "startedAt": 1794113916377,
+  "updatedAt": 1794122229139,
+  "baseRef": "fdfd2bc280482e9a878429f197619d5e794a075d"
+}

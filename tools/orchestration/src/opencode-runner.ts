@@ -23,7 +23,12 @@ const SESSION_TITLE = 'Untitled Session';
 
 // Polling settings used to wait for the assistant's reply after sending a prompt.
 const POLL_INTERVAL_MS = 250;
-const POLL_TIMEOUT_MS = 30_000;
+
+/** Default cap on waiting for the assistant's reply, in milliseconds. */
+export const DEFAULT_REPLY_TIMEOUT_MS = 30_000;
+
+/** Upper bound accepted for a configured reply timeout, in milliseconds. */
+export const MAX_REPLY_TIMEOUT_MS = 3_600_000;
 
 // ---------------------------------------------------------------------------
 // Client
@@ -114,6 +119,22 @@ export interface PromptOptions {
    * The title of the created session. Defaults to `Untitled Session`.
    */
   title?: string;
+
+  /**
+   * Wall-clock cap, in milliseconds, on waiting for the completed assistant
+   * reply. Defaults to {@link DEFAULT_REPLY_TIMEOUT_MS}.
+   *
+   * When provided it must be an integer in `1..MAX_REPLY_TIMEOUT_MS`; the
+   * contract is enforced by `runPrompt` itself (fail closed): any other value
+   * makes `runPrompt` throw a `TypeError` before the session is created, so
+   * invalid values produce zero HTTP requests.
+   *
+   * Values below the 250 ms poll interval are legal: the deadline is only
+   * tested after each reply check, so such a value yields exactly two
+   * `message.list` checks — one immediate, one after a single poll sleep —
+   * overshooting the configured deadline by at most one poll interval.
+   */
+  timeoutMs?: number;
 }
 
 /**
@@ -213,13 +234,24 @@ export async function runPrompt<T extends z.ZodType>(
   schema: T,
   prompt: string,
 ): Promise<PromptResult<z.infer<T>>> {
+  // Fail closed at the exported API boundary: an invalid timeoutMs would make
+  // the wall-clock deadline unreachable and poll forever, so reject it here,
+  // before any request is emitted (see the PromptOptions.timeoutMs contract).
+  const timeoutMs = options.timeoutMs ?? DEFAULT_REPLY_TIMEOUT_MS;
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_REPLY_TIMEOUT_MS) {
+    throw new TypeError(
+      `Invalid timeoutMs: ${String(timeoutMs)}. It must be an integer number of ` +
+        `milliseconds in 1..${MAX_REPLY_TIMEOUT_MS}.`,
+    );
+  }
+
   const session = await createSession(client, options.agent, options.title);
   const text = `${prompt}\n\n${replyFormat(schema)}`;
   await client.session.prompt({ sessionID: session.id, text });
 
-  const reply = await waitForReply(client, session.id);
+  const reply = await waitForReply(client, session.id, timeoutMs);
   if (!reply) {
-    throw new Error('No response received from OpenCode');
+    throw new ReplyTimeoutError(timeoutMs);
   }
 
   return {
@@ -253,8 +285,9 @@ export async function runPrompt<T extends z.ZodType>(
 async function waitForReply(
   client: OpenCodeClient,
   sessionID: string,
+  timeoutMs: number,
 ): Promise<SessionMessageAssistant | null> {
-  const deadline = Date.now() + POLL_TIMEOUT_MS;
+  const deadline = Date.now() + timeoutMs;
 
   const poll = async (): Promise<SessionMessageAssistant | null> => {
     const reply = await findCompletedReply(client, sessionID);
@@ -301,6 +334,24 @@ function sleep(ms: number): Promise<void> {
 // ---------------------------------------------------------------------------
 // Errors
 // ---------------------------------------------------------------------------
+
+/**
+ * Thrown by {@link runPrompt} when no completed assistant reply arrives before
+ * the configured reply timeout elapses. The message keeps the pre-existing
+ * `'No response received from OpenCode'` report as an exact prefix, so
+ * substring matchers and `Error` catches keep working while the elapsed
+ * duration and the knobs to change it are reported as well. The duration
+ * `<n>` is `timeoutMs / 1000` rendered as a plain JS number (seconds).
+ */
+export class ReplyTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(
+      `No response received from OpenCode within ${timeoutMs / 1000} s ` +
+        `(set --timeout or $OPENCODE_REPLY_TIMEOUT_SECONDS to change it)`,
+    );
+    this.name = 'ReplyTimeoutError';
+  }
+}
 
 /**
  * Render an SDK error object as a short human-readable message.

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // Baseline (ADR-001): no agent may write under docs/ by default. Pipeline
+  // stage agents re-allow exactly the shared hand-off location
+  // (docs/designs/**) in their own definitions under .opencode/agents/, and
+  // the runner-owned records (.pipeline.json, transcripts/) are denied there.
+  // docs/adrs/** is written only by the pipeline runner.
+  "permissions": [
+    { "action": "edit", "resource": "docs/**", "effect": "deny" }
+  ],
+
+  "agents": {
+    // Humans author ADRs and briefs interactively through the built-in agents,
+    // so those re-allow docs/ explicitly.
+    "build": {
+      "permissions": [{ "action": "edit", "resource": "docs/**", "effect": "allow" }]
+    },
+    "plan": {
+      "permissions": [{ "action": "edit", "resource": "docs/**", "effect": "allow" }]
+    }
+  }
+}

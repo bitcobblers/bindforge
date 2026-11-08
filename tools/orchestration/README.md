@@ -13,12 +13,13 @@ npm start            # run from source (tsx src/cli.ts)
 npm run build && node dist/cli.js   # run the compiled CLI
 ```
 
-| Option       | Environment variable       | Default                                       |
-| ------------ | -------------------------- | --------------------------------------------- |
-| `--base-url` | `OPENCODE_BASE_URL`        | `http://127.0.0.1:4096`                       |
-| `--username` | `OPENCODE_SERVER_USERNAME` | `opencode` (used when only a password is set) |
-| `--password` | `OPENCODE_SERVER_PASSWORD` | —                                             |
-| `--agent`    | `OPENCODE_AGENT`           | the server's default agent                    |
+| Option       | Environment variable             | Default                                       |
+| ------------ | -------------------------------- | --------------------------------------------- |
+| `--base-url` | `OPENCODE_BASE_URL`              | `http://127.0.0.1:4096`                       |
+| `--username` | `OPENCODE_SERVER_USERNAME`       | `opencode` (used when only a password is set) |
+| `--password` | `OPENCODE_SERVER_PASSWORD`       | —                                             |
+| `--agent`    | `OPENCODE_AGENT`                 | the server's default agent                    |
+| `--timeout`  | `OPENCODE_REPLY_TIMEOUT_SECONDS` | 30 s (integer, 1–3 600)                       |
 
 When a password is present (via flag or environment variable), every request is
 sent with HTTP Basic auth (`Authorization: Basic base64(<username>:<password>)`).
@@ -31,8 +32,9 @@ sent with HTTP Basic auth (`Authorization: Basic base64(<username>:<password>)`)
    session, not to the individual prompt.
 2. `session.prompt` enqueues the sample prompt, which asks the model to reply
    with a one-field JSON object.
-3. The CLI polls `message.list` every 250 ms (up to 30 s) until a completed
-   assistant message is available.
+3. The CLI polls `message.list` every 250 ms until a completed assistant
+   message is available or the reply timeout (default 30 s, set via `--timeout`
+   or `$OPENCODE_REPLY_TIMEOUT_SECONDS`) elapses.
 4. The reply text is parsed as JSON and validated with a Zod schema; the full
    result (session, prompt, reply, model, tokens, cost) is printed as JSON.
 
