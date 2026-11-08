@@ -81,7 +81,7 @@ export function extractText(parts: readonly ContentPart[]): string {
  * Parse a JSON string and validate it against the given Zod schema, returning
  * the validated value of the schema's inferred type.
  */
-export function parseContent<T extends z.ZodTypeAny>(schema: T, json: string): z.infer<T> {
+export function parseContent<T extends z.ZodType>(schema: T, json: string): z.infer<T> {
   const data: unknown = JSON.parse(json);
   return schema.parse(data);
 }
@@ -166,7 +166,7 @@ async function createSession(client: OpenCodeClient, agent?: string): Promise<Se
  * assistant's reply is produced asynchronously. We therefore poll
  * `message.list` until a completed assistant message is available.
  */
-export async function runPrompt<T extends z.ZodTypeAny>(
+export async function runPrompt<T extends z.ZodType>(
   client: OpenCodeClient,
   schema: T,
   prompt: string = SAMPLE_PROMPT,
