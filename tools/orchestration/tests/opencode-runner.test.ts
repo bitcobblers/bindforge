@@ -8,8 +8,6 @@ import {
   DEFAULT_BASE_URL,
   SAMPLE_PROMPT,
   createClient,
-  extractText,
-  parseContent,
   runPrompt,
 } from '../src/opencode-runner.js';
 
@@ -51,44 +49,6 @@ function stubClient(
     },
   } as unknown as OpenCodeClient;
 }
-
-describe('extractText', () => {
-  it('joins the text of all text parts', () => {
-    expect(
-      extractText([
-        { type: 'text', text: 'a' },
-        { type: 'text', text: 'b' },
-      ]),
-    ).toBe('ab');
-  });
-
-  it('ignores non-text parts', () => {
-    const parts = [
-      { type: 'text', text: 'yes' },
-      { type: 'reasoning', text: 'no' },
-      { type: 'tool' },
-    ];
-    expect(extractText(parts)).toBe('yes');
-  });
-
-  it('returns an empty string when there are no parts', () => {
-    expect(extractText([])).toBe('');
-  });
-});
-
-describe('parseContent', () => {
-  it('parses JSON and returns the schema-validated value', () => {
-    expect(parseContent(FactSchema, '{"fact":"hello"}')).toEqual({ fact: 'hello' });
-  });
-
-  it('throws a ZodError when the JSON does not match the schema', () => {
-    expect(() => parseContent(FactSchema, '{"fact":42}')).toThrow(z.ZodError);
-  });
-
-  it('throws a SyntaxError for malformed JSON', () => {
-    expect(() => parseContent(FactSchema, 'not json')).toThrow(SyntaxError);
-  });
-});
 
 describe('createClient', () => {
   afterEach(() => {
@@ -194,6 +154,41 @@ describe('runPrompt', () => {
 
     expect(list).toHaveBeenCalledTimes(3);
     expect(result.reply.messageID).toBe('msg_test');
+  });
+
+  it('joins text parts and ignores non-text parts when reading the reply', async () => {
+    const reply = {
+      ...fakeReply,
+      content: [
+        { type: 'reasoning', text: '{"fact":"ignored"}' },
+        { type: 'text', text: '{"fact":' },
+        { type: 'tool' },
+        { type: 'text', text: '"tsc is fast"}' },
+      ],
+    };
+
+    const result = await runPrompt(
+      stubClient({ list: async () => ({ data: [reply] }) }),
+      FactSchema,
+    );
+
+    expect(result.reply.content).toEqual({ fact: 'tsc is fast' });
+  });
+
+  it('rejects with a SyntaxError when the reply is not valid JSON', async () => {
+    const reply = { ...fakeReply, content: [{ type: 'text', text: 'not json' }] };
+
+    const pending = runPrompt(stubClient({ list: async () => ({ data: [reply] }) }), FactSchema);
+
+    await expect(pending).rejects.toThrow(SyntaxError);
+  });
+
+  it('rejects with a ZodError when the reply does not match the schema', async () => {
+    const reply = { ...fakeReply, content: [{ type: 'text', text: '{"fact":42}' }] };
+
+    const pending = runPrompt(stubClient({ list: async () => ({ data: [reply] }) }), FactSchema);
+
+    await expect(pending).rejects.toThrow(z.ZodError);
   });
 
   it('wraps session creation failures in a descriptive error', async () => {

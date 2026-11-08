@@ -70,7 +70,7 @@ type ContentPart = { type: string; text?: string };
  * Concatenate the text content of an assistant message's parts, ignoring
  * non-text parts such as reasoning and tool entries.
  */
-export function extractText(parts: readonly ContentPart[]): string {
+function extractText(parts: readonly ContentPart[]): string {
   return parts
     .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
     .map((part) => part.text)
@@ -81,7 +81,7 @@ export function extractText(parts: readonly ContentPart[]): string {
  * Parse a JSON string and validate it against the given Zod schema, returning
  * the validated value of the schema's inferred type.
  */
-export function parseContent<T extends z.ZodType>(schema: T, json: string): z.infer<T> {
+function parseContent<T extends z.ZodType>(schema: T, json: string): z.infer<T> {
   const data: unknown = JSON.parse(json);
   return schema.parse(data);
 }
