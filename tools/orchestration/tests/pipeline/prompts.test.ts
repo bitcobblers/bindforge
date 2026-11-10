@@ -204,6 +204,12 @@ describe('run-2 stage guidance', () => {
     // transcript; its own previous findings travel through the prompt.
     expect(text).toContain('Review independently');
     expect(text).toContain('Do not open review reports or transcripts');
+    // Design 007 §4: the bright line — walking a forbidden directory is
+    // already opening it, and every path a seat needs is named for it.
+    expect(text).toContain(
+      'Listing, globbing, or grepping those directories counts as opening them',
+    );
+    expect(text).toContain('never browse to verify one');
     expect(text).not.toContain('Earlier reports for every specialty');
     // T4: "Apply only this change set: the whole document" is contradictory.
     expect(text).not.toContain('Apply only this change set');
@@ -344,5 +350,26 @@ describe('test-tree convention', () => {
       }
     }
     expect(offenders).toEqual([]);
+  });
+});
+
+describe('run-7 stage guidance', () => {
+  // Design 007 §4: the test stages own the files they write, so the last
+  // `format:check` step belongs to them. These pins keep that ownership line
+  // from being silently reverted (the run-005 prettier-drift escalation).
+  it('tells both test stages to format the files they own before replying', async () => {
+    const authoring = renderTemplate(await loadTemplate(PROMPTS_DIR, 'test-authoring.md'), {
+      designDir: 'docs/designs/007-x',
+    });
+    expect(authoring).toContain('npx prettier --write');
+    expect(authoring).toContain('the files you touched');
+
+    const update = renderTemplate(await loadTemplate(PROMPTS_DIR, 'test-update.md'), {
+      designDir: 'docs/designs/007-x',
+      round: 2,
+      reviewFiles: 'docs/designs/007-x/reviews/code/testing-r2c0.md',
+    });
+    expect(update).toContain('npx prettier --write');
+    expect(update).toContain('the files you touched');
   });
 });

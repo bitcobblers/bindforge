@@ -232,3 +232,116 @@ describe('auditSessionIndependence', () => {
     expect(v).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Design 007 (audit by deeds): the audit judges where a tool looks, never
+// what text it carries. Delegation parts and payload keys are never accesses —
+// the child-session walk supplies the delegation evidence, and unknown tools
+// are judged on path-naming access keys only. The deeds themselves (pin (c))
+// stay detected at matcher level so the exemptions cannot hide them.
+// ---------------------------------------------------------------------------
+
+describe('judging deeds, not payload text (design 007)', () => {
+  // proves: Test strategy #1 — a completed subagent part's delegation text
+  // carries no access fields: a hardened prompt reciting the transcripts
+  // prohibition must not fail an attempt that accessed nothing (both lane
+  // kinds).
+  it('does not flag a subagent delegation prompt reciting the transcripts prohibition', () => {
+    const delegating = [
+      toolPart('subagent', {
+        task: 'gather test output',
+        agent: 'explore',
+        prompt:
+          'Run the package tests and report failures. Never open anything under ' +
+          'docs/designs/003-x/transcripts/ and never glob docs/designs/003-x/reviews/ — ' +
+          'those are not your inputs.',
+      }),
+    ];
+    expect(auditSessionIndependence(delegating, { since: 0, reviewStage: false })).toEqual([]);
+    expect(auditSessionIndependence(delegating, { since: 0, reviewStage: true })).toEqual([]);
+  });
+
+  // proves: Test strategy #2 — an execute part's program text is payload, not
+  // an access: test code whose string literals name transcripts/ and
+  // reviews/ must not fail the attempt that only wrote that code.
+  it('does not flag execute code containing transcripts/ and reviews/ string literals', () => {
+    const v = auditSessionIndependence(
+      [
+        toolPart('execute', {
+          code:
+            "const t = 'docs/designs/003-x/transcripts/research-r0.md';\n" +
+            "const r = 'docs/designs/003-x/reviews/design/security-r1c0.md';",
+        }),
+      ],
+      { since: 0, reviewStage: true },
+    );
+    expect(v).toEqual([]);
+  });
+
+  // proves: Test strategy #3 — unknown tools keep the path-key rule and lose
+  // the payload scan: the existing nested `{ path: '…/transcripts/y.md' }`
+  // pin above stays green, and the same fixture under a payload key
+  // (`code`) yields no violation.
+  it('does not flag a nested transcripts path under a payload key on an unknown tool', () => {
+    const v = auditSessionIndependence(
+      [toolPart('execute', { tools: [{ code: 'docs/designs/003-x/transcripts/y.md' }] })],
+      { since: 0, reviewStage: false },
+    );
+    expect(v).toEqual([]);
+  });
+
+  // proves: Test strategy #4 — pin (c) at matcher level: a message list (the
+  // runner will feed child-session lists through here) whose completed read
+  // names a transcripts path fails with the violation naming the path.
+  it('fails a child message list completing a read of a transcripts path', () => {
+    const v = auditSessionIndependence(
+      [toolPart('read', { filePath: 'docs/designs/003-x/transcripts/research-r0.md' })],
+      { since: 0, reviewStage: false },
+    );
+    expect(v).toHaveLength(1);
+    expect(v[0]).toContain('transcripts');
+  });
+
+  // proves: Test strategy #4 — a review-stage child globbing `reviews/**`
+  // fails the audit of that child's message list.
+  it('fails a child message list globbing reviews/** on a review stage', () => {
+    const v = auditSessionIndependence(
+      [toolPart('glob', { pattern: 'docs/designs/003-x/reviews/**' })],
+      { since: 0, reviewStage: true },
+    );
+    expect(v).toHaveLength(1);
+  });
+
+  // proves: Test strategy #4 — a child message list writing a report other
+  // than the attempt's ownReportPath fails; the write to ownReportPath
+  // itself stays allowed.
+  it('fails a child message list writing a report other than ownReportPath', () => {
+    const opts = {
+      since: 0,
+      reviewStage: true,
+      ownReportPath: 'docs/designs/003-x/reviews/design/correctness-r1c0.md',
+    };
+    expect(
+      auditSessionIndependence(
+        [
+          toolPart('write', {
+            filePath: 'docs/designs/003-x/reviews/design/correctness-r1c0.md',
+            content: 'my own report',
+          }),
+        ],
+        opts,
+      ),
+    ).toEqual([]);
+    expect(
+      auditSessionIndependence(
+        [
+          toolPart('write', {
+            filePath: 'docs/designs/003-x/reviews/design/security-r1c0.md',
+            content: 'another seat',
+          }),
+        ],
+        opts,
+      ),
+    ).toHaveLength(1);
+  });
+});

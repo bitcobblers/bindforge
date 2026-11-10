@@ -8,7 +8,7 @@
     "path": "docs/prompts/audit-by-deeds.md"
   },
   "status": "running",
-  "lastStage": "proposal-final",
+  "lastStage": "editorial-review",
   "designRound": 2,
   "codeRound": 0,
   "designBudgetUsed": 1,
@@ -24,7 +24,8 @@
     "db0f3a3b3d048faae9022a23b945724c5254c52f",
     "9e0c355a1fe90ca0f2f919f9b52f1c7d721b4b08",
     "49e3448a317307a1b3a6bb6d3cee1d6c238b0884",
-    "ce2b5d6e6364183652504ea846dec2206093849b"
+    "ce2b5d6e6364183652504ea846dec2206093849b",
+    "737566a10f7ea459dfe7f25565c8491408e637c0"
   ],
   "forceNext": null,
   "results": [
@@ -549,10 +550,17 @@
       "proceed": true,
       "reason": "all five seats approve the current revision stamp",
       "at": 1794350534378
+    },
+    {
+      "gate": "editorial-review",
+      "round": 2,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1794350830170
     }
   ],
   "startedAt": 1794348961824,
-  "updatedAt": 1794350830140,
+  "updatedAt": 1794350830170,
   "baseRef": "7844c17171465dd779f8db6671801eb058bd2eb3",
   "designCycle": 3,
   "designStamp": "f4f64f9c7a62e1487a3ad86706965ae11544eb87",
@@ -686,11 +694,13 @@
     }
   },
   "lastReviewPass": {
-    "phase": "design",
-    "round": 1,
-    "cycle": 2,
+    "phase": "editorial",
+    "round": 2,
     "seats": [
       "correctness",
+      "compatibility",
+      "security",
+      "performance",
       "complexity"
     ]
   },
