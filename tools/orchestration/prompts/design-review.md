@@ -6,6 +6,9 @@ below. Do not open review reports or transcripts, and do not ask for them:
 the panel's value is five independent reads of the same text, and another
 seat's verdict anchors yours. Reports and transcripts are the run's record,
 not review input.
+Listing, globbing, or grepping those directories counts as opening them.
+Every path you need is named in this prompt — never browse to verify one,
+even when a named path lives under a directory you must not open.
 The Revision log records findings the author deliberately rejected, with
 reasons — read it before treating a finding as new.
 Your own previous findings ({{specialty}} seat):

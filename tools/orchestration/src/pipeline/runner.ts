@@ -19,7 +19,12 @@ import {
   stagePathAllowed,
 } from './gates.js';
 import { type IdentityPin, type RunIdentity, deriveIdentity, identityClash } from './identity.js';
-import { auditSessionIndependence, printable } from './independence.js';
+import {
+  type IndependenceAuditOptions,
+  auditSessionIndependence,
+  brief,
+  printable,
+} from './independence.js';
 import {
   type PassPlan,
   hasSeats,
@@ -498,6 +503,207 @@ export async function listSessionMessages(
   return all;
 }
 
+// --- deeds of children (design 007 §2) --------------------------------------
+//
+// A completed `subagent` part carries no access, so the evidence for a
+// delegation is the child sessions' OWN completed tool parts. The walk is a
+// BFS over the attempt session's descendant sessions — visited-set guarded,
+// so a malformed parentID graph cannot loop — yielding one message list at
+// a time so peak memory stays one list. The enumeration route is probed at
+// call time: `session.children` when the client exposes it, else one paged
+// `session.list` indexed by `parentID`. If neither is available the walk
+// throws; the audit call site catches that and proceeds parent-only with the
+// gap logged — a stage failure on an infrastructure fault is not what this
+// audit is for (the permission fence stays the primary control).
+
+interface SessionChildApi {
+  children?: (
+    input: { sessionID: string },
+    options?: { signal: AbortSignal },
+  ) => Promise<unknown>;
+  list?: (input?: Record<string, unknown>, options?: { signal: AbortSignal }) => Promise<unknown>;
+}
+
+/** Session records out of a `children`/`list` response (array or `{ data }`). */
+function sessionEntries(page: unknown): Array<{ id: string; parentID?: string }> {
+  let data: unknown[] = [];
+  if (Array.isArray(page)) {
+    data = page;
+  } else if (page !== null && typeof page === 'object') {
+    const record = page as { data?: unknown };
+    if (Array.isArray(record.data)) {
+      data = record.data;
+    }
+  }
+  const out: Array<{ id: string; parentID?: string }> = [];
+  for (const entry of data) {
+    if (entry === null || typeof entry !== 'object') {
+      continue;
+    }
+    const id = (entry as { id?: unknown }).id;
+    if (typeof id !== 'string' || id.length === 0) {
+      continue;
+    }
+    const parentID = (entry as { parentID?: unknown }).parentID;
+    if (typeof parentID === 'string' && parentID.length > 0) {
+      out.push({ id, parentID });
+    } else {
+      out.push({ id });
+    }
+  }
+  return out;
+}
+
+/** The `cursor.next` of a paged response, if it carries one. */
+function pageCursorNext(page: unknown): string | undefined {
+  if (page === null || typeof page !== 'object') {
+    return undefined;
+  }
+  const next = (page as { cursor?: { next?: unknown } }).cursor?.next;
+  return typeof next === 'string' && next.length > 0 ? next : undefined;
+}
+
+async function descendantMessages(
+  client: OpenCodeClient,
+  sessionID: string,
+  requestTimeoutMs: number,
+): Promise<SessionMessageInfo[]> {
+  try {
+    return await listSessionMessages(client, sessionID, requestTimeoutMs);
+  } catch (error) {
+    throw new Error(
+      `fetching the message list of ${sessionID}: ` +
+        String(error instanceof Error ? error.message : error),
+    );
+  }
+}
+
+/**
+ * Every descendant session of `sessionID` (children, grandchildren, …) with
+ * its full creation-ordered message list. A point-in-time snapshot taken
+ * after the attempt's reply: a descendant still running at that moment
+ * contributes only its completed parts.
+ */
+export async function* listChildSessionMessages(
+  client: OpenCodeClient,
+  sessionID: string,
+  requestTimeoutMs: number,
+): AsyncGenerator<{ sessionID: string; messages: SessionMessageInfo[] }> {
+  const api = client.session as unknown as SessionChildApi;
+  const visited = new Set<string>([sessionID]);
+  const queue: string[] = [];
+  // `bind` keeps the method call on the client object: SDK methods may close
+  // over or use `this`.
+  const children = typeof api.children === 'function' ? api.children.bind(api) : undefined;
+  if (children !== undefined) {
+    queue.push(sessionID);
+    for (let head = 0; head < queue.length; head += 1) {
+      const parent = queue[head];
+      if (parent === undefined) {
+        continue;
+      }
+      let listed: unknown;
+      try {
+        listed = await bounded(() =>
+          children({ sessionID: parent }, { signal: AbortSignal.timeout(requestTimeoutMs) }),
+        );
+      } catch (error) {
+        throw new Error(
+          `enumerating the children of ${parent}: ` +
+            String(error instanceof Error ? error.message : error),
+        );
+      }
+      for (const child of sessionEntries(listed)) {
+        if (visited.has(child.id)) {
+          continue;
+        }
+        visited.add(child.id);
+        yield {
+          sessionID: child.id,
+          messages: await descendantMessages(client, child.id, requestTimeoutMs),
+        };
+        queue.push(child.id);
+      }
+    }
+    return;
+  }
+  const list = typeof api.list === 'function' ? api.list.bind(api) : undefined;
+  if (list === undefined) {
+    throw new Error(
+      `enumerating the children of ${sessionID}: the client exposes neither session.children nor session.list`,
+    );
+  }
+  // One paged enumeration for the whole walk (not one per node), indexed by
+  // `parentID` — the same `cursor.next` crawl as `listSessionMessages`.
+  const byParent = new Map<string, string[]>();
+  let cursor: string | undefined;
+  for (;;) {
+    let page: unknown;
+    try {
+      page = await bounded(() =>
+        list(
+          { limit: 200, ...(cursor === undefined ? {} : { cursor }) },
+          { signal: AbortSignal.timeout(requestTimeoutMs) },
+        ),
+      );
+    } catch (error) {
+      throw new Error(
+        `listing sessions to find the children of ${sessionID}: ` +
+          String(error instanceof Error ? error.message : error),
+      );
+    }
+    for (const entry of sessionEntries(page)) {
+      if (entry.parentID === undefined || entry.parentID === entry.id) {
+        continue;
+      }
+      const siblings = byParent.get(entry.parentID) ?? [];
+      siblings.push(entry.id);
+      byParent.set(entry.parentID, siblings);
+    }
+    const next = pageCursorNext(page);
+    if (next === undefined) {
+      break;
+    }
+    cursor = next;
+  }
+  queue.push(sessionID);
+  for (let head = 0; head < queue.length; head += 1) {
+    const parent = queue[head];
+    if (parent === undefined) {
+      continue;
+    }
+    for (const childID of byParent.get(parent) ?? []) {
+      if (visited.has(childID)) {
+        continue;
+      }
+      visited.add(childID);
+      yield {
+        sessionID: childID,
+        messages: await descendantMessages(client, childID, requestTimeoutMs),
+      };
+      queue.push(childID);
+    }
+  }
+}
+
+/** A completed `subagent` part in this attempt's audited window: a delegation happened. */
+function hasCompletedDelegation(messages: readonly SessionMessageInfo[], since: number): boolean {
+  for (const m of messages) {
+    if ((m.time?.created ?? 0) < since) {
+      continue;
+    }
+    if (m.type !== 'assistant') {
+      continue;
+    }
+    for (const part of m.content ?? []) {
+      if (part.type === 'tool' && part.name === 'subagent' && part.state.status === 'completed') {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /**
  * One bounded retry per request: a single dropped round-trip must not fail a
  * stage the model already completed, and no request may hang the poll loop.
@@ -644,6 +850,8 @@ interface StageHandle {
    * timed-out session is never resumed: the runner removed it as a zombie.
    */
   resume?: { sessionID: string; text: string };
+  /** Set on a fresh-session attempt 2: why attempt 1 failed (log excerpt). */
+  failureNote?: string;
 }
 
 /**
@@ -707,7 +915,19 @@ async function executeInference(
     ].join(' ');
   }
   const schema = stageReplySchema(def);
-  const fullPrompt = handle.resume ? handle.resume.text : `${prompt}\n\n${replyFormat(schema)}`;
+  // A fresh-session attempt 2 otherwise sees a byte-identical prompt with
+  // nothing about why attempt 1 failed. The note enters as a labeled log
+  // excerpt, bounded by the same `brief(printable(...))` posture as the gate
+  // log; quoting forbidden paths in it is safe because prompt text is not
+  // audit input. Mirrors the `repairPrompt` precedent for the resumable lane.
+  const failureFeedback =
+    handle.resume === undefined && handle.failureNote !== undefined
+      ? `\n\nPrevious attempt's gate failure (log excerpt): ${handle.failureNote}.\n` +
+        'Do not repeat the behavior that caused that failure.'
+      : '';
+  const fullPrompt = handle.resume
+    ? handle.resume.text
+    : `${prompt}${failureFeedback}\n\n${replyFormat(schema)}`;
 
   const requestTimeoutMs = cfg.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
   const minNudgeIntervalMs = cfg.minNudgeIntervalMs ?? DEFAULT_MIN_NUDGE_INTERVAL_MS;
@@ -836,12 +1056,59 @@ async function executeInference(
     // permissions say so; this checks up on it. A violation fails the attempt,
     // attempt 2 starts a fresh session (not resumable), then escalate —
     // the same budget as any stage failure.
-    const violations = auditSessionIndependence(lastSeen, {
+    // Design 007 §2: a delegation part is exempt on its own text, so the
+    // child sessions' deeds are the evidence. The parent list is audited
+    // first — when it already fails, the walk is skipped and the attempt
+    // fails on what is in hand. Otherwise every descendant list goes through
+    // the same matcher, and its violations name the session they came from.
+    const auditOptions: IndependenceAuditOptions = {
       since: auditStart,
       reviewStage: handle.stage.endsWith('-review'),
       ownReportPath:
         typeof handle.vars['reportPath'] === 'string' ? handle.vars['reportPath'] : undefined,
-    });
+    };
+    let violations = auditSessionIndependence(lastSeen, auditOptions);
+    if (violations.length === 0) {
+      let descendants = 0;
+      try {
+        for await (const child of listChildSessionMessages(
+          opts.client,
+          sessionID,
+          requestTimeoutMs,
+        )) {
+          descendants += 1;
+          for (const violation of auditSessionIndependence(child.messages, auditOptions)) {
+            violations.push(`${violation} (via child session ${child.sessionID})`);
+          }
+        }
+        // Tripwire: an empty-but-successful enumeration next to a completed
+        // delegation part must not masquerade as a clean audit.
+        if (descendants === 0 && hasCompletedDelegation(lastSeen, auditStart)) {
+          console.warn(
+            `stage ${handle.stageKey}: independence audit enumerated no child sessions of ` +
+              `${sessionID} despite a completed delegation part — the deeds of any child ` +
+              `this server did not enumerate went unseen`,
+          );
+        }
+      } catch (error) {
+        // An infrastructure fault on the walk is not a stage failure (A10):
+        // the attempt is audited on its own session alone, and the partial
+        // audit is named in the run record.
+        violations.length = 0;
+        console.warn(
+          `stage ${handle.stageKey}: independence audit could not complete the child-session ` +
+            `walk for ${sessionID}: ${String(error instanceof Error ? error.message : error)} — ` +
+            'auditing this attempt on its own session alone',
+        );
+        gateLog(state, 'independenceAudit', handle.round, {
+          proceed: true,
+          reason:
+            `child-session walk incomplete for session ${sessionID}: ` +
+            `${String(error instanceof Error ? error.message : error)}; ` +
+            'the attempt was audited on its own message list alone',
+        });
+      }
+    }
     if (violations.length > 0) {
       console.warn(`stage ${handle.stageKey}: independence violation — ${violations.join('; ')}`);
       outcome = { ok: false, failure: `independence violation: ${violations.join('; ')}` };
@@ -1269,7 +1536,7 @@ async function runReviewPass(args: ReviewPassArgs): Promise<string | null> {
                     text: repairPrompt(def, stageReplySchema(def), out.failure ?? 'no reply'),
                   },
                 }
-              : {}),
+              : { failureNote: brief(printable(out.failure ?? 'no reply')) }),
           },
           cfg,
           templateText,
@@ -1478,7 +1745,7 @@ async function drive(
                     text: repairPrompt(def, stageReplySchema(def), out.failure ?? 'no reply'),
                   },
                 }
-              : {}),
+              : { failureNote: brief(printable(out.failure ?? 'no reply')) }),
           },
           cfg,
         );

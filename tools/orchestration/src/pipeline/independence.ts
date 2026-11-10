@@ -26,6 +26,15 @@ import type { SessionMessageInfo } from '@opencode/client';
 // - A completed glob/list over transcripts/ IS a violation: enumerating run
 //   record names is rummaging in the run-records directory, and no stage
 //   prompt gives a reason to go there.
+// - A `subagent` part is never judged on its text (design 007 §1): a
+//   delegation input carries no access fields, and a hardened prompt that
+//   recites the prohibition is not an access. The evidence for a delegation
+//   is the child sessions' own completed tool parts — `runner.ts`'s
+//   `listChildSessionMessages` walks the attempt's descendant sessions and
+//   audits each of their message lists through this matcher.
+// - An unknown tool is judged on path-naming keys only (`PATH_ACCESS_KEYS`),
+//   never on its payload text: the audit judges where a tool looks, not what
+//   text it carries.
 //
 // What this does NOT prove, and does not claim to (security r1 finding):
 // - Matching is on path SEGMENTS, so `.../transcripts`, `.../transcripts;rm`,
@@ -63,8 +72,14 @@ export interface IndependenceAuditOptions {
 
 /**
  * The strings that say where this call looked. Known tools expose their
- * access fields only; an unknown tool gets the conservative full scan so a
- * tool that hides paths in nested arguments cannot slip through.
+ * access fields only; `subagent` carries none — delegation text is not an
+ * access, and the child sessions' deeds are the evidence (see
+ * `listChildSessionMessages` in `runner.ts`). An unknown tool is judged on
+ * the string values under the access-naming keys of `PATH_ACCESS_KEYS`, at
+ * any nesting depth — payload keys (`code`, `prompt`, `content`, `text`, …)
+ * are never scanned. An unknown tool's `pattern` is read glob-style; a
+ * query-text `pattern` on an unknown tool is the known false positive, and
+ * since the violation names key and value, the fix is one allowlist line.
  */
 const ACCESS_FIELDS: Record<string, readonly string[]> = {
   read: ['filePath', 'path'],
@@ -79,7 +94,33 @@ const ACCESS_FIELDS: Record<string, readonly string[]> = {
   write: ['filePath', 'path'],
   edit: ['path'],
   patch: ['path', 'filePath'],
+  // Delegation names no place: no access fields at all (design 007 §1).
+  subagent: [],
 };
+
+/**
+ * Key names that say where a tool looks. An unknown tool is scanned only
+ * under these keys (at any nesting depth); everything else in its input is
+ * payload, and payload text is never an access.
+ */
+const PATH_ACCESS_KEYS = new Set([
+  'path',
+  'filePath',
+  'file',
+  'directory',
+  'dir',
+  'workdir',
+  'command',
+  'include',
+  'pattern',
+]);
+
+/**
+ * Bound on the nodes walked when collecting path-key values: a huge payload
+ * object cannot cost the audit unbounded work. Breadth-first means the cap
+ * drops the deepest nodes first — the least likely place an access field is.
+ */
+const MAX_PATH_SCAN_NODES = 256;
 
 /** Tools whose completed calls deliver run-record content or names to the model. */
 const READONLY_TOOLS = new Set(['read', 'list', 'glob', 'grep']);
@@ -168,11 +209,49 @@ function reportKey(value: string): string | undefined {
 function accessValues(name: string, input: Record<string, unknown>): string[] {
   const fields = ACCESS_FIELDS[name];
   if (fields === undefined) {
-    return stringValues(input);
+    return pathKeyValues(input);
   }
   const out: string[] = [];
   for (const field of fields) {
     stringValues(input[field], out);
+  }
+  return out;
+}
+
+/**
+ * The unknown-tool scan: string values sitting under an access-naming key
+ * (at any nesting depth), and nothing else. A string under `code`, `prompt`,
+ * `content`, or any other payload key is text the tool carries, not a place
+ * it looks — test code naming `transcripts/` in a string literal is not a
+ * read of run records. Breadth-first with a node cap: the work stays bounded
+ * on a huge payload object, and what the cap drops is the deepest nodes,
+ * where an access field is least likely to live.
+ */
+function pathKeyValues(input: unknown): string[] {
+  const out: string[] = [];
+  const queue: unknown[] = [input];
+  let nodes = 0;
+  while (queue.length > 0 && nodes < MAX_PATH_SCAN_NODES) {
+    const node = queue.shift();
+    if (node === null || typeof node !== 'object') {
+      continue;
+    }
+    nodes += 1;
+    if (Array.isArray(node)) {
+      for (const value of node) {
+        if (value !== null && typeof value === 'object') {
+          queue.push(value);
+        }
+      }
+      continue;
+    }
+    for (const [key, value] of Object.entries(node)) {
+      if (PATH_ACCESS_KEYS.has(key)) {
+        stringValues(value, out);
+      } else if (value !== null && typeof value === 'object') {
+        queue.push(value);
+      }
+    }
   }
   return out;
 }
@@ -201,7 +280,8 @@ export function printable(value: string): string {
   return value.replace(/\p{Cc}/gu, ' ');
 }
 
-function brief(s: string): string {
+/** One printable line, short enough for a gate line, a prompt note, or status. */
+export function brief(s: string): string {
   const safe = printable(s);
   return safe.length > 140 ? `${safe.slice(0, 140)}…` : safe;
 }
