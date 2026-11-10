@@ -24,7 +24,7 @@ the coder's assumptions.
 4. Unit tests: pure functions, temp dirs, stubbed clients — no network,
    no live server. Integration tests: real files end to end in a temp
    directory.
-5. Follow `repo-practices` conventions: vitest, `tests/*.test.ts`, the
+5. Follow `repo-practices` conventions: vitest, `tests/**/*.test.ts`, the
    package's existing style.
 6. Update rounds (after a fix changed behavior): change a test only when
    the proposal changed or a review finding was accepted and the caller

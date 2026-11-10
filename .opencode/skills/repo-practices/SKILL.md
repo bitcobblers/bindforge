@@ -18,12 +18,16 @@ Conventions for code landing in this repository.
 ## Commands (from each package's package.json)
 
 - `npm run check` — lint + format check + tests. This is the gate.
-- `npm test` — vitest; tests in `tests/*.test.ts`.
+- `npm test` — vitest; tests in `tests/**/*.test.ts`.
 - `npm run format` — run before finishing; import order is
   `node:` externals, then relative, blank line between groups.
 
 ## Tests
 
+- A directory under `tests/` mirrors a subsystem directory under `src/`;
+  within it, a module-named file (`state-store.test.ts`) is that module's
+  unit test and cross-module behavior suites keep descriptive names
+  (`funnel.test.ts`). New subsystems follow the same shape.
 - Unit tests must not touch the network or a live server — stub the
   client (see `tools/orchestration/tests/opencode-runner.test.ts`).
 - Integration tests use temp directories and clean up after themselves.

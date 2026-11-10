@@ -1,0 +1,46 @@
+diff --git a/tmp/bindforge-editorial-mirror-src-hierarchy-in-tests-r2.md b/home/mike/.local/share/opencode/worktree/f852d4/stellar-mountain/docs/designs/004-mirror-src-hierarchy-in-tests/02-proposal.md
+index 1d1e68a..79aa2e9 100644
+--- a/tmp/bindforge-editorial-mirror-src-hierarchy-in-tests-r2.md
++++ b/home/mike/.local/share/opencode/worktree/f852d4/stellar-mountain/docs/designs/004-mirror-src-hierarchy-in-tests/02-proposal.md
+@@ -87,7 +87,7 @@ are named in Rollout 2, and Test strategy #4's assertions land before it (Rollou
+ 
+ 2. **Content edit (Decision, bullet 2 — as amended by this commit).** In each
+    moved file, rewrite every depth-sensitive `../` reference A8 enumerates: the
+-   62 `from '../src/...` imports to `from '../../src/...`, and the 16
++   62 `from '../src/...'` imports to `from '../../src/...'`, and the 16
+    `new URL('<rel>', import.meta.url)` paths — `../prompts/` → `../../prompts/`,
+    `../../../.opencode/…` → `../../../../.opencode/…` — which resolve against
+    the moved file's own location and would ENOENT one tier deeper. Import order
+@@ -107,7 +107,7 @@ are named in Rollout 2, and Test strategy #4's assertions land before it (Rollou
+ 
+ 4. **Convention rule (Decision, bullets 4–5), stated once here:** a directory
+    under `tests/` mirrors a subsystem directory under `src/`; a module-named file
+-   (`state-store.test.ts`) is that module's unit test and cross-module behavior
++   (`state-store.test.ts`) is that module's unit test, and cross-module behavior
+    suites keep descriptive names (`funnel.test.ts`). The commit amends both
+    surfaces encoding the flat form — `.opencode/skills/repo-practices/SKILL.md:21`
+    and `.opencode/skills/test-strategy/SKILL.md:27` — to `tests/**/*.test.ts`
+@@ -166,7 +166,7 @@ against the pre-move baseline Rollout 1 defines. Tests must prove:
+    commit with item 4's assertions — `expect`s inside `pipeline-gates.test.ts`'s
+    existing `stagePathAllowed` block, so test and file counts are unchanged;
+    `stagePathAllowed` is pure, so they hold either side of the move. That commit
+-   is the pre-move baseline for Test strategy #1–2 and Risks 4.
++   is the pre-move baseline for Test strategy #1–2 and Risk 4.
+ 2. Land the move commit: `git mv` ×23 (alphabetical), ¶2's rewrite of every
+    depth-sensitive `../` reference and its one comment line, the two skill-file
+    convention amendments, and the one-clause amendment to Decision bullet 2
+@@ -174,7 +174,7 @@ against the pre-move baseline Rollout 1 defines. Tests must prove:
+    `refactor: mirror src/ hierarchy in orchestration test tree`.
+ 3. Verify Test strategy items 1–6 locally before pushing; the reported
+    file/test counts are the acceptance evidence.
+-4. No migration or defaults change: from merge, downstream stages place tests in
++4. No migration or defaults change: from the merge, downstream stages place tests in
+    the mirrored layout (¶4); historical artifacts stay as written (Deferred).
+ 
+ ## Deferred / out of scope
+@@ -203,3 +203,5 @@ against the pre-move baseline Rollout 1 defines. Tests must prove:
+ - Test strategy #4 (r1 security, major): nested-path classification is asserted over a moved file's
+   own path, plus A19's enumeration of the gate's path patterns.
+ - Chosen design ¶3 (r1 security, minor): trust boundary stated.
++
++Editor notes: Chosen design ¶2 — "a relative path reference — code or comment — naming a location this move passes takes its new depth" is ambiguous; author to clarify.

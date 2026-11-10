@@ -137,10 +137,10 @@ catch regressions too late to be cheap.
 seat with something better than a counter. Under this funnel a wasted pass costs
 1 session instead of 5, so the ledger does not pay for its matching complexity
 until re-raise churn is measured against real runs. Related gate policy lives in
-ADR-004.
+ADR-005.
 
 **Severity-weighted gates or an arbiter seat** when two seats hold incompatible
-demands: deferred to ADR-004. This ADR keeps the AND over five seats.
+demands: deferred to ADR-005. This ADR keeps the AND over five seats.
 
 **Keep the round cap and add the funnel:** rejected. With a panel of 1-5 seats,
 a round cap bounds neither inference cost nor operator intent.
@@ -164,8 +164,8 @@ ability to tell a stuck run from a busy one.
 
 Not covered here: running a pass's seats concurrently — ADR-003, whose unit of
 fan-out becomes "the panel this pass selected"; cross-version checkpoint resume
-and checkpoint trust — ADR-004.
+and checkpoint trust — ADR-005.
 
 Ordering: this is the next ADR to be run. The operator has not authorized a run
-against it yet, and nothing here should be executed against ADR-003 or ADR-004
+against it yet, and nothing here should be executed against ADR-003 or ADR-005
 first.

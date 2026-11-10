@@ -37,7 +37,7 @@ the self-update run drives itself with the code loaded at its own start and
 never executes its own concurrency code. Making the checkpoint a *resume-safe*
 artifact across that transition is a larger, separable concern - it was the
 single largest source of design surface when this ADR was last designed - so it
-is carved out to ADR-004 and is **not** part of this decision.
+is carved out to ADR-005 and is **not** part of this decision.
 
 ## Decision
 
@@ -119,7 +119,7 @@ Because this change is expected to be implemented by the pipeline it changes:
   path, and that path is drained before the pass finalize. This ADR requires
   that write path and its invariant, proven with a mock client - and nothing
   beyond it. Checkpoint trust, tamper recovery, and recovery from a corrupted
-  or replaced checkpoint are out of scope here and belong to ADR-004.
+  or replaced checkpoint are out of scope here and belong to ADR-005.
 - Default `N = 1` keeps ADR-002 behavior for gates, artifacts, and control
   flow. Commit shape and finalize timing do change at `N = 1` - one commit per
   review pass, one ownership sweep per pass - so a claim of bit-for-bit identity
@@ -141,7 +141,7 @@ of locking around it.
 still-valid reason: pipeline semantics must not depend on model compliance.
 
 **Hardening the checkpoint as a cross-version, tamper-resistant artifact:**
-deferred to ADR-004 rather than decided here. Designing it inside this ADR is
+deferred to ADR-005 rather than decided here. Designing it inside this ADR is
 what turned a scheduling change into a storage-subsystem design; nothing about
 fan-out depends on the checkpoint surviving a foreign or older writer, and the
 one run that straddles two versions of the runner never executes its own new
@@ -168,11 +168,11 @@ surfaces.
 
 Dogfooding posture: the self-update run is safe by construction (startup
 code-freeze + `.pipeline.lock`). A `pipeline resume` that straddles this
-change's merge is deliberately not covered here - ADR-004 owns it.
+change's merge is deliberately not covered here - ADR-005 owns it.
 `docs/workflows.md` and the README gain the `--max-parallel` knob with the
 "N <= server slots" guidance.
 
 Deferred: per-stage model/endpoint routing already anticipated by ADR-001's
 `stages.ts` mapping; multi-run worktree parallelism left to a future ADR;
 cross-version checkpoint resume, checkpoint trust, and recovery from a corrupted
-or replaced checkpoint to ADR-004.
+or replaced checkpoint to ADR-005.

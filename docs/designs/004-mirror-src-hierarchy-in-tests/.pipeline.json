@@ -1,0 +1,1432 @@
+{
+  "version": 1,
+  "slug": "mirror-src-hierarchy-in-tests",
+  "nnn": "004",
+  "branch": "pipeline/004-mirror-src-hierarchy-in-tests",
+  "source": {
+    "kind": "adr",
+    "path": "docs/adrs/004-mirror-src-hierarchy-in-tests.md"
+  },
+  "status": "done",
+  "lastStage": "doc-sync",
+  "designRound": 2,
+  "codeRound": 1,
+  "designBudgetUsed": 1,
+  "codeBudgetUsed": 7,
+  "editorialDone": false,
+  "testsGreen": true,
+  "testsNeedUpdate": false,
+  "stageFailures": {
+    "doc-sync": 1
+  },
+  "stageCommits": [
+    "e2cd3b49d63dd9e4a2d34b7bd45c0e2d04714b64",
+    "1c71c2ca927a5fdf59b2d6fba3f924bf2c1a6ce2",
+    "9faea13d44613128670f13311b2159d46f682cc9",
+    "de129f68dee7fe793b98bf39f491dbe4bdb0470c",
+    "702dedeba0fd40c3f782532a39aa124575fa6e28",
+    "830066ef86a2b7ff0e655caad0580e7ba40b9de6",
+    "cac0ebff3d039aa4a13049a333fc06ba409caa68",
+    "c56cc921fb33d891ec0a3fe649389e5d55947ed6",
+    "639222d8b0a3ec54d76477682e247265d07d8ff7",
+    "eb1fdf218f3bf8d5f4a1ff88a5defa3050d74b68",
+    "d021aa1f2a5703335f2a85bacc06cd5b209f4f7f",
+    "1e90338903894453fc3632ab0c3253a7db1a9aa7",
+    "677b4c485914a6ef0377459557866201953ce1c9",
+    "35dc2a2b2ac167098b6f732fbe3d8959e8d1c800",
+    "00c66a642eb0a96337dca8a0e6cbb3d29dba0e64",
+    "68b207281520b0280ca956d3a187851393a6bc2d",
+    "e15dc49ba9035da72f19d7cc92b72d6258fbe89c",
+    "4c5f76ab82dc79eece3b6f3a6709c7bc34765983",
+    "5ac37714e103b6c64f0eb45ab700f35228028454",
+    "0dc8b362bafdc8fa002d32f6f7387360ccfc11fc",
+    "164aa02ece626a33ef111e1f5550b092636bfb2a",
+    "9b175db29304afc341b26d275e5fb15e22123114",
+    "6f669004a26f9aa15715f546feea3882138b297c",
+    "00e5e6dad0f16ab171987a3f4bf29603248bb7d3",
+    "5337a692e33053d970b11cc4588da3b64eecd375",
+    "1a66bda6a543508cf60bf792107a6d8b38bbfeee",
+    "32290c99ed042f05d4c837682fd1a38bc184455d",
+    "5b32468dc5ba03d3d2d1a35c3159937aceaf89d0",
+    "93032c6029dd5d1fbc723270b59cf78dbe1fa20d",
+    "deaf37f360e3beff208b43484d8a6d5fdbc7ed9e",
+    "22be5986e1c3a15ae6ff9e190e0bc8bbf2101eac",
+    "682358101c1185189e0720567a6589fa8deb7727"
+  ],
+  "forceNext": null,
+  "results": [
+    {
+      "stage": "research",
+      "round": 0,
+      "sessionID": "ses_e3a634959ffeme06LDOoQvBxQJ",
+      "agent": "research/researcher",
+      "at": 1794316968027,
+      "reply": {
+        "summary": "Researched ADR-004 (mirror src/ hierarchy in tools/orchestration/tests) and wrote docs/designs/004-mirror-src-hierarchy-in-tests/01-research.md. All of the ADR's load-bearing toolchain claims verified: tsconfig excludes tests/, no vitest config exists so the recursive default include discovers nested tests, gates.ts TEST_PATH_RE already matches nested paths, and all 26 test files only import ../src/... (never each other), so the move is git mv plus a uniform import-depth rewrite. Applied the prior-art and platform-notes lenses (Maven mirroring, Go colocation, Rust tests/; vitest 5 discovery+filtering, tsconfig, git rename detection). Flagged for the designer: the ADR says src/pipeline has 14 modules but it has 13; the 'import depth only' rule strands a stale path comment in pipeline-parallel-escalation.test.ts:45; and the flat tests/*.test.ts convention appears in two skill files (repo-practices:21 and test-strategy:27), not just the one the ADR names.",
+        "commitMessage": "docs: add research artifact for ADR-004 test-tree mirroring"
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/research-r0.md",
+      "durationMs": 223586,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal",
+      "round": 0,
+      "sessionID": "ses_e3a5fdf74ffe4OwU6vMDBe5CTd",
+      "agent": "design/designer",
+      "at": 1794317072569,
+      "reply": {
+        "commitMessage": "docs: add design proposal for ADR-004 mirrored test tree"
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/proposal-r0.md",
+      "durationMs": 104456,
+      "nudges": 0,
+      "docLines": 206,
+      "docLinesAdded": 206,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e3a5e470dffeVSCnPiJC11c1NF",
+      "agent": "review/design-compatibility",
+      "at": 1794317267554,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Compatibility matrix — \"Windows (case-insensitive checkout) | Expected — assumption | Same basis as macOS (A16)\" with Assumption A7 \"`TEST_PATH_RE = /(^|\\/)tests\\/|\\.test\\.ts$/` already matches nested `tests/…/x.test.ts` paths, so path gates are unchanged\"",
+            "problem": "The only platform dimension justified for the macOS/Windows rows is filename case (A16). The dimension this move actually changes is path separators: nesting adds a second separator between `tests/` and the filename, and the quoted gate regex anchors the `tests/` tier with a literal forward slash. A7 is marked verified on the strength of reading the regex and a POSIX-style path form; nothing in the design establishes which separator form the pipeline feeds that regex, and the Windows row's Notes cover only git rename behavior (A15) and case (A16). Checklist item 6 (separators handled by a library, not string concatenation) is therefore unevaluated for the nested layout.",
+            "fix": "Add one clause to A7's Basis naming the separator form reaching `TEST_PATH_RE` (e.g. \"paths reach the gate in POSIX form — git and vitest report `/`-separated paths\") and carry it into the Windows row's Notes so the row answers separators and not only case. If the pipeline builds OS-native paths instead, downgrade that row and name the normalization step. The `.test\\.ts$` alternation keeps file classification separator-safe, so exposure is limited to gates keying off the `tests/` prefix."
+          },
+          {
+            "severity": "minor",
+            "location": "Test strategy #3 — \"`vitest run tests/pipeline` selects exactly the 23 moved files and none of the 3 root-tier tests (A6)\" together with #7 \"macOS/Windows rely on the A16 inference\"",
+            "problem": "The one acceptance check whose meaning depends on the new nesting is a command embedding a forward slash in its filter string, and #7 excludes it from execution on every platform but Linux. On the two matrix rows describing case-insensitive (Windows-family) checkouts, the behavior of that nesting-specific filter is never established: the count assertion makes a mismatch fail rather than pass silently, but it would fail as an artifact of the check's platform, not of the move.",
+            "fix": "Add a one-line separator note to #3 — \"filter string is matched against `/`-separated paths; verified on Linux\" — so the platform boundary of the acceptance command is stated rather than implied by #7."
+          },
+          {
+            "severity": "nit",
+            "location": "Compatibility matrix, Node row — \"discovery/compile behavior verified at these pinned majors (A4, A5; package.json:31,41,43)\"",
+            "problem": "The cited dependencies are caret ranges (`vitest ^5.0.5`, `typescript ^6.0.3`), not pins, and A5 records that no `vitest.config.*` exists, so discovery is not held to the version that was actually checked. \"Pinned majors\" overstates the guarantee the matrix row rests on.",
+            "fix": "Reword to \"verified against the vitest 5.x / TypeScript 6.x versions in the lockfile; discovery relies on vitest's default recursive `include`, which the design does not pin\"."
+          }
+        ]
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/design-review-compatibility-r1c0.md",
+      "durationMs": 194875,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e3a5e470effeV7aZ2u64FPPnVV",
+      "agent": "review/design-correctness",
+      "at": 1794317400807,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Goals (bullet 3) and Chosen design ¶2 — \"The only content change inside a moved file is its import depth, plus one stated carve-out (Decision, bullet 2…)\" / \"Content edit (Decision, bullet 2 + carve-out).\"",
+            "problem": "The carve-out is attributed to ADR-004 Decision bullet 2, but that bullet as written states \"The only content change permitted is the import depth (`../src/...` -> `../../src/...`)\" — it forbids any other content change. The ADR (status: proposed) is left unamended; the Deferred section defers only the \"14 modules\" Context fix and nothing tasks an ADR amendment. So the design contradicts its source document as written: the single Rollout-2 commit contains a content change the Decision forbids, and the Risks-table acceptance check (\"the diff contains only renames, import-depth lines, and that one comment line\") enforces a rule the accepted Decision does not contain. The carve-out's substance is sound — A14's comment site at pipeline-parallel-escalation.test.ts:45 is verified (and a repo-wide grep for `tests/pipeline-` in tools/orchestration confirms it is the only real one, refuting the ADR Context's claim that tests never reference each other's paths) — but the deviation is unsanctioned while presented as Decision-compliant.",
+            "fix": "Amend ADR-004 Decision bullet 2 with one clause replacing the strict prohibition's scope: add \"the single exception: a path-reference comment naming a file this move relocates is updated to its new path in the same commit\" — then the proposal's \"(Decision, bullet 2)\" citations are accurate. Alternatively, keep the ADR text untouched and reword the proposal to record the carve-out as an explicit, tasked deviation from Decision bullet 2 rather than citing the Decision as its authority."
+          }
+        ]
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/design-review-correctness-r1c0.md",
+      "durationMs": 328130,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e3a5b4d93ffepdxBUsBD4XjMcH",
+      "agent": "review/design-security",
+      "at": 1794317530767,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Test strategy #4 (with Chosen design ¶3) — \"pass unmodified, demonstrating `TEST_PATH_RE` and ownership checks treat nested paths identically\"",
+            "problem": "The acceptance evidence cannot support the security-relevant half of the claim. The test-path gate and the ownership check are the privilege boundary deciding which files count as tests and which stage may edit them; the design's case that nesting does not move that boundary is one quoted regex (A7, TEST_PATH_RE only) plus these tests passing. But A14 states those tests' path strings are fixtures (\"other in-test path mentions are inert fixture data\") and Deferred keeps them in the old flat form (\"Refreshing fixture path strings that mimic the old naming (e.g. `pipeline-lane.test.ts` at `pipeline-independence.test.ts:145`)\"), so after the move the tests receive byte-identical inputs and a green run proves nothing about nested-path classification. No assumption row enumerates any path pattern other than TEST_PATH_RE (A8 is import specifiers, A11–A13 are agent globs and prompt prose), so a matcher keyed to the flat `pipeline-*` filename form could stop matching silently while `npm run check` stays green — fail open.",
+            "fix": "Replace the demonstrative claim in #4 with an assertion over a real nested path (classify the moved file's own path, e.g. tools/orchestration/tests/pipeline/gates.test.ts, through the same gate and ownership call sites A7 cites), and add one assumption row recording the static enumeration of every path pattern/literal in the gate and ownership code checked against the nested form. Fixture refresh stays deferred; the claim must not depend on it."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶3 — \"No config change (Decision, bullet 3)\"",
+            "problem": "The document has no trust-boundary statement anywhere, so checklist items 1, 2 and 4 are not evaluable: nothing classifies the inputs the change moves or leaves in place (repo files the pipeline reads, git metadata, agent permission grants), nothing states that no untrusted data is parsed, and nothing states that nothing leaves the machine. A later reader cannot tell whether the design considered that the paths it relocates are exactly the paths a gate and an agent grant match against.",
+            "fix": "Add one line to ¶3 (or Non-goals): the change moves only repo-local, trusted files; no untrusted/network/shared-binding input is parsed; the only security-relevant consumers of the moved paths are the in-repo path gate and the test-engineer agent's existing `**/tests/**` grant, both unchanged in scope before and after."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶2 / Rollout 2 — \"rewrite every `../src/...` specifier to `../../src/...` (A8)\"",
+            "problem": "The rewrite mechanism is unspecified and the evidence behind it is narrower than the instruction. A8's basis is an import-scoped grep (`from ['\"]\\.\\.?/`), which says nothing about `../src/`-shaped substrings inside fixture path strings — exactly what A14 and Deferred confirm the gate and ownership tests contain. A content-wide substring rewrite can alter gate test inputs while `npm run check` stays green; the only guard offered is the manual diff read in Risk row 3.",
+            "fix": "State the rewrite as specifier-scoped using the same pattern A8 greps (`from '../src/...`), naming the substring substitution it replaces, and extend the Test strategy ¶1 diff check to assert no line outside import specifiers and the one carve-out comment changed."
+          },
+          {
+            "severity": "minor",
+            "location": "Rollout 1 — \"Confirm no orchestration run is mid-branch against `tools/orchestration/tests/`\"",
+            "problem": "The pre-condition that keeps the tree from ending up half-mirrored is a human confirmation with no mechanical check, and A18 marks it unverified (\"must be checked at rollout\"). If it slips, the tree carries renames plus newly authored old-form files: a partially applied move, which the path gate and ownership check classify inconsistently, and neither Test strategy #2 nor #3 detects it since both only compare expected file counts.",
+            "fix": "Add a fail-closed post-condition instead of relying on the human check: one static Test strategy item asserting grep finds zero remaining `tests/pipeline-*.test.ts` paths under tools/orchestration/tests/ after the commit."
+          }
+        ]
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/design-review-security-r1c0.md",
+      "durationMs": 263146,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e3a594504ffeu2thNgBeyiAill",
+      "agent": "review/design-performance",
+      "at": 1794317551415,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Test strategy #1–#2 — \"with the same total test count as the pre-move baseline\" / Rollout 3 — \"Verify Test strategy items 1–6 locally before pushing; the reported file/test counts are the acceptance evidence\"",
+            "problem": "The acceptance evidence is a count comparison with no baseline in any input and no step that captures one before it disappears. The research baseline the design cites records only file counts (26 = 23 + 3) and 65 import specifiers; no total test/assertion count appears in 01-research.md, the ADR, or the proposal, so Test strategy #1's \"assertion counts per file are identical before and after the move\" and #2's \"same total test count\" have no number to compare against. The ordering compounds it: Rollout 2 lands the commit (`git mv` ×23) and Rollout 3 only then verifies, so the flat tree is off disk when the comparison is specified. This is the one gap between the design's expected numbers and the research baseline that the text does not explain (performance checklist #6). Fix: add the pre-move count capture as Rollout step 0, before the moves.",
+            "fix": "Insert Rollout step 0 before the moves: run `npm run check` at the pre-move commit and record the reporter's file and test totals (and per-file counts if Test strategy #1 is kept) as the named baseline in the artifact the rollout already designates as evidence; then point Test strategy #1/#2 and the Risks \"pre-move baseline\" cell at that recorded run instead of an unstated number. This also cuts verification cost: one pre-move and one post-move `npm run check` together satisfy items 1, 2, 4 and 5, replacing the four-plus suite invocations the strategy currently implies."
+          }
+        ]
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/design-review-performance-r1c0.md",
+      "durationMs": 150555,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e3a574966ffelnQlNEIS6RnYmc",
+      "agent": "review/design-complexity",
+      "at": 1794317630015,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design ¶4 — \"amends both convention surfaces that encode the old flat form ... to the recursive form `tests/**/*.test.ts` plus this rule\"",
+            "problem": "Read literally, the full naming rule is written into both skill files, so two live instruction surfaces carry a copy of the rule after landing, inviting drift; the design's own \"stated once\" intent is not kept system-wide.",
+            "fix": "State the rule once: put it in repo-practices' existing \"## Tests\" section, and in test-strategy amend only the glob it restates (`tests/*.test.ts` → `tests/**/*.test.ts`), matching that line's existing \"Follow `repo-practices` conventions:\" pointer style. The flat form is still removed from both files, so Test strategy #6's grep still passes."
+          }
+        ]
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/design-review-complexity-r1c0.md",
+      "durationMs": 99187,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e3a55c57bffeh3xGhqZahHEic2",
+      "agent": "design/designer",
+      "at": 1794317968566,
+      "reply": {
+        "changed": true,
+        "summary": "All five open findings consumed by changing the design, not padding it (206 lines before, 206 after). Correctness major (carve-out cited to ADR Decision bullet 2, which forbids it): the carve-out sub-system's 'carve-out' framing is deleted everywhere and recited instead as an explicit deviation, with the move commit tasked to amend bullet 2 by one clause (Chosen design ¶2, Goals bullet 3, Rollout 2, Deferred now states that only bullet 2 is edited while the Context '14 modules' deferral stands; the Options paragraph that argued for the carve-out was shortened to point at ¶2). Security major (fixture replay proves nothing about nested classification): Test strategy #4's demonstrative claim is replaced by assertions over the real moved path tools/orchestration/tests/pipeline/gates.test.ts through stagePathAllowed, landed in a separate test-only pre-move commit so the move commit stays mechanical, and A19 records the verified static enumeration showing TEST_PATH_RE (gates.ts:253 → gates.ts:262, runner.ts:232, runner.ts:1031) is the only test-path classifier in the gate/ownership code. Security minor (no trust boundary): one sentence in ¶3 — only trusted repo-local files move, nothing parses untrusted/network input, and the gate and the **/tests/** grant keep the same scope. Security minor (unspecified rewrite scope): ¶2 and Rollout 2 now bind the edit to A8's from '../src/... specifiers and name the content-wide substring substitution it forbids; Test strategy #1 and Risks row 3 bound the resulting diff. Security minor (in-flight-run pre-condition unguarded): Test strategy #2 carries the fail-closed post-condition — a grep finding zero leftover pipeline-*.test.ts paths after the commit — cited from Risks row 1. Net-zero achieved by deleting the duplicated Context scope restatement, three Goals/Non-goals bullets that restated the Decision or Deferred, two ¶4 sentences repeating the ADR's naming rule, and Rollout 4's restatement; the Revision log is rewritten in place as five section-anchored entries, one per still-material finding, superseding the prior r1 entry.",
+        "commitMessage": "docs: address r1 design review findings in 004 proposal"
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/proposal-revise-r1.md",
+      "durationMs": 338446,
+      "nudges": 0,
+      "docLines": 206,
+      "docLinesAdded": 67,
+      "docLinesRemoved": 67
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e3a509b00ffeIWQWSk71Pu3ov4",
+      "agent": "review/design-security",
+      "at": 1794318159699,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Test strategy #2 — \"fails closed on a half-applied move: a grep over `tools/orchestration/tests/` finds zero leftover `pipeline-*.test.ts` paths\"",
+            "problem": "[new] The same document guarantees this grep matches. A14 (\"other in-test path mentions are inert fixture data\", citing `pipeline-independence.test.ts:145` and `pipeline-gates.test.ts:298-303`) and Deferred (\"Refreshing fixture path strings that mimic the old naming (e.g. `pipeline-lane.test.ts` at `pipeline-independence.test.ts:145`) … no follow-up\") both state that `pipeline-*.test.ts`-shaped strings remain inside files under that directory after a fully applied move. So a content grep for that pattern can never report zero: the rollout's step-3 verification of items 1–6 either can never pass, or is made to pass by loosening the pattern — which is exactly how a half-mirrored tree, i.e. a partially applied move with inconsistent path-gate classification, slips past the only mechanical guard added for it (checklist item 7). Fix: replace the content grep with a name-level filesystem check the deferred fixture strings cannot satisfy — `find tools/orchestration/tests -name 'pipeline-*.test.ts'` prints nothing — or keep the grep only when anchored to the path shape `tests/pipeline-` and applied to a file listing rather than to file contents."
+          },
+          {
+            "severity": "nit",
+            "location": "Test strategy #4 — \"the existing `stagePathAllowed` block in the gate suite asserts the real post-move path `tools/orchestration/tests/pipeline/gates.test.ts`\"",
+            "problem": "[re-raised, partially closed] The new assertion exercises the first of the two consumers A19 enumerates of the single `TEST_PATH_RE` (\"`stagePathAllowed` (`gates.ts:262`, enforced at `runner.ts:232`) and the revert check (`runner.ts:1031`)\"), so the revert check's nested-path behavior is still carried only by A7's regex argument rather than by an assertion. Fix: add one expectation over the same nested path at the revert-check call site in the same block, or add one A19 clause stating the revert check shares that one regex and therefore the same classification."
+          }
+        ]
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/design-review-security-r1c1.md",
+      "durationMs": 191010,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e3a509b01ffeBl0TwTJmHHYUcb",
+      "agent": "review/design-correctness",
+      "at": 1794318242270,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Test strategy (intro + item 1) vs Rollout 1 — \"the move is proven by the existing suite being unchanged, plus the one added assertion block in item 4\" / \"every previously existing test still exists and passes unmodified — assertion counts per file are identical before and after the move, and the moved files' diff contains only ¶2's allowed set\"",
+            "problem": "Rollout 1 now lands a test-only commit before the move that adds assertions to the gate suite, tests/pipeline-gates.test.ts (existing describe('stagePathAllowed') block at pipeline-gates.test.ts:294-313) — one of the 23 files the move relocates. Against the branch's pre-work state, item 1's three invariants are all false for that file: the suite is not unchanged (the intro admits it), its per-file assertion count differs, and its diff across the two commits contains an assertion block that is neither an import line nor the comment line. Risks row 4 (\"compares the vitest reporter's file/test counts to a pre-move baseline\") inherits the same undefined baseline, and item 2's \"with the pre-move test count\" fails outright if the added block is a new case rather than extra expects. The baseline is never defined, so the acceptance evidence for Rollout 3 cannot be produced as written.",
+            "fix": "Name the baseline once: \"before the move\" = the move commit's parent (i.e. after the Rollout-1 test-only commit), and record the single expected delta — pipeline-gates.test.ts gains assertions inside the existing stagePathAllowed block while its test count and the 26-file count stay unchanged. Amends Test strategy #1 and Risks row 4's \"pre-move baseline\" rather than adding a new check."
+          },
+          {
+            "severity": "major",
+            "location": "Goals/Non-goals bullet 2 + Chosen design ¶2 vs Rollout 1 — \"Inside the move commit: no change to test logic, test names, fixtures, or file splits — 26 test files before, 26 after (Decision, bullet 2)\"",
+            "problem": "The revision adopts the strict reading of ADR-004 Decision bullet 2 (\"Bullet 2 permits import depth alone\") to justify amending it for one comment line, then silently narrows the same bullet to \"inside the move commit\" in order to admit a test-logic change — item 4's added assertions — that bullet 2's own text forbids (\"The only content change permitted is the import depth … No test logic, test names, fixtures, or file splits\", ADR:42-44) and that ADR Consequences:78 makes an acceptance gate (\"gate is `npm run check` green with an unchanged test count\"). The comment deviation is declared and tasked to an amendment; this deviation from the same clause is neither, so the document reads bullet 2 two different ways.",
+            "fix": "State one reading: add a sentence to Rollout 1 (or Deferred) that bullet 2 constrains the move commit's diff only, that the Rollout-1 commit is a separate test change outside ADR-004's subject, and that it leaves test and file counts unchanged — or fold it into the same one-clause amendment to bullet 2."
+          },
+          {
+            "severity": "major",
+            "location": "Test strategy item 2 + Risks row 1 — \"fails closed on a half-applied move: a grep over `tools/orchestration/tests/` finds zero leftover `pipeline-*.test.ts` paths\"",
+            "problem": "Read as written (item 6's \"grep over\" means a content grep), the check cannot pass: tools/orchestration/tests/pipeline-independence.test.ts:145 carries the fixture string `tools/orchestration/tests/pipeline-lane.test.ts`, which matches `pipeline-*.test.ts` and which the document deliberately keeps (Deferred: \"Refreshing fixture path strings that mimic the old naming … no follow-up yet\"). Verified: that line and pipeline-parallel-escalation.test.ts:45 are the only two occurrences of that shape in the tests directory. So the new fail-closed check either fails spuriously or pushes the implementer into the fixture edit the Deferred section defers — and Risks row 1's mitigation for the half-mirrored-tree risk rests on it. The deferral itself matches ADR-004 and is not re-opened; the new check contradicts the deferral.",
+            "fix": "Make item 2 filename-level: \"a file listing over `tools/orchestration/tests/` (e.g. `git ls-files`) finds zero files named `pipeline-*.test.ts`\", with a note that in-file fixture strings are excluded by Deferred. Same single sentence carries Risks row 1."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶1 — \"The move is one commit in `tools/orchestration/` with no config change, in four parts\"",
+            "problem": "The commit that section tasks is not confined to tools/orchestration/: Rollout 2 also commits the two skill-file amendments (.opencode/skills/repo-practices/SKILL.md:21 and .opencode/skills/test-strategy/SKILL.md:27) and, newly, the ADR-004 Decision bullet 2 amendment in docs/adrs/. The path qualifier contradicts the tasked content.",
+            "fix": "Drop the qualifier or name the areas: \"one commit touching tools/orchestration/, the two skill files, and ADR-004 Decision bullet 2; no config change\"."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶2 — \"never a content-wide `../src/` substring substitution, which would also rewrite the fixture path strings fed to the gate (A14)\"",
+            "problem": "The stated hazard does not exist in the repo: the gate's fixture strings are `tools/orchestration/tests/…` and `docs/…` paths (pipeline-gates.test.ts:296-313, pipeline-independence.test.ts:145) and none contains `../src/`. Meanwhile the real hole in a `from '../src/`-keyed rewrite goes unmentioned — non-import relative specifiers, `vi.mock('../src/opencode-runner.js', …)` and `importOriginal<typeof import('../src/opencode-runner.js')>()` at cli.test.ts:29-30, the only two `../src/` sites beyond A8's 65, which that pattern skips. It is harmless today only because cli.test.ts is root-tier and does not move, a fact the design never states.",
+            "fix": "Replace the unsupported clause with the checked fact: \"no moved file contains a relative specifier outside A8's 65 — the only such sites are the vi.mock and type-import in cli.test.ts, which stays at the package-root tier\"; optionally add that fact to A8's basis."
+          }
+        ]
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/design-review-correctness-r1c1.md",
+      "durationMs": 273580,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e3a4c6de6ffeFmOVuzkDM6aTdz",
+      "agent": "design/designer",
+      "at": 1794318506085,
+      "reply": {
+        "changed": true,
+        "summary": "All five open findings consumed by narrowing, not adding. (1) Baseline: Test strategy #1/#2 and Risks 4 no longer say 'before/after the move' or 'pre-move test count' — Rollout 1 now names the baseline once (the move commit's parent, after the test-only commit, with test and file counts unchanged) and the other sections cite it; #1's false 'assertion counts per file identical' clause is deleted. (2) Bullet-2 scope: the Non-goals bullet is rewritten to state the one reading — bullet 2 constrains the move commit's diff only and Rollout 1's added assertions are a separate test change outside ADR-004's subject, leaving both counts unchanged — so the strict-then-loose double reading cannot arise. (3) Fail-closed check: #2 is now a filename-level listing (`git ls-files`) rather than a content grep, and the Deferred fixture bullet records that those strings are outside that listing. (4) Chosen design ¶1 drops the false 'in `tools/orchestration/`' path qualifier; the areas are named once in Rollout 2. (5) ¶2's unhazardous 'content-wide `../src/` substitution' warning is deleted and replaced with the checked fact that no moved file holds a relative specifier outside A8's 65 (the only other `../src/` sites are `cli.test.ts:29-30`, which stays root-tier), with A8's row re-verified as 65 `from` matches vs 67 total `../src/`. Offsetting deletions in Options considered and Rollout 2 hold the document at 205 lines, one line shorter than before.",
+        "commitMessage": "docs: fix proposal baseline, bullet-2 scope, and flat-name check"
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/proposal-revise-r1.md",
+      "durationMs": 263724,
+      "nudges": 0,
+      "docLines": 205,
+      "docLinesAdded": 49,
+      "docLinesRemoved": 50
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e3a48675bffe5J2fS3x26ZNgs3",
+      "agent": "review/design-correctness",
+      "at": 1794318822372,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "blocker",
+            "location": "Chosen design ¶2 (with Assumption register A8, Test strategy #1, Rollout 2) — \"no moved file holds a relative specifier outside those 65, and the only other `../src/` sites are the `vi.mock` and type-import in `cli.test.ts:29-30`, which stays at the package-root tier\"",
+            "problem": "new — The newly added completeness claim is false, and it hides the one site class the move actually breaks. grep `\\.\\./ ` over tools/orchestration/tests/ finds 87 matches, not 67: the 65 from-imports (62 of them in moved files) + 2 cli.test.ts non-import `../src/` sites + 16 `new URL('<rel>', import.meta.url)` specifiers in 12 moved files — `'../prompts'`/`'../prompts/'` at pipeline-fix-trigger.test.ts:8, pipeline-prompts.test.ts:21, pipeline-budget.test.ts:85, pipeline-reply-contract.test.ts:83, pipeline-stage-lifecycle.test.ts:108, pipeline-funnel.test.ts:187, pipeline-proposal-size.test.ts:191, pipeline-parallel-integration.test.ts:191, pipeline-pass-finalize.test.ts:192, pipeline-parallel-fanout.test.ts:199, pipeline-parallel-escalation.test.ts:203 — plus `'../../../.opencode/skills/…'` at pipeline-prompts.test.ts:213,251,261,274,297 — + 4 inert `'../escape'` fixture strings (pipeline-identity.test.ts:65,68,103; pipeline-state-store.test.ts:156). new URL resolves against the moved file's own location, so one tier deeper turns `../prompts` into `tests/prompts` (absent) and `../../../.opencode/…` into `tools/.opencode/…` (absent), and these are live disk-read paths: loadTemplate is readFile(join(promptsDir, name)) at prompts.ts:26-27; pipeline-fix-trigger.test.ts:60 reads fix-tests.md through its PROMPTS_DIR; pipeline-prompts.test.ts:212-215 reads the skill files directly; the other nine suites feed that promptsDir into executeStage/resumePipeline, which render stage templates from disk. As written, the design rewrites only A8's 65 imports plus one comment line, and Test strategy #1 bounds the moved-file diff to exactly that allowed set — the ENOENT breakage is neither tasked nor permitted, `npm run check` cannot be green after the move, and ADR Decision bullet 2 (\"the only content change permitted is the import depth\") forbids the repair. The A8 row itself is narrowly true about imports and `../src/`, but its two cited greps structurally cannot see the URL sites, so it cannot support ¶2's claim; the 65 also span all 26 files (62 in moved files), so \"the 65\" is not the in-moved-file rewrite count either.",
+            "fix": "One coherent amendment: extend ¶2's rewrite set, Test strategy #1's allowed diff set, and Rollout 2's move-commit contents to the 16 depth-sensitive `new URL(..., import.meta.url)` sites (`'../prompts'` → `'../../prompts'`, `'../../../.opencode/...'` → `'../../../../.opencode/...'`), recite them in the bullet-2 amendment alongside the comment clause (replacing the current comment-only clause with e.g. \"a relative path reference — code or comment — naming a location this move passes takes its new depth\"), and replace ¶2's clause and A8's basis with the checked enumeration: grep `\\.\\./` = 87 sites = 65 from-imports (62 in moved files) + 2 cli.test.ts non-import `../src/` sites + 16 `new URL` sites + 4 inert `'../escape'` fixture strings. This replaces the false sentence rather than adding a new check; all five of my r1 findings are otherwise closed for real."
+          }
+        ]
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/design-review-correctness-r1c2.md",
+      "durationMs": 316176,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e3a4393d8ffewttLVaLNfg9rTk",
+      "agent": "design/designer",
+      "at": 1794318975262,
+      "reply": {
+        "changed": true,
+        "summary": "The r1c2 blocker (¶2's false completeness claim omitting 16 depth-sensitive `new URL('<rel>', import.meta.url)` sites — verified in-repo: 87 `../` sites = 65 from-imports (62 in moved files) + 2 cli.test.ts sites + 16 URL sites in 11 files + 4 inert '../escape' strings) is consumed by redefining ¶2's rewrite set to every depth-sensitive `../` reference (imports plus `../prompts/`→`../../prompts/` and `../../../.opencode/…`→`../../../../.opencode/…`), re-basing A8 on grep `\\\\.\\./` (87 matches, four enumerated classes), folding the fix into the single bullet-2 amendment clause ('a relative path reference — code or comment — naming a location this move passes takes its new depth'), and propagating via rewrite (not addition) through Test strategy #1's allowed-diff set, Rollout 2's commit contents, Risks 3, Goals, A15, and Non-goals ('fixture inputs'); the Revision log's stale ¶2 entry is replaced in place. Diff is line-count neutral (205→205): every edit replaces text in situ.",
+        "commitMessage": "docs: revise 004 proposal to cover import.meta.url-relative path sites"
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/proposal-revise-r1.md",
+      "durationMs": 152786,
+      "nudges": 0,
+      "docLines": 205,
+      "docLinesAdded": 21,
+      "docLinesRemoved": 21
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e3a413e9affeMre4lf2g4RjCtF",
+      "agent": "review/design-correctness",
+      "at": 1794319207052,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶2 — \"`../prompts/` → `../../prompts/`\"",
+            "problem": "new — The mapping as written covers 15 of the 16 URL sites: pipeline-fix-trigger.test.ts:8 uses `new URL('../prompts', import.meta.url)` with no trailing slash, so a rewrite keyed to the quoted pattern leaves one site one tier shallow. Test strategy #1 only asserts the moved-file diff stays inside the allowed set, so it cannot catch a missed site; only the acceptance run (item 5) would.",
+            "fix": "Key the rewrite to the call rather than the string literal — \"each `new URL('<rel>', import.meta.url)` in a moved file gains one `../`\" — keeping the two mappings as examples instead of the operative pattern."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶2 (clause written into ADR bullet 2) — \"a relative path reference — code or comment — naming a location this move passes takes its new depth\"",
+            "problem": "new — At the edge this revision closed, the clause reads wide enough to cover A8's fourth class: the 4 `'../escape'` strings are relative path references in code (verified inert: pipeline-state-store.test.ts:156 writes them into a mkdtemp checkpoint; pipeline-identity.test.ts:65,68,103 feed them to sanitizeSlug/deriveIdentity), and Deferred deliberately keeps other in-test path strings stale. The exclusion currently rests only on A8's word \"inert\", so the durable ADR sentence and the proposal's closed enumeration can be read against each other at implementation time.",
+            "fix": "Qualify the clause by resolution rather than by label: \"a path reference that the moved file resolves against its own location — code or comment — takes its new location\", which excludes the escape strings and A14's inert fixtures by definition instead of by an appended label."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶2 — \"takes its new depth\" with \"(the comment site: A14)\"",
+            "problem": "new — The comment A14 names is `tests/pipeline-reply-contract.test.ts` at pipeline-parallel-escalation.test.ts:45 (verified verbatim). It carries no `../`, so it is not inside A8's 87-site enumeration, and its edit is a directory insertion plus prefix drop, not a depth change. r1's clause (\"takes its new path\") sanctioned that edit; the replacement clause's \"new depth\" does not describe it, so the comment line is covered only by the parenthetical while the ADR sentence is what a reviewer of the commit checks.",
+            "fix": "One word in the clause — \"takes its new location\" — and in ¶2 name the actual edit (\"the comment's path gains the `pipeline/` tier and drops the prefix: A14\"), replacing the current verb rather than adding a new caveat."
+          },
+          {
+            "severity": "minor",
+            "location": "Goals / Non-goals — \"no change there to test logic, test names, fixture inputs, or file splits\"",
+            "problem": "new — This restates Decision bullet 2, which says \"No test logic, test names, fixtures, or file splits\" (ADR:42-44). Rollout 2 adds exactly one clause to bullet 2, so the narrowing of \"fixtures\" to \"fixture inputs\" exists only in the proposal and is not recorded in the Revision log — while the move commit now rewrites 16 path constants that feed readFile/loadTemplate.",
+            "fix": "Quote bullet 2's own word (\"fixtures\") and state that ¶2's clause is what licenses those path-constant changes, or fold the word change into the Revision log's ¶2 entry; either replaces the silent paraphrase rather than adding a further qualification."
+          },
+          {
+            "severity": "nit",
+            "location": "Assumption register A8 — \"all 87 `../` occurrences in the 26 files\"",
+            "problem": "new — The cited grep counts 87 matching lines; the 5 `../../../.opencode/…` lines each contain three `../`, so literal occurrences are 97. The row's arithmetic (65+2+16+4=87) only closes at line granularity.",
+            "fix": "Write \"all 87 `../`-bearing lines\" so the claim matches the cited grep verbatim."
+          }
+        ]
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/design-review-correctness-r1c3.md",
+      "durationMs": 231684,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e3a3db523ffegwdA933HAkr8kq",
+      "agent": "review/design-security",
+      "at": 1794319358251,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/design-review-security-r1c4.md",
+      "durationMs": 151045,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e3a3db524ffeINV4BE0RECWhPH",
+      "agent": "review/design-compatibility",
+      "at": 1794319376348,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶2 — \"the 16 `new URL('<rel>', import.meta.url)` paths — `../prompts/` → `../../prompts/`, `../../../.opencode/…` → `../../../../.opencode/…`\" (with A8's \"16 depth-sensitive `new URL('<rel>', import.meta.url)` paths in 11 moved files\" and Test strategy #1's \"depth-adjusted `new URL` lines\")",
+            "problem": "The revision moved 16 runtime path resolutions from untouched into the move's diff. At r1 the only edited path strings were import specifiers, resolved by the toolchain; these 16 resolve at run time against the moved file's own location, and Test strategy #7 (\"Linux executes items 1–5\") means no non-Linux run ever exercises the new depth. The macOS/Windows rows still justify \"Expected — assumption\" solely with case (A16) and git rename (A15), neither of which speaks to these sites, and the design never states how the URL becomes a path: a `URL` handed to `fs`/`fileURLToPath` is `/`-separated and platform-safe, while a `.pathname` read or a string-joined path on a case-insensitive checkout surfaces as ENOENT only for a maintainer off Linux. Checklist item 6 (separators handled by a library, not string editing) is unevaluated for the widened scope.",
+            "fix": "One clause in A8's Basis naming the form those 16 sites use (e.g. \"each site hands the `URL` object to `fs`/`fileURLToPath`; no `.pathname` read, no string-joined path\"), carried into the macOS/Windows Notes in place of the case-only basis. Names existing behavior; adds no mechanism."
+          },
+          {
+            "severity": "minor",
+            "location": "Test strategy #4 — \"the existing `stagePathAllowed` block in the gate suite asserts the real post-move path `tools/orchestration/tests/pipeline/gates.test.ts`\" (with A7's Basis \"gates.ts:253,262\" and the Windows row's Notes \"Same basis as macOS (A16); git handles the rename identically (A15); not executed there\")",
+            "problem": "Re-raised: my r1 separator finding is still open — A7's Basis and the Windows row's Notes are byte-identical to the text r1 reviewed — and the revision raised what rests on them. New A19 asserts \"no pattern in `src/` keys on the flat `pipeline-*` filename shape\" and #4 makes nested classification an executed assertion, but its input is a hand-written `/`-separated literal, so it passes whether or not the pipeline ever hands `stagePathAllowed` (A19's `runner.ts:232` enforcement point) an OS-native path; per #7 it runs only on Linux. The changed text gives the separator question the appearance of coverage without the evidence, so r1's qualification that exposure is \"limited to gates keying off the `tests/` prefix\" now carries more weight than at approval.",
+            "fix": "The clause requested at r1: name the separator form reaching `TEST_PATH_RE` in A7's Basis (\"paths reach the gate in POSIX form — git and vitest report `/`-separated paths\") and carry it into the Windows row's Notes. If the runner builds OS-native paths instead, #4's fixture must include one such path alongside the literal."
+          }
+        ]
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/design-review-compatibility-r1c4.md",
+      "durationMs": 169141,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e3a3b66beffeU4a7g7cPs8AhHH",
+      "agent": "review/design-performance",
+      "at": 1794319497221,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/design-review-performance-r1c4.md",
+      "durationMs": 138881,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e3a3b2020ffe17kecYxhOnl2oe",
+      "agent": "review/design-complexity",
+      "at": 1794319551571,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶2 — \"a relative path reference — code or comment — naming a location this move passes takes its new depth\"",
+            "problem": "This clause is the new permanent rule the move commit writes into ADR-004 Decision bullet 2 (Deferred bullet 3, Rollout 2), but it keys on the target being \"a location this move passes\". The 16 `new URL` sites it was added to sanction point at `../prompts/` and `../../../.opencode/…`, locations the move does not pass; their depth changes because the containing file moved, which is ¶2's own stated reasoning. As written the amendment leaves a second, vaguer copy of one rule in a permanent surface while the proposal's closed A8 enumeration remains the only operative statement, so the added mechanism reduces no complexity and does not cover its main case.",
+            "fix": "State the rule once in the precise ¶2 phrasing and use that clause in the ADR amendment instead of the current one: \"any relative `../` path in a moved file — code or comment — resolves against that file's location and takes its new depth\". Replaces the existing sentence; adds nothing."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design ¶4 — \"Convention rule (Decision, bullets 4–5), stated once here: … The commit amends both surfaces encoding the flat form … to `tests/**/*.test.ts` plus this rule (A13)\"",
+            "problem": "Unchanged in substance by this revision: the ¶4 rewrite turned the claim into a \"stated once here\" heading while still shipping a copy of the naming rule into two live instruction surfaces, so the drift flagged in r1 remains. It appears nowhere in the Revision log, so it was neither taken nor rejected.",
+            "fix": "Put the rule once in repo-practices' existing \"## Tests\" section and amend only the glob test-strategy:27 already restates behind its \"Follow `repo-practices` conventions:\" pointer (`tests/*.test.ts` → `tests/**/*.test.ts`). Both flat forms still disappear, so Test strategy #6's grep keeps passing."
+          }
+        ]
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/design-review-complexity-r1c4.md",
+      "durationMs": 175175,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-final",
+      "round": 0,
+      "sessionID": "ses_e3a38735cffeceaOTsNyltx08F",
+      "agent": "design/editor",
+      "at": 1794319680344,
+      "reply": {
+        "ambiguities": [
+          "Chosen design ¶2 — \"a relative path reference — code or comment — naming a location this move passes takes its new depth\" is ambiguous (\"a location this move passes\" is not parseable as written; author to clarify). Kept verbatim and flagged in an Editor notes footer since it is decision text."
+        ],
+        "commitMessage": "docs: final language pass on mirror-src-hierarchy test tree proposal"
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/proposal-final-r0.md",
+      "durationMs": 128642,
+      "nudges": 0,
+      "docLines": 207,
+      "docLinesAdded": 6,
+      "docLinesRemoved": 4
+    },
+    {
+      "stage": "editorial-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e3a367c68ffdrM4DTTVKBfiRlz",
+      "agent": "review/design-compatibility",
+      "at": 1794319839580,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/editorial-review-compatibility-r2.md",
+      "durationMs": 159124,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e3a367c68ffeYtX1hiiIjF0r4X",
+      "agent": "review/design-correctness",
+      "at": 1794319855700,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design ¶2, amended clause quoted verbatim in the diff's appended \"Editor notes:\" line: \"a relative path reference — code or comment — naming a location this move passes takes its new depth\"",
+            "problem": "The sentence is ambiguous — \"passes\" could mean \"passes through the moved file's old directory\" or \"passes over/leaves behind\", and which references qualify is undefined. It matters beyond style because Rollout 2 writes this one clause into ADR-004 Decision bullet 2 as the permission governing the move commit, and Test strategy #1 checks the moved-file diff against ¶2's allowed set. No correctness gap today: the operative set is pinned by A8's closed enumeration (62 imports, 16 new URL sites, one comment), which the diff leaves intact, so the Editor note's deferral to the author is acceptable.",
+            "fix": "Replace the clause, not add to it: \"every relative path reference — code or comment — that resolves through the moved file's former directory takes the depth of its new location\", keeping A8's closed enumeration unchanged."
+          }
+        ]
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/editorial-review-correctness-r2.md",
+      "durationMs": 175244,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:performance",
+      "round": 2,
+      "sessionID": "ses_e3a33cfa8ffehy0ztjBUkaXptM",
+      "agent": "review/design-performance",
+      "at": 1794319920101,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/editorial-review-performance-r2.md",
+      "durationMs": 64354,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:security",
+      "round": 2,
+      "sessionID": "ses_e3a340e81ffeXH17nE65mkiMld",
+      "agent": "review/design-security",
+      "at": 1794319956345,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/editorial-review-security-r2.md",
+      "durationMs": 116671,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:complexity",
+      "round": 2,
+      "sessionID": "ses_e3a32d40effeU7suo3Y2Oxsgg2",
+      "agent": "review/design-complexity",
+      "at": 1794319974431,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/editorial-review-complexity-r2.md",
+      "durationMs": 54279,
+      "nudges": 0
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_e3a31ff94ffefC28vLvwlNMIQG",
+      "agent": "code/test-engineer",
+      "at": 1794320288624,
+      "reply": {
+        "testsAdded": 4,
+        "commitMessage": "test: pin the mirrored test tree and nested-path gates before the ADR-004 move"
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/test-authoring-r0.md",
+      "durationMs": 314084,
+      "nudges": 0
+    },
+    {
+      "stage": "implement",
+      "round": 0,
+      "sessionID": "ses_e3a2d3452ffeRL65hPLNSnEX31",
+      "agent": "code/coder",
+      "at": 1794320619899,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "docs: adopt the recursive test-tree convention in the two skill files"
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/implement-r0.md",
+      "durationMs": 331055,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e3a281ddcffenmnvPmflfeq7tW",
+      "agent": "code/test-engineer",
+      "at": 1794320785173,
+      "reply": {
+        "commitMessage": "test: apply prettier to the orchestration prompts suite\n\n`prettier --check .` flagged tests/pipeline-prompts.test.ts (the gate state 03-build-notes.md\nrecorded); formatting it makes `npm run check` reach vitest. No other test change: the\nproposal's Test strategy section is unchanged since test-authoring r0 and there are no\nround-0 code-review findings to consume (docs/designs/004-.../reviews/code/ does not exist),\nso every behavior the approved design promises is already pinned — 26 test files, 228 tests,\nTest strategy #1/#2/#3 in tests/pipeline-gates.test.ts and #6 in tests/pipeline-prompts.test.ts.\n\nGate state (npm run check in tools/orchestration): eslint green, prettier green, vitest\n1 failed | 25 passed (26 files), 2 failed | 226 passed (228 tests). The two failures are\n'tracks exactly 26 test files: 23 under tests/pipeline/, 3 at the tests/ root' and\n'vitest run tests/pipeline selects exactly the 23 moved files', both in\ntests/pipeline-gates.test.ts. They are left failing per Test strategy (expected before the\nmove; never weakened or deleted).\n\nWhy no stage can close them: both assertions read `git ls-files`, so only the Chosen design\n¶1 rename of the 23 tests/pipeline-*.test.ts files plus ¶2's depth rewrites (62 '../src/'\nimports, 16 new URL('<rel>', import.meta.url) sites, the one comment at\npipeline-parallel-escalation.test.ts:45) can satisfy them. No agent has git access and this\nstage's tool set has no delete or rename primitive, so a test-update pass could only add\nnested copies while the 23 flat files stay tracked — exactly the half-mirrored tree Risks\nrow 1 forbids and Test strategy #2 fails closed on, and it would still leave both assertions\nred (untracked copies never appear in `git ls-files`). ADR-004 Rollout 2's `git mv` x23 needs\nthe operator or the runner; the ¶2 edits and the ADR bullet-2 amendment then ride that commit."
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/test-update-r0.md",
+      "durationMs": 163023,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e3a25890fffeM8vNVSA3nm0uGz",
+      "agent": "code/coder",
+      "at": 1794321015841,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "docs: record fix-round gate reproduction in 004 build notes"
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/fix-r0.md",
+      "durationMs": 224512,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e3a220228ffeZdy3ikGKw3y3Nh",
+      "agent": "code/test-engineer",
+      "at": 1794321248158,
+      "reply": {
+        "commitMessage": "test: name the Rollout-1 baseline in the tree-mirror suite\n\nRound-1 test-update pass; no test behavior changed. 02-proposal.md is unchanged since test-authoring r0 (its last edit was proposal-final r0, before authoring), and docs/designs/004-mirror-src-hierarchy-in-tests/reviews/code/ does not exist, so no round-0 code-review finding was accepted to consume. Everything the approved design tasks as assertions is already pinned: Test strategy #1/#2/#3 in tests/pipeline-gates.test.ts (the fail-closed check is a `git ls-files` listing, per the accepted r1 correctness major and security minor, not a content grep), #4's nested-path stagePathAllowed expects in the same file, and #6's two convention checks in tests/pipeline-prompts.test.ts. The single edit adds the baseline the r1 correctness major asked to be named once — the move commit's parent, 26 files, test count unchanged — to the block that pins the tree. No assertion, test name, fixture input, or file was added, changed, or weakened.\n\nGate state (npm run check in tools/orchestration): eslint green, prettier --check green, vitest 26 test files / 228 tests, 2 failed | 226 passed. The failures are 'tracks exactly 26 test files: 23 under tests/pipeline/, 3 at the tests/ root' and 'vitest run tests/pipeline selects exactly the 23 moved files', both in tests/pipeline-gates.test.ts. They are left red per Test strategy (expected before the move; never weakened or deleted). Only Rollout 2 closes them: ¶1's `git mv` x23 plus ¶2's depth rewrites (62 `from '../src/'` imports, the 16 `new URL('<rel>', import.meta.url)` sites, the one comment at pipeline-parallel-escalation.test.ts:45). 03-build-notes.md Deviation 1 and 4 record that no stage agent has git access or a rename/delete primitive, so a test-update pass could only add nested copies — the half-mirrored tree Risks row 1 forbids, which #2's listing fails closed on at 49 tracked paths. The move commit is operator/runner work."
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/test-update-r0.md",
+      "durationMs": 225698,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e3a1e78abffeCphfgK4Ftbwob3",
+      "agent": "code/coder",
+      "at": 1794321342763,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "docs: record fix-round r1 gate reproduction in 004 build notes"
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/fix-r0.md",
+      "durationMs": 88483,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e3a1d0736ffewObwlHo4RllCov",
+      "agent": "code/test-engineer",
+      "at": 1794321548275,
+      "reply": {
+        "commitMessage": "docs: record the r1 test-update verification of the ADR-004 test tree\n\nNo test changed, and none may: the five round-0 code reviews the prompt names do\nnot exist (docs/designs/004-mirror-src-hierarchy-in-tests/reviews/code/ is not a\ndirectory, .pipeline.json has no code-review stage entry and no seats.code\nverdicts), so no accepted finding exists to consume; and 02-proposal.md is\nunchanged since proposal-final r0 — before test-authoring r0 wrote its\nassertions — so the Test strategy section is the one the suite already encodes.\n\nRe-verified item by item: Test strategy #1/#2/#3 in tests/pipeline-gates.test.ts\n(the fail-closed check is the `git ls-files` listing, per the accepted r1\ncorrectness major + security minor, plus the tests/pipeline substring selection),\n#4's nested-path stagePathAllowed expects in the same block, #6's two convention\nchecks in tests/pipeline-prompts.test.ts. #4 and #6 are green; #1–#3 stay red.\nNo assertion, test name, fixture input or file was added, changed, or weakened.\n\nGate state (npm run check in tools/orchestration): eslint green, prettier\n--check green (all matched files), vitest 26 test files / 228 tests,\n2 failed | 226 passed. Both failures are\n'tracks exactly 26 test files: 23 under tests/pipeline/, 3 at the tests/ root'\nand 'vitest run tests/pipeline selects exactly the 23 moved files' — expected\nbefore the move, left red per Test strategy. Counts match the Rollout-1\nbaseline exactly.\n\nWhy this stage cannot close them: re-confirmed from inside it, `npm test` runs\nbut every `git` command is denied by the stage's shell permissions, and the tool\nset has no unlink/rename primitive, so the only reachable edit is nested copies\nalongside the 23 still-tracked flat files — 49 tracked test paths, the\nhalf-mirrored tree Risks row 1 forbids, which #2's listing fails closed on.\nRollout 2's `git mv` ×23 plus ¶2's depth rewrites (62 '../src/' imports, the 16\nnew URL sites including the no-trailing-slash site at\npipeline-fix-trigger.test.ts:8, the one comment at\npipeline-parallel-escalation.test.ts:45) and the ADR bullet-2 clause are\noperator/runner work. The build note adds the mapping table and that action\nlist."
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/test-update-r0.md",
+      "durationMs": 199419,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e3a19e4d8ffe8AbivCSjEuKXWn",
+      "agent": "code/coder",
+      "at": 1794321660861,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "docs: record fix round r2 gate reproduction in 004 build notes"
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/fix-r0.md",
+      "durationMs": 106601,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e3a182d12ffeAHndU6rKLSguEA",
+      "agent": "code/test-engineer",
+      "at": 1794321840104,
+      "reply": {
+        "commitMessage": "docs: record the r2 test-update verification of the ADR-004 test tree\n\nNo test changed, and none may: both rule-6 triggers are absent. The five\ncode reviews the prompt names do not exist (docs/designs/\n004-mirror-src-hierarchy-in-tests/reviews/code/ is not a directory in\nthis worktree, any other worktree, or the main checkout; .pipeline.json\ncarries no code-review entry in stages and its seats map holds only the\ndesign seats), so no accepted code-review finding exists to consume. And\n02-proposal.md is unchanged since proposal-final r0 — it still carries\nrevision stamp 1d1e68a6, which all five design seats approved at round 1\nand editorial round 2 passed with no blocking findings — and that write\npredates test-authoring r0, so the Test strategy section the suite was\nwritten against is the approved one.\n\nRe-verified item by item against the current tree: #1/#2/#3 in\ntests/pipeline-gates.test.ts:329-397 (the fail-closed check is the\n`git ls-files` listing, per the accepted r1 correctness major and\nsecurity minor), #4's nested-path stagePathAllowed expects at :295-318,\n#6's two convention checks in tests/pipeline-prompts.test.ts:306-339.\n#4 and #6 are green; #1-#3 stay red until Rollout 2. The A8/A1 pre-move\nenumeration still holds exactly, so no earlier pass half-applied the\nmove: 26 test files (23 flat + 3 root-tier), 65 `from '../src/'` lines,\nthe 16 `new URL('<rel>', import.meta.url)` depth sites, the one comment\nat pipeline-parallel-escalation.test.ts:45, and the 4 inert '../escape'\nfixtures. No assertion, test name, fixture input or file was added,\nchanged, weakened, or deleted.\n\nGate state: not re-measured in this pass — this stage's shell tool is\ndenied outright, so `npm test` and `npm run check` were both rejected.\nThe last executed run on this branch (fix round r2) reports 26 test\nfiles / 228 tests, 2 failed | 226 passed, both failures in\n'test tree mirrors src/ hierarchy' — the Rollout-1 baseline, unchanged\nbecause no test file changed. Closing them needs operator-level Rollout\n2: `git mv` x23 plus the Deviation 1 rewrites and the Deviation 2 ADR\nclause."
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/test-update-r0.md",
+      "durationMs": 173264,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e3a156e39ffecqGkq8TLmIqc8C",
+      "agent": "code/coder",
+      "at": 1794321941251,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "docs: record fix round r3 gate reproduction in build notes"
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/fix-r0.md",
+      "durationMs": 94482,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e3a13e4eaffe6jjpHu2HeBwhox",
+      "agent": "code/test-engineer",
+      "at": 1794322098767,
+      "reply": {
+        "commitMessage": "docs: record the r3 test-update verification of the ADR-004 test tree"
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/test-update-r0.md",
+      "durationMs": 151308,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e3a117c31ffeN0jgPyT9uqXzS7",
+      "agent": "code/coder",
+      "at": 1794322185782,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "docs: record fix round r4 gate reproduction for test-tree mirror"
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/fix-r0.md",
+      "durationMs": 80452,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e3a102892ffe1hreMvCyZXUikb",
+      "agent": "code/test-engineer",
+      "at": 1794322384004,
+      "reply": {
+        "commitMessage": "docs: record the r4 test-update verification of the ADR-004 test tree"
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/test-update-r0.md",
+      "durationMs": 191719,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e3a052eedffevEz6QXY7Ar3fMT",
+      "agent": "code/test-engineer",
+      "at": 1794323187358,
+      "reply": {
+        "commitMessage": "docs: record the post-move test-update verification of the mirrored test tree\n\nNo test changed, and none may: both rule-6 triggers are absent. The five round-0 code reviews the prompt names do not exist (docs/designs/004-.../reviews/ holds only design/; a repo-wide glob for **/reviews/code/** matches only run 003's reports; neither this worktree nor mighty-squid, swift-star, tidy-cactus nor the main checkout has run 004 code reviews; .pipeline.json records codeRound 0, no code-review entry in results, and design-only seats), so no accepted finding exists to consume — and 02-proposal.md is byte-unchanged since proposal-final r0, the stamp all five design seats approved at round 1, which predates test-authoring r0. No assertion, test name, fixture input or file was added, changed, weakened or deleted.\n\nWhat changed since the last pass is Rollout 2, landed by the operator as 'refactor: mirror src/ hierarchy in orchestration test tree': the 23 tests/pipeline-*.test.ts files now live at tests/pipeline/<name>.test.ts with ¶2's depth rewrites, and the ADR-004 Decision bullet-2 clause is in place (docs/adrs/004-...:42-44). Re-verified from the read side that the moved tree sits exactly inside ¶2's allowed set — grep over tests/pipeline/ finds 82 '../' sites: 62 '../../src/' imports, the 16 depth-adjusted new URL sites (10 '../../prompts/', the no-trailing-slash '../../prompts' at fix-trigger.test.ts:8, five '../../../../.opencode/skills/…' reads at prompts.test.ts:215, 255, 266, 280, 305) and the 4 inert '../escape' fixtures = A8's closed enumeration — plus the one comment now reading tests/pipeline/reply-contract.test.ts at parallel-escalation.test.ts:45. The only '../src/' specifiers left are the three unmoved root-tier files. Fixture strings mimicking the old naming (independence.test.ts:145) stay as written, per Deferred.\n\nGate state, executed in this pass (npm run check in tools/orchestration): eslint green, prettier --check green, vitest 26 test files / 228 tests — all 228 passed. The two assertions fix rounds r0-r4 recorded red in describe('test tree mirrors src/ hierarchy') are green because Rollout 2 landed, not because anything was relaxed. npm test -- tests/pipeline selects 23 files / 190 tests and none of the root tier, so Test strategy #3 holds in vitest itself. Test strategy #1-#6 all green (#4's nested stagePathAllowed path is now this suite's real location; #6's recursive glob holds in both skill files with zero flat-form statements); 26/228 is exactly the Rollout-1 baseline, which is Risk 4's and Rollout 3's acceptance evidence."
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/test-update-r0.md",
+      "durationMs": 275784,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e3a00e29affe9EqmtiWrdMIrvz",
+      "agent": "codereview/code-compatibility",
+      "at": 1794323518211,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/code-review-compatibility-r1c0.md",
+      "durationMs": 324939,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e39fbecd0ffefsT8aWD3pnAEIg",
+      "agent": "codereview/code-security",
+      "at": 1794323766007,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/code-review-security-r1c0.md",
+      "durationMs": 247692,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e3a00e29effeVnJnT0JS3KVWOh",
+      "agent": "codereview/code-correctness",
+      "at": 1794323898018,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "docs/designs/004-mirror-src-hierarchy-in-tests/03-build-notes.md:577-586",
+            "problem": "The acceptance evidence the proposal makes load-bearing (Rollout 3 / Risk 4: `npm run check` green, 26 test files / 228 tests, and 23 files / 190 tests for `npm test -- tests/pipeline`) is recorded as prose from the test-update stage and cannot be reproduced in any review seat (no shell granted). Every static precondition that could make it red was checked and is clean, but the counts themselves remain unverified at the merge commit.",
+            "fix": "Paste the vitest reporter tail verbatim (Test Files 26 passed / Tests 228 passed, and the 23/190 nested-selection run) into 03-build-notes.md at the merge commit, so Rollout 3's acceptance evidence is an artifact rather than a recollection."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/pipeline/proposal-size.test.ts:10-14; tools/orchestration/tests/pipeline/prompts.test.ts:214-216, 254-256, 265-268, 279-281, 304-306",
+            "problem": "Six of the ¶2 depth rewrites exceeded printWidth 100 after gaining `../`, so prettier re-wrapped them: the report.js import became a five-line statement and the five `.opencode/skills` reads became three-line fileURLToPath blocks. The change is forced by the format:check half of the gate and semantically inert (no other line in those files differs), but Test strategy #1 words the allowed set line-per-site and the build notes' post-move enumeration says only 'nothing outside it touched', so a diff review counting changed lines sees more than 62+16+1.",
+            "fix": "Add one clause to 03-build-notes.md naming the re-wrapped sites as prettier output of the ¶2 rewrite, so the allowed set reads as 'these statements, formatted however prettier requires'."
+          }
+        ]
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/code-review-correctness-r1c0.md",
+      "durationMs": 704747,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e39f824e5ffeZzB5ALh2yVP6vZ",
+      "agent": "codereview/code-performance",
+      "at": 1794323914983,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/pipeline/gates.test.ts:368-371,381,393 (and tools/orchestration/tests/pipeline/prompts.test.ts:315-316,324,337)",
+            "problem": "trackedTestFiles() spawns two synchronous git subprocesses (rev-parse + ls-files) on every call, and both new it blocks call it, so the suite pays 4 subprocess spawns per run; prompts.test.ts spawns rev-parse again in each of its two tests. The listing is write-stable within a run, so the recomputation has no invalidation value — avoidable duplicated work, though only millisecond-scale in test code.",
+            "fix": "Compute the repo root and the git ls-files listing once at describe scope (e.g. populate a shared variable in beforeAll or memoize the helper) and have both tests read the cached value; share a single gitRoot() result in prompts.test.ts."
+          }
+        ]
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/code-review-performance-r1c0.md",
+      "durationMs": 148901,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e39f62135ffeZ6zQKImlsHxsoi",
+      "agent": "codereview/code-testing",
+      "at": 1794324133590,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "tools/orchestration/tests/pipeline/gates.test.ts:383-384,394",
+            "problem": "The two new tree-pins assert exact set equality against the 23 MOVED_NAMES and 3 root files (sorted toEqual, toHaveLength(23), and the second toEqual). That exact-26 inventory is Test strategy #2/Rollout 3's acceptance measurement at the move commit, not a lasting invariant; the ADR's own forward rule (new subsystems and new mirrored tests are expected from merge) guarantees a future test file under tools/orchestration/tests/ turns these tests red on every unrelated branch, forcing a MOVED_NAMES edit in an unrelated suite. Only the zero-flat-name listing check is the fail-closed invariant the proposal prescribes permanently.",
+            "fix": "Keep the zero-flat-name git-ls-files check (:382) and assert the 23 moved names plus 3 root names as a subset of tracked files; drop the exact set-equality at :383/:394 and the toHaveLength(23) at :384. The exactly-26/228 counts remain the rollout's reported acceptance evidence."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/gates.test.ts:392-399",
+            "problem": "The test named 'vitest run tests/pipeline selects exactly the 23 moved files' never invokes vitest: it applies includes('tests/pipeline') to git ls-files output, pinning a substring emulation and the untested A6 premise rather than vitest's actual selection (verified by hand at HEAD: npm test -- tests/pipeline selects 23 files/190 tests, so no false claim today, but the test would stay green if vitest's filter semantics changed).",
+            "fix": "Spawn the real command in the test (e.g. vitest run tests/pipeline with a parseable reporter) and compare the selected file list, or rename the test to state it simulates the path-substring filter under A6."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/gates.test.ts:330-336 (pre-move test commits in this range vs 02-proposal.md Rollout 1 / Non-goals)",
+            "problem": "Rollout 1 says the pre-move assertions are expects inside pipeline-gates.test.ts's existing stagePathAllowed block 'so test and file counts are unchanged', but the pre-move commit added four new it blocks in gates and prompts and the #4 expects landed in a later test commit; the listing/#3 pins are red by construction from that commit until the move commit (their own comment: they 'hold only from that commit on'), so the suite was red across 13 intermediate commits and the baseline the comment defines diverges from the proposal's stated baseline. The added coverage itself is the right call for Test strategy #1-#3/#6, and the move commit's own content stays inside ¶2's allowed set (verified: 62 import rewrites, 16 new URL rewrites, one comment line — exactly A8).",
+            "fix": "Record the deviation in the run's design/rollout wording: the Rollout-1 test-only commit adds test cases beyond the #4 expects and lands red-until-move; align the gates.test.ts baseline comment and the proposal's 'test and file counts unchanged' clause with what actually landed."
+          }
+        ]
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/code-review-testing-r1c0.md",
+      "durationMs": 235472,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e39f288ddffeuNAx8336P6mpP4",
+      "agent": "code/coder",
+      "at": 1794324391852,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "docs: align the 004 rollout record with the landed test baseline\n\nFix round r5, consuming the code round-1 testing dissent (1 major, 2 minor).\n\nFinding 3 lands here: 02-proposal.md's Non-goals bullet 1, Rollout 1, Test\nstrategy #2/#3 and the revision log now record what actually landed — the\nRollout-1 test-only commit adds cases (four `it` blocks, 228 tests at 26 files)\nand its tree pins are red by construction until the move commit, and the exact\n26/228 and 23/190 figures are that commit's acceptance evidence, not permanent\nsuite invariants. Deviation 5 in 03-build-notes.md flags that this moves the\nproposal blob off the design-round-1 stamp.\n\nFindings 1 and 2 are test-owned and cannot land in a fix stage (stagePathAllowed\ndenies **/tests/** to fix; the ownership sweep reverts it), so they are routed to\ntest-update and 03-build-notes.md carries the exact prescribed edit: keep\n:382's zero-flat-name git-ls-files check, turn :383/:394 set-equality and the\n:384-386 toHaveLength(23) into subset assertions, and rename the #3 test to\nstate it simulates A6's path-substring filter (the nested-vitest option is\nrejected: the run would re-select gates.test.ts and recurse). Same file and test\ncounts, nothing weakened. No src, config or skill file changed; the correctness\nnit's prettier re-wrap clause is added to the build notes."
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/fix-r1.md",
+      "durationMs": 258152,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 1,
+      "sessionID": "ses_e39ee8065ffeTxPdz7KcpdWaxY",
+      "agent": "code/test-engineer",
+      "at": 1794324528809,
+      "reply": {
+        "commitMessage": "test(orchestration): keep tree-mirror pins as subset invariants, drop transient counts"
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/test-update-r1.md",
+      "durationMs": 130790,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e39ec6972ffeg2V5e2ykLyAf3B",
+      "agent": "codereview/code-testing",
+      "at": 1794324653530,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/code-review-testing-r1c1.md",
+      "durationMs": 118575,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e39ea99f1ffeMMTDp3dNMTYr5o",
+      "agent": "codereview/code-correctness",
+      "at": 1794324982188,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "docs/designs/004-mirror-src-hierarchy-in-tests/03-build-notes.md:577-591, 603-606; tools/orchestration/tests/pipeline/gates.test.ts:329-402",
+            "problem": "Carried from c0, re-scoped by the later fixes. The acceptance evidence Rollout 3/Risk 4 make load-bearing (npm run check green; 26 test files / 228 tests; 23 files / 190 tests for the nested selection) is still recorded as prose, not an attached reporter tail — the fix-r5 stage's own shell was denied, so no gate run was re-measured there. Worse-adjacent than at c0: the tree-pin block in gates.test.ts:329-402 was rewritten after the last recorded green run (post-move test-update pass), and no gate execution at the rewritten HEAD is recorded anywhere. My static re-checks (A8's 62+16+4 enumeration at HEAD, the fail-closed flat-name regex, the subset pins, the unchanged TEST_PATH_RE/tsconfig/skills surfaces) all pass, and the rewrite matches the fix-r5 prescription verbatim-in-substance with the same two it blocks (228 test count preserved), but the rewritten pins' green status at HEAD remains a recollection of the pre-rewrite commit.",
+            "fix": "At the merge commit, paste the vitest reporter tail verbatim (Test Files 26 passed / Tests 228 passed, plus the npm test -- tests/pipeline 23/190 run and the eslint/prettier pass lines) into 03-build-notes.md after the gates.test.ts rewrite, so the rewritten pins' acceptance evidence is an artifact rather than a prose recollection."
+          }
+        ]
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/code-review-correctness-r1c2.md",
+      "durationMs": 328561,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e39ea99f1ffdSKZJMJB0sPivLf",
+      "agent": "codereview/code-compatibility",
+      "at": 1794324998324,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/code-review-compatibility-r1c2.md",
+      "durationMs": 344696,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e39e55737ffeD1XkHRio0hpDs0",
+      "agent": "codereview/code-performance",
+      "at": 1794325147252,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/pipeline/gates.test.ts:370-377,386,398; tools/orchestration/tests/pipeline/prompts.test.ts:315-317,324,337",
+            "problem": "Carried unchanged from r1 and still open: trackedTestFiles() spawns two synchronous git subprocesses (rev-parse + ls-files) on every call and both new it blocks call it, and gitRoot() in prompts.test.ts is invoked once per loop iteration in each of its two tests — 8 subprocess spawns per run recomputing a write-stable listing. The post-r1 revisions at these sites are comment-only rewording (helper bodies and call sites identical to what was approved in round 1), so nothing performance-wise was broken; magnitude remains millisecond-scale test-code overhead.",
+            "fix": "Compute the repo root and the git ls-files listing once at describe scope (populate a shared variable in beforeAll or memoize the helpers), hoist gitRoot() out of the two loops in prompts.test.ts, and have both tests read the cached value."
+          }
+        ]
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/code-review-performance-r1c2.md",
+      "durationMs": 148863,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e39e59637ffe0bUUiT0Um4s4yC",
+      "agent": "codereview/code-security",
+      "at": 1794325155308,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/code-review-security-r1c2.md",
+      "durationMs": 173060,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e39e3117effeu0Q4Es3xh9frYG",
+      "agent": "codereview/code-testing",
+      "at": 1794325298043,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Checklist item 6 — tools/orchestration `npm run check` (testing-r1c2 seat)",
+            "problem": "The seat could not execute `npm run check` itself: this sandbox rejects all commands except `git log`/`git diff` (both npm invocations returned 'Permission denied: shell'), so green-gate evidence at HEAD is not this seat's own observation. Per the testing checklist an un-evaluated item is recorded as a finding rather than a pass.",
+            "fix": "No builder action; the scoped diff touches zero source/test paths and the checklist's stated backstop is the runner's independent gate verification. Optionally attach the runner's `npm run check` output to the build notes as the recorded acceptance evidence."
+          }
+        ]
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/code-review-testing-r1c2.md",
+      "durationMs": 150736,
+      "nudges": 0
+    },
+    {
+      "stage": "doc-sync",
+      "round": 1,
+      "sessionID": "ses_e39e0c443ffe8ilSgkxQrtYhcB",
+      "agent": "ops/doc-sync",
+      "at": 1794325451411,
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/doc-sync-r1.md",
+      "durationMs": 153257,
+      "nudges": 0,
+      "failure": "independence violation: read accessed run records: docs/designs/004-mirror-src-hierarchy-in-tests/transcripts"
+    },
+    {
+      "stage": "doc-sync",
+      "round": 1,
+      "sessionID": "ses_e39de6d5dffeiIuC1qQ3QlRWEs",
+      "agent": "ops/doc-sync",
+      "at": 1794325738011,
+      "reply": {
+        "drifted": true,
+        "commitMessage": "docs: verify and extend the 004 as-built drift record"
+      },
+      "transcript": "docs/designs/004-mirror-src-hierarchy-in-tests/transcripts/doc-sync-attempt2-r1.md",
+      "durationMs": 286559,
+      "nudges": 0
+    }
+  ],
+  "gateLog": [
+    {
+      "gate": "sourceAdmissible",
+      "round": 0,
+      "proceed": true,
+      "reason": "ADR is proposed and complete",
+      "at": 1794316744328
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: correctness, security",
+      "at": 1794317630068
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c2 pending: correctness",
+      "at": 1794318242314
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c3 pending: correctness",
+      "at": 1794318822430
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c4 pending: compatibility, security, performance, complexity",
+      "at": 1794319207114
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794319551634
+    },
+    {
+      "gate": "editorial-review",
+      "round": 2,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1794319974491
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794320622102
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794320791263
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794321022410
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794321254212
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794321348795
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794321554196
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794321666782
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794321846711
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794321947395
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794322105286
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794322192230
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794322393485
+    },
+    {
+      "gate": "escalate",
+      "round": 0,
+      "proceed": false,
+      "reason": "tests not green at the code-review budget limit",
+      "at": 1794322393488
+    },
+    {
+      "gate": "operatorForce",
+      "round": 0,
+      "proceed": true,
+      "reason": "operator forced the next step: test-update",
+      "at": 1794322911476
+    },
+    {
+      "gate": "operatorExtension",
+      "round": 0,
+      "proceed": true,
+      "reason": "operator extended the review budget by 3 review session(s) over the caps of 40/20 (and 3 revise round(s) over the backstop of 5)",
+      "at": 1794322911476
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check green",
+      "at": 1794323193163
+    },
+    {
+      "gate": "operatorExtension",
+      "round": 1,
+      "proceed": true,
+      "reason": "over-cap code round entered under operator extension (2 granted round(s) left)",
+      "at": 1794323193168
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: testing",
+      "at": 1794324133654
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check green",
+      "at": 1794324397965
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check green",
+      "at": 1794324534912
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c2 pending: correctness, compatibility, security, performance",
+      "at": 1794324653570
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794325298098
+    },
+    {
+      "gate": "stageFailure",
+      "round": 1,
+      "proceed": false,
+      "reason": "doc-sync: independence violation: read accessed run records: docs/designs/004-mirror-src-hierarchy-in-tests/transcripts",
+      "at": 1794325451416
+    },
+    {
+      "gate": "done",
+      "round": 0,
+      "proceed": true,
+      "reason": "pipeline complete",
+      "at": 1794325738067
+    }
+  ],
+  "startedAt": 1794316744313,
+  "updatedAt": 1794325738067,
+  "baseRef": "d5092f39755c4a0903dfd19207e4951dfc1cd33a",
+  "designCycle": 5,
+  "designStamp": "1d1e68a6726648633a3a2139ed1616eedda39a07",
+  "seats": {
+    "design": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "1d1e68a6726648633a3a2139ed1616eedda39a07",
+        "dissents": 3,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶2 — \"`../prompts/` → `../../prompts/`\"",
+            "problem": "new — The mapping as written covers 15 of the 16 URL sites: pipeline-fix-trigger.test.ts:8 uses `new URL('../prompts', import.meta.url)` with no trailing slash, so a rewrite keyed to the quoted pattern leaves one site one tier shallow. Test strategy #1 only asserts the moved-file diff stays inside the allowed set, so it cannot catch a missed site; only the acceptance run (item 5) would.",
+            "fix": "Key the rewrite to the call rather than the string literal — \"each `new URL('<rel>', import.meta.url)` in a moved file gains one `../`\" — keeping the two mappings as examples instead of the operative pattern."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶2 (clause written into ADR bullet 2) — \"a relative path reference — code or comment — naming a location this move passes takes its new depth\"",
+            "problem": "new — At the edge this revision closed, the clause reads wide enough to cover A8's fourth class: the 4 `'../escape'` strings are relative path references in code (verified inert: pipeline-state-store.test.ts:156 writes them into a mkdtemp checkpoint; pipeline-identity.test.ts:65,68,103 feed them to sanitizeSlug/deriveIdentity), and Deferred deliberately keeps other in-test path strings stale. The exclusion currently rests only on A8's word \"inert\", so the durable ADR sentence and the proposal's closed enumeration can be read against each other at implementation time.",
+            "fix": "Qualify the clause by resolution rather than by label: \"a path reference that the moved file resolves against its own location — code or comment — takes its new location\", which excludes the escape strings and A14's inert fixtures by definition instead of by an appended label."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶2 — \"takes its new depth\" with \"(the comment site: A14)\"",
+            "problem": "new — The comment A14 names is `tests/pipeline-reply-contract.test.ts` at pipeline-parallel-escalation.test.ts:45 (verified verbatim). It carries no `../`, so it is not inside A8's 87-site enumeration, and its edit is a directory insertion plus prefix drop, not a depth change. r1's clause (\"takes its new path\") sanctioned that edit; the replacement clause's \"new depth\" does not describe it, so the comment line is covered only by the parenthetical while the ADR sentence is what a reviewer of the commit checks.",
+            "fix": "One word in the clause — \"takes its new location\" — and in ¶2 name the actual edit (\"the comment's path gains the `pipeline/` tier and drops the prefix: A14\"), replacing the current verb rather than adding a new caveat."
+          },
+          {
+            "severity": "minor",
+            "location": "Goals / Non-goals — \"no change there to test logic, test names, fixture inputs, or file splits\"",
+            "problem": "new — This restates Decision bullet 2, which says \"No test logic, test names, fixtures, or file splits\" (ADR:42-44). Rollout 2 adds exactly one clause to bullet 2, so the narrowing of \"fixtures\" to \"fixture inputs\" exists only in the proposal and is not recorded in the Revision log — while the move commit now rewrites 16 path constants that feed readFile/loadTemplate.",
+            "fix": "Quote bullet 2's own word (\"fixtures\") and state that ¶2's clause is what licenses those path-constant changes, or fold the word change into the Revision log's ¶2 entry; either replaces the silent paraphrase rather than adding a further qualification."
+          },
+          {
+            "severity": "nit",
+            "location": "Assumption register A8 — \"all 87 `../` occurrences in the 26 files\"",
+            "problem": "new — The cited grep counts 87 matching lines; the 5 `../../../.opencode/…` lines each contain three `../`, so literal occurrences are 97. The row's arithmetic (65+2+16+4=87) only closes at line granularity.",
+            "fix": "Write \"all 87 `../`-bearing lines\" so the claim matches the cited grep verbatim."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "1d1e68a6726648633a3a2139ed1616eedda39a07",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶2 — \"the 16 `new URL('<rel>', import.meta.url)` paths — `../prompts/` → `../../prompts/`, `../../../.opencode/…` → `../../../../.opencode/…`\" (with A8's \"16 depth-sensitive `new URL('<rel>', import.meta.url)` paths in 11 moved files\" and Test strategy #1's \"depth-adjusted `new URL` lines\")",
+            "problem": "The revision moved 16 runtime path resolutions from untouched into the move's diff. At r1 the only edited path strings were import specifiers, resolved by the toolchain; these 16 resolve at run time against the moved file's own location, and Test strategy #7 (\"Linux executes items 1–5\") means no non-Linux run ever exercises the new depth. The macOS/Windows rows still justify \"Expected — assumption\" solely with case (A16) and git rename (A15), neither of which speaks to these sites, and the design never states how the URL becomes a path: a `URL` handed to `fs`/`fileURLToPath` is `/`-separated and platform-safe, while a `.pathname` read or a string-joined path on a case-insensitive checkout surfaces as ENOENT only for a maintainer off Linux. Checklist item 6 (separators handled by a library, not string editing) is unevaluated for the widened scope.",
+            "fix": "One clause in A8's Basis naming the form those 16 sites use (e.g. \"each site hands the `URL` object to `fs`/`fileURLToPath`; no `.pathname` read, no string-joined path\"), carried into the macOS/Windows Notes in place of the case-only basis. Names existing behavior; adds no mechanism."
+          },
+          {
+            "severity": "minor",
+            "location": "Test strategy #4 — \"the existing `stagePathAllowed` block in the gate suite asserts the real post-move path `tools/orchestration/tests/pipeline/gates.test.ts`\" (with A7's Basis \"gates.ts:253,262\" and the Windows row's Notes \"Same basis as macOS (A16); git handles the rename identically (A15); not executed there\")",
+            "problem": "Re-raised: my r1 separator finding is still open — A7's Basis and the Windows row's Notes are byte-identical to the text r1 reviewed — and the revision raised what rests on them. New A19 asserts \"no pattern in `src/` keys on the flat `pipeline-*` filename shape\" and #4 makes nested classification an executed assertion, but its input is a hand-written `/`-separated literal, so it passes whether or not the pipeline ever hands `stagePathAllowed` (A19's `runner.ts:232` enforcement point) an OS-native path; per #7 it runs only on Linux. The changed text gives the separator question the appearance of coverage without the evidence, so r1's qualification that exposure is \"limited to gates keying off the `tests/` prefix\" now carries more weight than at approval.",
+            "fix": "The clause requested at r1: name the separator form reaching `TEST_PATH_RE` in A7's Basis (\"paths reach the gate in POSIX form — git and vitest report `/`-separated paths\") and carry it into the Windows row's Notes. If the runner builds OS-native paths instead, #4's fixture must include one such path alongside the literal."
+          }
+        ]
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "1d1e68a6726648633a3a2139ed1616eedda39a07",
+        "dissents": 1,
+        "findings": []
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "1d1e68a6726648633a3a2139ed1616eedda39a07",
+        "dissents": 0,
+        "findings": []
+      },
+      "complexity": {
+        "verdict": "approve",
+        "stamp": "1d1e68a6726648633a3a2139ed1616eedda39a07",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶2 — \"a relative path reference — code or comment — naming a location this move passes takes its new depth\"",
+            "problem": "This clause is the new permanent rule the move commit writes into ADR-004 Decision bullet 2 (Deferred bullet 3, Rollout 2), but it keys on the target being \"a location this move passes\". The 16 `new URL` sites it was added to sanction point at `../prompts/` and `../../../.opencode/…`, locations the move does not pass; their depth changes because the containing file moved, which is ¶2's own stated reasoning. As written the amendment leaves a second, vaguer copy of one rule in a permanent surface while the proposal's closed A8 enumeration remains the only operative statement, so the added mechanism reduces no complexity and does not cover its main case.",
+            "fix": "State the rule once in the precise ¶2 phrasing and use that clause in the ADR amendment instead of the current one: \"any relative `../` path in a moved file — code or comment — resolves against that file's location and takes its new depth\". Replaces the existing sentence; adds nothing."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design ¶4 — \"Convention rule (Decision, bullets 4–5), stated once here: … The commit amends both surfaces encoding the flat form … to `tests/**/*.test.ts` plus this rule (A13)\"",
+            "problem": "Unchanged in substance by this revision: the ¶4 rewrite turned the claim into a \"stated once here\" heading while still shipping a copy of the naming rule into two live instruction surfaces, so the drift flagged in r1 remains. It appears nowhere in the Revision log, so it was neither taken nor rejected.",
+            "fix": "Put the rule once in repo-practices' existing \"## Tests\" section and amend only the glob test-strategy:27 already restates behind its \"Follow `repo-practices` conventions:\" pointer (`tests/*.test.ts` → `tests/**/*.test.ts`). Both flat forms still disappear, so Test strategy #6's grep keeps passing."
+          }
+        ]
+      }
+    },
+    "code": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "deaf37f360e3beff208b43484d8a6d5fdbc7ed9e",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "docs/designs/004-mirror-src-hierarchy-in-tests/03-build-notes.md:577-591, 603-606; tools/orchestration/tests/pipeline/gates.test.ts:329-402",
+            "problem": "Carried from c0, re-scoped by the later fixes. The acceptance evidence Rollout 3/Risk 4 make load-bearing (npm run check green; 26 test files / 228 tests; 23 files / 190 tests for the nested selection) is still recorded as prose, not an attached reporter tail — the fix-r5 stage's own shell was denied, so no gate run was re-measured there. Worse-adjacent than at c0: the tree-pin block in gates.test.ts:329-402 was rewritten after the last recorded green run (post-move test-update pass), and no gate execution at the rewritten HEAD is recorded anywhere. My static re-checks (A8's 62+16+4 enumeration at HEAD, the fail-closed flat-name regex, the subset pins, the unchanged TEST_PATH_RE/tsconfig/skills surfaces) all pass, and the rewrite matches the fix-r5 prescription verbatim-in-substance with the same two it blocks (228 test count preserved), but the rewritten pins' green status at HEAD remains a recollection of the pre-rewrite commit.",
+            "fix": "At the merge commit, paste the vitest reporter tail verbatim (Test Files 26 passed / Tests 228 passed, plus the npm test -- tests/pipeline 23/190 run and the eslint/prettier pass lines) into 03-build-notes.md after the gates.test.ts rewrite, so the rewritten pins' acceptance evidence is an artifact rather than a prose recollection."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "deaf37f360e3beff208b43484d8a6d5fdbc7ed9e",
+        "dissents": 0,
+        "findings": []
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "deaf37f360e3beff208b43484d8a6d5fdbc7ed9e",
+        "dissents": 0,
+        "findings": []
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "deaf37f360e3beff208b43484d8a6d5fdbc7ed9e",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/pipeline/gates.test.ts:370-377,386,398; tools/orchestration/tests/pipeline/prompts.test.ts:315-317,324,337",
+            "problem": "Carried unchanged from r1 and still open: trackedTestFiles() spawns two synchronous git subprocesses (rev-parse + ls-files) on every call and both new it blocks call it, and gitRoot() in prompts.test.ts is invoked once per loop iteration in each of its two tests — 8 subprocess spawns per run recomputing a write-stable listing. The post-r1 revisions at these sites are comment-only rewording (helper bodies and call sites identical to what was approved in round 1), so nothing performance-wise was broken; magnitude remains millisecond-scale test-code overhead.",
+            "fix": "Compute the repo root and the git ls-files listing once at describe scope (populate a shared variable in beforeAll or memoize the helpers), hoist gitRoot() out of the two loops in prompts.test.ts, and have both tests read the cached value."
+          }
+        ]
+      },
+      "testing": {
+        "verdict": "approve",
+        "stamp": "deaf37f360e3beff208b43484d8a6d5fdbc7ed9e",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Checklist item 6 — tools/orchestration `npm run check` (testing-r1c2 seat)",
+            "problem": "The seat could not execute `npm run check` itself: this sandbox rejects all commands except `git log`/`git diff` (both npm invocations returned 'Permission denied: shell'), so green-gate evidence at HEAD is not this seat's own observation. Per the testing checklist an un-evaluated item is recorded as a finding rather than a pass.",
+            "fix": "No builder action; the scoped diff touches zero source/test paths and the checklist's stated backstop is the runner's independent gate verification. Optionally attach the runner's `npm run check` output to the build notes as the recorded acceptance evidence."
+          }
+        ]
+      }
+    }
+  },
+  "lastReviewPass": {
+    "phase": "code",
+    "round": 1,
+    "cycle": 2,
+    "seats": [
+      "correctness",
+      "compatibility",
+      "security",
+      "performance",
+      "testing"
+    ]
+  },
+  "reviseNoChange": false,
+  "extensionSessions": 3,
+  "extensionRounds": 2,
+  "codeCycle": 3,
+  "codeStamp": "deaf37f360e3beff208b43484d8a6d5fdbc7ed9e"
+}
