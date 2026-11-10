@@ -8,14 +8,14 @@
     "path": "docs/prompts/audit-by-deeds.md"
   },
   "status": "running",
-  "lastStage": "code-review",
+  "lastStage": "fix",
   "designRound": 2,
   "codeRound": 1,
   "designBudgetUsed": 1,
-  "codeBudgetUsed": 3,
+  "codeBudgetUsed": 4,
   "editorialDone": false,
   "testsGreen": true,
-  "testsNeedUpdate": false,
+  "testsNeedUpdate": true,
   "stageFailures": {
     "code-review:compatibility": 1
   },
@@ -32,7 +32,8 @@
     "29087ca8da895ff9a4b546a43a484ee7dca9e467",
     "ac7b03ec3bc7ca6838f0413efc7ef66367b396f5",
     "95b73560fab5571ad65610ffe4f790d080d715c1",
-    "7461e9db26d07da2d7cc4eae60bf153a13018fd0"
+    "7461e9db26d07da2d7cc4eae60bf153a13018fd0",
+    "aff51e89e94b2b444ad00cafec9054f568e47e40"
   ],
   "forceNext": null,
   "results": [
@@ -801,6 +802,20 @@
       "transcript": "docs/designs/007-audit-by-deeds/transcripts/code-review-testing-r1c0.md",
       "durationMs": 270201,
       "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e38359630ffed0DRlyuYmob7TU",
+      "agent": "code/coder",
+      "at": 1794353657240,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "fix: resolve code review round 1 on the child-session audit — keep pre-failure violations, add the direct children route, guard and bound the walk"
+      },
+      "transcript": "docs/designs/007-audit-by-deeds/transcripts/fix-r1.md",
+      "durationMs": 363439,
+      "nudges": 0
     }
   ],
   "gateLog": [
@@ -873,10 +888,17 @@
       "proceed": false,
       "reason": "dissent pass c1 pending: security, performance, testing",
       "at": 1794353293769
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check green",
+      "at": 1794353662938
     }
   ],
   "startedAt": 1794348961824,
-  "updatedAt": 1794353293770,
+  "updatedAt": 1794353662938,
   "baseRef": "7844c17171465dd779f8db6671801eb058bd2eb3",
   "designCycle": 3,
   "designStamp": "f4f64f9c7a62e1487a3ad86706965ae11544eb87",

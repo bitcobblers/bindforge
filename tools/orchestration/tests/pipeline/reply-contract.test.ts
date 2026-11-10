@@ -138,6 +138,9 @@ function stubServer(text: string, answerAfter: number) {
         });
       },
       remove: async () => undefined,
+      // Test strategy #9: the descendant walk's enumeration endpoint. This
+      // fixture creates no child sessions, so an empty page is the truth.
+      list: async () => ({ data: [], cursor: { previous: null, next: null } }),
     },
     message: {
       list: async (input: { sessionID: string }) => {

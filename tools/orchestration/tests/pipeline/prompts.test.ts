@@ -204,8 +204,9 @@ describe('run-2 stage guidance', () => {
     // transcript; its own previous findings travel through the prompt.
     expect(text).toContain('Review independently');
     expect(text).toContain('Do not open review reports or transcripts');
-    // Design 007 §4: the bright line — walking a forbidden directory is
-    // already opening it, and every path a seat needs is named for it.
+    // proves: Test strategy #8 — Design 007 §4's bright line: walking a
+    // forbidden directory is already opening it, and every path a seat needs
+    // is named for it.
     expect(text).toContain(
       'Listing, globbing, or grepping those directories counts as opening them',
     );
@@ -354,9 +355,10 @@ describe('test-tree convention', () => {
 });
 
 describe('run-7 stage guidance', () => {
-  // Design 007 §4: the test stages own the files they write, so the last
-  // `format:check` step belongs to them. These pins keep that ownership line
-  // from being silently reverted (the run-005 prettier-drift escalation).
+  // proves: Test strategy #8 — Design 007 §4: the test stages own the files
+  // they write, so the last `format:check` step belongs to them. These pins
+  // keep that ownership line from being silently reverted (the run-005
+  // prettier-drift escalation).
   it('tells both test stages to format the files they own before replying', async () => {
     const authoring = renderTemplate(await loadTemplate(PROMPTS_DIR, 'test-authoring.md'), {
       designDir: 'docs/designs/007-x',

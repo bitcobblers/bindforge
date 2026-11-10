@@ -70,6 +70,9 @@ function busyClient() {
       remove: async (input: { sessionID: string }) => {
         calls.push(`remove:${input.sessionID}`);
       },
+      // Test strategy #9: the descendant walk's enumeration endpoint. This
+      // fixture creates no child sessions, so an empty page is the truth.
+      list: async () => ({ data: [], cursor: { previous: null, next: null } }),
     },
     message: {
       list: async () => {

@@ -117,9 +117,12 @@ const CHILD_READ = 'docs/designs/002-x/transcripts/r0.md';
  * through a COMPLETED `subagent` part whose text names nothing forbidden;
  * each such session has one child session — enumerable through BOTH SDK
  * routes the walk may take (A4) — and that child's own message list holds a
- * completed `read` of a transcripts file.
+ * completed `read` of a transcripts file. `listOnly: true` removes
+ * `session.children`, the shape the pinned SDK actually exposes, so the walk
+ * has to find the deed through the `session.list` + `parentID` route;
+ * `listCalls()` counts those enumerations.
  */
-function deedsStub() {
+function deedsStub({ listOnly = false }: { listOnly?: boolean } = {}) {
   const prompts: Array<{ sessionID: string; text: string }> = [];
   const creates: Array<{ id: string; key: string }> = [];
   const info = new Map<string, { id: string; parentID?: string }>();
@@ -127,6 +130,7 @@ function deedsStub() {
   const sessions = new Map<string, { key: string; prompts: number; lists: number }>();
   const stamp = realClock();
   let created = 0;
+  let listCalls = 0;
 
   const replyFor = (key: string): string => {
     if (key === 'implement') {
@@ -134,6 +138,9 @@ function deedsStub() {
     }
     return JSON.stringify({ verdict: 'approve', findings: [] });
   };
+
+  const childrenOf = async (input: { sessionID: string }) =>
+    (childrenByParent.get(input.sessionID) ?? []).map((id) => ({ id }));
 
   const client = {
     session: {
@@ -157,12 +164,11 @@ function deedsStub() {
         if (s) s.prompts += 1;
       },
       remove: async () => undefined,
-      children: async (input: { sessionID: string }) =>
-        (childrenByParent.get(input.sessionID) ?? []).map((id) => ({ id })),
-      list: async () => ({
-        data: [...info.values()],
-        cursor: { previous: null, next: null },
-      }),
+      ...(listOnly ? {} : { children: childrenOf }),
+      list: async () => {
+        listCalls += 1;
+        return { data: [...info.values()], cursor: { previous: null, next: null } };
+      },
     },
     message: {
       list: async (input: { sessionID: string }) => {
@@ -227,7 +233,7 @@ function deedsStub() {
     },
   } as unknown as OpenCodeClient;
 
-  return { client, prompts, creates };
+  return { client, prompts, creates, listCalls: () => listCalls };
 }
 
 describe('child deeds fail the parent attempt end to end', () => {
@@ -266,7 +272,54 @@ describe('child deeds fail the parent attempt end to end', () => {
       expect(result.failure).toContain('(via child session');
     }
     expect(saved.stageFailures['implement']).toBeDefined();
-    expect(saved.gateLog.some((g) => g.gate === 'stageFailure')).toBe(true);
+    // One gate entry per failure: attempt 1 and its retry. The run escalates
+    // right after the retry, so nothing else in this scenario failed.
+    expect(saved.gateLog.filter((g) => g.gate === 'stageFailure')).toHaveLength(2);
+  });
+
+  // proves: Test strategy #6 — the enumeration route every real run takes:
+  // the pinned SDK exposes no `session.children`, so the child deed has to be
+  // found through the paged `session.list` + `parentID` index. Same outcome
+  // as the children route: the attempt fails on the child's transcripts read
+  // and attempt 2 is told why (code review testing r1c0 finding 1).
+  it('fails the attempt on a child deed found through the session-list route', async () => {
+    const dir = tmpRepo(baseState());
+    const stub = deedsStub({ listOnly: true });
+
+    const status = await resumePipeline(optionsFor(dir, stub.client, { forceStage: 'implement' }));
+
+    expect(status).toBe('escalated');
+    const attempts = stub.creates.filter((c) => c.key === 'implement');
+    expect(attempts).toHaveLength(2);
+
+    const saved = savedState(dir);
+    const failed = saved.results.filter((r) => r.stage === 'implement');
+    expect(failed).toHaveLength(2);
+    for (const result of failed) {
+      expect(result.failure).toContain('independence violation');
+      expect(result.failure).toContain('transcripts');
+      expect(result.failure).toContain('(via child session');
+    }
+
+    const secondAttempt = stub.prompts.filter((p) => p.sessionID === attempts[1]?.id);
+    expect(secondAttempt[0]?.text).toContain("Previous attempt's gate failure");
+    expect(secondAttempt[0]?.text).toContain('independence violation');
+  });
+
+  // proves: Test strategy #6 — the walk's cost rule (design 007 §2): one
+  // descendant enumeration per attempt, off the poll loop. The stage loop
+  // re-audits the attempt's own message list on every re-entry, so an
+  // unbounded walk would pay the tree once per turn instead of once per
+  // attempt (code review performance r1c0 finding 2).
+  it('pays at most one descendant enumeration per attempt', async () => {
+    const dir = tmpRepo(baseState());
+    const stub = deedsStub({ listOnly: true });
+
+    await resumePipeline(optionsFor(dir, stub.client, { forceStage: 'implement' }));
+
+    const attempts = stub.creates.filter((c) => c.key === 'implement');
+    expect(attempts).toHaveLength(2);
+    expect(stub.listCalls()).toBeLessThanOrEqual(attempts.length);
   });
 });
 
