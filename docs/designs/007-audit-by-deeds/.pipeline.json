@@ -10,13 +10,15 @@
   "status": "running",
   "lastStage": "fix",
   "designRound": 2,
-  "codeRound": 0,
+  "codeRound": 1,
   "designBudgetUsed": 1,
-  "codeBudgetUsed": 1,
+  "codeBudgetUsed": 3,
   "editorialDone": false,
-  "testsGreen": false,
+  "testsGreen": true,
   "testsNeedUpdate": false,
-  "stageFailures": {},
+  "stageFailures": {
+    "code-review:compatibility": 1
+  },
   "stageCommits": [
     "87eb2a3728e9c42b8f594b549f7133690de09907",
     "63f4f3c126eac4ec6384715eee2065239c16bbfd",
@@ -28,7 +30,8 @@
     "737566a10f7ea459dfe7f25565c8491408e637c0",
     "848fa22274795896f864d181229b897dc594e90a",
     "29087ca8da895ff9a4b546a43a484ee7dca9e467",
-    "ac7b03ec3bc7ca6838f0413efc7ef66367b396f5"
+    "ac7b03ec3bc7ca6838f0413efc7ef66367b396f5",
+    "95b73560fab5571ad65610ffe4f790d080d715c1"
   ],
   "forceNext": null,
   "results": [
@@ -565,6 +568,238 @@
       "transcript": "docs/designs/007-audit-by-deeds/transcripts/fix-r0.md",
       "durationMs": 659711,
       "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e3842a544ffeBnfCp3xi63KaTk",
+      "agent": "code/coder",
+      "at": 1794352488209,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "fix(orchestration): attach cause when wrapping child-walk fetch errors"
+      },
+      "transcript": "docs/designs/007-audit-by-deeds/transcripts/fix-r0.md",
+      "durationMs": 50236,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e3841cb1bffdkavaoF92u4BBmt",
+      "agent": "codereview/code-security",
+      "at": 1794352788836,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1097",
+            "problem": "The child-walk catch resets `violations.length = 0`, discarding violations already detected from descendant sessions when a later enumeration or message fetch in the same walk fails. The walk is entered only when the parent list is clean, so the reset can only drop child findings: a confirmed deed (e.g. a child's completed read of a transcripts/ file) becomes a clean pass with a 'walk incomplete' gate line. This is worse than the design's stated failure mode (Risks row: deeds UNSEEN are the gap, deeds seen must not be erased), and it is an agent-shaped bypass of the defense-in-depth audit — a stage that delegates one violating child plus a second child whose message fetch stalls past requestTimeoutMs converts a detected violation into a pass; it also fires benignly on any transient server fault mid-walk.",
+            "fix": "Delete `violations.length = 0;` from the catch — keep the violations collected from successfully-fetched descendants before the failure, keep the console.warn/gateLog partial-audit record, and let surviving child violations reach the `violations.length > 0` failure branch. Add a pin: a fake client whose first child reads a transcripts/ path and whose second descendant fetch throws must still fail the attempt with the violation plus the walk-incomplete gate entry."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:629-634",
+            "problem": "The design's compatibility matrix promises a third enumeration route (direct `GET /session/:id/children` against the configured baseUrl with the client's auth headers) and states 'the walk always has a route'; the implementation probes only `session.children` and `session.list` and throws when neither client method exists. With `subagent: []` in ACCESS_FIELDS, that throw means every delegation's evidence goes unseen on such a client — a logged but clean verdict, a coverage gap versus the reviewed design text.",
+            "fix": "Implement the direct-HTTP third route per the compatibility matrix, or amend the design matrix/rollout to state the two client-probed routes are the shipped envelope so the reviewed claim matches the shipped audit."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1098-1102",
+            "problem": "The walk-failure console.warn interpolates the server-supplied error string raw, while the module's own printable() posture (independence.ts:270-281, and gateLog at runner.ts:1425) exists to keep control/escape bytes from server- or model-chosen text off the operator terminal. Consistency only — the pre-existing bounded() warn has the same shape.",
+            "fix": "Wrap the error text in `brief(printable(String(...)))` in the warn message."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:639-668",
+            "problem": "The session.list pagination crawl has no anti-loop bound: a server that keeps returning the same non-empty cursor.next pages forever (each request time-boxed, iteration unbounded), with byParent re-accumulating duplicates. It mirrors the pre-existing listSessionMessages loop, but new code should not clone the flaw.",
+            "fix": "Stop when a cursor value repeats (visited-cursor set) or cap the total number of pages per walk."
+          }
+        ]
+      },
+      "transcript": "docs/designs/007-audit-by-deeds/transcripts/code-review-security-r1c0.md",
+      "durationMs": 294984,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e3841cb1bffeau6QGKkxFhXXom",
+      "agent": "codereview/code-compatibility",
+      "at": 1794352914338,
+      "transcript": "docs/designs/007-audit-by-deeds/transcripts/code-review-compatibility-r1c0.md",
+      "durationMs": 420486,
+      "nudges": 0,
+      "failure": "independence violation: read a review report: docs/designs/007-audit-by-deeds/reviews/code/**"
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e3841cb1cffemk9iiWBkUoD6lh",
+      "agent": "codereview/code-correctness",
+      "at": 1794353023512,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1070-1111",
+            "problem": "The child-walk audit sits inside executeInference's outer poll/parse loop, and every nudge path (continue at 1148/1174/1190/1212) re-enters it, so the descendant walk runs up to MAX_NUDGES+1 = 9 times per attempt. The proposal's cost paragraph fixes it as 'once per attempt after the reply, off the poll loop'. Consequences are new side effects: up to 9 near-identical 'independenceAudit' gate entries per attempt when the walk route is missing (which is every audited attempt of the nine pre-existing fakes, and of any client exposing neither SDK route), crowding the six-entry 'recent gates' view (runner.ts:2300-2302) and the persisted checkpoint, plus a repeat of the whole session-list crawl and one full paged message fetch per descendant on each nudge cycle.",
+            "fix": "Run the descendant walk at most once per attempt: hoist a walkAudited flag (or compute the descendant violations before the parse/nudge paths and reuse them), leaving the idempotent parent-list audit where it is."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:637-668",
+            "problem": "The session.list fallback pagination breaks only when pageCursorNext(page) is absent. If the endpoint ignores the cursor parameter (A4/A8 leave it unverified) but answers with a cursor.next, the for(;;) crawl never terminates: the BFS visited set cannot stop it because the pagination loop is separate, and byParent accumulates the same page's ids forever, hanging the attempt in the post-reply audit with only per-request timeouts.",
+            "fix": "Break when the returned cursor equals the cursor just sent (or has been seen before), and add a page/node cap on the enumeration."
+          },
+          {
+            "severity": "minor",
+            "location": "docs/designs/007-audit-by-deeds/03-build-notes.md:28,99-100",
+            "problem": "The notes state 'test files are not editable at this stage' and 'No test files were modified', and 'Files touched' lists no test files, while the change under review carries tests/pipeline/child-session-deeds.test.ts, tests/pipeline/child-deeds-retry.test.ts and extended pins at tests/pipeline/prompts.test.ts:207-212,359-372. A reviewer handed that diff and these notes is misled about the change set (and about the Test strategy #1-#8 pins existing).",
+            "fix": "List the test files in the change set, noting the test-authoring stage authored them, so the notes describe the diff a reviewer receives."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:585",
+            "problem": "listChildSessionMessages is exported, while the proposal's snippet keeps it module-private; the export exists only so child-session-deeds.test.ts:80-86 can drive the walk against fake clients. The widened module surface is undeclared.",
+            "fix": "Record the export in 03-build-notes.md's additions list (or drive the walk solely through the audit call site)."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/independence.ts:97-98",
+            "problem": "The delegation exemption keys on the tool-part name 'subagent', established only by fixtures (independence.test.ts:249-262). If a real server records the delegation part under another name, 'subagent: []' is inert: the false positive is still cured because the unknown-tool path never scans payload keys, but pin (a) would pin nothing production exercises.",
+            "fix": "Confirm the recorded delegation part name from one real session message list and map that name in ACCESS_FIELDS as well."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1084-1092",
+            "problem": "The zero-descendant tripwire inspects only the parent list (hasCompletedDelegation(lastSeen, ...)). Proposal 2 says 'an audited message list'; a child list that itself holds a completed subagent part whose own descendants went unenumerated triggers no warning.",
+            "fix": "Apply hasCompletedDelegation to each audited child list too, or note the narrower parent-only reading in the build notes."
+          },
+          {
+            "severity": "nit",
+            "location": "docs/designs/007-audit-by-deeds/03-build-notes.md:127-139",
+            "problem": "Claims this seat could not evaluate: shell was denied, so 'npm run check green / 241/241 tests' and the exact diff boundary were not executed or reproduced here; note also that 'check' does not run typecheck (package.json:23), so a type slip in the new code would not fail the gate the notes cite as evidence.",
+            "fix": "No change required for the code: re-run 'npm run check' and 'npm run typecheck' in a seat that has shell and record the output."
+          }
+        ]
+      },
+      "transcript": "docs/designs/007-audit-by-deeds/transcripts/code-review-correctness-r1c0.md",
+      "durationMs": 529661,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e383d4a90ffevGcLyECbTmoh7I",
+      "agent": "codereview/code-performance",
+      "at": 1794353086114,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1070-1083",
+            "problem": "The descendant walk runs unconditionally on every clean attempt, with no key to delegation. Attempts that contain no `subagent` part at all still pay a `session.children` call per BFS node, or on the fallback route a full paged crawl of the server's whole session list (runner.ts:639-668). Per 03-build-notes deviation #2, every attempt under the nine pre-existing fake clients takes the neither-route throw, so each clean attempt burns a throw, a console.warn, and a persisted `gateLog('independenceAudit')` entry for no possible benefit.",
+            "fix": "Pre-guard the walk with delegation presence computed over the whole `lastSeen` list — any `subagent` part regardless of status or `since` (a resumed attempt's part sits pre-`since` while its child's deeds sit in-window, and §2's still-running-child risk has a non-completed part, so restricting the guard to completed in-window parts would open a detection gap). Skip the walk when the list holds none; keep the zero-descendant tripwire at 1086-1092 for the delegation-exists-but-enumeration-empty case."
+          },
+          {
+            "severity": "major",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1052-1116 (inside the outer stage loop at 983; re-entry via `continue` at 1148, 1174, 1190, 1212)",
+            "problem": "The audit block — and with it the child walk — runs once per completed turn, not once per attempt. The `if (gate === 'wait') continue` paths at 1148/1190 re-enter it with no new prompt and no new reply. Worst case per attempt is 1 + MAX_NUDGES = 9 audit passes, each re-running the whole descendant walk, i.e. up to nine whole-store session crawls plus nine × (descendants) full message fetches, and up to nine extra `gateLog` entries appended to the persisted checkpoint. Design 007 §2's cost paragraph states the walk happens \"once per attempt after the reply, off the poll loop\".",
+            "fix": "Bound the walk to at most once per attempt: keep a per-attempt count of the `subagent` parts walked, re-audit the parent list (pure, cheap) on later passes, and re-walk only when that count has grown — so a nudge that triggers a new delegation stays in view. If child lists are memoized across passes instead, keep the memo per-attempt, discard it at attempt end, and document that it is a point-in-time snapshot."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:637-668",
+            "problem": "The fallback enumeration is one paged `session.list` crawl (limit 200) looping until `cursor.next` is absent, indexing every parentID-bearing session the server has ever recorded into `byParent`. Request count and map size scale with the server's lifetime session store, not with this attempt's subtree; nothing bounds it, and there is no guard that the cursor advances, so an echoed `cursor.next` spins forever while `byParent` grows (the `visited` set guards the BFS, not this crawl).",
+            "fix": "Add a page budget (e.g. 50 pages) and break when `next === cursor`; on either limit, throw so the existing catch at 1093 degrades to the design's logged parent-only partial audit. Also pin §2's \"one enumeration per walk\" claim with a stub assertion that `session.list` is called once for a two-level tree."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1074-1110",
+            "problem": "The walk's awaits sit outside the stage deadline: `deadline` is consulted only in the inner poll loop (996, 1129). Each request site costs up to 2 × DEFAULT_REQUEST_TIMEOUT_MS = 60s through `bounded()`'s retry (runner.ts:712), and the walk makes one site per page plus one per descendant, so a half-open server pushes a clean attempt minutes past `stageTimeoutMs` (30 min default) — multiplied again by the per-pass repetition above. `bounded()`'s own comment says the caller owns the stage deadline; the walk never exercises that.",
+            "fix": "Give the walk a whole-walk budget derived from the remaining deadline (e.g. `AbortSignal.timeout(Math.max(1, deadline - Date.now()))`, or a deadline check before each `descendantMessages`) and route expiry into the same caught path at 1093, naming the truncation in the `independenceAudit` gate line."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/independence.ts:249-251",
+            "problem": "Once a key is in PATH_ACCESS_KEYS, its entire value subtree is handed to the uncapped recursive `stringValues` (259-268), so the MAX_PATH_SCAN_NODES budget documented at 118-123 does not apply to that subtree. Harmless for real tool inputs, but the comment promises a bound the code does not deliver.",
+            "fix": "Apply the same node budget inside `stringValues` for the path-key case, or narrow the comment to \"caps traversal of payload nodes, not the values sitting under access keys\"."
+          }
+        ]
+      },
+      "transcript": "docs/designs/007-audit-by-deeds/transcripts/code-review-performance-r1c0.md",
+      "durationMs": 297245,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e383b6058ffeJY9xRCpnWPuYmq",
+      "agent": "codereview/code-compatibility",
+      "at": 1794353217196,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:629-634",
+            "problem": "The Compatibility matrix row 'OpenCode server/SDK without a children method' promises a three-route chain (SDK session.children, else SDK session.list + parentID filter, else a direct GET /session/:id/children against baseUrl) and asserts 'the walk always has a route'. The code implements only the two SDK-method probes; when the client exposes neither, listChildSessionMessages throws and the audit degrades to parent-only. A4 (the pinned @opencode/client exposes a children- or list-method) remains unverified — node_modules is not installed in the worktree and the diff carries no evidence Rollout step 1 (install, read the SDK types, fix the route) was performed — so the third, promised route has no code path (checklist item 1: a supported environment lacks the promised path). Degradation is at least logged (warn + independenceAudit gate entry), hence minor.",
+            "fix": "Implement the direct GET /session/:id/children fallback against the configured baseUrl with the client's auth headers, or verify the pinned @opencode/client ^2.1.4 exposes session.list and amend the matrix row to the two routes actually implemented, recording the Rollout step 1 result."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/budget.test.ts:109-125 (all nine named stubs: reply-contract, pass-finalize, parallel-integration, parallel-fanout, budget, parallel-escalation, stage-lifecycle, funnel, proposal-size); consequence at tools/orchestration/src/pipeline/runner.ts:1103",
+            "problem": "Test strategy #9 required the nine fake clients be 'extended with the session-list method their flows need'; the diff touches none of their session stubs (create/prompt/remove only). Every clean attempt in those existing integration flows now deterministically takes the walk's throw path: each appends an independenceAudit proceed:true entry to the checkpoint gate log and a console.warn. The suites still pass (no test asserts gate-log length or exact contents), but CI no longer exercises those flows through the walk's success path, and checkpoints/CI output accumulate degradation noise the design did not ask for (checklist item 7: plan-named test work not delivered).",
+            "fix": "Add a minimal `list: async () => ({ data: [...], cursor: { previous: null, next: null } })` to the nine stubs' session objects, as child-session-deeds.test.ts's delegatingClient already does, so those flows walk successfully."
+          }
+        ]
+      },
+      "transcript": "docs/designs/007-audit-by-deeds/transcripts/code-review-compatibility-attempt2-r1c0.md",
+      "durationMs": 302828,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e3839b5e3ffeepuuv86oDHm6dh",
+      "agent": "codereview/code-testing",
+      "at": 1794353293736,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "tools/orchestration/src/pipeline/runner.ts:595,629-681; tools/orchestration/tests/pipeline/child-session-deeds.test.ts:47-70; tools/orchestration/tests/pipeline/child-deeds-retry.test.ts:160-166",
+            "problem": "The walk probes `session.children` first, but the pinned @opencode/client ^2.1.4 exposes no `session.children` on the promise client (verified over dist/*.d.ts), so every production run takes the `session.list` + parentID-index fallback route. Every fake client with a non-empty descendant tree also provides `session.children`, so all walk and integration tests take the children route; the only list-route fake (delegatingClient) holds zero descendants. The fallback's parentID indexing, BFS, and cursor.next pagination — the route carrying the design's child-deeds guarantee in production — have no positive-path coverage; a shape regression there degrades every run to parent-only audits with the suite still green.",
+            "fix": "Pin the fallback route with a non-empty tree: make at least one list-only fake (no `session.children`) whose `session.list` pages with `cursor.next`, and assert the grandchild is reached through the parentID index and audited (ideally also run the #6 end-to-end walk on the list route). This is what Test strategy #9's fake-client extension anticipated once A4 is settled."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/budget.test.ts:108-125 (and the eight sibling fakes: reply-contract, pass-finalize, parallel-integration, parallel-fanout, parallel-escalation, stage-lifecycle, funnel, proposal-size)",
+            "problem": "Test strategy #9 requires the nine existing fake clients be extended with the session-list method their flows need; the diff touches none of them. Every one of their stage attempts now enters the child-walk fetch-failure catch, adding a console.warn and a new `independenceAudit` (proceed: true) entry to every scenario's saved gateLog, and those scenarios now verify the degraded parent-only path instead of the designed walk.",
+            "fix": "Give those fakes a minimal `session.list` returning one empty page wherever the flow reaches the audit call site."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/prompts.test.ts:207-212 and 355-375",
+            "problem": "The Test strategy #8 pins (bright-line sentence, formatter duty in both test templates) exist and assert the right rendered content but carry no `// proves: Test strategy #8` citation, which checklist item 1 requires of every numbered strategy item.",
+            "fix": "Add `// proves: Test strategy #8` comments to the bright-line assertions and to the run-7 stage guidance test."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/pipeline/child-deeds-retry.test.ts:269",
+            "problem": "Strategy #6 promises the budget pin shows 'one gate entry per failure', but the assertion is gateLog.some(g => g.gate === 'stageFailure') — existence, not count.",
+            "fix": "Assert exactly two stageFailure gate entries for the implement stage (attempt 1 and the retry)."
+          }
+        ]
+      },
+      "transcript": "docs/designs/007-audit-by-deeds/transcripts/code-review-testing-r1c0.md",
+      "durationMs": 270201,
+      "nudges": 0
     }
   ],
   "gateLog": [
@@ -616,10 +851,24 @@
       "proceed": false,
       "reason": "npm run check red",
       "at": 1794352437941
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check green",
+      "at": 1794352493785
+    },
+    {
+      "gate": "stageFailure",
+      "round": 1,
+      "proceed": false,
+      "reason": "code-review:compatibility: independence violation: read a review report: docs/designs/007-audit-by-deeds/reviews/code/**",
+      "at": 1794352914338
     }
   ],
   "startedAt": 1794348961824,
-  "updatedAt": 1794352437941,
+  "updatedAt": 1794353293736,
   "baseRef": "7844c17171465dd779f8db6671801eb058bd2eb3",
   "designCycle": 3,
   "designStamp": "f4f64f9c7a62e1487a3ad86706965ae11544eb87",
@@ -763,5 +1012,7 @@
       "complexity"
     ]
   },
-  "reviseNoChange": false
+  "reviseNoChange": false,
+  "codeCycle": 0,
+  "codeStamp": "95b73560fab5571ad65610ffe4f790d080d715c1"
 }
