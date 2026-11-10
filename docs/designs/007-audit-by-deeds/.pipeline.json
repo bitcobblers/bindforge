@@ -8,8 +8,8 @@
     "path": "docs/prompts/audit-by-deeds.md"
   },
   "status": "running",
-  "lastStage": "design-review",
-  "designRound": 1,
+  "lastStage": "proposal-final",
+  "designRound": 2,
   "codeRound": 0,
   "designBudgetUsed": 1,
   "codeBudgetUsed": 0,
@@ -23,7 +23,8 @@
     "e02ad362c9b3c60d89f9bffef934309a91d53e4b",
     "db0f3a3b3d048faae9022a23b945724c5254c52f",
     "9e0c355a1fe90ca0f2f919f9b52f1c7d721b4b08",
-    "49e3448a317307a1b3a6bb6d3cee1d6c238b0884"
+    "49e3448a317307a1b3a6bb6d3cee1d6c238b0884",
+    "ce2b5d6e6364183652504ea846dec2206093849b"
   ],
   "forceNext": null,
   "results": [
@@ -428,6 +429,96 @@
       "transcript": "docs/designs/007-audit-by-deeds/transcripts/design-review-correctness-r1c2.md",
       "durationMs": 213268,
       "nudges": 0
+    },
+    {
+      "stage": "proposal-final",
+      "round": 0,
+      "sessionID": "ses_e385fb10fffe5FsD63nmleWK6b",
+      "agent": "design/editor",
+      "at": 1794350675006,
+      "reply": {
+        "ambiguities": [
+          "Options considered → Depth-1 child walk: \"would restore the blind spot for the price of zero extra machinery\" attached the cost clause ambiguously; both recoverable readings state the same facts, so it was rephrased to \"would restore the blind spot, and closing it costs no extra machinery\" rather than flagged with an editor note.",
+          "Validation posture: \"its fixes\" had an ambiguous antecedent (this run vs. the design); rephrased to \"the design's fixes\", which matches the paragraph and Rollout step 4. No sentence was left ambiguous, so no Editor notes section was added."
+        ],
+        "commitMessage": "docs: final language pass on the 007 audit-by-deeds proposal"
+      },
+      "transcript": "docs/designs/007-audit-by-deeds/transcripts/proposal-final-r0.md",
+      "durationMs": 140594,
+      "nudges": 0,
+      "docLines": 342,
+      "docLinesAdded": 15,
+      "docLinesRemoved": 15
+    },
+    {
+      "stage": "editorial-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e385d8b95ffe7vq7mJdRXIF01c",
+      "agent": "review/design-compatibility",
+      "at": 1794350741547,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/007-audit-by-deeds/transcripts/editorial-review-compatibility-r2.md",
+      "durationMs": 66447,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e385d8b96ffe9NsJ1tFyj8Z7P4",
+      "agent": "review/design-correctness",
+      "at": 1794350793944,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/007-audit-by-deeds/transcripts/editorial-review-correctness-r2.md",
+      "durationMs": 118844,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:security",
+      "round": 2,
+      "sessionID": "ses_e385d8b95ffd4I3Ojcdll0yHYG",
+      "agent": "review/design-security",
+      "at": 1794350803998,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/007-audit-by-deeds/transcripts/editorial-review-security-r2.md",
+      "durationMs": 128898,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:performance",
+      "round": 2,
+      "sessionID": "ses_e385c87d1ffegTp1rqdFMIiZ3Z",
+      "agent": "review/design-performance",
+      "at": 1794350816071,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/007-audit-by-deeds/transcripts/editorial-review-performance-r2.md",
+      "durationMs": 74489,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:complexity",
+      "round": 2,
+      "sessionID": "ses_e385bbb24ffelOpBW8I0cD4atg",
+      "agent": "review/design-complexity",
+      "at": 1794350830139,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/007-audit-by-deeds/transcripts/editorial-review-complexity-r2.md",
+      "durationMs": 36158,
+      "nudges": 0
     }
   ],
   "gateLog": [
@@ -461,7 +552,7 @@
     }
   ],
   "startedAt": 1794348961824,
-  "updatedAt": 1794350534378,
+  "updatedAt": 1794350830140,
   "baseRef": "7844c17171465dd779f8db6671801eb058bd2eb3",
   "designCycle": 3,
   "designStamp": "f4f64f9c7a62e1487a3ad86706965ae11544eb87",

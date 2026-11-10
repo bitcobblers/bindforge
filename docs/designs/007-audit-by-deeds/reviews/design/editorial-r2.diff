@@ -1,0 +1,97 @@
+diff --git a/tmp/bindforge-editorial-audit-by-deeds-r2.md b/home/mike/.local/share/opencode/worktree/f852d4/quiet-orchid/docs/designs/007-audit-by-deeds/02-proposal.md
+index f4f64f9..4f3575f 100644
+--- a/tmp/bindforge-editorial-audit-by-deeds-r2.md
++++ b/home/mike/.local/share/opencode/worktree/f852d4/quiet-orchid/docs/designs/007-audit-by-deeds/02-proposal.md
+@@ -22,7 +22,7 @@ tool looks, never what text it carries.**
+ ## Goals / Non-goals
+ 
+ - Goals:
+-  - `subagent` (delegation) parts are never evidence from their input text;
++  - `subagent` (delegation) parts are never judged on their input text;
+     the child sessions' own completed tool parts become the evidence, so the
+     audit sees deeds it is blind to today (source §1).
+   - `execute` and every unknown tool are judged on path-naming access fields
+@@ -42,7 +42,7 @@ tool looks, never what text it carries.**
+   - No change to the retry budget, nudge loop, escalation wording, or
+     resumability rule (`retryInSameSession`, runner.ts:1121–1126) — only
+     attempt-2 prompt content changes.
+-  - No runner-executed formatter — re-affirmed rejected in run 003, pinned at
++  - No runner-executed formatter — rejection re-affirmed in run 003, pinned at
+     `tests/pipeline/fix-trigger.test.ts:15–20` (A11).
+   - No claim of detecting obfuscated or unrecorded accesses — the audit's
+     stated coverage posture (A10) is unchanged.
+@@ -69,8 +69,8 @@ tool looks, never what text it carries.**
+ 
+ **Word-based exemption (negative scan: don't flag prohibition sentences).**
+ Rejected: it is the same words-not-acts error seen from the other side, and it
+-keeps the perverse loop the source names — hardened prompts quote the rule more,
+-raising the false-positive rate of a content scan. The fix must remove the
++perpetuates the perverse loop the source names — hardened prompts quote the rule
++more, raising the false-positive rate of a content scan. The fix must remove the
+ content judgment, not curate its vocabulary.
+ 
+ **Full-scan removal with no replacement ("judge nothing for unknown tools").**
+@@ -92,8 +92,8 @@ message lists; the matcher stays a function over message lists.
+ 
+ **Depth-1 child walk (direct children only).** Rejected: two levels of
+ delegation (a subagent delegating to its own subagent — custom agents can, per
+-https://opencode.ai/docs/agents/) would restore the blind spot for the price of
+-zero extra machinery; a BFS over the attempt's session subtree costs one
++https://opencode.ai/docs/agents/) would restore the blind spot, and closing it
++costs no extra machinery: a BFS over the attempt's session subtree costs one
+ children call per session in that subtree.
+ 
+ **Failure-reason injection in `runWithRetry` only.** Rejected: the source names
+@@ -160,8 +160,8 @@ async function* listChildSessionMessages(
+   (`since`, `reviewStage`, `ownReportPath`), appending child violations as
+   `` `${violation} (via child session ${sessionID})` ``. `since` bounds what
+   the matcher judges, not what the walk fetches (A7, A8).
+-- A child-walk fetch error after `bounded()`'s single retry is caught, logged
+-  (`console.warn` plus one `gateLog` line naming the session it could not
++- A child-walk fetch error after `bounded()`'s single retry is caught and
++  logged (`console.warn` plus one `gateLog` line naming the session it could not
+   enumerate), and the audit proceeds on the parent list alone — a stage
+   failure on an infrastructure fault is not what the source asks for (A10).
+   Tripwire: `console.warn` also fires when an audited message list holds a
+@@ -186,7 +186,7 @@ carry it.
+   failureNote?: string;
+   ```
+ 
+-- In `executeInference`, when building `fullPrompt` (runner.ts:693–710) and
++- In `executeInference`, when building `fullPrompt` (runner.ts:693–710), if
+   `handle.resume` is absent and `failureNote` is set, append after the rendered
+   template:
+ 
+@@ -230,10 +230,10 @@ carry it.
+ 
+ ### Validation posture (dogfooding)
+ 
+-This run executes under the CURRENT matcher: its fixes are exercised live only
+-by the first post-merge run. Per the source's note, this run's stage agents
+-name allowed paths/commands directly in any subagent delegation and do not
+-copy prohibition sentences into delegation text.
++This run executes under the CURRENT matcher, so the design's fixes are
++exercised live only by the first post-merge run. Per the source's note, this run's
++stage agents name allowed paths/commands directly in any subagent delegation and
++do not copy prohibition sentences into delegation text.
+ 
+ ## Risks
+ 
+@@ -242,7 +242,7 @@ copy prohibition sentences into delegation text.
+ | An unknown tool names its access under a key outside `PATH_ACCESS_KEYS` → missed violation | Medium | Low–Medium (audit is defense-in-depth; the fence is the primary control — A10) | Allowlist covers the key names the platform's tools actually use; the child walk catches delegated effects; the miss class is the same accepted class as obfuscated shells (independence.ts:30–41) |
+ | A descendant still running at the snapshot contributes no completed parts, so its deeds go unseen for that attempt (a net loss vs today's delegation-text scan) | Low (background delegations outliving the parent's reply) | Medium (detection gap for one attempt) | Stated snapshot semantics (§2); the fence still blocks the access (A10); same accepted-gap posture as the fetch-error row |
+ | Child actions misattributed to this attempt (a resumed or sibling session's older children) | Low | Medium (false failure) | Walk is parent-scoped from this attempt's own sessionID; the `since` filter skips pre-attempt messages in any fetched list (A7); pinned by Test strategy #5 |
+-| Child-walk fetch fails and the attempt audited parent-only | Low | Low (detection gap for one attempt, fence still holds) | `console.warn` plus a `gateLog` line name the partial audit in the run record; A10 posture; not treated as a stage failure |
++| Child-walk fetch fails and the attempt is audited parent-only | Low | Low (detection gap for one attempt, fence still holds) | `console.warn` plus a `gateLog` line name the partial audit in the run record; A10 posture; not treated as a stage failure |
+ | Failure note quotes forbidden paths into the attempt-2 prompt/transcript | Low | Low | Prompt text is not audit input (A9); the note enters as a labeled log excerpt bounded by `brief(printable(...))` |
+ | The formatter prompt line is guidance, not a gate — an engineer can still skip it | Medium | Low (today's failure mode unchanged, and the fix→format ownership route still catches it) | Pinned prompt (Test strategy #8) keeps the line from being silently reverted, which is what the source asks for |
+ 
+@@ -305,7 +305,7 @@ copy prohibition sentences into delegation text.
+    on the next run's attempts. No migrations, no config, no persisted field.
+ 3. The two prompt lines land with their pins (source §3: re-landed as reviewed
+    artifacts); their first live effect is the next test-authoring/test-update
+-   and design-review stage.
++   and design-review stages.
+ 4. First post-merge dogfooded run is the live check of the child walk and the
+    attempt-2 note (Validation posture).
+ 
