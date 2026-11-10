@@ -8,14 +8,14 @@
     "path": "docs/prompts/audit-by-deeds.md"
   },
   "status": "running",
-  "lastStage": "fix",
+  "lastStage": "test-update",
   "designRound": 2,
   "codeRound": 1,
   "designBudgetUsed": 1,
   "codeBudgetUsed": 5,
   "editorialDone": false,
-  "testsGreen": false,
-  "testsNeedUpdate": true,
+  "testsGreen": true,
+  "testsNeedUpdate": false,
   "stageFailures": {
     "code-review:compatibility": 1
   },
@@ -35,7 +35,8 @@
     "7461e9db26d07da2d7cc4eae60bf153a13018fd0",
     "aff51e89e94b2b444ad00cafec9054f568e47e40",
     "5ea1b4ff2a71fb1321ba255fad30834c381e2206",
-    "5be92d3c0f24efda46df0d69426ef556305cd5e7"
+    "5be92d3c0f24efda46df0d69426ef556305cd5e7",
+    "1ce23f4dff33a4bbe52ed6e716afb3590749fcdd"
   ],
   "forceNext": null,
   "results": [
@@ -845,6 +846,87 @@
       "transcript": "docs/designs/007-audit-by-deeds/transcripts/fix-r1.md",
       "durationMs": 337119,
       "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 1,
+      "sessionID": "ses_e3823e842ffeN6wtssT7gqJ3YJ",
+      "agent": "code/test-engineer",
+      "at": 1794354722827,
+      "reply": {
+        "commitMessage": "test(orchestration): pin the bounded session-list crawl and the escalate-pair budget shape\n\nTest update for design 007 after the round-1 fix stage; tests only, no\nweakening or removal of any existing pin.\n\n- child-deeds-retry.test.ts: the Test strategy #6 budget pin asserted two\n  `stageFailure` gate entries. Design 007 §3 keeps gate entries and the\n  escalation flow untouched, so the unchanged shape is one `stageFailure` for\n  attempt 1 plus the run's `escalate` naming that stage (03-build-notes\n  addendum 3 puts the fix in the pin, not the runner). The pair and the\n  escalate entry naming the stage are now pinned.\n- child-session-deeds.test.ts: new pin that a `session.list` enumeration which\n  repeats its `cursor.next` bounds itself and degrades to the logged partial\n  audit instead of hanging the attempt in the post-reply audit (performance\n  r1c0 finding 3, correctness r1c0 finding 2).\n- child-session-deeds.test.ts: new pin that the walk still runs for a resumed\n  attempt whose `subagent` part sits outside the audit window, so an\n  out-of-window delegation cannot hide the child's in-window deed (performance\n  r1c0 finding 1's status/`since` clause).\n- The nine pre-existing fakes stay unchanged: their attempts hold no\n  `subagent` part, so the delegation guard skips the walk entirely and their\n  run records carry no partial-audit line — Test strategy #9's session-list\n  extension is not needed on their flows any more.\n\nGate note: the shell tool is denied at this stage, so `npx prettier --write`\nand `npm test` could not be run. The two touched files were hand-checked\nagainst the package's prettier config (no line over 100 chars, single quotes,\ntrailing commas, no import changes, break shapes copied from the same files)"
+      },
+      "transcript": "docs/designs/007-audit-by-deeds/transcripts/test-update-r1.md",
+      "durationMs": 270383,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e381fb210ffe4u34cObfV8U9lE",
+      "agent": "codereview/code-security",
+      "at": 1794355006990,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:609-624",
+            "problem": "The third enumeration route implemented to close security r1 finding #2 — directChildSessions plus the ServerConnection wiring in cli.ts — is executed by no test: every fake client in the suite exposes session.list or session.children, so route three is never reached, and the tests' ChildWalk type does not even pass the options argument. The compat matrix's 'the walk always has a route' claim over a credential-bearing fetch path is verified by inspection only.",
+            "fix": "Pin the route: stub globalThis.fetch, use a fake client with neither session.children nor session.list, and call listChildSessionMessages with { connection: { baseUrl, username, password } }; assert the recorded request hits /api/session/<id>/children with the expected Authorization header, that its (sessionEntries-shaped) records feed the same audit — a child transcript read fails the attempt — and that a non-OK status lands in the caught partial-audit path."
+          }
+        ]
+      },
+      "transcript": "docs/designs/007-audit-by-deeds/transcripts/code-review-security-r1c1.md",
+      "durationMs": 278505,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e381fb20fffewawlPweoMl5JGW",
+      "agent": "codereview/code-testing",
+      "at": 1794355027201,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:609-624,789-830; tools/orchestration/cli.ts:171-179",
+            "problem": "The fix round added the compat matrix's third enumeration route (directChildSessions: direct GET /api/session/:id/children with basic auth, its BFS, and the no-routes error throw) and wired a ServerConnection through the CLI, but no test passes `connection` to listChildSessionMessages or stubs fetch for it; a shape regression in the URL path, auth header, or response parsing, or the throw at 827-830, ships untested (checklist item 7). Not blocking: the pinned SDK exposes session.list so production never reaches this branch, and the call site already catches it as a partial audit.",
+            "fix": "One walk test with a fake client lacking both session.children and session.list plus vi.stubGlobal('fetch', ...) (pattern at tests/opencode-runner.test.ts:56), passing connection: { baseUrl }: assert the request path /api/session/<id>/children, that a child enumerated that way is audited, and that a no-route client without connection lands in the caught partial-audit path."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:664-677",
+            "problem": "budgetMs() clamps each walk request to the stage deadline and throws 'truncated at the stage deadline' once it expires; no test fires the clamp or the expired-budget path. The new tests cover the repeated-cursor stop and list-route cost, but the deadline clamp the walk's comment claims to finally exercise stays unpinned.",
+            "fix": "Call listChildSessionMessages with an already-expired `deadline` option and assert the throw (or, at the call site, the caught partial-audit outcome with the truncation named)."
+          },
+          {
+            "severity": "minor",
+            "location": "checklist item 6 — tools/orchestration `npm run check`",
+            "problem": "This seat's shell tool was permission-denied for the whole dissent pass, so I could not run npm run check and cannot paste its tail. Per the skill rule an un-evaluated checklist item is a finding, not a pass. Static cross-checks of every new assertion against the implementation (route dispatch, delegation guard, stageFailure/escalate gate shape, list-route paging) found no contradiction, and the run's runner verifies the suite independently.",
+            "fix": "No code change; the runner's independent npm run check record stands in for this seat's execution."
+          }
+        ]
+      },
+      "transcript": "docs/designs/007-audit-by-deeds/transcripts/code-review-testing-r1c1.md",
+      "durationMs": 298716,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e381fb210ffdwFjqKVSzqVbGI4",
+      "agent": "codereview/code-performance",
+      "at": 1794355057468,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/007-audit-by-deeds/transcripts/code-review-performance-r1c1.md",
+      "durationMs": 328983,
+      "nudges": 0
     }
   ],
   "gateLog": [
@@ -938,10 +1020,17 @@
       "proceed": false,
       "reason": "npm run check red",
       "at": 1794354452405
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check green",
+      "at": 1794354728417
     }
   ],
   "startedAt": 1794348961824,
-  "updatedAt": 1794354452405,
+  "updatedAt": 1794355057468,
   "baseRef": "7844c17171465dd779f8db6671801eb058bd2eb3",
   "designCycle": 3,
   "designStamp": "f4f64f9c7a62e1487a3ad86706965ae11544eb87",
@@ -1255,5 +1344,5 @@
   },
   "reviseNoChange": false,
   "codeCycle": 1,
-  "codeStamp": "95b73560fab5571ad65610ffe4f790d080d715c1"
+  "codeStamp": "1ce23f4dff33a4bbe52ed6e716afb3590749fcdd"
 }
