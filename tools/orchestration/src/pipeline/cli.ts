@@ -6,7 +6,7 @@ import yargs, { type Argv } from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
 import { DEFAULT_BASE_URL, createClient } from '../opencode-runner.js';
-import { renderStatus, resumePipeline, runPipeline } from './runner.js';
+import { type ServerConnection, renderStatus, resumePipeline, runPipeline } from './runner.js';
 import { DEFAULT_CONFIG } from './stages.js';
 import { loadState } from './state-store.js';
 
@@ -168,6 +168,15 @@ export async function main(argv: string[] = process.argv): Promise<number> {
     username: args.username as string | undefined,
     password: args.password as string | undefined,
   });
+  // Same connection the client was created with: the child-session walk's
+  // direct `GET /session/:id/children` fallback (compat matrix) needs the
+  // baseUrl and the basic-auth credentials to reach the server the client
+  // cannot reach through its own methods.
+  const server: ServerConnection = {
+    baseUrl: String(args.baseUrl),
+    username: args.username as string | undefined,
+    password: args.password as string | undefined,
+  };
 
   if (args.$0 === undefined) {
     return 1;
@@ -190,6 +199,7 @@ export async function main(argv: string[] = process.argv): Promise<number> {
         sourcePath: sourcePath(repo, String(args.source)),
         promptsDir: PROMPTS_DIR,
         client,
+        server,
         forceStage: args.stage as string | undefined,
         pin: { nnn: args.nnn as string | undefined, slug: args.slug as string | undefined },
         force: Boolean(args.force),
@@ -204,6 +214,7 @@ export async function main(argv: string[] = process.argv): Promise<number> {
         slug: String(args.slug),
         promptsDir: PROMPTS_DIR,
         client,
+        server,
         forceStage: args.stage as string | undefined,
         extendBudget: args.extendBudget as number | undefined,
         cfg: { ...DEFAULT_CONFIG, maxParallelReviews },

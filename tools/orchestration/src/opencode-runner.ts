@@ -44,6 +44,22 @@ export interface ClientAuth {
 }
 
 /**
+ * The HTTP Basic auth header for these credentials, or undefined when no
+ * password is supplied (requests then go unauthenticated). Exported so the
+ * pipeline's direct child-enumeration route sends exactly the authorization
+ * the client itself would.
+ */
+export function basicAuthHeader(auth: ClientAuth): Record<string, string> | undefined {
+  return auth.password
+    ? {
+        Authorization: `Basic ${Buffer.from(
+          `${auth.username ?? 'opencode'}:${auth.password}`,
+        ).toString('base64')}`,
+      }
+    : undefined;
+}
+
+/**
  * Create an OpenCode client pointed at the given server. When a password is
  * supplied, every request is sent with an HTTP Basic auth header
  * (`Authorization: Basic base64(<username>:<password>)`).
@@ -52,13 +68,7 @@ export function createClient(
   baseUrl: string = DEFAULT_BASE_URL,
   auth: ClientAuth = {},
 ): OpenCodeClient {
-  const headers = auth.password
-    ? {
-        Authorization: `Basic ${Buffer.from(
-          `${auth.username ?? 'opencode'}:${auth.password}`,
-        ).toString('base64')}`,
-      }
-    : undefined;
+  const headers = basicAuthHeader(auth);
 
   return OpenCode.make({
     baseUrl,

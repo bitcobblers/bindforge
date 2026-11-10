@@ -7,6 +7,7 @@ import { join, relative, resolve } from 'node:path';
 import type { OpenCodeClient, SessionMessageAssistant, SessionMessageInfo } from '@opencode/client';
 import { z } from 'zod';
 
+import { basicAuthHeader } from '../opencode-runner.js';
 import { createSemaphore } from './concurrency.js';
 import {
   TEST_PATH_RE,
@@ -78,6 +79,19 @@ import type { Finding, LockInfo, PipelineState, StageResult } from './types.js';
 // 1 — the same seats, strictly one at a time) and finalizes once per pass.
 // ---------------------------------------------------------------------------
 
+/**
+ * The server connection the client was created with. The child-session walk's
+ * third enumeration route — a direct `GET /session/:id/children` (compat
+ * matrix: "OpenCode server/SDK without a children method") — hits this
+ * baseUrl with the same basic-auth header `createClient` sends. In-memory
+ * run options only; nothing here enters the checkpoint.
+ */
+export interface ServerConnection {
+  baseUrl: string;
+  username?: string;
+  password?: string;
+}
+
 export interface RunOptions {
   repoDir: string;
   sourcePath: string;
@@ -91,6 +105,8 @@ export interface RunOptions {
   pin?: IdentityPin;
   /** Start even when the identity's branch or design directory is taken. */
   force?: boolean;
+  /** Connection for the child walk's direct-HTTP enumeration fallback. */
+  server?: ServerConnection;
 }
 
 export interface ResumeOptions {
@@ -102,6 +118,8 @@ export interface ResumeOptions {
   forceStage?: string;
   /** Grant this many review rounds beyond the cap, recorded as operator consent. */
   extendBudget?: number;
+  /** Connection for the child walk's direct-HTTP enumeration fallback. */
+  server?: ServerConnection;
 }
 
 const LOCK_FILE = '.pipeline.lock';
@@ -511,15 +529,35 @@ export async function listSessionMessages(
 // so a malformed parentID graph cannot loop — yielding one message list at
 // a time so peak memory stays one list. The enumeration route is probed at
 // call time: `session.children` when the client exposes it, else one paged
-// `session.list` indexed by `parentID`. If neither is available the walk
-// throws; the audit call site catches that and proceeds parent-only with the
-// gap logged — a stage failure on an infrastructure fault is not what this
-// audit is for (the permission fence stays the primary control).
+// `session.list` indexed by `parentID` (capped crawl, see below), else a
+// direct `GET /session/:id/children` against the configured server
+// connection with the client's auth headers — all three exist server-side
+// (A3), so the walk always has a route (the compat matrix's "not whether").
+// Only when no connection was configured either does the walk throw; the
+// audit call site catches that and proceeds with the gap logged — a stage
+// failure on an infrastructure fault is not what this audit is for (the
+// permission fence stays the primary control).
+//
+// Cost rules (perf r1c0 #1–#4): the call site only starts a walk when the
+// attempt's own list holds a `subagent` part, and at most once per growth of
+// that count, so attempts that delegated nothing pay nothing and a nudge
+// loop cannot pay the walk nine times; the paged crawl carries a page
+// budget and a repeated-cursor stop; and every request inside the walk is
+// clamped to the stage deadline — an expired walk throws into the call
+// site's caught partial-audit path, naming the truncation in the gate line.
 
 interface SessionChildApi {
   children?: (input: { sessionID: string }, options?: { signal: AbortSignal }) => Promise<unknown>;
   list?: (input?: Record<string, unknown>, options?: { signal: AbortSignal }) => Promise<unknown>;
 }
+
+/**
+ * Cap on the paged `session.list` crawl. The server's session store grows
+ * with every run this location has ever had; the walk's budget does not.
+ * Hitting the cap throws into the call site's caught partial-audit path
+ * instead of spinning (perf r1c0 #3).
+ */
+const MAX_SESSION_LIST_PAGES = 50;
 
 /** Session records out of a `children`/`list` response (array or `{ data }`). */
 function sessionEntries(page: unknown): Array<{ id: string; parentID?: string }> {
@@ -560,6 +598,31 @@ function pageCursorNext(page: unknown): string | undefined {
   return typeof next === 'string' && next.length > 0 ? next : undefined;
 }
 
+/**
+ * The compat matrix's third enumeration route: a direct
+ * `GET /session/:id/children` against the configured `baseUrl` with the
+ * same basic-auth header `createClient` sends. The path carries the v2
+ * client's `/api` prefix (see the `DEFAULT_BASE_URL` note in
+ * `opencode-runner.ts`), so it hits the same server surface the SDK does.
+ * The response is unvalidated until `sessionEntries` shapes it.
+ */
+async function directChildSessions(
+  connection: ServerConnection,
+  sessionID: string,
+  signal: AbortSignal,
+): Promise<unknown> {
+  const url = new URL(`/api/session/${encodeURIComponent(sessionID)}/children`, connection.baseUrl);
+  const headers = basicAuthHeader({
+    username: connection.username,
+    password: connection.password,
+  });
+  const response = await fetch(url, { ...(headers === undefined ? {} : { headers }), signal });
+  if (!response.ok) {
+    throw new Error(`GET ${url.pathname} responded ${String(response.status)}`);
+  }
+  return await response.json();
+}
+
 async function descendantMessages(
   client: OpenCodeClient,
   sessionID: string,
@@ -576,6 +639,13 @@ async function descendantMessages(
   }
 }
 
+export interface ChildWalkOptions {
+  /** Server connection enabling the direct-HTTP enumeration route. */
+  connection?: ServerConnection;
+  /** Stage deadline (wall clock): the walk clamps every request to what it leaves. */
+  deadline?: number;
+}
+
 /**
  * Every descendant session of `sessionID` (children, grandchildren, …) with
  * its full creation-ordered message list. A point-in-time snapshot taken
@@ -586,10 +656,25 @@ export async function* listChildSessionMessages(
   client: OpenCodeClient,
   sessionID: string,
   requestTimeoutMs: number,
+  options: ChildWalkOptions = {},
 ): AsyncGenerator<{ sessionID: string; messages: SessionMessageInfo[] }> {
   const api = client.session as unknown as SessionChildApi;
   const visited = new Set<string>([sessionID]);
   const queue: string[] = [];
+  // `bounded()` caps one round-trip; the deadline caps the whole walk
+  // (perf r1c0 #4 — "the caller still owns the stage deadline", and here it
+  // finally exercises that ownership). An expired budget throws into the
+  // call site's caught partial-audit path, naming the truncation.
+  const budgetMs = (): number => {
+    if (options.deadline === undefined) {
+      return requestTimeoutMs;
+    }
+    const remaining = options.deadline - Date.now();
+    if (remaining <= 0) {
+      throw new Error(`the child-session walk of ${sessionID} was truncated at the stage deadline`);
+    }
+    return Math.min(requestTimeoutMs, remaining);
+  };
   // `bind` keeps the method call on the client object: SDK methods may close
   // over or use `this`.
   const children = typeof api.children === 'function' ? api.children.bind(api) : undefined;
@@ -600,10 +685,11 @@ export async function* listChildSessionMessages(
       if (parent === undefined) {
         continue;
       }
+      const timeoutMs = budgetMs();
       let listed: unknown;
       try {
         listed = await bounded(() =>
-          children({ sessionID: parent }, { signal: AbortSignal.timeout(requestTimeoutMs) }),
+          children({ sessionID: parent }, { signal: AbortSignal.timeout(timeoutMs) }),
         );
       } catch (error) {
         throw new Error(
@@ -619,7 +705,7 @@ export async function* listChildSessionMessages(
         visited.add(child.id);
         yield {
           sessionID: child.id,
-          messages: await descendantMessages(client, child.id, requestTimeoutMs),
+          messages: await descendantMessages(client, child.id, budgetMs()),
         };
         queue.push(child.id);
       }
@@ -627,63 +713,121 @@ export async function* listChildSessionMessages(
     return;
   }
   const list = typeof api.list === 'function' ? api.list.bind(api) : undefined;
-  if (list === undefined) {
-    throw new Error(
-      `enumerating the children of ${sessionID}: the client exposes neither session.children nor session.list`,
-    );
-  }
-  // One paged enumeration for the whole walk (not one per node), indexed by
-  // `parentID` — the same `cursor.next` crawl as `listSessionMessages`.
-  const byParent = new Map<string, string[]>();
-  let cursor: string | undefined;
-  for (;;) {
-    let page: unknown;
-    try {
-      page = await bounded(() =>
-        list(
-          { limit: 200, ...(cursor === undefined ? {} : { cursor }) },
-          { signal: AbortSignal.timeout(requestTimeoutMs) },
-        ),
-      );
-    } catch (error) {
-      throw new Error(
-        `listing sessions to find the children of ${sessionID}: ` +
-          String(error instanceof Error ? error.message : error),
-        { cause: error },
-      );
+  if (list !== undefined) {
+    // One paged enumeration for the whole walk (not one per node), indexed by
+    // `parentID` — the same `cursor.next` crawl as `listSessionMessages`,
+    // plus the bounds the pre-existing crawl lacks (sec r1c0 #4, perf r1c0
+    // #3): a repeated cursor stops the crawl, and a page budget keeps its
+    // request count and map size off the server's total session count.
+    const byParent = new Map<string, string[]>();
+    let cursor: string | undefined;
+    let pages = 0;
+    for (;;) {
+      const timeoutMs = budgetMs();
+      let page: unknown;
+      try {
+        page = await bounded(() =>
+          list(
+            { limit: 200, ...(cursor === undefined ? {} : { cursor }) },
+            { signal: AbortSignal.timeout(timeoutMs) },
+          ),
+        );
+      } catch (error) {
+        throw new Error(
+          `listing sessions to find the children of ${sessionID}: ` +
+            String(error instanceof Error ? error.message : error),
+          { cause: error },
+        );
+      }
+      for (const entry of sessionEntries(page)) {
+        if (entry.parentID === undefined || entry.parentID === entry.id) {
+          continue;
+        }
+        const siblings = byParent.get(entry.parentID) ?? [];
+        siblings.push(entry.id);
+        byParent.set(entry.parentID, siblings);
+      }
+      const next = pageCursorNext(page);
+      if (next === undefined) {
+        break;
+      }
+      if (next === cursor) {
+        throw new Error(
+          `listing sessions to find the children of ${sessionID}: ` +
+            'the server repeated the same cursor.next — the crawl stopped',
+        );
+      }
+      pages += 1;
+      if (pages >= MAX_SESSION_LIST_PAGES) {
+        throw new Error(
+          `listing sessions to find the children of ${sessionID}: the session store ` +
+            `outgrew the ${String(MAX_SESSION_LIST_PAGES)}-page crawl budget`,
+        );
+      }
+      cursor = next;
     }
-    for (const entry of sessionEntries(page)) {
-      if (entry.parentID === undefined || entry.parentID === entry.id) {
+    queue.push(sessionID);
+    for (let head = 0; head < queue.length; head += 1) {
+      const parent = queue[head];
+      if (parent === undefined) {
         continue;
       }
-      const siblings = byParent.get(entry.parentID) ?? [];
-      siblings.push(entry.id);
-      byParent.set(entry.parentID, siblings);
+      for (const childID of byParent.get(parent) ?? []) {
+        if (visited.has(childID)) {
+          continue;
+        }
+        visited.add(childID);
+        yield {
+          sessionID: childID,
+          messages: await descendantMessages(client, childID, budgetMs()),
+        };
+        queue.push(childID);
+      }
     }
-    const next = pageCursorNext(page);
-    if (next === undefined) {
-      break;
-    }
-    cursor = next;
+    return;
   }
-  queue.push(sessionID);
-  for (let head = 0; head < queue.length; head += 1) {
-    const parent = queue[head];
-    if (parent === undefined) {
-      continue;
-    }
-    for (const childID of byParent.get(parent) ?? []) {
-      if (visited.has(childID)) {
+  if (options.connection !== undefined) {
+    // Third route (compat matrix): a client with neither SDK method still
+    // gets the walk through the server endpoint (A3), so the enumeration
+    // route is never "whether", only which.
+    const connection = options.connection;
+    queue.push(sessionID);
+    for (let head = 0; head < queue.length; head += 1) {
+      const parent = queue[head];
+      if (parent === undefined) {
         continue;
       }
-      visited.add(childID);
-      yield {
-        sessionID: childID,
-        messages: await descendantMessages(client, childID, requestTimeoutMs),
-      };
-      queue.push(childID);
+      const timeoutMs = budgetMs();
+      let listed: unknown;
+      try {
+        listed = await bounded(() =>
+          directChildSessions(connection, parent, AbortSignal.timeout(timeoutMs)),
+        );
+      } catch (error) {
+        throw new Error(
+          `enumerating the children of ${parent}: ` +
+            String(error instanceof Error ? error.message : error),
+          { cause: error },
+        );
+      }
+      for (const child of sessionEntries(listed)) {
+        if (visited.has(child.id)) {
+          continue;
+        }
+        visited.add(child.id);
+        yield {
+          sessionID: child.id,
+          messages: await descendantMessages(client, child.id, budgetMs()),
+        };
+        queue.push(child.id);
+      }
     }
+    return;
   }
+  throw new Error(
+    `enumerating the children of ${sessionID}: the client exposes neither session.children ` +
+      'nor session.list, and no server connection was configured for the direct route',
+  );
 }
 
 /** A completed `subagent` part in this attempt's audited window: a delegation happened. */
@@ -702,6 +846,29 @@ function hasCompletedDelegation(messages: readonly SessionMessageInfo[], since: 
     }
   }
   return false;
+}
+
+/**
+ * Every `subagent` tool part in the list — any status, any age. The walk's
+ * guard (perf r1c0 #1): a list holding none has no delegation whose deeds
+ * could go unseen, so no network walk is worth paying. Restricting the guard
+ * to completed in-window parts would open a detection gap — a resumed
+ * attempt's part sits pre-`since` while its child's deeds sit in-window, and
+ * a still-running child is exactly §2's Risks row.
+ */
+function countDelegationParts(messages: readonly SessionMessageInfo[]): number {
+  let count = 0;
+  for (const m of messages) {
+    if (m.type !== 'assistant') {
+      continue;
+    }
+    for (const part of m.content ?? []) {
+      if (part.type === 'tool' && part.name === 'subagent') {
+        count += 1;
+      }
+    }
+  }
+  return count;
 }
 
 /**
@@ -977,6 +1144,12 @@ async function executeInference(
   // The most complete message list seen while polling this attempt; the
   // independence audit reads the tool calls and shells out of it.
   let lastSeen: SessionMessageInfo[] = [];
+  // Per-attempt count of the `subagent` parts the child walk has already
+  // covered (perf r1c0 #2): a later pass — a nudge, or a `wait` re-entry
+  // with no new prompt — re-audits the parent list (pure, cheap) but re-walks
+  // only if that count has grown, bounding the walk to at most one network
+  // pass per new delegation instead of one per completed turn.
+  let walkedDelegations = 0;
 
   // One assistant message == one model turn (verified against the server).
   // Each idle marker closes one prompt (the stage prompt plus any nudges).
@@ -1068,13 +1241,19 @@ async function executeInference(
         typeof handle.vars['reportPath'] === 'string' ? handle.vars['reportPath'] : undefined,
     };
     const violations = auditSessionIndependence(lastSeen, auditOptions);
-    if (violations.length === 0) {
+    // Cost rules (perf r1c0 #1, #2): only attempts that actually delegated
+    // are worth a walk, and at most one walk per growth of the delegation
+    // count — a nudge loop must not pay the walk nine times per attempt.
+    const delegations = countDelegationParts(lastSeen);
+    if (violations.length === 0 && delegations > walkedDelegations) {
+      walkedDelegations = delegations;
       let descendants = 0;
       try {
         for await (const child of listChildSessionMessages(
           opts.client,
           sessionID,
           requestTimeoutMs,
+          { connection: opts.server, deadline },
         )) {
           descendants += 1;
           for (const violation of auditSessionIndependence(child.messages, auditOptions)) {
@@ -1092,20 +1271,28 @@ async function executeInference(
         }
       } catch (error) {
         // An infrastructure fault on the walk is not a stage failure (A10):
-        // the attempt is audited on its own session alone, and the partial
-        // audit is named in the run record.
-        violations.length = 0;
+        // the partial audit is named in the run record. But a deed the walk
+        // ALREADY saw is not thrown away with the rest of it (sec r1c0 #1):
+        // the design's failure mode for a broken walk is a detection gap for
+        // deeds UNSEEN, never erasure of evidence in hand, so the violations
+        // collected before the failure survive into the check below — a
+        // violation seen is a violation failed for.
         console.warn(
           `stage ${handle.stageKey}: independence audit could not complete the child-session ` +
-            `walk for ${sessionID}: ${String(error instanceof Error ? error.message : error)} — ` +
-            'auditing this attempt on its own session alone',
+            `walk for ${sessionID}: ` +
+            `${brief(printable(String(error instanceof Error ? error.message : error)))} — ` +
+            (violations.length === 0
+              ? 'auditing this attempt on its own session alone'
+              : `keeping the ${String(violations.length)} violation(s) the walk had already found`),
         );
         gateLog(state, 'independenceAudit', handle.round, {
           proceed: true,
           reason:
             `child-session walk incomplete for session ${sessionID}: ` +
             `${String(error instanceof Error ? error.message : error)}; ` +
-            'the attempt was audited on its own message list alone',
+            (violations.length === 0
+              ? 'the attempt was audited on its own message list alone'
+              : `${String(violations.length)} violation(s) already found by the walk were kept`),
         });
       }
     }

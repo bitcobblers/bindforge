@@ -19,10 +19,10 @@ deviations below.
    is made per client at runtime, which also satisfies both routes' tests
    (the new stubs answer both). The matrix's third fallback — a direct
    `GET /session/:id/children` against the configured `baseUrl` with the
-   client's auth headers — is NOT implemented: the SDK client's internals
-   (base URL, auth) are unverifiable in this worktree and were not probed.
-   If a future client exposes neither SDK route, the audit logs the gap
-   rather than reaching the server directly.
+   client's auth headers — was NOT implemented at first (the SDK client's
+   internals were unverifiable in this worktree); code review r1c0
+   (security finding 2) required closing that gap, and the fix stage
+   implemented it: see "Code-review round 1 addendum" below.
 
 2. **Test strategy #9's "nine fake clients extended with the session-list
    method" did not happen — test files are not editable at this stage.**
@@ -71,9 +71,12 @@ deviations below.
   `fetching the message list of …`, `listing sessions to find the children
   of …`) — §2 requires the gate line to "name the session", and `bounded()`
   alone would not.
-- Violations collected from descendants are DISCARDED when the walk later
-  errors, per §2's "the audit proceeds on the parent list alone" (the
-  parent list is the only list audited in the failed-walk case).
+- Violations collected from descendants were originally DISCARDED when the
+  walk later errored, per §2's "the audit proceeds on the parent list
+  alone". Code review r1c0 (security finding 1) showed that erases deeds
+  already seen — worse than the design's stated failure mode, a gap for
+  deeds UNSEEN. Superseded: collected child violations are now KEPT; only
+  the unseen remainder of the walk is a gap. See the round-1 addendum.
 
 ## Files touched
 
@@ -137,3 +140,67 @@ flow changes (a small addition beyond the design's letter, listed with
 the other error-wrapping additions above). `npm run format` found no
 drift; `npm run check` then exited green: lint clean, prettier clean,
 241/241 tests passing. No test file was touched.
+
+## Code-review round 1 addendum (fix stage)
+
+All open findings from the three code-review seats (security, performance,
+testing, all `request-changes`) were cleared on the source side:
+
+- **Sec #1 (major):** the walk's catch no longer runs `violations.length =
+  0`. Violations the walk collected before a mid-walk fetch failure survive
+  into the normal `violations.length > 0` branch — a deed seen is a deed
+  failed for — and the `console.warn`/gate line now names the kept count
+  instead of claiming a parent-only audit when the attempt in fact fails.
+- **Sec #2 (minor):** the compat matrix's third enumeration route is now
+  implemented: with neither `session.children` nor `session.list` on the
+  client, the walk issues a direct `GET /api/session/:id/children` against
+  the configured `baseUrl` with the same basic-auth header `createClient`
+  sends (`basicAuthHeader` extracted from `opencode-runner.ts` so the two
+  routes share one header construction). The connection is threaded as a
+  new OPTIONAL `server: { baseUrl, username?, password? }` field on
+  `RunOptions`/`ResumeOptions` and set by `pipeline run|resume` in
+  `pipeline/cli.ts` from the same `--base-url/--username/--password` the
+  client is created with. (The path carries the v2 client's `/api` prefix,
+  matching the SDK's own surface — a deliberate reading of the matrix's
+  `GET /session/:id/children` wording.) `server` is in-memory run-options
+  state, not a checkpoint or config schema change.
+- **Sec #3 (nit):** the walk-failure `console.warn` wraps the
+  server-supplied error string in `brief(printable(...))`.
+- **Sec #4 + Perf #3:** the paged `session.list` crawl throws when
+  `cursor.next` repeats, and a 50-page budget (`MAX_SESSION_LIST_PAGES`)
+  bounds its request count and `byParent` size; either throw degrades to
+  the caught partial-audit path instead of spinning.
+- **Perf #1 (major):** the call site counts `subagent` parts over the whole
+  audited list (`countDelegationParts`, any status, any age) and skips the
+  walk entirely when the attempt delegated nothing; the zero-descendant
+  tripwire is untouched for the case where a delegation part exists but
+  enumeration returns nothing. Consequence for deviation 2: the nine
+  pre-existing fakes never delegate, so their attempts now skip the walk
+  entirely — the per-attempt warn + `independenceAudit` gate line
+  deviation 2 described no longer appears in their run records.
+- **Perf #2 (major):** a per-attempt `walkedDelegations` counter bounds the
+  walk to at most one network pass per growth of the delegation count, so
+  the nudge/`wait` re-entries of the stage loop re-audit the parent list
+  (pure, cheap) without re-walking the tree.
+- **Perf #4 (minor):** the walk takes the stage `deadline` (new optional
+  `deadline` on `listChildSessionMessages`' options bag) and clamps every
+  request's timeout to what the deadline leaves, throwing a named
+  "truncated at the stage deadline" error into the same caught
+  partial-audit path when it expires.
+- **Perf #5 (nit):** in `independence.ts`, the `MAX_PATH_SCAN_NODES` budget
+  is now ONE shared `ScanBudget` drawn on by both the breadth-first payload
+  traversal and the value subtrees under access keys
+  (`budgetedStringValues`), so the cap bounds the work under an access key
+  as its comment always promised.
+
+**Test-side findings not done here (test files are not editable at this
+stage):** testing #1 (positive list-route pins with descendants present —
+e.g. `treeClient` without `children`, a multi-page `cursor.next` crawl,
+the #6 walk on the list route), testing #2 (the nine fakes extended with
+`session.list`, Test strategy #9), testing #3 (`// proves: Test strategy
+#8` citations on the two prompt pins), and testing #4 (assert exactly two
+`stageFailure` gate entries in the budget pin). Security #1's pin (first
+child violates, second fetch throws → the attempt still fails) and perf
+#3's "one enumeration per walk" stub assertion are also new pins. All of
+them are test-file changes → `testsNeedUpdate: true`; the source edits
+above change no existing test's verdict.

@@ -116,11 +116,18 @@ const PATH_ACCESS_KEYS = new Set([
 ]);
 
 /**
- * Bound on the nodes walked when collecting path-key values: a huge payload
- * object cannot cost the audit unbounded work. Breadth-first means the cap
- * drops the deepest nodes first — the least likely place an access field is.
+ * Bound on the nodes walked when collecting path-key values: one budget
+ * shared by the payload traversal AND the value subtrees under access keys,
+ * so a huge payload object cannot cost the audit unbounded work anywhere.
+ * Breadth-first on the payload side means the cap drops the deepest nodes
+ * first — the least likely place an access field is.
  */
 const MAX_PATH_SCAN_NODES = 256;
+
+/** The one node budget a `pathKeyValues` scan draws from. */
+interface ScanBudget {
+  nodes: number;
+}
 
 /** Tools whose completed calls deliver run-record content or names to the model. */
 const READONLY_TOOLS = new Set(['read', 'list', 'glob', 'grep']);
@@ -223,20 +230,22 @@ function accessValues(name: string, input: Record<string, unknown>): string[] {
  * (at any nesting depth), and nothing else. A string under `code`, `prompt`,
  * `content`, or any other payload key is text the tool carries, not a place
  * it looks — test code naming `transcripts/` in a string literal is not a
- * read of run records. Breadth-first with a node cap: the work stays bounded
- * on a huge payload object, and what the cap drops is the deepest nodes,
- * where an access field is least likely to live.
+ * read of run records. Breadth-first on the payload side with ONE node cap
+ * (`ScanBudget`) shared by the payload traversal and the values sitting
+ * under access keys: the work stays bounded on a huge payload object even
+ * entirely under access keys, and what the payload traversal drops is the
+ * deepest nodes, where an access field is least likely to live.
  */
 function pathKeyValues(input: unknown): string[] {
   const out: string[] = [];
+  const budget: ScanBudget = { nodes: MAX_PATH_SCAN_NODES };
   const queue: unknown[] = [input];
-  let nodes = 0;
-  while (queue.length > 0 && nodes < MAX_PATH_SCAN_NODES) {
+  while (queue.length > 0 && budget.nodes > 0) {
     const node = queue.shift();
     if (node === null || typeof node !== 'object') {
       continue;
     }
-    nodes += 1;
+    budget.nodes -= 1;
     if (Array.isArray(node)) {
       for (const value of node) {
         if (value !== null && typeof value === 'object') {
@@ -247,13 +256,36 @@ function pathKeyValues(input: unknown): string[] {
     }
     for (const [key, value] of Object.entries(node)) {
       if (PATH_ACCESS_KEYS.has(key)) {
-        stringValues(value, out);
+        budgetedStringValues(value, out, budget);
       } else if (value !== null && typeof value === 'object') {
         queue.push(value);
       }
     }
   }
   return out;
+}
+
+/**
+ * `stringValues` under the shared `pathKeyValues` node budget: once a key is
+ * an access key, its value subtree is traversal too, and an unbounded
+ * recursive walk under it would defeat the cap (perf r1c0 #5).
+ */
+function budgetedStringValues(value: unknown, out: string[], budget: ScanBudget): void {
+  if (budget.nodes <= 0) {
+    return;
+  }
+  budget.nodes -= 1;
+  if (typeof value === 'string') {
+    out.push(value);
+  } else if (Array.isArray(value)) {
+    for (const v of value) {
+      budgetedStringValues(v, out, budget);
+    }
+  } else if (value !== null && typeof value === 'object') {
+    for (const v of Object.values(value)) {
+      budgetedStringValues(v, out, budget);
+    }
+  }
 }
 
 function stringValues(value: unknown, out: string[] = []): string[] {
