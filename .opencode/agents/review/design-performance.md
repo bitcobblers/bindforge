@@ -14,9 +14,21 @@ permissions:
   - action: edit
     resource: "docs/designs/**/transcripts/**"
     effect: deny
+  - action: read
+    resource: "docs/designs/**/transcripts/**"
+    effect: deny
+  - action: read
+    resource: "docs/designs/**/reviews/**"
+    effect: deny
+  - action: read
+    resource: "docs/designs/**/reviews/design/editorial-r*.diff"
+    effect: allow
   - action: shell
     resource: "*"
     effect: deny
+  - action: shell
+    resource: "git diff*"
+    effect: allow
   - action: webfetch
     resource: "*"
     effect: allow

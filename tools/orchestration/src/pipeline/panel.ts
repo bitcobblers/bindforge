@@ -1,6 +1,6 @@
 import { CODE_SPECIALTIES, DESIGN_SPECIALTIES } from './stages.js';
 import type { PipelineConfig } from './stages.js';
-import type { PipelineState, SeatRecord, VerdictReply } from './types.js';
+import type { Finding, PipelineState, SeatRecord, VerdictReply } from './types.js';
 
 // ---------------------------------------------------------------------------
 // The review funnel (ADR-002). A revision goes back only to the seats whose
@@ -143,6 +143,7 @@ export function recordSeatVerdict(
   specialty: string,
   verdict: 'approve' | 'request-changes',
   stamp: string,
+  findings?: Finding[],
 ): void {
   const bySeat = { ...seatsOf(state, phase) };
   const prior = bySeat[specialty];
@@ -150,6 +151,9 @@ export function recordSeatVerdict(
     verdict,
     stamp,
     dissents: (prior?.dissents ?? 0) + (verdict === 'request-changes' ? 1 : 0),
+    // The seat's own findings travel back into its next prompt through the
+    // checkpoint; it never re-reads a report file to recover them.
+    ...(findings !== undefined ? { findings } : {}),
   };
   state.seats =
     phase === 'design' ? { ...state.seats, design: bySeat } : { ...state.seats, code: bySeat };

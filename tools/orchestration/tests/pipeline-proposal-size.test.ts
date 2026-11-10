@@ -207,6 +207,7 @@ function handleFor(stage: 'proposal' | 'proposal-revise' | 'design-review') {
       specialty: 'correctness',
       scope: 'the whole document',
       passNote: 'full-panel pass c0',
+      prevFindings: '(none — test fixture)',
       reportPath: `${DESIGN_DIR_REL}/reviews/design/correctness-r1c0.md`,
       reviewFiles: '',
     },

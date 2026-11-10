@@ -1,0 +1,75 @@
+diff --git a/tmp/bindforge-editorial-parallel-inference-lane-r2.md b/home/mike/.local/share/opencode/worktree/f852d4/mighty-squid/docs/designs/003-parallel-inference-lane/02-proposal.md
+index 9716bf4..9c93355 100644
+--- a/tmp/bindforge-editorial-parallel-inference-lane-r2.md
++++ b/home/mike/.local/share/opencode/worktree/f852d4/mighty-squid/docs/designs/003-parallel-inference-lane/02-proposal.md
+@@ -3,10 +3,10 @@
+ ## Context
+ 
+ The pipeline runs every reviewer session behind the previous one; ADR-002 budgets 40
+-design + 20 code sessions per run, so that serial lane is the run's dominant wall
+-clock. ADR-003 replaces ADR-001's sequential lane with a bounded-concurrency lane:
++design + 20 code sessions per run, so that serial lane is the run's dominant wall-clock
++cost. ADR-003 replaces ADR-001's sequential lane with a bounded-concurrency lane:
+ the seats a pass selects launch in fixed order, run up to N at a time, and finalize
+-once per pass, while every other state-machine semantic stays as written
++once per pass, while every other state-machine semantics stay as written
+ (source: [ADR-003](../../adrs/003-parallel-inference-lane.md),
+ [research](./01-research.md)). Today's `tools/orchestration/src/pipeline/runner.ts`
+ has no seam for this: `executeStage` (lines 604–952) mixes inference with the git
+@@ -64,7 +64,8 @@ sibling reviewer's in-flight edits from a permission violation, and `commitStage
+ Pass-level finalize removes the interleaving instead of locking around it.
+ 
+ **Model-driven subagent fan-out.** Rejected again for ADR-001's still-valid reason:
+-pipeline semantics must not depend on model compliance. The cap stays runner code.
++pipeline semantics must not depend on model compliance. The cap stays in runner
++code.
+ 
+ **Parallel mutating stages / concurrent pipeline runs.** Rejected for now: the
+ mutating chain has real data dependencies over one worktree; multi-run concurrency
+@@ -107,7 +108,7 @@ Finding 1):
+   state)` + `commitStage(...)`, moved out of the `if (outcome.ok)` block (lines
+   917–950). All three review stage names share one ownership rule (`docs/**`,
+   gates.ts:260–273), so one sweep is sound (A3, A6). The commit's stage key is
+-  the pass's stage name, so the message is today's fallback shape with one
++  the pass's stage name, so the message has today's fallback shape with one
+   value: `docs: <nnn-slug> design-review stage` (A8: no `commitMessage` in replies).
+ 
+ Non-review stages keep the current combined path: `executeInference` followed
+@@ -155,13 +156,14 @@ saveState (sequential, as today)
+ - **Escalate after siblings settle.** Inside a pass, `runSeatWithRetry` does not
+   call `finalizeEscalate`; it sets a pass-level `escalationPending` flag and
+   records the failure in `state.stageFailures` and the `stageFailure` gate entry
+-  (as today). A seat that acquires after the flag is set releases it and returns
+-  unprompted, so no seat today's `StopDriving` (runner.ts:1158–1166) would skip
+-  ever runs — at N = 1 control flow is exactly today's. After the barrier, if
+-  the flag is set: drain the writer, run the pass `enforceOwnership` sweep, then
++  (as today). A seat that acquires after the flag is set releases its permit and
++  returns without prompting, so no seat that today's `StopDriving`
++  (runner.ts:1158–1166) would skip ever gets run — at N = 1 control flow is
++  exactly today's. After the barrier, if the flag is set: drain the writer, run
++  the pass `enforceOwnership` sweep, then
+   `finalizeEscalate` once with today's `failed twice … one retry, then escalate`
+   message. The sweep reverts out-of-policy sibling files and escalation still
+-  lands; its commit carries only in-policy complete sibling reports.
++  lands; its commit carries only complete in-policy sibling reports.
+ - **The editorial pass fans out too** (A11): its `kind: 'review'` registration
+   puts it in scope, so it gets the same barrier, one commit, and one ownership
+   sweep; its `-rN` report naming (cycle undefined in `reportPathFor`) is unchanged.
+@@ -195,7 +197,7 @@ persisting: N is per-run config), so `version` stays 1 by default.
+   `$OPENCODE_MAX_PARALLEL`, resolved by a local `resolveMaxParallel(flag, env)` that
+   mirrors `resolveReplyTimeoutSeconds` (`src/cli.ts:101–137`): a `^\d{1,5}$` format
+   gate on the env string that runs even when the flag overrides it (bad env is a
+-  config error), range check (integer ≥ 1) as a separate error naming the source,
++  config error), a range check (integer ≥ 1) as a separate error naming the source,
+   all validation before side effects. The CLI then passes
+   `cfg: { ...DEFAULT_CONFIG, maxParallelReviews: n }`.
+ - No coupling between N and `stageTimeoutMs` in code; `docs/workflows.md` (the CLI
+@@ -258,7 +260,7 @@ strategy #1–#8 plus the first post-merge parallel run (ADR-003 §Self-update).
+    valid values pass through (mirrors the `--timeout` tests in `tests/cli.test.ts`).
+ 9. Integration — end-to-end `runPipeline` review pass on a temp git repo with a
+    mock client at N = 2: every report and transcript exists, results and seat
+-   verdicts are recorded once per seat, the pass produced one commit, the
++   verdicts are recorded once per seat, the pass produces one commit, the
+    checkpoint loads with `loadState`, and the gate log has one pass-gate entry —
+    identical control flow to the same fixture at N = 1 (result order included).
+ 10. Platform — Linux CI (`npm run check` in `tools/orchestration`): the full

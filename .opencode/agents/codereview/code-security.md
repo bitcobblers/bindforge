@@ -14,6 +14,12 @@ permissions:
   - action: edit
     resource: "docs/designs/**/transcripts/**"
     effect: deny
+  - action: read
+    resource: "docs/designs/**/transcripts/**"
+    effect: deny
+  - action: read
+    resource: "docs/designs/**/reviews/**"
+    effect: deny
   - action: shell
     resource: "*"
     effect: deny

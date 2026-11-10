@@ -51,6 +51,16 @@ export interface PipelineConfig {
    * fired eight nudges in 69 seconds at sessions that were still working.
    */
   minNudgeIntervalMs?: number;
+  /**
+   * Maximum review-seat sessions in flight at once inside one pass
+   * (ADR-003). Optional so existing configs keep compiling; the sole default
+   * authority is `DEFAULT_CONFIG` (1 — today's serial lane, the degenerate
+   * fan-out). Seats launch in the fixed handed order through a semaphore of
+   * this size; retries hold their seat's permit. Operator guidance: N must
+   * not exceed the inference server's parallel slot count, which the runner
+   * cannot verify.
+   */
+  maxParallelReviews?: number;
 }
 
 /**
@@ -69,6 +79,8 @@ export const DEFAULT_CONFIG: PipelineConfig = {
   blockingSeverities: ['blocker', 'major'],
   pollIntervalMs: 2_000,
   stageTimeoutMs: 30 * 60_000,
+  // ADR-003: opt-in fan-out; 1 keeps today's serial lane on the same code path.
+  maxParallelReviews: 1,
 };
 
 export interface StageDef {

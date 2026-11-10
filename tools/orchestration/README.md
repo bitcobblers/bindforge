@@ -21,6 +21,12 @@ npm run build && node dist/cli.js   # run the compiled CLI
 | `--agent`    | `OPENCODE_AGENT`                 | the server's default agent                    |
 | `--timeout`  | `OPENCODE_REPLY_TIMEOUT_SECONDS` | 30 s (integer, 1–3 600)                       |
 
+This table covers the connection-test CLI (`src/cli.ts`). The pipeline CLI
+(`src/pipeline/cli.ts`) has its own flags — `--max-parallel`
+(`$OPENCODE_MAX_PARALLEL`) among them — and they are documented with their
+operational guidance in [`docs/workflows.md`](../../docs/workflows.md), not
+duplicated here.
+
 When a password is present (via flag or environment variable), every request is
 sent with HTTP Basic auth (`Authorization: Basic base64(<username>:<password>)`).
 

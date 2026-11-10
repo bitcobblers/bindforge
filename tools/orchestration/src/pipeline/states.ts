@@ -26,10 +26,15 @@ export function specialtiesFor(phase: ReviewPhase): readonly string[] {
   return phase === 'code' ? CODE_SPECIALTIES : DESIGN_SPECIALTIES;
 }
 
+/**
+ * The pass gate in the gate log is named after the stage whose seats it gates,
+ * so a `design-review` entry reads next to that pass's commit and transcripts.
+ * A label only: which gate runs, and what it decides, is unchanged.
+ */
 const gateNameFor: Record<ReviewPhase, string> = {
-  design: 'allDesignReviewsApproved',
-  editorial: 'allEditorialReviewsApproved',
-  code: 'allCodeReviewsApproved',
+  design: 'design-review',
+  editorial: 'editorial-review',
+  code: 'code-review',
 };
 
 export function gateName(phase: ReviewPhase): string {

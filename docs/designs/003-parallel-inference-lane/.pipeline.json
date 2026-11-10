@@ -1,0 +1,1372 @@
+{
+  "version": 1,
+  "slug": "parallel-inference-lane",
+  "nnn": "003",
+  "branch": "pipeline/003-parallel-inference-lane",
+  "source": {
+    "kind": "adr",
+    "path": "docs/adrs/003-parallel-inference-lane.md"
+  },
+  "status": "done",
+  "lastStage": "doc-sync",
+  "designRound": 2,
+  "codeRound": 1,
+  "designBudgetUsed": 1,
+  "codeBudgetUsed": 4,
+  "editorialDone": false,
+  "testsGreen": true,
+  "testsNeedUpdate": false,
+  "stageFailures": {
+    "editorial-review:compatibility": 1,
+    "test-authoring": 2
+  },
+  "stageCommits": [
+    "afa7693be299a6fadd335f709d4e1fdfc28cf336",
+    "21991367979ce3198fc25746844fef4531f0e0c7",
+    "578c223af124e6c9016aadff6693633077b20c39",
+    "08e4b4bf6329d1b058c65c5ef8ac778c4362c3dd",
+    "fbd72a28ff554b55f3701a833827dca2aa8ff403",
+    "b7d93e1395efab915405111336b629e6f4d5ebcf",
+    "b03b406609a54e5d77434396af253b2a66db70ee",
+    "a24ca9e7439c31c780974365f128466353085089",
+    "e3d8406d985bf138d2f8fc00050751a8dfb85332",
+    "0184ef3cbdbdee78a47e4560b7766d203ec81482",
+    "2e02064a3709dd74dcbb4c664b37fc9388cfbcc4",
+    "30c028578fa59ff7761f3da9ad3ad7d02ac1376a",
+    "9c44b51c8f4ef81916e64d16fb1aff92100e0c08",
+    "2e5afb06e8b6d7bea7985d4751c24266b6d6c38e",
+    "bc5061051eb01a8baccf5d963cec4fd6352d326b",
+    "67b0b894e11ec568f5177f5bac36d8302f370446",
+    "164e1d530ee43fd6e9eafcb8165d19610b9203a1",
+    "c028693d0863b6e36f75348c5f713bb14ef78efd",
+    "21677e2c3d960ab25cd68a316afe6eaccd3f7ab8",
+    "2fb6047ac66b124e7e5608309c0dfd2c211a72c3",
+    "b84b97dac75803c5d042b65c54fc92fc882941f7",
+    "7604a29a5c89675042d3a98b41a52aa3ec40b7f3",
+    "5928346804f864b14404284ae6f2b61e94c5574d",
+    "91dfbea2f0ab34c063a14036b3afdc1f4b4227d9",
+    "5f498a6ddd5ec8643f8e8d05618d2b2dbf9d5ae1",
+    "5e12f5fe69e6957b52701e3331ab8fb704c33121",
+    "3745f3c6d0d0855bf2b77ea2f400a9d16c0b6a6a",
+    "ec6130ad241374906c3ff9955919de2d8a5edc23",
+    "d8a844c870a19326ef2ac07b764f63d7bb014f4b",
+    "1b85a148bc127a03bb07ce73e49d6703df3f3396"
+  ],
+  "forceNext": null,
+  "results": [
+    {
+      "stage": "research",
+      "round": 0,
+      "sessionID": "ses_e3ca73656ffegtrbpViR3kiPHs",
+      "agent": "research/researcher",
+      "at": 1794279171921,
+      "reply": {
+        "summary": "Wrote docs/designs/003-parallel-inference-lane/01-research.md for ADR-003's parallel inference lane. The research grounds the change in the current runner code (executeStage mixes inference and git finalize; seats run in an awaited loop; gates are already set-based), applies three lenses — prior art (p-limit/p-queue, promptfoo, Inspect AI, cargo/jest jobs knobs), performance baselines (ADR's ceil(|panel|/N) math, llama.cpp slots, vLLM KV-cache pressure), and platform notes (single-threaded event loop, spawnSync serialization, rename(2) last-writer-wins) — and flags the checkpoint write-ordering race, the timeout/queueing interaction, and the editorial-review fan-out question as the items the design must resolve, all with inline source citations.",
+        "commitMessage": "docs: add research for ADR-003 parallel inference lane"
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/research-r0.md",
+      "durationMs": 433527,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal",
+      "round": 0,
+      "sessionID": "ses_e3c9cacbeffeh6fGuzgJCeW0Uz",
+      "agent": "design/designer",
+      "at": 1794279672379,
+      "reply": {
+        "commitMessage": "docs: add design proposal for parallel inference lane (ADR-003)"
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/proposal-r0.md",
+      "durationMs": 243412,
+      "nudges": 0,
+      "docLines": 306,
+      "docLinesAdded": 306,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e3c98f590ffeOJ01v7Yird6jCm",
+      "agent": "review/design-correctness",
+      "at": 1794279839493,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design > Pass-level fan-out in `drive`, bullet \"Escalate after siblings settle\" — \"Accept this widened commit: siblings already in flight complete before escalation is visible (they would not have run at all under today's loop).\"",
+            "problem": "All seat tasks are spawned up front (per-seat `sem.acquire()` plus `await allSettled(seat tasks)`), so nothing stops queued seats from running after one seat exhausts its retry budget. At the default N = 1 the entire panel still executes serially after the first seat has failed twice, before escalation is visible. This contradicts ADR-003 §Self-update (\"Default N = 1 keeps ADR-002 behavior for gates, artifacts, and control flow\") and the proposal's own claims (Configuration: \"DEFAULT_CONFIG.maxParallelReviews = 1 — today's behavior\"; Rollout 1: \"with only the pass-commit shape changed\"). Each executed attempt pushes a `state.results` entry and `reviewSessionsUsed` (panel.ts:50-51) counts those, so post-failure siblings burn ADR-002's `maxReviews` session budget (checked at runner.ts:1220-1241) and change status/ESCALATION accounting; at N = 1 a failed-seat escalation costs 5x2 attempts of serial wall clock instead of 2. Test strategy #5 codifies the widened behavior.",
+            "fix": "Replace `StopDriving` inside `runSeatWithRetry` with a pass-level `escalationPending` flag set on second failure; each seat task checks the flag immediately after `acquire()` and, if set, releases and returns without running. The barrier then waits only for in-flight tasks, so ADR §Execution 3 (escalate after siblings settle) still holds at N > 1 while at N = 1 no unstarted seat runs — exactly today's control flow. Amend the \"already in flight\" sentence and test #5 to say escalation waits for in-flight tasks and skips unstarted seats."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design > Two-phase split of `executeStage` — \"finalizeReviewPass(opts, state, headBefore, stageName, stageKey, cfg)\" / \"`commitStage` keeps today's fallback message shape (`docs: <nnn-slug> <stageKey> stage`)\"",
+            "problem": "A review pass has five seats, each with a distinct stageKey (`design-review:correctness`, ...), but the design passes a single `stageKey` into a once-per-pass `commitStage` without saying which value it carries. Today's fallback message shape (runner.ts:277) is only defined for the seat's `handle.stageKey`, so the same interface appears under two shapes: an implementer could emit `docs: <nnn-slug> design-review stage` or a stale per-seat key, and test #6's \"message shape\" assertion is underdetermined.",
+            "fix": "Pin the value: the pass commit's stageKey is the pass's stage name (`design-review` / `code-review` / `editorial-review`), so the message is exactly `docs: <nnn-slug> design-review stage`; have test #6 assert that exact string."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/design-review-correctness-r1c0.md",
+      "durationMs": 167031,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e3c9668d3ffeW2rwOuDm4mR50o",
+      "agent": "review/design-compatibility",
+      "at": 1794279897759,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Compatibility matrix — \"| macOS | unknown | Platform-agnostic Node code; nothing exercised here proves it |\" and the Windows row \"| Windows | unknown | Same; git stays `spawnSync` (A6) |\"",
+            "problem": "Checklist rule 1 requires every platform row to carry a definite status; `unknown` is a deferral, not a status. Nothing in Rollout or Test strategy resolves these rows, so the design ships with two platform-support boundaries left undecided at implementation time.",
+            "fix": "Commit to a status: given Linux-only CI (Test strategy #10) and no new OS-specific surface, mark both rows \"no — untested; no OS-specific code added\"; alternatively promote to `yes` only by adding the matching platform test to Test strategy (checklist rule 7). Either way `unknown` must go."
+          },
+          {
+            "severity": "minor",
+            "location": "Configuration and CLI — \"add `maxParallelReviews?: number` to `PipelineConfig` (optional so existing configs compile, mirroring `requestTimeoutMs`)\"",
+            "problem": "ADR-003 §Configuration specifies \"`PipelineConfig.maxParallelReviews: number`, default **1**\" (required). The proposal silently relaxes the field to optional, an unrecorded deviation from the source ADR that leaves an unexplained mismatch when implementation is diffed against the ADR, and ambiguity about whether the ADR's default-1 guarantee is enforced by the type or only by DEFAULT_CONFIG.",
+            "fix": "Add one clause: \"the ADR's field type is deliberately relaxed to optional so existing config literals compile; `DEFAULT_CONFIG.maxParallelReviews = 1` is the sole default authority\" — or keep the field required as the ADR writes it."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/design-review-compatibility-r1c0.md",
+      "durationMs": 58200,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e3c958540ffeenTCKAxZIlg4lR",
+      "agent": "review/design-security",
+      "at": 1794279980116,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design → Pass-level fan-out in `drive` (`src/pipeline/runner.ts`), bullet 'Escalate after siblings settle' — \"No pass finalize runs on this path — a failed stage skips ownership enforcement today too, and `finalizeEscalate`'s own `commitStage` lands the siblings' partial reports in the escalation commit. Accept this widened commit\"",
+            "problem": "The escalation path runs `commitStage` (`git add -A`) with no `enforceOwnership` sweep, and pass-level finalize silently widens what that unchecked commit can land. Today every succeeded seat in a pass was ownership-checked and committed at its own finalize before history, so the escalation commit never carried a sibling's output; under this design, whenever any seat fails, the complete output of up to four succeeded siblings reaches history only through the unenforced escalation commit. A seat induced — e.g. by prompt injection in the reviewed document — to write a file outside the review ownership rule (`docs/**`) and then fail reply validation twice has that out-of-policy file committed with the permission check the design otherwise preserves, and the run stops with it in history. The 'today too' justification compares only the failing seat's files and does not cover the siblings' newly unenforced output.",
+            "fix": "On the escalation path, run the same pass-level `enforceOwnership` sweep that `finalizeReviewPass` uses, after `writer.drain()` and before `finalizeEscalate` — siblings are settled at the barrier, so the dirty-file scan no longer sees in-flight sibling edits, which was the only reason per-seat ownership was unsound under fan-out. State the posture when the sweep trips (e.g. revert out-of-policy files, then still escalate). This replaces the sentence 'No pass finalize runs on this path — a failed stage skips ownership enforcement today too…' in the bullet and the flow diagram, and the Risks row 'Escalation mid-pass loses sibling work or races its writes' should name the ownership sweep in its mitigation."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/design-review-security-r1c0.md",
+      "durationMs": 82297,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e3c94437fffe286sUp9ZBlDhRg",
+      "agent": "review/design-performance",
+      "at": 1794280068642,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design → Pass-level fan-out in `drive` → \"Escalate after siblings settle\" — \"it records the failure in `state.stageFailures` and the `stageFailure` gate entry (as today) and returns\" / \"Accept this widened commit: siblings already in flight complete before escalation is visible (they would not run at all under today's loop).\"",
+            "problem": "new — the specified mechanism (all seat tasks created up front, each acquiring a permit, barrier `await allSettled(seat tasks)`, nothing checking the recorded failure) runs not-yet-started seats too, not just in-flight siblings. Today the loop short-circuits: on a seat's second failure `runWithRetry` calls `finalizeEscalate` and throws `StopDriving` (runner.ts:1158–1166), so later seats of the pass never launch. As specified, a c0 seat failing first at the default N=1 still runs the remaining four seats: worst-case escalation wall clock grows from 2 × stageTimeoutMs (~60 min at the 30-min default) to |panel| × 2 × stageTimeoutMs (~300 min), and four doomed inference sessions consume server slots on an already-escalating run — a latency/cost regression on the default path whose justification sentence misdescribes the mechanism.",
+            "fix": "In each seat task, after `sem.acquire()` and before session creation, check a pass-level \"retry-exhausted failure recorded\" flag; if set, release the permit and return without prompting, so the barrier waits only for genuinely in-flight siblings. This matches the design's own rationale and ADR-003's \"escalates after its siblings settle\", and stays one code path (no-op on the success path)."
+          },
+          {
+            "severity": "nit",
+            "location": "Context / Rollout step 4 — \"ADR-002 budgets 40 design + 20 code sessions per run, so that serial lane is the run's dominant wall clock\"",
+            "problem": "new — the proposal names the cost but never quotes the research/ADR payoff baseline (ADR-003 Consequences / research Performance baselines: a full-panel pass \"shrinks from 5× to ceil(|panel|/N)× the serial wall clock\"), so the first post-merge parallel run that the design makes the live validation of the lane has no expected number to check against (performance checklist item 6).",
+            "fix": "Add the ceil(|panel|/N)× expected-pass-time sentence, with the N ≤ slots precondition, to Goals or Rollout step 4, citing ADR-003 Consequences."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/design-review-performance-r1c0.md",
+      "durationMs": 88444,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e3c92e9a7ffeJrgs1gNZof3GHl",
+      "agent": "review/design-complexity",
+      "at": 1794280131029,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/design-review-complexity-r1c0.md",
+      "durationMs": 62297,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e3c91f5f9fferSGXIrVw1BzgnL",
+      "agent": "design/designer",
+      "at": 1794280279942,
+      "reply": {
+        "changed": true,
+        "summary": "All four majors consumed by changing the design, not adding to it: the escalation passage was rewritten so `runSeatWithRetry` sets a pass-level `escalationPending` flag that makes seat tasks skip after acquire() (fixes correctness + performance majors — no unstarted seat runs, N=1 control flow stays today's, and the contradicted Rollout/Configuration claims become true again), the same path now runs the pass-level `enforceOwnership` sweep after drain() and before `finalizeEscalate` with a revert-and-still-escalate posture (security major, also fixing the partial/complete wording contradiction and the Risks row), the compatibility matrix drops `unknown` — macOS/Windows fixed to `no`, untested — and Test strategy #5/#6 pin the new behavior. Minors folded in at zero cost: the never-valued `stageKey` parameter of `finalizeReviewPass` is deleted with the exact pass-commit message pinned, and the config bullet records the deliberate relaxation of the ADR's required field. Offsetting the new revision-log entries, the duplicated N=1 identity caveat was compressed; net line count is zero (306→306). The performance nit (ceil(|panel|/N) baseline) was left out as non-required.",
+        "commitMessage": "docs: address r1 design review findings in parallel-lane proposal"
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/proposal-revise-r1.md",
+      "durationMs": 148828,
+      "nudges": 0,
+      "docLines": 306,
+      "docLinesAdded": 32,
+      "docLinesRemoved": 32
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e3c8fb03dfferKBrNdvNCcg6Cs",
+      "agent": "review/design-correctness",
+      "at": 1794280384625,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design > Pass-level fan-out in `drive` — \"**N = 1 is the same path** ... only commit shape and finalize timing change — one commit and one ownership sweep per pass, not per seat\"",
+            "problem": "Contradicts the escalation bullet revised in the same pass: \"After the barrier, if the flag is set: drain the writer, run the pass `enforceOwnership` sweep, then `finalizeEscalate` once\". Today's failed stage skips ownership enforcement — the sentence this revision deleted said exactly that (\"a failed stage skips ownership enforcement today too\"). At N = 1 the escalation path now reverts out-of-policy sibling files that today land unfiltered in `finalizeEscalate`'s commit, i.e. the escalation commit's content changes, which is neither commit shape nor finalize timing; the \"only ... change\" enumeration and Rollout 1's \"with only the pass-commit shape changed\" are both now false, and ADR-003 §Self-update (\"Default N = 1 keeps ADR-002 behavior for gates, artifacts, and control flow\", carving out only commit shape and sweep timing) is ambiguous about a new sweep on the escalation path. The design should state its reading instead of undercounting the N = 1 diff. Label: new.",
+            "fix": "Add the escalation sweep to the N = 1 caveat bullet and the Rollout 1 sentence as a third stated difference (\"and the escalation path now runs one ownership sweep before `finalizeEscalate`, where today none ran\"), or keep the sweep success-path only so escalation commit content stays exactly today's."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design > Pass-level fan-out in `drive` — \"The sweep reverts out-of-policy sibling files and escalation still lands; its commit carries only in-policy complete sibling reports.\"",
+            "problem": "The sweep enforces policy only, not completeness. Nothing prevents a second in-flight seat from also exhausting its retries at N > 1 (it still completes attempt 2 before releasing its permit, per \"Retries consume slots\"), and its partial report is in-policy under the shared `docs/**` ownership rule, so `finalizeEscalate`'s `commitStage` carries it — exactly what the replaced r1 sentence admitted (\"finalizeEscalate's own `commitStage` lands the siblings' partial reports in the escalation commit\"). \"complete\" asserts a filter the mechanism does not have. Label: new.",
+            "fix": "Reword to \"carries only in-policy sibling files, including any partial report from a retry-exhausted seat (as today)\"; if partial reports must be excluded, name the mechanism that detects incompleteness."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design > Pass-level fan-out in `drive` — escalation bullet ending \"...then `finalizeEscalate` once with today's `failed twice … one retry, then escalate` message\"",
+            "problem": "The r1 version ended \"then `finalizeEscalate` once ... and stop driving\"; the rewrite drops the statement that the run halts after escalation, and the flow diagram shows only the success branch (barrier → drain → `finalizeReviewPass` → verdicts → gate). Halting is now only inferable. Label: new.",
+            "fix": "Restore \"then stop driving\" as the final clause of the escalation sequence (or draw the escalation branch in the diagram)."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/design-review-correctness-r1c1.md",
+      "durationMs": 104584,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e3c8e175dffew7zBM5GbpIBcCX",
+      "agent": "review/design-compatibility",
+      "at": 1794280444978,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Pass-level fan-out — \"no seat today's `StopDriving` (runner.ts:1158–1166) would skip ever runs — at N = 1 control flow is exactly today's.\"",
+            "problem": "Re-raised only as a wording issue: the sentence's argument is about which seats run, but as written it is a blanket backward-compatibility claim for the entire N=1 path, and the same revised paragraph contradicts it — escalation now runs \"the pass `enforceOwnership` sweep, then `finalizeEscalate`\", a git mutation today's escalation path does not perform (r1 text: \"a failed stage skips ownership enforcement today too\"). ADR-003 §Self-update draws exactly this line (N = 1 keeps ADR-002 behavior for gates, artifacts, and control flow, commit shape and finalize timing excepted; a bit-for-bit identity claim \"must not be made in the design\"). The sweep decision itself is sound and not contested; only the identity claim over it is false.",
+            "fix": "Scope the clause to what the flag preserves: \"at N = 1 the set of seats that run is exactly today's; the escalation path additionally runs the pass ownership sweep, so its commit differs from today's (see the N = 1 caveat)\"."
+          },
+          {
+            "severity": "minor",
+            "location": "Configuration and CLI — \"`maxParallelReviews?: number` … optional … and `DEFAULT_CONFIG.maxParallelReviews = 1`, the sole default authority\"",
+            "problem": "The closure of my r1 finding now asserts a default guarantee the document gives no mechanism for. The only DEFAULT_CONFIG merge shown is the CLI's `cfg: { ...DEFAULT_CONFIG, maxParallelReviews: n }`, yet the stated reason for the optional field is that config objects exist that omit it (\"so existing configs compile\"). Such a caller reaches `createSemaphore(cfg.maxParallelReviews)` in the fan-out diagram with `undefined`, not the documented default of 1; no Test strategy item covers the omitted-field path.",
+            "fix": "One clause in the same bullet naming the normalization point for all callers — every `runPipeline`/`resumePipeline` entry merges `DEFAULT_CONFIG` before config reaches the lane (or the semaphore reads `cfg.maxParallelReviews ?? DEFAULT_CONFIG.maxParallelReviews`) — and assert the omitted-field run serializes in Test strategy #8 or #9."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/design-review-compatibility-r1c1.md",
+      "durationMs": 60257,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e3c8d2b94ffeRi9gKjTSI0Hx1t",
+      "agent": "review/design-security",
+      "at": 1794280604067,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → Pass-level fan-out in `drive`, bullet \"Escalate after siblings settle\" — \"The sweep reverts out-of-policy sibling files and escalation still lands\"",
+            "problem": "The r1 fix is in place and correctly positioned after the barrier, so out-of-policy sibling output can no longer reach history through the escalation commit — the r1 finding is closed. But the new guarantee has no stated mechanism, and the closure puts a throw point in front of the run's only terminal landing. `enforceOwnership` is not error-tolerant: `git()` throws on any non-zero exit (runner.ts:97–103) and the revert path uses it for `restore`/`add -A`/`commit` (runner.ts:227, 243–251). Today it is reached only inside `if (outcome.ok)` (runner.ts:917), so the escalation path never had a git-mutating step before `finalizeEscalate`; this design adds one. If it throws — an index.lock left by a seat that shelled out to git before failing reply validation, an unresolvable `restore --source=<headBefore>` — the error escapes `drive` (only `StopDriving` is caught, runner.ts:1401–1405), so `finalizeEscalate` never runs: status stays `running`, no `escalate` gateLog, no ESCALATION.md, and the revert is left half-applied with the out-of-policy file still dirty. The run's only continuation, `pipeline resume`, escalates at drive's `next.kind === 'escalate'` (runner.ts:1121–1123), which runs no sweep, so `commitStage`'s `git add -A` lands exactly the file the closure was meant to keep out of history. A seat steered by injected content has a motive to break that step.",
+            "fix": "Replace \"The sweep reverts out-of-policy sibling files and escalation still lands\" with the mechanism plus the degraded posture: the escalation sweep is best-effort — a sweep error is logged and swallowed the way runner.ts already swallows a failed ownership delete (\"Deleting an out-of-ownership path must never take the run down\", runner.ts:230–235) — `finalizeEscalate` still runs, and when the sweep did not complete, the escalate gate entry's reason records that the escalation commit is un-enforced. Mirror that wording in the Risks row \"Escalation mid-pass loses sibling work or races its writes\"."
+          },
+          {
+            "severity": "minor",
+            "location": "Test strategy #5 — \"escalation is one `enforceOwnership` sweep then one `finalizeEscalate` after siblings settle\"",
+            "problem": "The revised assertion pins call count and order, not the security property the r1 closure rests on. Nothing in #1–#10 proves that a path the review ownership rule forbids is absent from the escalation commit. An implementation that sweeps after `finalizeEscalate`'s `commitStage` has already added everything, or sweeps with a `headBefore` that is not the pass-entry value, satisfies the sentence as written — one sweep, one finalize, after siblings settle — and still lands the file, so the r1 hole returns with the design text intact.",
+            "fix": "Name the fixture inside #5: a succeeded sibling leaves a path outside `docs/**` (e.g. `src/injected.ts`) while another seat fails twice; assert three effects rather than two calls — the path is reverted or deleted after the pass, the escalation commit's `--name-only` listing contains no path outside `docs/**`, and `state.status === 'escalated'` with `ESCALATION.md` present. This is the executable form of the Risks-row mitigation."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Pass-level fan-out in `drive`, bullet \"Escalate after siblings settle\" — \"its commit carries only in-policy complete sibling reports\"",
+            "problem": "The sweep contains paths, not roles: `stagePathAllowed` permits every review stage anything under `docs/**` (gates.ts:260–273), so a seat's edit to the document under review or to another seat's report file passes the sweep and lands in the escalation commit. The sentence reads as a per-seat report guarantee, which is not what runs. Behaviourally this is strictly narrower than today's unenforced commit and rests on the same premise A3/A6 use to make the pass sweep sound, so it is wording only — but that commit plus ESCALATION.md is the record the operator reconstructs an escalated run from.",
+            "fix": "Replace the phrase with \"only paths the review ownership rule allows (`docs/**`, not per-seat report paths)\"."
+          },
+          {
+            "severity": "nit",
+            "location": "Configuration and CLI — \"`maxParallelReviews?: number` to `PipelineConfig` — optional, deliberately relaxing the ADR's required field so existing configs compile — and `DEFAULT_CONFIG.maxParallelReviews = 1`, the sole default authority\"",
+            "problem": "The bullet names who owns the default but not what the read site resolves when the field is absent. `RunOptions.cfg` is caller-supplied, so with the field optional `cfg.maxParallelReviews` is `number | undefined` at `createSemaphore(cfg.maxParallelReviews)`; a `PipelineConfig` literal built without the field (embedded caller, test harness) gets a semaphore whose limit is `undefined` — a counter that never blocks — so ADR-003 §Execution 3's invariant \"total in-flight inference never exceeds N\" fails open instead of closed.",
+            "fix": "State the resolution in the same bullet — `createSemaphore(cfg.maxParallelReviews ?? 1)` — replacing \"the sole default authority\" with the expression that enforces it; or keep `maxParallelReviews: number` required on `PipelineConfig` (as ADR-003 §Configuration has it) and confine the optionality to the boundary that parses existing configs."
+          },
+          {
+            "severity": "nit",
+            "location": "Configuration and CLI — \"a `^\\d{1,5}$` format gate on the env string that runs even when the flag overrides it (bad env is a config error), range check (integer ≥ 1) as a separate error naming the source\"",
+            "problem": "The resolver the design says it mirrors, `resolveReplyTimeoutSeconds` (src/cli.ts:86–137), has two fail-closed properties this summary drops: a bound on both sources (`flagValue > maxSeconds` rejected — \"unbounded waits are not supported\", src/cli.ts:116–121) and escaping of the reflected value so \"control and ANSI bytes can never reach the terminal raw\" (src/cli.ts:98–99). As specified, `resolveMaxParallel` bounds only the env string (5 digits); the flag path takes yargs `type: 'number'`, where `1e30` passes both `Number.isInteger` and `≥ 1`, and an error line that interpolates `$OPENCODE_MAX_PARALLEL` raw echoes environment-influenced bytes to the terminal. Impact is low — the panel caps real fan-out at 5 seats and nothing is interpolated into a shell string — but \"mirrors the `--timeout` pattern\" is the design's contract for fail-closed validation and this bullet is what gets implemented.",
+            "fix": "In the same bullet, add an explicit upper bound with the constant named (e.g. reject `N > 16`, or `N > |panel|`), or state in one clause why the panel size makes an upper bound unnecessary; and name `JSON.stringify` on the reflected env value as part of the mirrored pattern."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/design-review-security-r1c1.md",
+      "durationMs": 159000,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e3c8abe21ffex5TrNtOke5fzoe",
+      "agent": "review/design-performance",
+      "at": 1794280652412,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Context / Rollout step 4 — \"ADR-002 budgets 40 design + 20 code sessions per run, so that serial lane is the run's dominant wall clock\" / \"The first post-merge parallel run … is the live validation of the lane\"",
+            "problem": "new — carried from r1 (revision did not address it; Revision log does not record it as rejected) — the proposal still never quotes the research/ADR-003 payoff baseline (ADR-003 Consequences / research Performance baselines: a full-panel or ratification pass \"shrinks from 5× to ceil(|panel|/N)× the serial wall clock\"), so the first post-merge parallel run that the design makes the live validation of the lane has no expected number to check against (performance checklist item 6).",
+            "fix": "Add one sentence to Goals or Rollout step 4 quoting the ceil(|panel|/N)× expected pass time with the N ≤ slots precondition, citing ADR-003 §Consequences."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/design-review-performance-r1c1.md",
+      "durationMs": 48247,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e3c8a0147ffeHDCGzi0ax0qFtZ",
+      "agent": "review/design-complexity",
+      "at": 1794280720825,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design — Two-phase split of `executeStage` (\"`finalizeReviewPass` … the only git code for review passes\") vs Pass-level fan-out in `drive` (\"drain the writer, run the pass `enforceOwnership` sweep, then `finalizeEscalate` once\")",
+            "problem": "The escalation-path revision makes the success-path-only claim stale: the document now describes a second review-pass git sequence (sweep, then finalizeEscalate's own commit) without saying where that sweep call lives, leaving it ambiguous whether `enforceOwnership` has one call site or two for review passes. This slightly widens the two-phase contract the Risks table relies on. New to the changed text; the theme was not flagged in r1.",
+            "fix": "Keep one sweep call site: run it inside `finalizeReviewPass` on both exits and skip only `commitStage` when `escalationPending` is set, so the \"only git code for review passes\" sentence stays literally true; or reword that sentence to \"the pass's single `enforceOwnership` call site, used by both the success and escalation exits; `commitStage` runs only on the success exit.\""
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/design-review-complexity-r1c2.md",
+      "durationMs": 68324,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-final",
+      "round": 0,
+      "sessionID": "ses_e3c88f614ffewBIlQ4iy1wjHCf",
+      "agent": "design/editor",
+      "at": 1794280813572,
+      "reply": {
+        "ambiguities": [],
+        "commitMessage": "docs: final language pass on the parallel inference lane proposal"
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/proposal-final-r0.md",
+      "durationMs": 92648,
+      "nudges": 0,
+      "docLines": 308,
+      "docLinesAdded": 14,
+      "docLinesRemoved": 12
+    },
+    {
+      "stage": "editorial-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e3c878bc0ffevuDP8xyy5vRmoW",
+      "agent": "review/design-correctness",
+      "at": 1794280855891,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/editorial-review-correctness-r2.md",
+      "durationMs": 42226,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e3c86e681ffeqykiV1HfGOVMuu",
+      "agent": "review/design-compatibility",
+      "at": 1794280904196,
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/editorial-review-compatibility-r2.md",
+      "durationMs": 48232,
+      "nudges": 0,
+      "failure": "independence violation: read a review report: /home/mike/.local/share/opencode/worktree/f852d4/mighty-squid/docs/designs/003-parallel-inference-lane/reviews/design/compatibility-r2.md"
+    },
+    {
+      "stage": "editorial-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e3c8629f4ffebJknseQchwpFqR",
+      "agent": "review/design-compatibility",
+      "at": 1794280936398,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/editorial-review-compatibility-attempt2-r2.md",
+      "durationMs": 32171,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:security",
+      "round": 2,
+      "sessionID": "ses_e3c85ac07ffeGYdGFPm5Ver6S6",
+      "agent": "review/design-security",
+      "at": 1794280978627,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/editorial-review-security-r2.md",
+      "durationMs": 42157,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:performance",
+      "round": 2,
+      "sessionID": "ses_e3c850716ffeBe7lEY7YcirvlC",
+      "agent": "review/design-performance",
+      "at": 1794281008810,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/editorial-review-performance-r2.md",
+      "durationMs": 30118,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:complexity",
+      "round": 2,
+      "sessionID": "ses_e3c849131ffeYlC1vgvJ3WVX8r",
+      "agent": "review/design-complexity",
+      "at": 1794281030981,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/editorial-review-complexity-r2.md",
+      "durationMs": 22107,
+      "nudges": 0
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_e3c843a83ffe854l2WpjCmWnmM",
+      "agent": "code/test-engineer",
+      "at": 1794281550624,
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/test-authoring-r0.md",
+      "durationMs": 519560,
+      "nudges": 0,
+      "failure": "independence violation: write touched run records: import { execFileSync } from 'node:child_process';\nimport { mkdirSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs';\nimport { tm…"
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_e3c7c4cd2ffeGarRXpEl9JOokA",
+      "agent": "code/test-engineer",
+      "at": 1794281689704,
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/test-authoring-attempt2-r0.md",
+      "durationMs": 139037,
+      "nudges": 0,
+      "failure": "independence violation: read touched run records: /home/mike/.local/share/opencode/worktree/f852d4/mighty-squid/docs/designs/003-parallel-inference-lane/transcripts/test-authoring-r0.md; glob touched run records: docs/designs/*/transcripts/editorial*"
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_e3c71c20effeujX8PukOjQWJtF",
+      "agent": "code/test-engineer",
+      "at": 1794282408573,
+      "reply": {
+        "testsAdded": 27,
+        "commitMessage": "test: pin ADR-003 parallel review-lane contracts"
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/test-authoring-r0.md",
+      "durationMs": 167006,
+      "nudges": 0
+    },
+    {
+      "stage": "implement",
+      "round": 0,
+      "sessionID": "ses_e3c6f355affewNq41liJI16Of3",
+      "agent": "code/coder",
+      "at": 1794283350675,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "feat: fan out review passes across up to N parallel inference slots"
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/implement-r0.md",
+      "durationMs": 942035,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e3c60cc2effeC43eo40negSHwd",
+      "agent": "code/test-engineer",
+      "at": 1794283685562,
+      "reply": {
+        "commitMessage": "test(orchestration): fail the reply contract in the parallel-lane escalation fixture\n\nTest strategy #5 requires the seat under test to fail twice through the reply\ncontract, which is the failure the design's one-retry-then-escalate path is\nwritten for: an unparseable reply ends the attempt as `invalid-reply`, so\nattempt 2 resumes the same session while still holding the same permit. The\nlane fixtures left `minNudgeIntervalMs` at its default floor, so their attempt\nended at the deadline as `stage-timeout` instead — a cancelled, non-resumable\nsession that opens a second one and stops proving the same-permit retry. The\nfixtures now clear the floor (as tests/pipeline-reply-contract.test.ts does)\nand set per-seat prompt windows so the escalationPending flag lands while the\nsibling still holds the other permit and every queued seat is stopped at\nacquire. No assertion was weakened or removed: the same-permit, single-session,\none-sweep-then-one-finalizeEscalate assertions still hold, and the other\nADR-003 tests are unchanged apart from reformating to the repo's prettier style.\n"
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/test-update-r0.md",
+      "durationMs": 332487,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e3c5bafd3ffeMit603blhVcOm3",
+      "agent": "code/coder",
+      "at": 1794284235721,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "fix: keep escalation terminal when a review pass ownership sweep throws"
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/fix-r0.md",
+      "durationMs": 547706,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e3c426d89ffeieay45d4U6U5ul",
+      "agent": "code/coder",
+      "at": 1794285447852,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "docs: record direct green-gate confirmation in parallel-lane build notes"
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/fix-r0.md",
+      "durationMs": 104463,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e3c40b362ffeukdDcX6M48UZf1",
+      "agent": "codereview/code-correctness",
+      "at": 1794285704867,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "tools/orchestration/src/pipeline/independence.ts:1 (also runner.ts:23, 839–853, 1849–1856; state-store.ts:32–34; types.ts:107–114; tests/pipeline-independence.test.ts; prompts/implement.md, prompts/test-authoring.md; .opencode/agents/code/coder.md, test-engineer.md)",
+            "problem": "The entire review-independence audit and own-findings-injection subsystem (commits d831541, d4cfbe8) is inside the reviewed diff but is not in scope in 02-proposal.md and is not declared in 03-build-notes.md's deviation list — scope creep (checklist item 4). Its new optional persisted SeatRecord.findings checkpoint field also contradicts the proposal's recorded promise that no .pipeline.json schema field is added by this design (the field itself is additive with version 1, so ADR-003 posture holds, but the undeclared gap does not).",
+            "fix": "Either carve the independence subsystem out of this branch, or add it to 03-build-notes.md's deviations with provenance (mid-run harness change) — explicitly naming the new optional SeatRecord.findings checkpoint field — so the panel adjudicates it rather than inheriting it inside an ADR-003 review."
+          },
+          {
+            "severity": "major",
+            "location": "tools/orchestration/src/pipeline/runner.ts:268–307, 317 (formatTouchedFiles in commitStage); runner.ts:656–673 + tools/orchestration/prompts/fix-tests.md (stageTemplate selection); .opencode/agents/code/coder.md and test-engineer.md permission edits; docs/workflows.md +7 lines",
+            "problem": "Commit 4c59b79's commit-time prettier formatting (now run on every commit including every pass commit) and the trigger-sensitive fix-stage template change alter single-stage finalize behavior and stage prompt routing for all stages. The proposal's finalize contract is enforceOwnership + commitStage, and none of this appears in the proposal or in 03-build-notes.md's deviation list — undeclared scope creep.",
+            "fix": "Declare both as deviations with rationale in 03-build-notes.md (they read as legitimate self-repair for the format deadlock), or split them out of this change."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/state-store.ts:167–182 (saveState / createStateWriter.enqueue); 03-build-notes.md deviation 1",
+            "problem": "Deviation 1 claims the landed snapshot 'carries the moment it was taken', but nothing assigns state.updatedAt except freshState (runner.ts:414–437): the writer does not stamp at enqueue and no save path restamps, so every checkpoint in a run carries the run-creation timestamp. The checkpoint-writer tests pass only because their fixtures hand-stamp snapshots, masking the production behavior; the field's 'last save' signal is silently lost.",
+            "fix": "Stamp updatedAt on the cloned snapshot in createStateWriter.enqueue (and at the plain saveState call sites), or correct the build-notes text to state the field becomes informational, frozen at run start."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/code-review-correctness-r1c0.md",
+      "durationMs": 248287,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e3c3ce949ffemjuZANN1iMo25K",
+      "agent": "codereview/code-compatibility",
+      "at": 1794285924792,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "docs/workflows.md:83-91 (and tools/orchestration/README.md)",
+            "problem": "The operator-facing compatibility story for the new knob never lands, and the docs now contradict the shipped code. workflows.md:83-85 still says \"Seats execute one at a time (single local inference lane)\", which is false for any --max-parallel >= 2 and never notes the pass-commit shape change at the default; workflows.md:87-91 still lists ADR-003 under \"Proposed, not implemented\", the exact entry Rollout step 3 says must move out with the change; and `--max-parallel` / `$OPENCODE_MAX_PARALLEL` with the `N <= server slots` guidance and the per-seat-deadline/queueing note appear nowhere in workflows.md or either README — only in a code comment (src/pipeline/cli.ts:56-64) and yargs describe strings. Since A1/A2 make the runner unable to verify slot count, that guidance is the only mitigation for the change's top-rated risk, and the matrix row \"Run with N > 1 — yes, conditional on the server exposing >= N slots\" has no discoverable support story.",
+            "fix": "Add the knob to the workflows.md CLI block (`pipeline run/resume <slug> --max-parallel <n>`, `$OPENCODE_MAX_PARALLEL`, default 1) with the `N <= server slots` guidance and the note that each seat's deadline starts at its own prompt and counts queue waiting; delete the ADR-003 bullet from \"Proposed, not implemented\"; rewrite the \"one at a time\" sentence to \"up to N seats at a time (--max-parallel, default 1 — the serial lane), launch order fixed, one commit per pass\"; and add the knob to tools/orchestration/README.md's flag table or state why it does not list pipeline knobs."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:281-306 (formatTouchedFiles)",
+            "problem": "The new hygiene step resolves the formatter as a hard-coded path `join(pkg, 'node_modules', '.bin', 'prettier')` instead of npm's own resolution, and when that path is absent it does a bare `continue` with no log line. Under any hoisted layout (npm workspaces, pnpm, yarn) or a checkout without devDependencies, packageDirs finds the package, the shim is one level up, formatting silently stops happening, and the run-003 deadlock the function exists to remove returns with no signal — the comment \"the gate will say so instead\" only means the gate goes red while nothing says the formatter never ran. The shim is also the POSIX sh script; on Windows npm writes `prettier.cmd`, so this is OS-specific behavior added against a matrix row whose stated basis is \"no OS-specific code added\".",
+            "fix": "Resolve the formatter the way npm does — walk up from the package to the nearest `node_modules/.bin/prettier`, or `spawnSync('npm', ['exec', '--no', '--', 'prettier', '--write', ...], { cwd: pkg })` — and console.warn naming any package that has dirty formattable files but no formatter, so the skip is never silent."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:281-303 (formatTouchedFiles file list)",
+            "problem": "The formatter's file list comes from dirtyFiles(), which strips the porcelain status letters (porcelainPaths, runner.ts:167-172), so git-deleted paths go to `prettier --write` alongside modified ones. Prettier exits non-zero for a pattern matching nothing (\"No files matching the pattern were found\") and treats each positional arg as a glob, so one stage that deletes a .ts/.md file makes the whole --write batch for that package fail — the `res.status !== 0` branch only warns, leaving every other dirty file in that package unformatted, i.e. the deadlock case returns silently — and a dirty path containing glob metacharacters (`[`, `]`, `*`, `?`, `{`, `}`) is reinterpreted as a pattern matching nothing or the wrong siblings. pipeline-fix-trigger.test.ts:87-108 only dirties modified, plainly-named files, so CI is green and the failure is latent.",
+            "fix": "Keep the porcelain status letters for the formatter's list (or filter on existsSync(join(pkg, p))) so deleted paths are skipped, and pass the batch after `--` or format per file with `--stdin-filepath` so argv are not glob patterns; extend the fixture with one deleted .ts and one `[weird].ts` asserting the remaining files still get formatted."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/states.ts:29-39 (gateNameFor)",
+            "problem": "The gate labels change from `allDesignReviewsApproved`/`allEditorialReviewsApproved`/`allCodeReviewsApproved` to `design-review`/`editorial-review`/`code-review`, but those strings are persisted values in `.pipeline.json`'s gateLog (`gate: z.string()`, state-store.ts:99), printed by `pipeline status` (runner.ts:1974-1976) and the escalation report (report.ts:279), and docs/adrs/001-code-driven-agent-pipeline.md:190 still documents the old names as the identity of the aggregated-verdict gates. The matrix row \"Checkpoints written before this change — yes — No checkpoint schema change\" and Rollout step 2 \"No migrations\" do not cover a value-vocabulary change, so a run resuming on this code shows both vocabularies in one gate log and anything keyed on the documented name stops matching. Nothing in the change needed the rename: the entry's stage context and reason already name the pass.",
+            "fix": "Revert gateNameFor to the ADR-001 names, or keep the labels and record them: update the ADR-001 gate table / docs/workflows.md and add a Rollout line saying gate-log labels change and pre-existing entries keep the old names."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/state-store.ts:156-173 (saveState)",
+            "problem": "The `state.updatedAt = Date.now()` line is deleted with no replacement writer: `updatedAt` is now set exactly once, at state creation (runner.ts:435-436), so every checkpoint written after this change carries `updatedAt === startedAt` for the whole run while the field stays required (types.ts:224, state-store.ts:107) and `version` stays 1. The stated rationale is correct for the drained writer — a queued snapshot must not masquerade as newer — but the fix drops the timestamp rather than moving it, an unannounced semantic change to a persisted operator-facing artifact under a \"no checkpoint schema change\" claim. It also leaves the new ordering test relying on hand-set values (pipeline-checkpoint-writer.test.ts:52-84) instead of the writer recording snapshot time.",
+            "fix": "Stamp at snapshot time: set `snapshot.updatedAt = Date.now()` inside `createStateWriter.enqueue` before queueing, and keep (or restore) the stamp in `saveState` for the sequential non-pass path, so both write paths mean \"when this snapshot was taken\"; then assert ordering in the writer test without hand-setting updatedAt in the fixture."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:290-296",
+            "problem": "The package-prefix matcher is built as `prefix = rel === '' ? '' : `${rel}/`` from `relative(repoDir, pkg)` and compared with `p.startsWith(prefix)` against git porcelain paths, which are always `/`-separated. On a platform where `relative()` yields `\\`, the prefix never matches and formatTouchedFiles becomes a silent no-op — acceptable under the Linux-only matrix, but another OS assumption added against a matrix row that says \"no OS-specific code added\".",
+            "fix": "Normalize once: `const rel = relative(repoDir, pkg).split(sep).join('/')`, or record the POSIX-only assumption in the matrix row's Notes so the formatter's non-portability is explicit."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/code-review-compatibility-r1c0.md",
+      "durationMs": 219872,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e3c398e2fffe7Xg0VbIT9fafqe",
+      "agent": "codereview/code-security",
+      "at": 1794286138749,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "tools/orchestration/src/pipeline/runner.ts:297-305 (formatTouchedFiles, new)",
+            "problem": "The runner executes a convention-resolved binary from the worktree — join(pkg,'node_modules','.bin','prettier') spawned via commitStage before every commit. node_modules/ is git-ignored repo-wide, so an implement/fix session (agent edit permission '*', ownership rule !inTests) — the exact threat independence.ts and gates.ts assume is real — can plant package.json + node_modules/.bin/prettier under any packageDirs-probed dir; the payload is invisible to dirtyFiles/enforceOwnership, never appears in a human-reviewed commit, and is then executed by the runner (which holds the checkpoint, git authorship, and the lock) on that commit and every later one. The new pipeline-fix-trigger.test.ts stub proves the mechanism; the function is also absent from the proposal.",
+            "fix": "Never exec a name-conventional path in the worktree's node_modules: resolve the formatter through the package manager from the repo root's install (e.g. spawnSync('npm',['exec','--no-install','--','prettier','--',...],{cwd:repoDir})), or validate the formatter install against the committed lockfile, or drop the auto-format step and let the format:check gate name the files."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/independence.ts:77,91-98",
+            "problem": "The independence audit matches raw substrings ('transcripts/', 'reviews/'), so trivial variants bypass it: a completed shell/glob over '.../transcripts' without a trailing slash (enumerating the run-records dir itself) or command substitution ('cat \"$(echo …/transcr; echo ipt/x)\"') accesses run records undetected, while the module comment claims the audit 'proves' compliance. Additionally, review seats' write/edit/patch parts targeting reviews/** are scanned for the transcripts check only: a seat can overwrite a sibling's report file, which passes the audit and survives the ownership sweep (docs/** is in-policy), corrupting the panel's run record — the same independence property the feature protects.",
+            "fix": "Match path segments instead of substrings (segment test for 'transcripts', same for 'reviews'), and in review stages flag write/edit/patch parts under reviews/** whose path is not the seat's handed reportPath; document residual obfuscation bypasses as unprovable-by-design."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/independence.ts:135-137 with runner.ts:850,1234,1270",
+            "problem": "brief() truncates model-authored violation strings to 140 chars but keeps control bytes; violation summaries and server/model-derived stageFailure strings are printed via console.warn, persisted into the gate log, and re-displayed by pipeline status and ESCALATION.md, so ANSI/control-sequence payloads in a model-chosen path or command can spoof or corrupt operator terminal output. This contradicts the posture cli.ts:56-64 deliberately takes for config values (reflect through JSON.stringify/String so no control or ANSI bytes reach the terminal raw).",
+            "fix": "Strip/escape control characters in brief() (e.g. s.replace(/\\p{Cc}/gu,' ') or JSON.stringify reflection) and apply the same to out.failure strings before logging or writing them to the gate log."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1852-1856 (prevFindings) with tools/orchestration/src/pipeline/types.ts:11-16 (FindingSchema)",
+            "problem": "The findings re-injection channel is shape-validated but size-unbounded: FindingSchema puts no length cap on location/problem/fix, so an oversized seat reply is persisted into every later checkpoint snapshot (re-cloned and re-serialized on every write) and embedded verbatim into every later prompt of that seat — checklist item 1 wants schema-validated and size-limited.",
+            "fix": "Bound the re-injected payload (truncate with an elision note in reviewVars) or add .max(...) caps to FindingSchema's strings."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/code-review-security-r1c0.md",
+      "durationMs": 213905,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e3c364a6fffeHygPh6swgAoH9S",
+      "agent": "codereview/code-performance",
+      "at": 1794286277790,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:282,317-318",
+            "problem": "commitStage spawns git twice per commit: formatTouchedFiles runs dirtyFiles() (a sync `git status` spawn) and commitStage immediately recomputes dirtyFiles(repoDir) for the emptiness check. Every commit (~30/run) pays one extra subprocess.",
+            "fix": "Have formatTouchedFiles return (or accept) its dirty-file list and reuse it for the emptiness check in commitStage instead of re-running git status."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1238,1272,1276",
+            "problem": "A review seat holds its semaphore permit across `await writer.enqueue(state)`: the permit is released in `finally` only after the queued saveState chain has caught up to this seat's write, so up to |panel| fs write completions serialize inside slot turnover. Bounded and small (5 tmp+rename writes/pass) so effect is negligible, but it needlessly delays slot release.",
+            "fix": "Release the permit before awaiting the seat's own write promise (the writer snapshots synchronously at enqueue and the barrier's drain() guarantees durability), keeping the same rejection semantics via Promise.allSettled."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/state-store.ts:207; tools/orchestration/src/pipeline/runner.ts:764-765",
+            "problem": "structuredClone(state) adds a full deep copy per checkpoint write on top of saveState's existing safeParse + JSON.stringify (correct and bounded, but undocumented); and the runner comment says the independence audit 'shells out of it', while auditSessionIndependence never spawns anything — the wording invites a future maintainer to assume a subprocess sits in the polling loop.",
+            "fix": "Add a one-line comment at state-store.ts:207 noting the snapshot copy is deliberate and must stay synchronous; fix the runner.ts:765 comment to say the audit is pure in-memory over lastSeen."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/code-review-performance-r1c0.md",
+      "durationMs": 139000,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e3c342b5dffelcdw2nb6lDTDPM",
+      "agent": "codereview/code-testing",
+      "at": 1794286424904,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration (whole diff) — testing checklist item 6",
+            "problem": "This seat could not run `npm run check` in tools/orchestration: the shell tool is permission-denied (two attempts), so the suite's green status at the default N = 1 is unverified by this review (per the checklist, an unevaluated item counts as a finding, not a pass).",
+            "fix": "Covered by the panel runner's independent `npm run check` in tools/orchestration; a seat with shell access should paste the output tail. If that run is red, it overrides this verdict."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline-parallel-escalation.test.ts:257-266",
+            "problem": "The N = 2 escalation fixture depends on a wall-clock budget rather than a signal: the claim only holds while the failing seat's two attempts (≈90-120 ms of 5 ms timers) land inside the sibling's 600 ms prompt window. Under CI event-loop starvation the sibling could settle first, the queued security seat would take the freed permit, and the exact `creates` assertion fails as a false alarm (flaky, not wrong code).",
+            "fix": "Make the interleaving explicit: have the stub resolve the sibling's prompt only after it observes the failing seat's second attempt (prompt count >= 2 for that session key), or widen the margin and state the dependency in the fixture comment."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline-cli-max-parallel.test.ts",
+            "problem": "Coverage is resolver-level only. The proposal says the knob mirrors the --timeout pattern, and the --timeout mirror in tests/cli.test.ts also includes the end-to-end argv -> yargs -> resolver -> cfg chain and the validation-before-createClient ordering test; no equivalent exists for --max-parallel / $OPENCODE_MAX_PARALLEL, leaving the yargs coercion in src/pipeline/cli.ts and the resolve-before-side-effects order (cli.ts:163-170) unexercised.",
+            "fix": "Add one argv-level test asserting `run/resume --max-parallel 3` and $OPENCODE_MAX_PARALLEL land in cfg.maxParallelReviews, and one that a malformed env rejects before createClient/lock, mirroring tests/cli.test.ts:170-213."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1301-1309",
+            "problem": "The best-effort escalation-sweep catch (sweep throws -> log -> finalizeEscalate still lands), which the proposal's r1 security revision introduced, has no test forcing enforceOwnership to throw.",
+            "fix": "Fixture that plants .git/index.lock (or an unresolvable headBefore) before the escalation pass and asserts the warning plus the terminal escalate commit."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1198-1200",
+            "problem": "The `seats.length === 0` early return is unreachable — planPass and specialtiesFor never hand an empty seat list — so it is untestable defensive surface on a function not exported for unit tests.",
+            "fix": "Drop the guard, or mark it explicitly as a defensive no-op so the untested branch is intentional."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/code-review-testing-r1c0.md",
+      "durationMs": 147082,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e3c31ec71ffexZrzeM3Opto3zL",
+      "agent": "code/coder",
+      "at": 1794287036922,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "fix: drop runner-executed formatter, stamp checkpoints at write sites, harden audit"
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/fix-r1.md",
+      "durationMs": 611911,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 1,
+      "sessionID": "ses_e3c287a20ffeAAxQOB5YNO3IxS",
+      "agent": "code/test-engineer",
+      "at": 1794287181102,
+      "reply": {
+        "commitMessage": "test(orchestration): match round-1 review fixes - drop formatter-stub tests, pin audit segment matching and snapshot-time updatedAt"
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/test-update-r1.md",
+      "durationMs": 137000,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e3c26483cffeWSVVUxqKsH0DI2",
+      "agent": "codereview/code-correctness",
+      "at": 1794287373388,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/independence.ts:143–149 (tests/pipeline-independence.test.ts)",
+            "problem": "The new cross-seat report write fence has no positive test: no test anywhere passes ownReportPath, so every write case exercises only the own === undefined skip and the flagging branch (key !== own → 'wrote a review report') is unexercised. Deviation 7's hardening claim is implemented in code but pinned by no test.",
+            "fix": "Add a case passing ownReportPath with a write/edit/patch part aimed at a sibling report expecting one violation, plus a negative case writing the handed path with ownReportPath set expecting none."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/independence.ts:135,142,148; runner.ts:846",
+            "problem": "The build-notes claim that every model- and server-authored string reaching the terminal, gate log, or ESCALATION.md passes through printable() is not quite true for part.name (a server-supplied tool name interpolated raw into the violation text printed by console.warn); paths and command text are sanitized via brief()/printable(), the tool name is not.",
+            "fix": "Wrap part.name in printable() at the violation-construction sites, or narrow the build-notes wording."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/code-review-correctness-r1c1.md",
+      "durationMs": 185446,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e3c2373a4ffeJJoVx7DO23cDSI",
+      "agent": "codereview/code-compatibility",
+      "at": 1794287583093,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "docs/adrs/001-code-driven-agent-pipeline.md:121,190,197",
+            "problem": "Residual of my r1c0 finding 4: the gate-label rename stands (states.ts:34-38) and docs/workflows.md:116-119 now records the new vocabulary and the old/new coexistence rule, verified sound in code (gate names are write-and-display only; gate: z.string() keeps old entries loading). But the document workflows.md:3 calls normative still names the aggregated-verdict gates allDesignReviewsApproved/allCodeReviewsApproved in its gate table with no pointer to the shipped labels, so an operator keyed on ADR-001 alone targets a name this code no longer writes.",
+            "fix": "Add an amendment note to ADR-001's gate table (in the style ADR-003 uses to amend ADR-001) recording that since ADR-003 the runner logs these gates under `<phase>-review`, or state that ADR-001's table is the historical record and docs/workflows.md is the live label authority."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/code-review-compatibility-r1c1.md",
+      "durationMs": 209664,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e3c204076ffel571c64KGQW7VH",
+      "agent": "codereview/code-security",
+      "at": 1794287728243,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/independence.ts:143-145 with runner.ts:842-843 and tools/orchestration/tests/pipeline-independence.test.ts:97-108,222-233",
+            "problem": "The sibling-report write guard added to answer r1 finding 2 fails open and is untested. The write check only runs when ownReportPath is a string; the runner passes undefined whenever handle.vars['reportPath'] is absent, silently disabling write adjudication with no signal if the template variable is renamed or dropped. No test anywhere passes ownReportPath or asserts the 'wrote a review report' violation — the two tests that read like write coverage omit ownReportPath and therefore exercise the vacuous 'cannot judge writes' branch, passing whether or not the guard works.",
+            "fix": "Add unit tests that flag a completed write to another seat's path under reviews/** while handed a different reportPath, treat an absolute-path write of the own path as own (reportKey identity), and assert reviewVars emits reportPath for every review phase so the runner wiring cannot rot; optionally warn once when a review-stage audit runs with no handed report path."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/code-review-security-r1c1.md",
+      "durationMs": 145105,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e3c1e0943ffexcc1S2JRGfKbCZ",
+      "agent": "codereview/code-correctness",
+      "at": 1794287915232,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/independence.ts:143–149 (tests/pipeline-independence.test.ts)",
+            "problem": "Carried forward from c1, unchanged: the code/test diff for this pass is empty (the only commit in 3745f3c..HEAD excluding docs/designs is a docs commit), so the cross-seat report write fence still has no positive test — no test anywhere passes ownReportPath, leaving the key !== own → 'wrote a review report' branch unexercised and deviation 7's hardening claim unpinned by any test.",
+            "fix": "Add a test case passing ownReportPath with a write/edit/patch part aimed at a sibling report expecting one violation, plus a negative case writing the handed path with ownReportPath set expecting none."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/independence.ts:135,142,148; runner.ts:846",
+            "problem": "Carried forward from c1, unchanged: the build-notes claim that every model- and server-authored string reaching the terminal, gate log, or ESCALATION.md passes through printable() is still not true for part.name (a server-supplied tool name interpolated raw into the violation text at independence.ts:135, printed via console.warn at runner.ts:846); paths and command text are sanitized via brief()/printable(), the tool name is not.",
+            "fix": "Wrap part.name in printable() at the violation-construction sites, or narrow the build-notes wording."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/code-review-correctness-r1c2.md",
+      "durationMs": 186888,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e3c1b2f18ffe2wV6dcTWPEwImZ",
+      "agent": "codereview/code-compatibility",
+      "at": 1794287991595,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "docs/adrs/001-code-driven-agent-pipeline.md:121,190,197",
+            "problem": "Carried from r1c1, unchanged by this pass: the in-scope diff (3745f3c..HEAD excluding docs/designs) is empty — its only commit, ec6130a, touches solely docs/designs run records — so ADR-001's gate table still names the aggregated-verdict gates allDesignReviewsApproved/allCodeReviewsApproved while the runner (states.ts:35,37) logs them under design-review/code-review with no amendment pointer. The nit did not grow and nothing in this pass makes it worse.",
+            "fix": "Add an amendment note to ADR-001's gate table recording that since ADR-003 the runner logs these gates under `<phase>-review`, or state that ADR-001's table is the historical record and docs/workflows.md is the live label authority."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/code-review-compatibility-r1c2.md",
+      "durationMs": 76333,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e3c1a04c4ffegWIPWZhjacbwRY",
+      "agent": "codereview/code-security",
+      "at": 1794288104524,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline-independence.test.ts:97-108,222-233 with tools/orchestration/src/pipeline/independence.ts:143-150 and tools/orchestration/src/pipeline/runner.ts:842-843",
+            "problem": "Carried unchanged from my r1 finding: the sibling-report write guard is still untested. No test passes ownReportPath or asserts the 'wrote a review report' violation; the two tests that read like write coverage omit ownReportPath and exercise only the vacuous 'cannot judge writes' branch. Re-verified at HEAD: the cited lines are byte-identical to what I approved, so this is not a regression introduced by the later revisions — the fixes neither broke the guard nor addressed the coverage gap. It remains minor and non-blocking since reviewVars does emit reportPath for every review phase (runner.ts:1869,1918) and the guard behaves correctly when handed a path.",
+            "fix": "Add unit tests that flag a completed write to another seat's path under reviews/** while handed a different reportPath, treat an absolute-path write of the own path as own (reportKey identity), and assert review-stage vars carry reportPath so the runner wiring cannot rot; optionally warn once when a review-stage audit runs with no handed report path."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/pipeline-cli-max-parallel.test.ts against tools/orchestration/src/pipeline/cli.ts:72-77",
+            "problem": "The resolveMaxParallel env-error path reflects the raw $OPENCODE_MAX_PARALLEL string through JSON.stringify (correct), but the max-parallel suite never exercises control/ANSI-byte reflection, while the resolveReplyTimeoutSeconds mirror it copies has exactly that case (tests/cli.test.ts:108-115). A future edit that drops the JSON.stringify escape in the max-parallel messages would not fail any test.",
+            "fix": "Port the '\\x1b[2J' reflection case from tests/cli.test.ts to the max-parallel suite: assert the error message contains JSON.stringify of the value and no raw ESC byte."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/code-review-security-r1c2.md",
+      "durationMs": 112882,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e3c184ba6ffeeJ8qbzbPe3tJo3",
+      "agent": "codereview/code-performance",
+      "at": 1794288239260,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1248,1282,1286,1287-1288",
+            "problem": "Carried over from round 1, unchanged by the ratified fixes: a seat holds its semaphore permit across `await enqueueSnapshot()`, so up to |panel| tmp+rename fs completions serialize inside slot turnover at N > 1. The fix only prepends a Date.now() stamp to the same enqueue, so it neither worsens nor resolves the behavior. Bounded (≤3 enqueues per seat) and negligible, hence still approve-able as a nit.",
+            "fix": "Release the permit before awaiting the seat's own write promise (the writer snapshots synchronously at enqueue and drain() preserves the durability barrier), keeping rejection semantics via the existing Promise.allSettled."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/code-review-performance-r1c2.md",
+      "durationMs": 134697,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e3c163d5fffe6p047au1boPULr",
+      "agent": "codereview/code-testing",
+      "at": 1794288382349,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration (whole diff) — testing checklist item 6",
+            "problem": "This seat could not run `npm run check` again: the shell tool is permission-denied (three attempts), so the suite's green status at the default N = 1 remains unverified by this review (per the checklist, an unevaluated item counts as a finding, not a pass).",
+            "fix": "Covered by the panel runner's independent `npm run check` in tools/orchestration; a red run there overrides this verdict."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline-fix-trigger.test.ts:15-20 / src/pipeline/runner.ts:267-285",
+            "problem": "Checklist item 3 gap in this revision: the fix for security r1 major 1 (runner execs a model-plantable binary under `node_modules/.bin`) removed the step and the formatter-stub test that pinned the old behavior, leaving only header comments. No test now fails if a runner-executed formatter is reintroduced.",
+            "fix": "Add one regression fixture: plant a recording stub at `<pkg>/node_modules/.bin/prettier` for a package dir a stage touches, run a pass through `commitStage`, and assert the stub never executed (or spy spawnSync for any non-git binary)."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline-cli-max-parallel.test.ts",
+            "problem": "Carried from r1, unchanged by the revision: coverage is resolver-level only. The yargs coercion of `--max-parallel` and the resolve-before-createClient/lock ordering (src/pipeline/cli.ts:161-170) remain unexercised, while the file's header asserts 'all validation before side effects'; the --timeout mirror in tests/cli.test.ts:170-213 has both.",
+            "fix": "Add one argv-level test asserting `run/resume --max-parallel 3` and $OPENCODE_MAX_PARALLEL land in cfg.maxParallelReviews, and one that a malformed env rejects before createClient/lock, mirroring tests/cli.test.ts:170-213."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1311-1319",
+            "problem": "Carried from r1: the best-effort escalation-sweep catch still has no test forcing enforceOwnership to throw on the escalation path.",
+            "fix": "Fixture that plants .git/index.lock (or an unresolvable headBefore) before the escalation pass and asserts the warning plus the terminal escalate commit."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1198-1200",
+            "problem": "Carried from r1: the `seats.length === 0` early return remains unreachable (planPass and specialtiesFor never hand an empty seat list) and is still not marked as an intentional defensive no-op.",
+            "fix": "Drop the guard, or mark it explicitly as a defensive no-op so the untested branch is intentional."
+          }
+        ]
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/code-review-testing-r1c2.md",
+      "durationMs": 143062,
+      "nudges": 0
+    },
+    {
+      "stage": "doc-sync",
+      "round": 1,
+      "sessionID": "ses_e3c140e2effeZHnwzYmhPMn2eX",
+      "agent": "ops/doc-sync",
+      "at": 1794288645273,
+      "reply": {
+        "drifted": true,
+        "commitMessage": "docs: record as-built drift for the parallel inference lane"
+      },
+      "transcript": "docs/designs/003-parallel-inference-lane/transcripts/doc-sync-r1.md",
+      "durationMs": 262828,
+      "nudges": 0
+    }
+  ],
+  "gateLog": [
+    {
+      "gate": "sourceAdmissible",
+      "round": 0,
+      "proceed": true,
+      "reason": "ADR is proposed and complete",
+      "at": 1794278738313
+    },
+    {
+      "gate": "allDesignReviewsApproved",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: correctness, compatibility, security, performance",
+      "at": 1794280131071
+    },
+    {
+      "gate": "allDesignReviewsApproved",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c2 pending: complexity",
+      "at": 1794280652461
+    },
+    {
+      "gate": "allDesignReviewsApproved",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794280720864
+    },
+    {
+      "gate": "stageFailure",
+      "round": 2,
+      "proceed": false,
+      "reason": "editorial-review:compatibility: independence violation: read a review report: /home/mike/.local/share/opencode/worktree/f852d4/mighty-squid/docs/designs/003-parallel-inference-lane/reviews/design/compatibility-r2.md",
+      "at": 1794280904197
+    },
+    {
+      "gate": "allEditorialReviewsApproved",
+      "round": 2,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1794281031032
+    },
+    {
+      "gate": "stageFailure",
+      "round": 0,
+      "proceed": false,
+      "reason": "test-authoring: independence violation: write touched run records: import { execFileSync } from 'node:child_process';\nimport { mkdirSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs';\nimport { tm…",
+      "at": 1794281550626
+    },
+    {
+      "gate": "escalate",
+      "round": 0,
+      "proceed": false,
+      "reason": "stage test-authoring failed twice (independence violation: read touched run records: /home/mike/.local/share/opencode/worktree/f852d4/mighty-squid/docs/designs/003-parallel-inference-lane/transcripts/test-authoring-r0.md; glob touched run records: docs/designs/*/transcripts/editorial*) — nudge/reply rule: one retry, then escalate",
+      "at": 1794281689709
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794283353024
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794283687971
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794284238150
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check green",
+      "at": 1794285456496
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: correctness, compatibility, security",
+      "at": 1794286424962
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794287044050
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check green",
+      "at": 1794287187888
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c2 pending: performance, testing",
+      "at": 1794287728299
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794288382406
+    },
+    {
+      "gate": "done",
+      "round": 0,
+      "proceed": true,
+      "reason": "pipeline complete",
+      "at": 1794288645333
+    }
+  ],
+  "startedAt": 1794278738294,
+  "updatedAt": 1794284238152,
+  "baseRef": "73200b44dc6ae47e18fe9aba25cd7a0e9167136e",
+  "designCycle": 3,
+  "designStamp": "9716bf4c84f55bfe464605c41edaf3514210fd00",
+  "seats": {
+    "design": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "9716bf4c84f55bfe464605c41edaf3514210fd00",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design > Pass-level fan-out in `drive` — \"**N = 1 is the same path** ... only commit shape and finalize timing change — one commit and one ownership sweep per pass, not per seat\"",
+            "problem": "Contradicts the escalation bullet revised in the same pass: \"After the barrier, if the flag is set: drain the writer, run the pass `enforceOwnership` sweep, then `finalizeEscalate` once\". Today's failed stage skips ownership enforcement — the sentence this revision deleted said exactly that (\"a failed stage skips ownership enforcement today too\"). At N = 1 the escalation path now reverts out-of-policy sibling files that today land unfiltered in `finalizeEscalate`'s commit, i.e. the escalation commit's content changes, which is neither commit shape nor finalize timing; the \"only ... change\" enumeration and Rollout 1's \"with only the pass-commit shape changed\" are both now false, and ADR-003 §Self-update (\"Default N = 1 keeps ADR-002 behavior for gates, artifacts, and control flow\", carving out only commit shape and sweep timing) is ambiguous about a new sweep on the escalation path. The design should state its reading instead of undercounting the N = 1 diff. Label: new.",
+            "fix": "Add the escalation sweep to the N = 1 caveat bullet and the Rollout 1 sentence as a third stated difference (\"and the escalation path now runs one ownership sweep before `finalizeEscalate`, where today none ran\"), or keep the sweep success-path only so escalation commit content stays exactly today's."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design > Pass-level fan-out in `drive` — \"The sweep reverts out-of-policy sibling files and escalation still lands; its commit carries only in-policy complete sibling reports.\"",
+            "problem": "The sweep enforces policy only, not completeness. Nothing prevents a second in-flight seat from also exhausting its retries at N > 1 (it still completes attempt 2 before releasing its permit, per \"Retries consume slots\"), and its partial report is in-policy under the shared `docs/**` ownership rule, so `finalizeEscalate`'s `commitStage` carries it — exactly what the replaced r1 sentence admitted (\"finalizeEscalate's own `commitStage` lands the siblings' partial reports in the escalation commit\"). \"complete\" asserts a filter the mechanism does not have. Label: new.",
+            "fix": "Reword to \"carries only in-policy sibling files, including any partial report from a retry-exhausted seat (as today)\"; if partial reports must be excluded, name the mechanism that detects incompleteness."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design > Pass-level fan-out in `drive` — escalation bullet ending \"...then `finalizeEscalate` once with today's `failed twice … one retry, then escalate` message\"",
+            "problem": "The r1 version ended \"then `finalizeEscalate` once ... and stop driving\"; the rewrite drops the statement that the run halts after escalation, and the flow diagram shows only the success branch (barrier → drain → `finalizeReviewPass` → verdicts → gate). Halting is now only inferable. Label: new.",
+            "fix": "Restore \"then stop driving\" as the final clause of the escalation sequence (or draw the escalation branch in the diagram)."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "9716bf4c84f55bfe464605c41edaf3514210fd00",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Pass-level fan-out — \"no seat today's `StopDriving` (runner.ts:1158–1166) would skip ever runs — at N = 1 control flow is exactly today's.\"",
+            "problem": "Re-raised only as a wording issue: the sentence's argument is about which seats run, but as written it is a blanket backward-compatibility claim for the entire N=1 path, and the same revised paragraph contradicts it — escalation now runs \"the pass `enforceOwnership` sweep, then `finalizeEscalate`\", a git mutation today's escalation path does not perform (r1 text: \"a failed stage skips ownership enforcement today too\"). ADR-003 §Self-update draws exactly this line (N = 1 keeps ADR-002 behavior for gates, artifacts, and control flow, commit shape and finalize timing excepted; a bit-for-bit identity claim \"must not be made in the design\"). The sweep decision itself is sound and not contested; only the identity claim over it is false.",
+            "fix": "Scope the clause to what the flag preserves: \"at N = 1 the set of seats that run is exactly today's; the escalation path additionally runs the pass ownership sweep, so its commit differs from today's (see the N = 1 caveat)\"."
+          },
+          {
+            "severity": "minor",
+            "location": "Configuration and CLI — \"`maxParallelReviews?: number` … optional … and `DEFAULT_CONFIG.maxParallelReviews = 1`, the sole default authority\"",
+            "problem": "The closure of my r1 finding now asserts a default guarantee the document gives no mechanism for. The only DEFAULT_CONFIG merge shown is the CLI's `cfg: { ...DEFAULT_CONFIG, maxParallelReviews: n }`, yet the stated reason for the optional field is that config objects exist that omit it (\"so existing configs compile\"). Such a caller reaches `createSemaphore(cfg.maxParallelReviews)` in the fan-out diagram with `undefined`, not the documented default of 1; no Test strategy item covers the omitted-field path.",
+            "fix": "One clause in the same bullet naming the normalization point for all callers — every `runPipeline`/`resumePipeline` entry merges `DEFAULT_CONFIG` before config reaches the lane (or the semaphore reads `cfg.maxParallelReviews ?? DEFAULT_CONFIG.maxParallelReviews`) — and assert the omitted-field run serializes in Test strategy #8 or #9."
+          }
+        ]
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "9716bf4c84f55bfe464605c41edaf3514210fd00",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → Pass-level fan-out in `drive`, bullet \"Escalate after siblings settle\" — \"The sweep reverts out-of-policy sibling files and escalation still lands\"",
+            "problem": "The r1 fix is in place and correctly positioned after the barrier, so out-of-policy sibling output can no longer reach history through the escalation commit — the r1 finding is closed. But the new guarantee has no stated mechanism, and the closure puts a throw point in front of the run's only terminal landing. `enforceOwnership` is not error-tolerant: `git()` throws on any non-zero exit (runner.ts:97–103) and the revert path uses it for `restore`/`add -A`/`commit` (runner.ts:227, 243–251). Today it is reached only inside `if (outcome.ok)` (runner.ts:917), so the escalation path never had a git-mutating step before `finalizeEscalate`; this design adds one. If it throws — an index.lock left by a seat that shelled out to git before failing reply validation, an unresolvable `restore --source=<headBefore>` — the error escapes `drive` (only `StopDriving` is caught, runner.ts:1401–1405), so `finalizeEscalate` never runs: status stays `running`, no `escalate` gateLog, no ESCALATION.md, and the revert is left half-applied with the out-of-policy file still dirty. The run's only continuation, `pipeline resume`, escalates at drive's `next.kind === 'escalate'` (runner.ts:1121–1123), which runs no sweep, so `commitStage`'s `git add -A` lands exactly the file the closure was meant to keep out of history. A seat steered by injected content has a motive to break that step.",
+            "fix": "Replace \"The sweep reverts out-of-policy sibling files and escalation still lands\" with the mechanism plus the degraded posture: the escalation sweep is best-effort — a sweep error is logged and swallowed the way runner.ts already swallows a failed ownership delete (\"Deleting an out-of-ownership path must never take the run down\", runner.ts:230–235) — `finalizeEscalate` still runs, and when the sweep did not complete, the escalate gate entry's reason records that the escalation commit is un-enforced. Mirror that wording in the Risks row \"Escalation mid-pass loses sibling work or races its writes\"."
+          },
+          {
+            "severity": "minor",
+            "location": "Test strategy #5 — \"escalation is one `enforceOwnership` sweep then one `finalizeEscalate` after siblings settle\"",
+            "problem": "The revised assertion pins call count and order, not the security property the r1 closure rests on. Nothing in #1–#10 proves that a path the review ownership rule forbids is absent from the escalation commit. An implementation that sweeps after `finalizeEscalate`'s `commitStage` has already added everything, or sweeps with a `headBefore` that is not the pass-entry value, satisfies the sentence as written — one sweep, one finalize, after siblings settle — and still lands the file, so the r1 hole returns with the design text intact.",
+            "fix": "Name the fixture inside #5: a succeeded sibling leaves a path outside `docs/**` (e.g. `src/injected.ts`) while another seat fails twice; assert three effects rather than two calls — the path is reverted or deleted after the pass, the escalation commit's `--name-only` listing contains no path outside `docs/**`, and `state.status === 'escalated'` with `ESCALATION.md` present. This is the executable form of the Risks-row mitigation."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Pass-level fan-out in `drive`, bullet \"Escalate after siblings settle\" — \"its commit carries only in-policy complete sibling reports\"",
+            "problem": "The sweep contains paths, not roles: `stagePathAllowed` permits every review stage anything under `docs/**` (gates.ts:260–273), so a seat's edit to the document under review or to another seat's report file passes the sweep and lands in the escalation commit. The sentence reads as a per-seat report guarantee, which is not what runs. Behaviourally this is strictly narrower than today's unenforced commit and rests on the same premise A3/A6 use to make the pass sweep sound, so it is wording only — but that commit plus ESCALATION.md is the record the operator reconstructs an escalated run from.",
+            "fix": "Replace the phrase with \"only paths the review ownership rule allows (`docs/**`, not per-seat report paths)\"."
+          },
+          {
+            "severity": "nit",
+            "location": "Configuration and CLI — \"`maxParallelReviews?: number` to `PipelineConfig` — optional, deliberately relaxing the ADR's required field so existing configs compile — and `DEFAULT_CONFIG.maxParallelReviews = 1`, the sole default authority\"",
+            "problem": "The bullet names who owns the default but not what the read site resolves when the field is absent. `RunOptions.cfg` is caller-supplied, so with the field optional `cfg.maxParallelReviews` is `number | undefined` at `createSemaphore(cfg.maxParallelReviews)`; a `PipelineConfig` literal built without the field (embedded caller, test harness) gets a semaphore whose limit is `undefined` — a counter that never blocks — so ADR-003 §Execution 3's invariant \"total in-flight inference never exceeds N\" fails open instead of closed.",
+            "fix": "State the resolution in the same bullet — `createSemaphore(cfg.maxParallelReviews ?? 1)` — replacing \"the sole default authority\" with the expression that enforces it; or keep `maxParallelReviews: number` required on `PipelineConfig` (as ADR-003 §Configuration has it) and confine the optionality to the boundary that parses existing configs."
+          },
+          {
+            "severity": "nit",
+            "location": "Configuration and CLI — \"a `^\\d{1,5}$` format gate on the env string that runs even when the flag overrides it (bad env is a config error), range check (integer ≥ 1) as a separate error naming the source\"",
+            "problem": "The resolver the design says it mirrors, `resolveReplyTimeoutSeconds` (src/cli.ts:86–137), has two fail-closed properties this summary drops: a bound on both sources (`flagValue > maxSeconds` rejected — \"unbounded waits are not supported\", src/cli.ts:116–121) and escaping of the reflected value so \"control and ANSI bytes can never reach the terminal raw\" (src/cli.ts:98–99). As specified, `resolveMaxParallel` bounds only the env string (5 digits); the flag path takes yargs `type: 'number'`, where `1e30` passes both `Number.isInteger` and `≥ 1`, and an error line that interpolates `$OPENCODE_MAX_PARALLEL` raw echoes environment-influenced bytes to the terminal. Impact is low — the panel caps real fan-out at 5 seats and nothing is interpolated into a shell string — but \"mirrors the `--timeout` pattern\" is the design's contract for fail-closed validation and this bullet is what gets implemented.",
+            "fix": "In the same bullet, add an explicit upper bound with the constant named (e.g. reject `N > 16`, or `N > |panel|`), or state in one clause why the panel size makes an upper bound unnecessary; and name `JSON.stringify` on the reflected env value as part of the mirrored pattern."
+          }
+        ]
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "9716bf4c84f55bfe464605c41edaf3514210fd00",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Context / Rollout step 4 — \"ADR-002 budgets 40 design + 20 code sessions per run, so that serial lane is the run's dominant wall clock\" / \"The first post-merge parallel run … is the live validation of the lane\"",
+            "problem": "new — carried from r1 (revision did not address it; Revision log does not record it as rejected) — the proposal still never quotes the research/ADR-003 payoff baseline (ADR-003 Consequences / research Performance baselines: a full-panel or ratification pass \"shrinks from 5× to ceil(|panel|/N)× the serial wall clock\"), so the first post-merge parallel run that the design makes the live validation of the lane has no expected number to check against (performance checklist item 6).",
+            "fix": "Add one sentence to Goals or Rollout step 4 quoting the ceil(|panel|/N)× expected pass time with the N ≤ slots precondition, citing ADR-003 §Consequences."
+          }
+        ]
+      },
+      "complexity": {
+        "verdict": "approve",
+        "stamp": "9716bf4c84f55bfe464605c41edaf3514210fd00",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design — Two-phase split of `executeStage` (\"`finalizeReviewPass` … the only git code for review passes\") vs Pass-level fan-out in `drive` (\"drain the writer, run the pass `enforceOwnership` sweep, then `finalizeEscalate` once\")",
+            "problem": "The escalation-path revision makes the success-path-only claim stale: the document now describes a second review-pass git sequence (sweep, then finalizeEscalate's own commit) without saying where that sweep call lives, leaving it ambiguous whether `enforceOwnership` has one call site or two for review passes. This slightly widens the two-phase contract the Risks table relies on. New to the changed text; the theme was not flagged in r1.",
+            "fix": "Keep one sweep call site: run it inside `finalizeReviewPass` on both exits and skip only `commitStage` when `escalationPending` is set, so the \"only git code for review passes\" sentence stays literally true; or reword that sentence to \"the pass's single `enforceOwnership` call site, used by both the success and escalation exits; `commitStage` runs only on the success exit.\""
+          }
+        ]
+      }
+    },
+    "code": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "ec6130ad241374906c3ff9955919de2d8a5edc23",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/independence.ts:143–149 (tests/pipeline-independence.test.ts)",
+            "problem": "Carried forward from c1, unchanged: the code/test diff for this pass is empty (the only commit in 3745f3c..HEAD excluding docs/designs is a docs commit), so the cross-seat report write fence still has no positive test — no test anywhere passes ownReportPath, leaving the key !== own → 'wrote a review report' branch unexercised and deviation 7's hardening claim unpinned by any test.",
+            "fix": "Add a test case passing ownReportPath with a write/edit/patch part aimed at a sibling report expecting one violation, plus a negative case writing the handed path with ownReportPath set expecting none."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/independence.ts:135,142,148; runner.ts:846",
+            "problem": "Carried forward from c1, unchanged: the build-notes claim that every model- and server-authored string reaching the terminal, gate log, or ESCALATION.md passes through printable() is still not true for part.name (a server-supplied tool name interpolated raw into the violation text at independence.ts:135, printed via console.warn at runner.ts:846); paths and command text are sanitized via brief()/printable(), the tool name is not.",
+            "fix": "Wrap part.name in printable() at the violation-construction sites, or narrow the build-notes wording."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "ec6130ad241374906c3ff9955919de2d8a5edc23",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "docs/adrs/001-code-driven-agent-pipeline.md:121,190,197",
+            "problem": "Carried from r1c1, unchanged by this pass: the in-scope diff (3745f3c..HEAD excluding docs/designs) is empty — its only commit, ec6130a, touches solely docs/designs run records — so ADR-001's gate table still names the aggregated-verdict gates allDesignReviewsApproved/allCodeReviewsApproved while the runner (states.ts:35,37) logs them under design-review/code-review with no amendment pointer. The nit did not grow and nothing in this pass makes it worse.",
+            "fix": "Add an amendment note to ADR-001's gate table recording that since ADR-003 the runner logs these gates under `<phase>-review`, or state that ADR-001's table is the historical record and docs/workflows.md is the live label authority."
+          }
+        ]
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "ec6130ad241374906c3ff9955919de2d8a5edc23",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline-independence.test.ts:97-108,222-233 with tools/orchestration/src/pipeline/independence.ts:143-150 and tools/orchestration/src/pipeline/runner.ts:842-843",
+            "problem": "Carried unchanged from my r1 finding: the sibling-report write guard is still untested. No test passes ownReportPath or asserts the 'wrote a review report' violation; the two tests that read like write coverage omit ownReportPath and exercise only the vacuous 'cannot judge writes' branch. Re-verified at HEAD: the cited lines are byte-identical to what I approved, so this is not a regression introduced by the later revisions — the fixes neither broke the guard nor addressed the coverage gap. It remains minor and non-blocking since reviewVars does emit reportPath for every review phase (runner.ts:1869,1918) and the guard behaves correctly when handed a path.",
+            "fix": "Add unit tests that flag a completed write to another seat's path under reviews/** while handed a different reportPath, treat an absolute-path write of the own path as own (reportKey identity), and assert review-stage vars carry reportPath so the runner wiring cannot rot; optionally warn once when a review-stage audit runs with no handed report path."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/pipeline-cli-max-parallel.test.ts against tools/orchestration/src/pipeline/cli.ts:72-77",
+            "problem": "The resolveMaxParallel env-error path reflects the raw $OPENCODE_MAX_PARALLEL string through JSON.stringify (correct), but the max-parallel suite never exercises control/ANSI-byte reflection, while the resolveReplyTimeoutSeconds mirror it copies has exactly that case (tests/cli.test.ts:108-115). A future edit that drops the JSON.stringify escape in the max-parallel messages would not fail any test.",
+            "fix": "Port the '\\x1b[2J' reflection case from tests/cli.test.ts to the max-parallel suite: assert the error message contains JSON.stringify of the value and no raw ESC byte."
+          }
+        ]
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "ec6130ad241374906c3ff9955919de2d8a5edc23",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1248,1282,1286,1287-1288",
+            "problem": "Carried over from round 1, unchanged by the ratified fixes: a seat holds its semaphore permit across `await enqueueSnapshot()`, so up to |panel| tmp+rename fs completions serialize inside slot turnover at N > 1. The fix only prepends a Date.now() stamp to the same enqueue, so it neither worsens nor resolves the behavior. Bounded (≤3 enqueues per seat) and negligible, hence still approve-able as a nit.",
+            "fix": "Release the permit before awaiting the seat's own write promise (the writer snapshots synchronously at enqueue and drain() preserves the durability barrier), keeping rejection semantics via the existing Promise.allSettled."
+          }
+        ]
+      },
+      "testing": {
+        "verdict": "approve",
+        "stamp": "ec6130ad241374906c3ff9955919de2d8a5edc23",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration (whole diff) — testing checklist item 6",
+            "problem": "This seat could not run `npm run check` again: the shell tool is permission-denied (three attempts), so the suite's green status at the default N = 1 remains unverified by this review (per the checklist, an unevaluated item counts as a finding, not a pass).",
+            "fix": "Covered by the panel runner's independent `npm run check` in tools/orchestration; a red run there overrides this verdict."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline-fix-trigger.test.ts:15-20 / src/pipeline/runner.ts:267-285",
+            "problem": "Checklist item 3 gap in this revision: the fix for security r1 major 1 (runner execs a model-plantable binary under `node_modules/.bin`) removed the step and the formatter-stub test that pinned the old behavior, leaving only header comments. No test now fails if a runner-executed formatter is reintroduced.",
+            "fix": "Add one regression fixture: plant a recording stub at `<pkg>/node_modules/.bin/prettier` for a package dir a stage touches, run a pass through `commitStage`, and assert the stub never executed (or spy spawnSync for any non-git binary)."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline-cli-max-parallel.test.ts",
+            "problem": "Carried from r1, unchanged by the revision: coverage is resolver-level only. The yargs coercion of `--max-parallel` and the resolve-before-createClient/lock ordering (src/pipeline/cli.ts:161-170) remain unexercised, while the file's header asserts 'all validation before side effects'; the --timeout mirror in tests/cli.test.ts:170-213 has both.",
+            "fix": "Add one argv-level test asserting `run/resume --max-parallel 3` and $OPENCODE_MAX_PARALLEL land in cfg.maxParallelReviews, and one that a malformed env rejects before createClient/lock, mirroring tests/cli.test.ts:170-213."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1311-1319",
+            "problem": "Carried from r1: the best-effort escalation-sweep catch still has no test forcing enforceOwnership to throw on the escalation path.",
+            "fix": "Fixture that plants .git/index.lock (or an unresolvable headBefore) before the escalation pass and asserts the warning plus the terminal escalate commit."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1198-1200",
+            "problem": "Carried from r1: the `seats.length === 0` early return remains unreachable (planPass and specialtiesFor never hand an empty seat list) and is still not marked as an intentional defensive no-op.",
+            "fix": "Drop the guard, or mark it explicitly as a defensive no-op so the untested branch is intentional."
+          }
+        ]
+      }
+    }
+  },
+  "lastReviewPass": {
+    "phase": "code",
+    "round": 1,
+    "cycle": 2,
+    "seats": [
+      "correctness",
+      "compatibility",
+      "security",
+      "performance",
+      "testing"
+    ]
+  },
+  "reviseNoChange": false,
+  "codeCycle": 3,
+  "codeStamp": "ec6130ad241374906c3ff9955919de2d8a5edc23"
+}

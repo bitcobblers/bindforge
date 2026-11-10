@@ -98,6 +98,7 @@ const HANDLE = {
     specialty: 'correctness',
     scope: 'the whole document',
     passNote: 'full-panel pass c0',
+    prevFindings: '(none — test fixture)',
     reportPath: 'docs/designs/002-x/reviews/design/correctness-r1c0.md',
     reviewFiles: '',
   },

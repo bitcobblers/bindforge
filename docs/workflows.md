@@ -66,16 +66,33 @@ named `rNc0`, `rNc1`, …:
 - The phase advances when **every seat approves the current revision stamp**:
   the proposal's git blob id for design, `HEAD` for code. The next revise
   (or fix) stage receives only the last pass's dissenting reports.
+- **Seats review independently.** A reviewer sees the current artifact, the
+  source document, and its own previous findings — the runner re-injects
+  those from the seat ledger, so no reviewer reads a report file. Reports
+  and transcripts are the run's record, not review input: every stage agent
+  is denied *reading* `transcripts/`, review seats are additionally denied
+  `reviews/**`, and code-review diff scopes exclude `docs/designs/`.
+- **The runner commits each stage's work** (models have no git access),
+  reverting paths outside the stage's ownership. The runner never runs the
+  formatter itself: `node_modules/.bin` is git-ignored, and executing a
+  binary a stage could have planted in the worktree is not a trade the
+  runner makes. Hygiene is handled by ownership instead: a red
+  `npm run check` summons the `fix` stage, which is told the build is red,
+  may run `npm run format` on the files it owns, and replies
+  `testsNeedUpdate: true` when the failing files are test-owned — then the
+  work routes to the test engineer, so a format failure inside test files
+  never deadlocks the fix loop. A fix summoned this way is never handed
+  review reports that do not exist yet.
 
-Seats execute one at a time (single local inference lane); the order is
-fixed for reproducibility. The editorial phase is not funneled — it is a
-single language pass with its own existing gate.
-
-### Proposed, not implemented
-
-- **ADR-004 — parallel review lane (proposed).** A pass's seats run up to N
-  at a time instead of strictly one at a time, with one commit per pass. It
-  schedules whatever panel ADR-002 selects.
+A pass runs up to N seats at a time (`--max-parallel`, default 1 — the
+serial lane). Launch order is fixed for reproducibility, and one commit
+lands per pass: at the default the schedule is unchanged, but the commit
+shape changed with the knob — one per pass, not one per seat. Keep N at or
+below the inference slots your server actually exposes: the runner cannot
+verify the slot count, an oversized N queues seats, and each seat's timeout
+starts at its own prompt send and counts that queue waiting. The editorial
+phase is not funneled — it is a single language pass with its own existing
+gate.
 
 ## Running, resuming, asking
 
@@ -84,12 +101,22 @@ pipeline run <source-path>        # start (or continue) a run
 pipeline resume <design-slug>     # continue from the last checkpoint
 pipeline status <design-slug>     # where it is and why it's stuck
 pipeline resume <slug> --extend-budget 5   # buy 5 more review sessions
+pipeline run <source> --max-parallel 3     # review-lane width ($OPENCODE_MAX_PARALLEL also works)
 ```
+
+`--max-parallel <n>` (on `run` and `resume`, default 1) is the only review
+lane knob; `$OPENCODE_MAX_PARALLEL` is its env fallback and a malformed value
+in either source fails the command before any inference is spent. The
+guidance on picking `n` is in the stages section above.
 
 `pipeline status` explains the current state from the gate log without you
 having to read reviews — including the per-seat board
 (`design seats: correctness:approve security:DISSENT* …`), where `*` marks a
-verdict that no longer describes the current revision.
+verdict that no longer describes the current revision. The aggregated review
+gates log under `design-review` / `editorial-review` / `code-review`; a run
+checkpointed before those labels landed keeps its historical
+`all*ReviewsApproved` entries, so one log can show both vocabularies —
+nothing keys on the old names.
 
 ## When a run escalates
 
@@ -113,6 +140,8 @@ Pipeline config defaults (set in `tools/orchestration/src/pipeline/stages.ts`):
 
 - `maxReviews: { design: 40, code: 20 }` — reviewer **sessions** per phase;
   checked at every pass entry, so no pass sneaks past the cap
+- `maxParallelReviews: 1` — review-lane width per pass; the `--max-parallel`
+  flag and `$OPENCODE_MAX_PARALLEL` override it (see the stages section)
 - `maxPassesPerRound: 6` — dissent/ratify passes inside one round; the
   backstop against a seat that will not converge
 - `maxRounds: 5` — backstop on the mutating revise/fix loop only; passes

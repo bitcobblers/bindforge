@@ -180,7 +180,7 @@ describe('run-2 stage guidance', () => {
   // anchor findings in a document that renumbers every round, or where the
   // Revision log and prior-round reports live (harness-audit T1/T2/T4).
   // These pins keep that guidance from being silently reverted again.
-  it('tells design reviewers the round, the prior reports, and the Revision log', async () => {
+  it('tells design reviewers the round, their own injected findings, and the Revision log', async () => {
     const text = renderTemplate(await loadTemplate(PROMPTS_DIR, 'design-review.md'), {
       designDir: 'docs/designs/002-x',
       sourcePath: 'docs/adrs/002-x.md',
@@ -190,12 +190,20 @@ describe('run-2 stage guidance', () => {
       passNote: 'dissent pass c2: the last revision was written to answer YOUR findings',
       reportPath: 'docs/designs/002-x/reviews/design/correctness-r9c2.md',
       reviewFiles: '',
+      prevFindings: JSON.stringify([
+        { severity: 'major', location: 'Decision', problem: 'still broken' },
+      ]),
     });
     expect(text).toContain('round 9');
     expect(text).toContain('correctness-r9c2.md');
     expect(text).toContain('dissent pass c2');
-    expect(text).toContain('docs/designs/002-x/reviews/');
+    expect(text).toContain('still broken');
     expect(text).toContain('Revision log');
+    // Review independence: a seat never reads another seat's report or any
+    // transcript; its own previous findings travel through the prompt.
+    expect(text).toContain('Review independently');
+    expect(text).toContain('Do not open review reports or transcripts');
+    expect(text).not.toContain('Earlier reports for every specialty');
     // T4: "Apply only this change set: the whole document" is contradictory.
     expect(text).not.toContain('Apply only this change set');
   });
@@ -272,6 +280,7 @@ describe('run-2 stage guidance', () => {
     // The reviewer prompt must be able to name the source document.
     const review = renderTemplate(await loadTemplate(PROMPTS_DIR, 'design-review.md'), {
       designDir: 'docs/designs/002-x',
+      prevFindings: '(none)',
       sourcePath: 'docs/adrs/002-x.md',
       round: 3,
       specialty: 'complexity',

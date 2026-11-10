@@ -3,10 +3,10 @@ status: proposed
 date: 2026-11-09
 ---
 
-# ADR 003: Make the pipeline checkpoint resumable across a self-update
+# ADR 004: Make the pipeline checkpoint resumable across a self-update
 
-Carved out of ADR-004, which no longer carries any of it. **Not scheduled to be
-run:** ADR-004 should land and be exercised once before this is worth designing,
+Carved out of ADR-003, which no longer carries any of it. **Not scheduled to be
+run:** ADR-003 should land and be exercised once before this is worth designing,
 and nothing in fan-out depends on the property below.
 
 ## Context
@@ -14,9 +14,9 @@ and nothing in fan-out depends on the property below.
 `pipeline resume` reads `docs/designs/<nnn-slug>/.pipeline.json` and continues
 mid-run. When a run implements its own pipeline, that resume can happen after
 the runner code on disk has changed, against a checkpoint written by the old
-code. ADR-004 originally declared that transition a hard requirement.
+code. ADR-003 originally declared that transition a hard requirement.
 
-Designing that requirement inside ADR-004 is what made the design run away. In
+Designing that requirement inside ADR-003 is what made the design run away. In
 the attempt stopped on 9 Nov (run `002-run2`, 8 design rounds), 27 of 33
 blocking/major findings — including the run's only blocker — were about making
 the checkpoint trustworthy: concurrent-write ordering, trusting an in-worktree
@@ -48,6 +48,6 @@ Nothing here changes fan-out, review rounds, gates, or the artifact contract.
 Becomes possible: a self-update run can escalate after committing new runner
 code and be resumed by a human on the new branch.
 
-Accepted costs: ADR-004 lands without that property. The interim posture is
-operator-facing — a resume that straddles the merge of ADR-004 may need
+Accepted costs: ADR-003 lands without that property. The interim posture is
+operator-facing — a resume that straddles the merge of ADR-003 may need
 `git checkout HEAD -- docs/designs/<run>/.pipeline.json` or a fresh run.

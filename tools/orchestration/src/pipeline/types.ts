@@ -65,7 +65,13 @@ export interface StageResult {
   sessionID: string;
   agent: string;
   at: number;
-  reply: unknown;
+  /**
+   * The stage's validated reply. Absent on failed attempts: `outcome.reply`
+   * is undefined there and `JSON.stringify` drops the key, so a checkpoint
+   * that had ever stored a failed result could not re-parse while the schema
+   * required the key — run 003 became unresumable exactly that way.
+   */
+  reply?: unknown;
   transcript: string;
   /** Wall-clock duration of the attempt (operator observability). */
   durationMs?: number;
@@ -98,6 +104,14 @@ export interface SeatRecord {
   stamp: string;
   /** Passes in which this seat dissented (operator-facing, not gating). */
   dissents: number;
+  /**
+   * The findings this seat held on the revision its verdict describes. The
+   * runner re-injects these into that seat's next-pass prompt so a reviewer
+   * never reads a report file - not even its own, and never another seat's.
+   * Cross-seat report reading anchors verdicts and poisons the panel's
+   * independence; transcripts are out of band entirely.
+   */
+  findings?: Finding[];
 }
 
 /** Per-seat ledger for the funnel phases. Editorial has no seats. */

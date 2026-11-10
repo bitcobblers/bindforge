@@ -1,3 +1,4 @@
+import { printable } from './independence.js';
 import { hasSeats, reviewSessionsUsed, seatSummary } from './panel.js';
 import type { FunnelPhase } from './panel.js';
 import type { ReviewPhase } from './states.js';
@@ -255,7 +256,7 @@ export function escalationMarkdown(
     for (const f of group) {
       lines.push(
         `- [${f.severity}] (${f.specialty}, first seen r${String(f.firstSeen)}) ` +
-          `${f.location} — ${f.problem}`,
+          `${printable(f.location)} — ${printable(f.problem)}`,
       );
     }
     lines.push('');
@@ -276,7 +277,7 @@ export function escalationMarkdown(
     lines.push('- (none)');
   } else {
     for (const g of denied) {
-      lines.push(`- ${g.gate} (r${String(g.round)}): ${g.reason}`);
+      lines.push(`- ${g.gate} (r${String(g.round)}): ${printable(g.reason)}`);
     }
   }
   lines.push(

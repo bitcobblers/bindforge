@@ -93,6 +93,32 @@ describe('state store', () => {
     expect(loaded?.results[0]?.docLinesRemoved).toBe(41);
   });
 
+  it('round-trips a failed attempt stored without a reply', async () => {
+    // Run 003 became unresumable this way: a failed attempt has
+    // `reply: undefined`, JSON.stringify drops the key, and a required
+    // `reply` in the persisted schema rejected the run's own checkpoint.
+    const dir = await mkdtemp(join(tmpdir(), 'bindforge-state-'));
+    const failed = structuredClone(base);
+    failed.results = [
+      {
+        stage: 'test-authoring',
+        round: 0,
+        sessionID: 'ses_failed',
+        agent: 'code/test-engineer',
+        at: 1,
+        // no reply: the attempt failed before one validated
+        transcript: 'docs/designs/002-feat/transcripts/test-authoring-r0:attempt1.md',
+        durationMs: 5200,
+        nudges: 0,
+        failure: 'independence violation: read a review report: …',
+      },
+    ];
+    await saveState(dir, failed);
+    const loaded = await loadState(dir);
+    expect(loaded?.results[0]?.reply).toBeUndefined();
+    expect(loaded?.results[0]?.failure).toContain('independence violation');
+  });
+
   it('refuses unsupported state versions', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'bindforge-state-'));
     await writeFile(join(dir, '.pipeline.json'), JSON.stringify({ version: 99 }), 'utf8');

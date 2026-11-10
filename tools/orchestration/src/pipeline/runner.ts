@@ -7,6 +7,7 @@ import { join, relative, resolve } from 'node:path';
 import type { OpenCodeClient, SessionMessageAssistant, SessionMessageInfo } from '@opencode/client';
 import { z } from 'zod';
 
+import { createSemaphore } from './concurrency.js';
 import {
   TEST_PATH_RE,
   allReviewsApproved,
@@ -18,6 +19,7 @@ import {
   stagePathAllowed,
 } from './gates.js';
 import { type IdentityPin, type RunIdentity, deriveIdentity, identityClash } from './identity.js';
+import { auditSessionIndependence, printable } from './independence.js';
 import {
   type PassPlan,
   hasSeats,
@@ -48,7 +50,13 @@ import {
   stageReplySchema,
 } from './stages.js';
 import type { PipelineConfig } from './stages.js';
-import { designDirOf, loadState, saveState } from './state-store.js';
+import {
+  type CheckpointWriter,
+  createStateWriter,
+  designDirOf,
+  loadState,
+  saveState,
+} from './state-store.js';
 import {
   type ReviewPhase,
   decideNext,
@@ -56,11 +64,13 @@ import {
   reviewBudgetUsed,
   specialtiesFor,
 } from './states.js';
-import type { LockInfo, PipelineState, StageResult } from './types.js';
+import type { Finding, LockInfo, PipelineState, StageResult } from './types.js';
 
 // ---------------------------------------------------------------------------
-// The sequential inference lane. Exactly one stage session runs at a time;
-// every stage gets a fresh top-level session bound to its stage agent.
+// The inference lane. Mutating stages keep exactly one session at a time, each
+// a fresh top-level session bound to its stage agent. A `kind: 'review'` pass
+// fans its seats out through a semaphore of `cfg.maxParallelReviews` (default
+// 1 — the same seats, strictly one at a time) and finalizes once per pass.
 // ---------------------------------------------------------------------------
 
 export interface RunOptions {
@@ -254,6 +264,26 @@ export function enforceOwnership(
   return { reverted, foreign };
 }
 
+// Hygiene is NOT done here, and the runner never executes a formatter.
+//
+// A previous revision of this code ran `node_modules/.bin/prettier` of every
+// package the stage touched, before every commit. That is a runner-executed
+// binary whose path is a naming convention inside the worktree: `node_modules`
+// is git-ignored, so a planted `package.json` + `node_modules/.bin/<tool>`
+// under any probed package dir is invisible to `dirtyFiles` and
+// `enforceOwnership`, never appears in a human-reviewed commit, and still gets
+// exec'd by the process that owns the checkpoint, the git authorship, and the
+// lock. Nothing in a model-writable worktree can be made trustworthy from a
+// path convention, so no stage-execution path runs anything out of one.
+//
+// The `format:check` failure that step papered over has an ownership answer
+// instead: the gate names the files, the red `npm run check` summons `fix`
+// (which runs `npm run format` itself — an allow-listed command from the
+// package's committed `package.json`), and when the dirty files are test files
+// the fix stage cannot own, its `testsNeedUpdate: true` reply routes the work
+// to `test-update`, which owns them. `docs/workflows.md` carries the same
+// answer for operators.
+
 /** Commit exactly the current stage's changes; model message or fallback. */
 function commitStage(
   repoDir: string,
@@ -382,6 +412,22 @@ function freshState(id: RunIdentity, sourceRel: string): PipelineState {
     startedAt: now,
     updatedAt: now,
   };
+}
+
+/**
+ * Checkpoint the run: record the moment this snapshot was TAKEN, then write it.
+ *
+ * The stamp lives at the write site, not inside `saveState`. ADR-003's review
+ * passes hand their state to a queued writer, and a snapshot stamped when the
+ * queue reaches it would mean "when the writer woke up" rather than "when the
+ * run looked like this" — exactly the masquerade that made `saveState` stop
+ * re-stamping. Stamping at every snapshot point keeps the persisted
+ * `updatedAt` meaning "when this checkpoint was taken" on both write paths:
+ * the plain sequential one here and the drained writer inside a pass.
+ */
+async function checkpoint(designDir: string, state: PipelineState): Promise<void> {
+  state.updatedAt = Date.now();
+  await saveState(designDir, state); // the validating tmp+rename write
 }
 
 function ensureBranch(repoDir: string, branch: string): void {
@@ -600,22 +646,56 @@ interface StageHandle {
   resume?: { sessionID: string; text: string };
 }
 
-export async function executeStage(
+/**
+ * Which template a stage runs. `fix` is the one trigger-sensitive stage: the
+ * planner enters it either from a red testsGreen gate (states.ts: implement/
+ * test-update/fix) or from a code-review dissent (tests green by then). A
+ * tests-red fix must not be handed review reports — when review has not run
+ * they do not exist, and run 003's fix was sent five phantom paths and told
+ * to guess the real task.
+ */
+export function stageTemplate(
+  def: { name: string; template: string | null },
+  stage: string,
+  state: PipelineState,
+): string | null {
+  if (stage === 'fix' && !state.testsGreen) {
+    return 'fix-tests.md';
+  }
+  return def.template;
+}
+
+/**
+ * The git-free inference phase of one stage attempt: render the prompt,
+ * create (or resume) the session, poll/nudge to a validated reply, write the
+ * transcript, and append the `StageResult`. No git mutation lives here — the
+ * caller owns the stage/pass window (`headBefore`, captured before the
+ * prompt) and the finalize (ownership + commit). See `executeStage` for the
+ * single-stage combined path and `runReviewPass` for the pass-level one.
+ *
+ * `templateText` preloads the prompt template: the pass fan-out loads it
+ * once and hands it to every seat, so the only await before `session.create`
+ * is the semaphore's — keeping session-creation order the handed seat order
+ * at any N (ADR-003 §Execution).
+ */
+async function executeInference(
   opts: RunOptions,
   state: PipelineState,
   handle: StageHandle,
   cfg: PipelineConfig,
+  templateText?: string,
 ): Promise<StageOutcome> {
   const def = stageDef(handle.stage, handle.specialty);
+  const template = stageTemplate(def, handle.stage, state);
   const designDirRel = designDirOf(state);
   const designDir = join(opts.repoDir, designDirRel);
 
   let prompt: string;
   let templateFile: string | null = null;
   let sha: string | undefined;
-  if (def.template) {
-    const text = await loadTemplate(opts.promptsDir, def.template);
-    templateFile = `tools/orchestration/prompts/${def.template}`;
+  if (template) {
+    const text = templateText ?? (await loadTemplate(opts.promptsDir, template));
+    templateFile = `tools/orchestration/prompts/${template}`;
     sha = templateHash(text);
     prompt = renderTemplate(text, handle.vars);
   } else {
@@ -631,7 +711,8 @@ export async function executeStage(
 
   const requestTimeoutMs = cfg.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
   const minNudgeIntervalMs = cfg.minNudgeIntervalMs ?? DEFAULT_MIN_NUDGE_INTERVAL_MS;
-  const headBefore = git(opts.repoDir, ['rev-parse', 'HEAD']).trim();
+  // No git here at all: the caller captured the window's `headBefore` before
+  // this prompt and runs the finalize after it.
   const sessionID =
     handle.resume?.sessionID ??
     (
@@ -649,6 +730,7 @@ export async function executeStage(
   if (!sessionID) {
     return { ok: false, failure: 'server returned no session id' };
   }
+  const auditStart = Date.now();
   await opts.client.session.prompt(
     { sessionID, text: fullPrompt },
     { signal: AbortSignal.timeout(requestTimeoutMs) },
@@ -672,6 +754,9 @@ export async function executeStage(
   let model: ModelInfo | undefined;
   let nudges = 0;
   let outcome: StageOutcome;
+  // The most complete message list seen while polling this attempt; the
+  // independence audit reads the tool calls and shells out of it.
+  let lastSeen: SessionMessageInfo[] = [];
 
   // One assistant message == one model turn (verified against the server).
   // Each idle marker closes one prompt (the stage prompt plus any nudges).
@@ -681,6 +766,7 @@ export async function executeStage(
       let data: SessionMessageInfo[];
       try {
         data = await listSessionMessages(opts.client, sessionID, requestTimeoutMs);
+        lastSeen = data;
       } catch (error) {
         // The server is unreachable or hung: keep polling inside the stage
         // deadline instead of ending the run over one failed round-trip.
@@ -740,6 +826,25 @@ export async function executeStage(
         ok: false,
         failure: `no model turns — agent "${def.agent}" may not exist`,
       };
+      break;
+    }
+
+    // Review independence: inspect what this attempt's session actually read
+    // or ran, not just what its reply claims. Transcripts are out of band
+    // for every stage; report files are out of band for review seats —
+    // including writes to a seat other than the one the prompt handed it. The
+    // permissions say so; this checks up on it. A violation fails the attempt,
+    // attempt 2 starts a fresh session (not resumable), then escalate —
+    // the same budget as any stage failure.
+    const violations = auditSessionIndependence(lastSeen, {
+      since: auditStart,
+      reviewStage: handle.stage.endsWith('-review'),
+      ownReportPath:
+        typeof handle.vars['reportPath'] === 'string' ? handle.vars['reportPath'] : undefined,
+    });
+    if (violations.length > 0) {
+      console.warn(`stage ${handle.stageKey}: independence violation — ${violations.join('; ')}`);
+      outcome = { ok: false, failure: `independence violation: ${violations.join('; ')}` };
       break;
     }
 
@@ -886,47 +991,126 @@ export async function executeStage(
   };
   state.results.push(result);
   console.log(
-    `stage ${handle.stageKey}: ${outcome.ok ? 'ok' : `FAIL (${outcome.failure})`} ` +
+    `stage ${handle.stageKey}: ${outcome.ok ? 'ok' : `FAIL (${printable(outcome.failure ?? '')})`} ` +
       `${String(Math.round((endedAt - startedAt) / 1000))}s, ${String(nudges)} nudge(s)` +
       `${handle.attempt > 1 ? ', retry' : ''}` +
       `${size ? `, proposal ${String(size.docLines)} lines (+${String(size.added)}/-${String(size.removed)})` : ''}`,
   );
 
-  if (outcome.ok) {
-    const report = enforceOwnership(opts.repoDir, headBefore, def.name, state);
-    if (report.reverted.length > 0) {
-      console.warn(
-        `ownership: reverted ${String(report.reverted.length)} file(s) changed by ${def.name}: ` +
-          report.reverted.join(', '),
-      );
-    }
-    for (const c of report.foreign) {
-      console.warn(
-        `ownership: commit ${c.sha.slice(0, 8)} ("${c.subject}") landed during ${def.name}; ` +
-          'left untouched — it is not runner-authored',
-      );
-    }
-    if (
-      (def.name === 'implement' || def.name === 'fix') &&
-      report.reverted.some((p) => TEST_PATH_RE.test(p))
-    ) {
-      state.testsNeedUpdate = true;
-    }
-    if (typeof (outcome.reply as { testsNeedUpdate?: boolean })?.testsNeedUpdate === 'boolean') {
-      state.testsNeedUpdate = (outcome.reply as { testsNeedUpdate: boolean }).testsNeedUpdate;
-    }
-    recordStageCommit(
-      state,
-      commitStage(
-        opts.repoDir,
-        `${state.nnn}-${state.slug}`,
-        handle.stageKey,
-        STAGE_COMMIT_TYPE[def.name] ?? 'chore',
-        outcome.reply,
-      ),
+  return { ...outcome, sessionID };
+}
+
+// --- the finalize half of the two-phase contract ----------------------------
+// `executeInference` runs no git. Everything that mutates the worktree lives
+// here, against the window (`headBefore`) the caller captured before the
+// prompt: one window per stage on the mutating chain, one per PASS on the
+// review fan-out — a per-seat sweep would revert a sibling's in-flight report
+// and `git add -A` would sweep a sibling's half-written file into the wrong
+// commit.
+
+/** The warnings and the test-bookkeeping an ownership sweep produces. */
+function applyOwnershipReport(
+  report: OwnershipReport,
+  state: PipelineState,
+  stageName: string,
+): void {
+  if (report.reverted.length > 0) {
+    console.warn(
+      `ownership: reverted ${String(report.reverted.length)} file(s) changed by ${stageName}: ` +
+        report.reverted.join(', '),
     );
   }
-  return { ...outcome, sessionID };
+  for (const c of report.foreign) {
+    console.warn(
+      `ownership: commit ${c.sha.slice(0, 8)} ("${c.subject}") landed during ${stageName}; ` +
+        'left untouched — it is not runner-authored',
+    );
+  }
+  if (
+    (stageName === 'implement' || stageName === 'fix') &&
+    report.reverted.some((p) => TEST_PATH_RE.test(p))
+  ) {
+    state.testsNeedUpdate = true;
+  }
+}
+
+/** One stage's window: today's sweep + commit, skipped when the stage failed. */
+function finalizeStage(
+  repoDir: string,
+  state: PipelineState,
+  headBefore: string,
+  stageName: string,
+  stageKey: string,
+  outcome: StageOutcome,
+): void {
+  if (!outcome.ok) {
+    return;
+  }
+  applyOwnershipReport(enforceOwnership(repoDir, headBefore, stageName, state), state, stageName);
+  if (typeof (outcome.reply as { testsNeedUpdate?: boolean })?.testsNeedUpdate === 'boolean') {
+    state.testsNeedUpdate = (outcome.reply as { testsNeedUpdate: boolean }).testsNeedUpdate;
+  }
+  recordStageCommit(
+    state,
+    commitStage(
+      repoDir,
+      `${state.nnn}-${state.slug}`,
+      stageKey,
+      STAGE_COMMIT_TYPE[stageName] ?? 'chore',
+      outcome.reply,
+    ),
+  );
+}
+
+/**
+ * The combined path a single (non-review) stage has always used: the inference
+ * phase, then this stage's own finalize window. Review passes do not use it —
+ * they fan out `executeInference` and finalize once, at pass level.
+ */
+export async function executeStage(
+  opts: RunOptions,
+  state: PipelineState,
+  handle: StageHandle,
+  cfg: PipelineConfig,
+): Promise<StageOutcome> {
+  const stageName = stageDef(handle.stage, handle.specialty).name;
+  const headBefore = git(opts.repoDir, ['rev-parse', 'HEAD']).trim();
+  const outcome = await executeInference(opts, state, handle, cfg);
+  finalizeStage(opts.repoDir, state, headBefore, stageName, handle.stageKey, outcome);
+  return outcome;
+}
+
+/**
+ * One review pass's window, after every seat settled: ONE ownership sweep for
+ * the whole pass, and one commit for it — review replies carry no
+ * `commitMessage` (VerdictReply), so the message is the fallback shape with
+ * the pass's stage name: `docs: <nnn-slug> design-review stage`.
+ *
+ * `commit` is false on the escalation path, where `finalizeEscalate` mints the
+ * terminal commit instead: the sweep still runs, so a sibling's out-of-policy
+ * file can never ride into that commit.
+ */
+function finalizeReviewPass(
+  repoDir: string,
+  state: PipelineState,
+  headBefore: string,
+  stageName: string,
+  commit: boolean,
+): void {
+  applyOwnershipReport(enforceOwnership(repoDir, headBefore, stageName, state), state, stageName);
+  if (!commit) {
+    return;
+  }
+  recordStageCommit(
+    state,
+    commitStage(
+      repoDir,
+      `${state.nnn}-${state.slug}`,
+      stageName,
+      STAGE_COMMIT_TYPE[stageName] ?? 'chore',
+      undefined,
+    ),
+  );
 }
 
 /**
@@ -967,9 +1151,174 @@ function gateLog(
     gate,
     round,
     proceed: result.proceed,
-    reason: result.reason,
+    // A gate reason can carry text the model or the server chose (a stage
+    // failure, an independence violation naming a path the session ran). The
+    // gate log is printed by `pipeline status` and copied into ESCALATION.md,
+    // so no control or escape byte from that text reaches either.
+    reason: printable(result.reason),
     at: Date.now(),
   });
+}
+
+// --- the review-pass fan-out (ADR-003) -------------------------------------------
+
+interface ReviewPassArgs {
+  opts: RunOptions;
+  state: PipelineState;
+  cfg: PipelineConfig;
+  designDir: string;
+  /** Registry stage name: `design-review` | `editorial-review` | `code-review`. */
+  stage: string;
+  round: number;
+  /** Funnel pass inside the round; undefined for the single editorial pass. */
+  pass?: number;
+  /** The seats exactly as `planPass` / `specialtiesFor` handed them, in order. */
+  seats: readonly string[];
+  varsFor: (specialty: string) => TemplateVars;
+  /** HEAD captured at pass entry, before any seat prompted. */
+  headBefore: string;
+}
+
+/**
+ * One review pass on the bounded-concurrency lane: the handed seats launch
+ * through a semaphore of `cfg.maxParallelReviews` (1 = the serial lane, the
+ * same code path, not a branch), each seat holding its permit across its own
+ * retry so total in-flight inference never exceeds N, and the pass finalizes
+ * once — one ownership sweep and one commit — after every seat settled and
+ * every checkpoint write drained.
+ *
+ * A seat that fails twice does not call `finalizeEscalate` mid-pass: it records
+ * the failure (as today) and raises the pass-level flag. A seat that acquires
+ * after that releases its permit and returns without prompting, so no seat
+ * today's `StopDriving` would skip ever runs. The reason comes back for
+ * `drive` to escalate once; `null` means the pass completed.
+ */
+async function runReviewPass(args: ReviewPassArgs): Promise<string | null> {
+  const { opts, state, cfg } = args;
+  if (args.seats.length === 0) {
+    return null;
+  }
+  // DEFAULT_CONFIG is the sole default authority: a config object that omits
+  // the field lands on the serial lane, never on `createSemaphore(undefined)`.
+  const limit = cfg.maxParallelReviews ?? DEFAULT_CONFIG.maxParallelReviews ?? 1;
+  const sem = createSemaphore(limit);
+  const writer: CheckpointWriter = createStateWriter(args.designDir);
+  let escalation: string | null = null;
+
+  // Every in-pass snapshot is stamped at the moment it is TAKEN, right before
+  // it is queued: the writer never re-stamps at rename time (a queued snapshot
+  // would masquerade as a newer one), so stamping here is what keeps
+  // `.pipeline.json`'s `updatedAt` meaning "when this was written" — and keeps
+  // enqueue order and timestamp order the same ordering.
+  const enqueueSnapshot = async (): Promise<void> => {
+    state.updatedAt = Date.now();
+    await writer.enqueue(state);
+  };
+
+  // The template is read once for the whole pass, before any seat starts, so
+  // the semaphore is the only await ahead of `session.create`: the waiter
+  // queue's FIFO order is then also the session-creation order.
+  const template = stageDef(args.stage, args.seats[0]).template;
+  const templateText = template ? await loadTemplate(opts.promptsDir, template) : undefined;
+
+  const runSeat = async (specialty: string): Promise<void> => {
+    const release = await sem.acquire();
+    try {
+      if (escalation !== null) {
+        return;
+      }
+      const handle: StageHandle = {
+        stage: args.stage,
+        stageKey: `${args.stage}:${specialty}`,
+        attempt: 1,
+        round: args.round,
+        pass: args.pass,
+        specialty,
+        vars: args.varsFor(specialty),
+      };
+      let out = await executeInference(opts, state, handle, cfg, templateText);
+      if (!out.ok) {
+        state.stageFailures[handle.stageKey] = (state.stageFailures[handle.stageKey] ?? 0) + 1;
+        gateLog(state, 'stageFailure', args.round, {
+          proceed: false,
+          reason: `${handle.stageKey}: ${out.failure}`,
+        });
+        // Every in-pass checkpoint write goes through the drained writer; a
+        // seat calling `saveState` here would race its siblings' renames.
+        await enqueueSnapshot();
+        if (escalation !== null) {
+          return; // a sibling gave up while this seat was answering: spare it
+        }
+        // A reply failure means the work is usually done and only the closing
+        // object was missing: retry in the same session, where the report and
+        // the reading are still there. A timeout is different — that session
+        // was cancelled as a zombie, so attempt 2 starts fresh. Both attempts
+        // run inside this seat's permit.
+        const def = stageDef(handle.stage, specialty);
+        const resumable = retryInSameSession(out.failure, out.sessionID);
+        out = await executeInference(
+          opts,
+          state,
+          {
+            ...handle,
+            attempt: 2,
+            ...(resumable
+              ? {
+                  resume: {
+                    sessionID: out.sessionID as string,
+                    text: repairPrompt(def, stageReplySchema(def), out.failure ?? 'no reply'),
+                  },
+                }
+              : {}),
+          },
+          cfg,
+          templateText,
+        );
+        if (!out.ok) {
+          state.stageFailures[handle.stageKey] = (state.stageFailures[handle.stageKey] ?? 0) + 1;
+          escalation =
+            `stage ${handle.stageKey} failed twice (${out.failure}) — ` +
+            'nudge/reply rule: one retry, then escalate';
+          await enqueueSnapshot();
+          return;
+        }
+      }
+      await enqueueSnapshot();
+    } finally {
+      release();
+    }
+  };
+
+  const settled = await Promise.allSettled(args.seats.map((specialty) => runSeat(specialty)));
+  // Barrier: settled seats only, then every queued checkpoint write has landed,
+  // so the pass's `git add -A` cannot sweep a half-written `.pipeline.json.tmp`.
+  await writer.drain();
+  for (const s of settled) {
+    if (s.status === 'rejected') {
+      throw s.reason; // a runner error (template, transcript, checkpoint) ends the run, as today
+    }
+  }
+  // Proposal: "The sweep reverts out-of-policy sibling files and escalation
+  // still lands." `enforceOwnership`/`commitStage` shell out to git and throw
+  // on any non-zero exit; a throw from the escalation-path sweep would escape
+  // `drive` before `finalizeEscalate`, leaving status `running`, no
+  // ESCALATION.md, and the run's only terminal record never minted. On the
+  // escalation path the sweep is therefore best-effort: a failure is logged
+  // and escalation lands anyway. On the success path a runner error still
+  // ends the run, as today.
+  if (escalation === null) {
+    finalizeReviewPass(opts.repoDir, state, args.headBefore, args.stage, true);
+  } else {
+    try {
+      finalizeReviewPass(opts.repoDir, state, args.headBefore, args.stage, false);
+    } catch (error) {
+      console.warn(
+        `review pass ${args.stage}: ownership sweep failed before escalate: ` +
+          String(error instanceof Error ? error.message : error),
+      );
+    }
+  }
+  return escalation;
 }
 
 // --- the drive loop -------------------------------------------------------------
@@ -1010,7 +1359,7 @@ export async function runPipeline(opts: RunOptions): Promise<PipelineState['stat
     }
     state.baseRef = git(opts.repoDir, ['rev-parse', 'HEAD']).trim();
     ensureBranch(opts.repoDir, state.branch);
-    await saveState(join(opts.repoDir, designDirOf(state)), state);
+    await checkpoint(join(opts.repoDir, designDirOf(state)), state);
     const verdict = await sourceAdmissible(sourceAbs, id.kind);
     gateLog(state, 'sourceAdmissible', 0, verdict);
     if (!verdict.proceed) {
@@ -1109,7 +1458,7 @@ async function drive(
           proceed: false,
           reason: `${handle.stageKey}: ${out.failure}`,
         });
-        await saveState(designDir, state);
+        await checkpoint(designDir, state);
         // A reply failure means the work is usually done and only the closing
         // object was missing: retry in the same session, where the report and
         // the reading are still there. A timeout is different — that session
@@ -1157,17 +1506,25 @@ async function drive(
           if (proposalSnapshot !== null) {
             writeEditorialDiff(designDir, state.slug, next.round, proposalSnapshot, opts.repoDir);
           }
-          await saveState(designDir, state);
-          for (const specialty of specialtiesFor('editorial')) {
-            await runWithRetry({
-              stage: 'editorial-review',
-              stageKey: `editorial-review:${specialty}`,
-              attempt: 1,
-              round: next.round,
-              specialty,
-              vars: reviewVars(designDirRel, state, 'editorial', next.round, specialty),
-            });
-            await saveState(designDir, state);
+          await checkpoint(designDir, state);
+          const editorialHead = git(opts.repoDir, ['rev-parse', 'HEAD']).trim();
+          const editorialEscalation = await runReviewPass({
+            opts: opts as RunOptions,
+            state,
+            cfg,
+            designDir,
+            stage: 'editorial-review',
+            round: next.round,
+            // ADR-002 leaves editorial naming alone: no pass number.
+            pass: undefined,
+            seats: specialtiesFor('editorial'),
+            varsFor: (specialty) =>
+              reviewVars(designDirRel, state, 'editorial', next.round, specialty),
+            headBefore: editorialHead,
+          });
+          if (editorialEscalation !== null) {
+            await finalizeEscalate(opts.repoDir, state, editorialEscalation, cfg);
+            return;
           }
           state.lastStage = 'editorial-review';
           const editorialRejects = specialtiesFor('editorial').filter(
@@ -1187,7 +1544,7 @@ async function drive(
             cfg,
           );
           gateLog(state, gateName('editorial'), next.round, g);
-          await saveState(designDir, state);
+          await checkpoint(designDir, state);
           continue;
         }
 
@@ -1270,26 +1627,35 @@ async function drive(
               ? { proceed: true, reason: 'all seats already approve the current revision' }
               : { proceed: false, reason: plan.reason },
           );
-          await saveState(designDir, state);
+          await checkpoint(designDir, state);
           continue;
         }
         console.log(
           `review ${phase} r${String(next.round)}c${String(plan.cycle)} ` +
             `(${plan.pass}: ${plan.seats.join(', ')})`,
         );
-        await saveState(designDir, state);
+        await checkpoint(designDir, state);
 
-        for (const specialty of plan.seats) {
-          await runWithRetry({
-            stage: `${phase}-review`,
-            stageKey: `${phase}-review:${specialty}`,
-            attempt: 1,
-            round: next.round,
-            pass: plan.cycle,
-            specialty,
-            vars: reviewVars(designDirRel, state, phase, next.round, specialty, plan),
-          });
-          await saveState(designDir, state);
+        // ADR-003: the seats `planPass` handed launch in that order through a
+        // semaphore of `cfg.maxParallelReviews`; the whole pass owns ONE git
+        // window, captured here, before any seat prompted.
+        const passHead = git(opts.repoDir, ['rev-parse', 'HEAD']).trim();
+        const passEscalation = await runReviewPass({
+          opts: opts as RunOptions,
+          state,
+          cfg,
+          designDir,
+          stage: `${phase}-review`,
+          round: next.round,
+          pass: plan.cycle,
+          seats: plan.seats,
+          varsFor: (specialty) =>
+            reviewVars(designDirRel, state, phase, next.round, specialty, plan),
+          headBefore: passHead,
+        });
+        if (passEscalation !== null) {
+          await finalizeEscalate(opts.repoDir, state, passEscalation, cfg);
+          return;
         }
         state.lastStage = `${phase}-review`;
         // Pin every seat's latest valid verdict to the revision it was shown;
@@ -1298,7 +1664,14 @@ async function drive(
         for (const specialty of plan.seats) {
           const reply = lastSeatReply(state, phase, specialty);
           if (reply) {
-            recordSeatVerdict(state, phase, specialty, seatDecision(reply, cfg), passStamp);
+            recordSeatVerdict(
+              state,
+              phase,
+              specialty,
+              seatDecision(reply, cfg),
+              passStamp,
+              boundedFindings(reply.findings),
+            );
           }
         }
         if (isDesign) {
@@ -1330,7 +1703,7 @@ async function drive(
                   reason: `${after.pass} pass c${String(after.cycle)} pending: ${after.seats.join(', ')}`,
                 },
         );
-        await saveState(designDir, state);
+        await checkpoint(designDir, state);
         continue;
       }
 
@@ -1368,7 +1741,7 @@ async function drive(
           reason: state.testsGreen ? 'npm run check green' : 'npm run check red',
         });
       }
-      await saveState(designDir, state);
+      await checkpoint(designDir, state);
     } catch (error) {
       if (error instanceof StopDriving) {
         return;
@@ -1435,6 +1808,48 @@ function stageVars(designDirRel: string, state: PipelineState, name: string): Te
   };
 }
 
+/**
+ * Caps on what one seat's findings contribute. They are model-authored text,
+ * and they are persisted into the seat board — which is cloned into every
+ * later checkpoint and re-injected into that seat's own next-pass prompt. One
+ * runaway reply would otherwise inflate the checkpoint and every subsequent
+ * prompt of that seat forever (security r1 nit: shape-validated is not
+ * size-limited). The cap is applied where findings are RECORDED, so the
+ * ledger on disk stays bounded; `reviewVars` bounds again on the way out, for
+ * ledgers written before the cap existed.
+ */
+const MAX_RECORDED_FINDINGS = 40;
+const MAX_FINDING_FIELD_CHARS = 1_000;
+
+function boundedField(value: string): string {
+  const safe = printable(value);
+  return safe.length > MAX_FINDING_FIELD_CHARS
+    ? `${safe.slice(0, MAX_FINDING_FIELD_CHARS)}… [elided by the checkpoint cap]`
+    : safe;
+}
+
+function boundedFindings(findings: readonly Finding[] | undefined): Finding[] | undefined {
+  if (findings === undefined) {
+    return undefined;
+  }
+  const kept = findings.slice(0, MAX_RECORDED_FINDINGS).map((f) => ({
+    severity: f.severity,
+    location: boundedField(f.location),
+    problem: boundedField(f.problem),
+    ...(f.fix === undefined ? {} : { fix: boundedField(f.fix) }),
+  }));
+  const elided = findings.length - kept.length;
+  if (elided > 0) {
+    kept.push({
+      // A nit never gates: elision is a record, not a dissent.
+      severity: 'nit',
+      location: '(findings elided)',
+      problem: `${String(elided)} further finding(s) elided by the checkpoint cap`,
+    });
+  }
+  return kept;
+}
+
 function reviewVars(
   designDirRel: string,
   state: PipelineState,
@@ -1453,6 +1868,7 @@ function reviewVars(
       passNote: 'the single editorial confirmation pass',
       reportPath: reportPathFor(designDirRel, 'editorial', specialty, round, undefined),
       reviewFiles: '',
+      prevFindings: '(none — the editorial phase is a single language pass per round)',
     };
   }
   const cycle = plan?.cycle ?? 0;
@@ -1466,14 +1882,15 @@ function reviewVars(
     passKind === 'full'
       ? phase === 'design'
         ? 'the whole document'
-        : `git diff ${state.baseRef ?? 'main'}...HEAD`
+        : `git diff ${state.baseRef ?? 'main'}...HEAD -- ':(exclude)docs/designs'`
       : priorStamp === '' || currentStamp === ''
         ? 'the whole current document (no revision stamp to diff against)'
         : phase === 'design'
           ? `the sections changed since you last reviewed: run ` +
             `\`git diff ${priorStamp} ${currentStamp}\` (both are blob ids of 02-proposal.md), ` +
             'then read the full current document'
-          : `git diff ${priorStamp}..HEAD, read against the full current document`;
+          : `git diff ${priorStamp}..HEAD -- ':(exclude)docs/designs', read against the ` +
+            'full current document';
   const passNote =
     passKind === 'full'
       ? `full-panel pass c${String(cycle)}`
@@ -1481,6 +1898,16 @@ function reviewVars(
         ? `dissent pass c${String(cycle)}: the last revision was written to answer YOUR findings`
         : `ratification pass c${String(cycle)}: revisions landed after you approved; ` +
           'you are checking only that they did not break what you approved';
+  // Review independence: the seat's own previous findings come to it through
+  // the checkpoint, so it never opens a report — its own or another seat's —
+  // and the panel's five reads stay independent. Bounded on the way out too:
+  // a ledger written before the record cap existed can still hold a runaway
+  // finding, and this text goes straight into the seat's prompt.
+  const own = boundedFindings(state.seats?.[phase]?.[specialty]?.findings);
+  const prevFindings =
+    own !== undefined && own.length > 0
+      ? JSON.stringify(own, null, 2)
+      : '(none — this is your first pass, or your last verdict held no findings)';
   return {
     designDir: designDirRel,
     sourcePath: state.source.path,
@@ -1490,6 +1917,7 @@ function reviewVars(
     passNote,
     reportPath: reportPathFor(designDirRel, phase, specialty, round, cycle),
     reviewFiles: '',
+    prevFindings,
   };
 }
 
@@ -1533,7 +1961,7 @@ async function finalizeDone(repoDir: string, state: PipelineState): Promise<void
   gateLog(state, 'done', 0, { proceed: true, reason: 'pipeline complete' });
   // Save BEFORE committing so the completion commit contains the terminal
   // status; a save after the commit would leave the checkpoint dirty.
-  await saveState(designDir, state);
+  await checkpoint(designDir, state);
   recordStageCommit(
     state,
     commitStage(repoDir, `${state.nnn}-${state.slug}`, 'done', 'docs', {
@@ -1548,8 +1976,13 @@ export async function finalizeEscalate(
   reason: string,
   cfg: PipelineConfig,
 ): Promise<void> {
+  // The reason usually quotes failure text the model or the server chose (a
+  // seat failure, an independence violation naming a path). It lands in the
+  // gate log, on the operator's terminal, and in ESCALATION.md: keep it on one
+  // line and free of control/escape bytes.
+  const safeReason = printable(reason);
   state.status = 'escalated';
-  gateLog(state, 'escalate', 0, { proceed: false, reason });
+  gateLog(state, 'escalate', 0, { proceed: false, reason: safeReason });
   const designDirRel = designDirOf(state);
   const designDir = join(repoDir, designDirRel);
   mkdirSync(designDir, { recursive: true });
@@ -1557,7 +1990,7 @@ export async function finalizeEscalate(
   // Atomic tmp+rename, like every other checkpoint write: this is the one
   // record the operator must be able to read afterwards, and interrupting a
   // run is most likely exactly when it is being written.
-  await saveState(designDir, state);
+  await checkpoint(designDir, state);
   const reportRel = join(designDirRel, 'ESCALATION.md');
   writeFileSync(
     join(repoDir, reportRel),
@@ -1567,7 +2000,7 @@ export async function finalizeEscalate(
   // Nothing printed on escalation in run 1: a 47-minute resume that ended
   // escalated looked like a quiet success on the operator's terminal.
   console.error(
-    `\npipeline ESCALATED (${phase} phase, after stage ${state.lastStage}): ${reason}\n` +
+    `\npipeline ESCALATED (${phase} phase, after stage ${state.lastStage}): ${safeReason}\n` +
       `  report: ${reportRel}\n` +
       `  status: pipeline status ${state.nnn}-${state.slug}\n` +
       `  retry after a fix: pipeline resume ${state.nnn}-${state.slug}`,
@@ -1599,7 +2032,7 @@ export function renderStatus(state: PipelineState): string {
     'recent gates:',
     ...state.gateLog
       .slice(-6)
-      .map((g) => `  ${g.proceed ? 'ok  ' : 'DENY'} ${g.gate} r${g.round}: ${g.reason}`),
+      .map((g) => `  ${g.proceed ? 'ok  ' : 'DENY'} ${g.gate} r${g.round}: ${printable(g.reason)}`),
   ];
   return lines.join('\n');
 }

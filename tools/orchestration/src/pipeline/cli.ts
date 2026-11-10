@@ -7,6 +7,7 @@ import { hideBin } from 'yargs/helpers';
 
 import { DEFAULT_BASE_URL, createClient } from '../opencode-runner.js';
 import { renderStatus, resumePipeline, runPipeline } from './runner.js';
+import { DEFAULT_CONFIG } from './stages.js';
 import { loadState } from './state-store.js';
 
 // ---------------------------------------------------------------------------
@@ -51,6 +52,54 @@ function sourcePath(repo: string, source: string): string {
   return isAbsolute(source) ? source : resolve(repo, source);
 }
 
+/**
+ * `--max-parallel <N>` with `$OPENCODE_MAX_PARALLEL` as fallback (ADR-003
+ * §Configuration), following the same strict fail-closed pattern as
+ * `resolveReplyTimeoutSeconds` in `src/cli.ts`: a `^\d{1,5}$` format gate on
+ * the env string that runs EVEN when a valid flag overrides it — a broken
+ * environment is a configuration error — and a separate range check naming the
+ * offending source. Values are reflected through `JSON.stringify` / `String`
+ * so no control or ANSI bytes can reach the terminal raw. The runner cannot
+ * know the inference server's slot count, so the only hard limit is `>= 1`:
+ * `N <= slots` stays operator guidance (`docs/workflows.md`).
+ */
+export function resolveMaxParallel(
+  flagValue: number | undefined,
+  envValue: string | undefined,
+): number {
+  const fallback = DEFAULT_CONFIG.maxParallelReviews ?? 1;
+
+  if (envValue !== undefined && !/^\d{1,5}$/.test(envValue)) {
+    throw new Error(
+      `$OPENCODE_MAX_PARALLEL must be an integer number of parallel review slots ` +
+        `(plain digits only), got ${JSON.stringify(envValue)}`,
+    );
+  }
+
+  if (flagValue !== undefined) {
+    if (!Number.isInteger(flagValue) || flagValue < 1) {
+      throw new Error(
+        `--max-parallel must be an integer >= 1 (the review lane always runs at ` +
+          `least one seat at a time), got ${String(flagValue)}`,
+      );
+    }
+    return flagValue;
+  }
+
+  if (envValue !== undefined) {
+    const seats = Number(envValue);
+    if (!Number.isInteger(seats) || seats < 1) {
+      throw new Error(
+        `$OPENCODE_MAX_PARALLEL must be an integer >= 1 (the review lane always runs ` +
+          `at least one seat at a time), got ${JSON.stringify(envValue)}`,
+      );
+    }
+    return seats;
+  }
+
+  return fallback;
+}
+
 export async function main(argv: string[] = process.argv): Promise<number> {
   const args = await connectionOptions(
     yargs(hideBin(argv))
@@ -80,6 +129,10 @@ export async function main(argv: string[] = process.argv): Promise<number> {
             .option('extend-budget', {
               type: 'number',
               describe: 'Grant this many review SESSIONS beyond the cap (recorded)',
+            })
+            .option('max-parallel', {
+              type: 'number',
+              describe: 'Review seats in flight at once (default 1; <= your server slots)',
             }),
       )
       .command('resume <slug>', 'Resume a run from its checkpoint', (cmd) =>
@@ -92,6 +145,10 @@ export async function main(argv: string[] = process.argv): Promise<number> {
           .option('extend-budget', {
             type: 'number',
             describe: 'Grant this many review SESSIONS beyond the cap (recorded)',
+          })
+          .option('max-parallel', {
+            type: 'number',
+            describe: 'Review seats in flight at once (default 1; <= your server slots)',
           }),
       )
       .command('status <slug>', 'Explain where a run is and why it is stuck', (cmd) =>
@@ -101,6 +158,12 @@ export async function main(argv: string[] = process.argv): Promise<number> {
   ).parseAsync();
 
   const repo = String(args.repo);
+  // Resolved before anything with a side effect (client, lock, checkpoint): a
+  // bad knob is a usage error, never a half-started run.
+  const maxParallelReviews = resolveMaxParallel(
+    args.maxParallel as number | undefined,
+    process.env.OPENCODE_MAX_PARALLEL,
+  );
   const client = createClient(String(args.baseUrl), {
     username: args.username as string | undefined,
     password: args.password as string | undefined,
@@ -131,6 +194,7 @@ export async function main(argv: string[] = process.argv): Promise<number> {
         pin: { nnn: args.nnn as string | undefined, slug: args.slug as string | undefined },
         force: Boolean(args.force),
         extendBudget: args.extendBudget as number | undefined,
+        cfg: { ...DEFAULT_CONFIG, maxParallelReviews },
       });
       return status === 'done' ? 0 : 2;
     }
@@ -142,6 +206,7 @@ export async function main(argv: string[] = process.argv): Promise<number> {
         client,
         forceStage: args.stage as string | undefined,
         extendBudget: args.extendBudget as number | undefined,
+        cfg: { ...DEFAULT_CONFIG, maxParallelReviews },
       });
       return status === 'done' ? 0 : 2;
     }

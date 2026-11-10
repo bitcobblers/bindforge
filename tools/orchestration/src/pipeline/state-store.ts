@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 
 import type { PipelineState } from './types.js';
-import { NNN_RE, SLUG_RE, STATE_FILE } from './types.js';
+import { FindingSchema, NNN_RE, SLUG_RE, STATE_FILE } from './types.js';
 
 export { STATE_FILE };
 
@@ -29,6 +29,13 @@ const SeatSchema = z.object({
   verdict: z.enum(['approve', 'request-changes']),
   stamp: z.string(),
   dissents: z.number().int().min(0),
+  // Review independence (own-findings injection); added after run 1, so it
+  // is optional and checkpoints written before it still parse. Every string
+  // in it is model-authored, and the runner caps each recorded finding's
+  // fields (`boundedFindings`) before storing them: the seat board is cloned
+  // into every later checkpoint and re-injected into that seat's next prompt,
+  // so one oversized reply would otherwise inflate the checkpoint forever.
+  findings: z.array(FindingSchema).optional(),
 });
 
 const StateSchema = z.object({
@@ -78,7 +85,10 @@ const StateSchema = z.object({
       sessionID: z.string(),
       agent: z.string(),
       at: z.number(),
-      reply: z.unknown(),
+      // Optional: failed attempts persist without a reply (JSON.stringify
+      // drops the undefined key), and a checkpoint must re-read what saveState
+      // writes — required here made run 003 unresumable.
+      reply: z.unknown().optional(),
       transcript: z.string(),
       durationMs: z.number().optional(),
       nudges: z.number().optional(),
@@ -150,6 +160,17 @@ export async function loadState(designDir: string): Promise<PipelineState | null
  * Atomically checkpoint the state: write to a unique temp file in the same
  * directory, then rename. A crash mid-write can never truncate the last
  * good checkpoint.
+ *
+ * The written snapshot is exactly the state that was handed in — `updatedAt`
+ * is NOT re-stamped here. With ADR-003's fanned-out review passes the write
+ * that lands for a snapshot is the one that was enqueued for it, possibly
+ * later; re-stamping at rename time would make the checkpoint's `updatedAt`
+ * mean "when the queue got around to it" instead of "when this snapshot was
+ * taken", and would let a queued snapshot masquerade as a newer one.
+ * The stamp is therefore the CALLER's job, applied where the snapshot is
+ * taken: `checkpoint()` in the runner for the sequential path, and before
+ * every `createStateWriter.enqueue` inside a pass. Both write paths keep the
+ * persisted field meaning "when this snapshot was taken".
  */
 export async function saveState(designDir: string, state: PipelineState): Promise<void> {
   // Write nothing the loader would refuse to read back: a checkpoint the run
@@ -161,10 +182,48 @@ export async function saveState(designDir: string, state: PipelineState): Promis
       .join('; ');
     throw new Error(`refusing to write an invalid pipeline checkpoint (${issues})`);
   }
-  state.updatedAt = Date.now();
   const target = statePath(designDir);
   const tmp = `${target}.${randomBytes(4).toString('hex')}.tmp`;
   await mkdir(designDir, { recursive: true });
   await writeFile(tmp, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
   await rename(tmp, target);
+}
+
+/**
+ * ADR-003 §Self-update: the one in-process checkpoint write path used from
+ * inside a concurrent review pass. Concurrent `saveState` calls race their
+ * tmp+rename pairs: an older snapshot can land last (lost reviewer record),
+ * and a stray `.pipeline.json.*.tmp` can sit where the pass's `git add -A`
+ * sweeps it. This writer snapshots at enqueue time and drains through
+ * `saveState` one write at a time in enqueue order, so the last landed
+ * rename is the newest snapshot; `drain()` is the barrier's guarantee that
+ * no checkpoint write is in flight when pass finalize mutates git.
+ */
+export interface CheckpointWriter {
+  /** Snapshot `state` now; the write runs when all earlier enqueues landed. */
+  enqueue(state: PipelineState): Promise<void>;
+  /** Resolve once every enqueued write has landed (or failed). */
+  drain(): Promise<void>;
+}
+
+export function createStateWriter(designDir: string): CheckpointWriter {
+  let queue: Promise<void> = Promise.resolve();
+  return {
+    enqueue(state: PipelineState): Promise<void> {
+      // Snapshot synchronously: the caller's state keeps mutating while
+      // this write waits its turn; the queued bytes are the state as enqueued.
+      const snapshot = structuredClone(state);
+      const write = queue.then(() => saveState(designDir, snapshot));
+      // A refused snapshot (invalid state) rejects the caller's promise but
+      // never stalls the chain: later writes still land.
+      queue = write.then(
+        () => undefined,
+        () => undefined,
+      );
+      return write;
+    },
+    drain(): Promise<void> {
+      return queue;
+    },
+  };
 }

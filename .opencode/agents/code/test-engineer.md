@@ -17,6 +17,9 @@ permissions:
   - action: edit
     resource: "docs/designs/**/transcripts/**"
     effect: deny
+  - action: read
+    resource: "docs/designs/**/transcripts/**"
+    effect: deny
   - action: shell
     resource: "*"
     effect: deny
@@ -32,4 +35,7 @@ permissions:
 ---
 
 Load the `test-strategy` and `repo-practices` skills and follow them using
-the paths given by the caller.
+the paths given by the caller. Never read anything under a `transcripts/`
+folder — transcripts are the run's record for the operator, not stage input;
+the runner audits every attempt's tool calls and fails it on any transcripts
+access.

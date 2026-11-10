@@ -243,6 +243,14 @@ describe('funnel loop end to end', () => {
       ),
     ).toBe(true);
     expect(readTranscript(dir, 'design-review-security-r1c1.md')).toContain('dissent pass c1');
+    // Review independence: the dissent prompt carries the seat's OWN c0
+    // findings re-injected from the checkpoint — no report file to read —
+    // and never names another seat's report.
+    const c1 = readTranscript(dir, 'design-review-security-r1c1.md');
+    expect(c1).toContain('Your own previous findings (security seat)');
+    expect(c1).toContain('still broken');
+    expect(c1).toContain('Review independently');
+    expect(c1).not.toContain('correctness-r1c0.md');
     expect(readTranscript(dir, 'design-review-security-r1c1.md')).toContain('security-r1c1.md');
     expect(readTranscript(dir, 'design-review-correctness-r1c2.md')).toContain(
       'ratification pass c2',

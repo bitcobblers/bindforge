@@ -14,7 +14,7 @@ import type { PipelineState } from '../src/pipeline/types.js';
 // ---------------------------------------------------------------------------
 // A timed-out stage session is never cancelled: the runner recorded the
 // failure and immediately started attempt 2 against the same files while the
-// abandoned agent was still editing them. ADR-004 fans a review pass out, so
+// abandoned agent was still editing them. ADR-003 fans a review pass out, so
 // the race multiplies with N.
 // ---------------------------------------------------------------------------
 
@@ -131,6 +131,7 @@ describe('executeStage timeout', () => {
           specialty: 'correctness',
           scope: 'the whole document',
           passNote: 'full-panel pass c0',
+          prevFindings: '(none — test fixture)',
           reportPath: 'docs/designs/002-x/reviews/design/correctness-r1c0.md',
           reviewFiles: '',
         },
@@ -169,6 +170,7 @@ describe('executeStage timeout', () => {
           specialty: 'security',
           scope: 'the whole document',
           passNote: 'full-panel pass c0',
+          prevFindings: '(none — test fixture)',
           reportPath: 'docs/designs/002-x/reviews/design/security-r1c0.md',
           reviewFiles: '',
         },

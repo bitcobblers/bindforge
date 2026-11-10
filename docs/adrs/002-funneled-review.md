@@ -17,7 +17,7 @@ one round's five reports. ADR-001 remains accepted otherwise.
 
 ## Context
 
-The last attempt to design ADR-004 (run `002-run2`, stopped by the operator on 9
+The last attempt to design ADR-003 (run `002-run2`, stopped by the operator on 9
 Nov after 8 design rounds) measured what "every specialty runs every round" buys:
 
 - **40 design reviewer sessions produced 33 blocking/major findings.** Seat yield
@@ -137,10 +137,10 @@ catch regressions too late to be cheap.
 seat with something better than a counter. Under this funnel a wasted pass costs
 1 session instead of 5, so the ledger does not pay for its matching complexity
 until re-raise churn is measured against real runs. Related gate policy lives in
-ADR-003.
+ADR-004.
 
 **Severity-weighted gates or an arbiter seat** when two seats hold incompatible
-demands: deferred to ADR-003. This ADR keeps the AND over five seats.
+demands: deferred to ADR-004. This ADR keeps the AND over five seats.
 
 **Keep the round cap and add the funnel:** rejected. With a panel of 1-5 seats,
 a round cap bounds neither inference cost nor operator intent.
@@ -162,9 +162,9 @@ across more files; and `report.ts`, `pipeline status`, and `ESCALATION.md` must
 show seats, stamps and sessions rather than rounds, or the operator loses the
 ability to tell a stuck run from a busy one.
 
-Not covered here: running a pass's seats concurrently — ADR-004, whose unit of
+Not covered here: running a pass's seats concurrently — ADR-003, whose unit of
 fan-out becomes "the panel this pass selected"; cross-version checkpoint resume
-and checkpoint trust — ADR-003.
+and checkpoint trust — ADR-004.
 
 Ordering: this is the next ADR to be run. The operator has not authorized a run
 against it yet, and nothing here should be executed against ADR-003 or ADR-004
