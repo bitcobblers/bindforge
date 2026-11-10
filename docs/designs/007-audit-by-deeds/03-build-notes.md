@@ -204,3 +204,52 @@ child violates, second fetch throws → the attempt still fails) and perf
 #3's "one enumeration per walk" stub assertion are also new pins. All of
 them are test-file changes → `testsNeedUpdate: true`; the source edits
 above change no existing test's verdict.
+
+## Fix-stage addendum 3 (this round: the red gate's cause is a test pin)
+
+The shell stayed denied at this stage, so the gate was audited statically
+again, as in addendum 1 — lint rules (`typescript-eslint` recommended:
+no unused symbols in the new regions, no `any`, every `catch`-rethrow in
+the walk carries `{ cause }`), the prettier config (printWidth 100, the
+`node:` → external → relative import groups, one-line-vs-broken call
+shapes), and then the r1 test batch against the implementation.
+
+No source-side red was found:
+
+- No `format:check` drift: every line over 100 chars in the touched
+  regions is an unbreakable string literal or a `it(...)` title, which
+  prettier leaves alone; no trailing whitespace, no tabs; the new test
+  files' import blocks already match the plugin's grouping.
+- Every other pin of the r1 test batch matches the implementation:
+  the `list`-route pins (`session.list` + `parentID` index, the
+  `cursor.next` crawl — 3 calls for a 5-session 2-page store, 1 call for
+  a single-page store: perf #3's "one enumeration per walk"), the
+  security #1 pin (a deed collected before a mid-walk fetch failure still
+  fails the attempt, and the warn names `ses_bad_child`), the perf #1/#2
+  cost pins (an attempt with no `subagent` part makes zero `session.list`
+  calls; at most one enumeration per attempt), the tripwire warn naming
+  the attempt's own session, and both attempt-2 failure-note pins on the
+  single-stage and review-pass lanes.
+
+**The one red assertion:**
+`tests/pipeline/child-deeds-retry.test.ts:277` —
+`expect(saved.gateLog.filter((g) => g.gate === 'stageFailure')).toHaveLength(2)`.
+That scenario runs `implement` once through `drive`'s `runWithRetry`,
+which logs `stageFailure` after attempt 1 (runner.ts:1911) and, when
+attempt 2 fails, calls `finalizeEscalate` — whose entry is named
+`escalate` (runner.ts:2439), reason
+`stage implement failed twice (independence violation: …)`. So the run
+record holds exactly one gate entry per failure — `stageFailure` for
+attempt 1, `escalate` for attempt 2 — which is what Test strategy #6
+("budget is unchanged (attempt 2 fails → escalate, one gate entry per
+failure)") asks for, and §3 lists gate entries among what stays
+untouched. Giving attempt 2 a second `stageFailure` entry would be the
+behavior change §3 forbids, and it would rewrite the gate log of every
+two-attempt escalation in every lane; so the fix belongs to the pin, not
+to the runner. Test-side fix: assert the pair, e.g. one `stageFailure`
+plus one `escalate` naming the same stage — or count
+`['stageFailure', 'escalate']` together and expect 2.
+
+No deviation from the proposal: no source file changed this round, and no
+test file was touched (the runner reverts those paths anyway).
+`testsNeedUpdate: true`.

@@ -8,14 +8,14 @@
     "path": "docs/prompts/audit-by-deeds.md"
   },
   "status": "running",
-  "lastStage": "fix",
+  "lastStage": "test-update",
   "designRound": 2,
   "codeRound": 1,
   "designBudgetUsed": 1,
   "codeBudgetUsed": 4,
   "editorialDone": false,
-  "testsGreen": true,
-  "testsNeedUpdate": true,
+  "testsGreen": false,
+  "testsNeedUpdate": false,
   "stageFailures": {
     "code-review:compatibility": 1
   },
@@ -33,7 +33,8 @@
     "ac7b03ec3bc7ca6838f0413efc7ef66367b396f5",
     "95b73560fab5571ad65610ffe4f790d080d715c1",
     "7461e9db26d07da2d7cc4eae60bf153a13018fd0",
-    "aff51e89e94b2b444ad00cafec9054f568e47e40"
+    "aff51e89e94b2b444ad00cafec9054f568e47e40",
+    "5ea1b4ff2a71fb1321ba255fad30834c381e2206"
   ],
   "forceNext": null,
   "results": [
@@ -816,6 +817,19 @@
       "transcript": "docs/designs/007-audit-by-deeds/transcripts/fix-r1.md",
       "durationMs": 363439,
       "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 1,
+      "sessionID": "ses_e382ff41cffeWMuzhbsmOpDdDx",
+      "agent": "code/test-engineer",
+      "at": 1794354103472,
+      "reply": {
+        "commitMessage": "test(orchestration): pin the walk's list route, kept deeds, and cost\n\n- reach descendants through session.list + the parentID index, across\n  cursor.next pages, one enumeration per walk (testing r1c0 #1, perf #3)\n- an attempt that delegated nothing pays no descendant enumeration, and an\n  attempt pays at most one walk pass (perf r1c0 #1, #2)\n- a deed collected before a mid-walk fetch failure still fails the attempt,\n  and the incomplete walk is logged (security r1c0 #1)\n- exactly two stageFailure gate entries in the budget pin (testing #4),\n  Test strategy #8 citations on the two prompt pins (testing #3), and the\n  session-list endpoint on the nine pre-existing fakes (Test strategy #9)\n\nGate not run: the shell tool is permission-denied in this stage, so neither\nnpx prettier nor npm test could be executed; every added line was\nhand-formatted to the package's prettier config (printWidth 100, no added\nline over 100 chars, no tabs or trailing whitespace)."
+      },
+      "transcript": "docs/designs/007-audit-by-deeds/transcripts/test-update-r1.md",
+      "durationMs": 440502,
+      "nudges": 0
     }
   ],
   "gateLog": [
@@ -895,10 +909,17 @@
       "proceed": true,
       "reason": "npm run check green",
       "at": 1794353662938
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794354109659
     }
   ],
   "startedAt": 1794348961824,
-  "updatedAt": 1794353662938,
+  "updatedAt": 1794354109659,
   "baseRef": "7844c17171465dd779f8db6671801eb058bd2eb3",
   "designCycle": 3,
   "designStamp": "f4f64f9c7a62e1487a3ad86706965ae11544eb87",
