@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "slug": "audit-by-deeds",
+  "nnn": "007",
+  "branch": "pipeline/007-audit-by-deeds",
+  "source": {
+    "kind": "brief",
+    "path": "docs/prompts/audit-by-deeds.md"
+  },
+  "status": "running",
+  "lastStage": "",
+  "designRound": 0,
+  "codeRound": 0,
+  "designBudgetUsed": 0,
+  "codeBudgetUsed": 0,
+  "editorialDone": false,
+  "testsGreen": false,
+  "testsNeedUpdate": false,
+  "stageFailures": {},
+  "stageCommits": [],
+  "forceNext": null,
+  "results": [],
+  "gateLog": [],
+  "startedAt": 1794348961824,
+  "updatedAt": 1794348961834,
+  "baseRef": "7844c17171465dd779f8db6671801eb058bd2eb3"
+}
