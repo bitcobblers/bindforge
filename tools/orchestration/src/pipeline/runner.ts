@@ -517,10 +517,7 @@ export async function listSessionMessages(
 // audit is for (the permission fence stays the primary control).
 
 interface SessionChildApi {
-  children?: (
-    input: { sessionID: string },
-    options?: { signal: AbortSignal },
-  ) => Promise<unknown>;
+  children?: (input: { sessionID: string }, options?: { signal: AbortSignal }) => Promise<unknown>;
   list?: (input?: Record<string, unknown>, options?: { signal: AbortSignal }) => Promise<unknown>;
 }
 
@@ -1067,7 +1064,7 @@ async function executeInference(
       ownReportPath:
         typeof handle.vars['reportPath'] === 'string' ? handle.vars['reportPath'] : undefined,
     };
-    let violations = auditSessionIndependence(lastSeen, auditOptions);
+    const violations = auditSessionIndependence(lastSeen, auditOptions);
     if (violations.length === 0) {
       let descendants = 0;
       try {

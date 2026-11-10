@@ -98,3 +98,28 @@ deviations below.
 
 No test files were modified. Budget, escalation wording, `retryInSameSession`,
 the nudge loop, and the checkpoint schema are untouched.
+
+## Fix-stage addendum (clearing the red `npm run check`)
+
+The shell stayed denied at the fix stage, so the gate was audited
+statically against the package's configs instead of by running it. Two
+hand-written slips in the design-007 regions of `runner.ts` were fixed
+there, consistent with deviation 7's forecast:
+
+- `SessionChildApi.children?` was split across four lines although its
+  one-line form is 98 chars — `format:check` drift (printWidth 100),
+  collapsed to one line.
+- The audit call site's `let violations` was never reassigned
+  (`.length = 0`/`.push` mutate); rewritten `const`. Hygiene only — the
+  package's ESLint config (`js.configs.recommended` +
+  `tseslint.configs.recommended`) does not enable `prefer-const`, so
+  this was not the gate failure.
+
+The rest of the touched regions (`independence.ts`, the child-walk and
+audit call sites, both `failureNote` retry sites, `report.ts`'s
+`printable` import, and the three prompt files) were re-read against the
+prettier config and the enabled lint rules and found clean; every line
+over 100 chars in them is an unbreakable string literal, and the
+pre-existing over-100 lines elsewhere are unchanged code that was green
+before design 007. No test file needs changing: `testsNeedUpdate` stays
+false.
