@@ -5,8 +5,8 @@
 - agent: code/test-engineer
 - model: strata/qwen3.8-flash-next-iq3_s
 - template: tools/orchestration/prompts/test-update.md @ a87018c3a39d
-- started: 2026-11-10T23:34:22.970Z
-- ended: 2026-11-10T23:41:43.472Z
+- started: 2026-11-10T23:47:32.444Z
+- ended: 2026-11-10T23:52:02.827Z
 - parameters: {"note":"not exposed by endpoint"}
 - gate: (no gate)
 
@@ -29,5 +29,5 @@ JSON Schema: {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"o
 
 ## Raw reply
 ```text
-{"commitMessage": "test(orchestration): pin the walk's list route, kept deeds, and cost\n\n- reach descendants through session.list + the parentID index, across\n  cursor.next pages, one enumeration per walk (testing r1c0 #1, perf #3)\n- an attempt that delegated nothing pays no descendant enumeration, and an\n  attempt pays at most one walk pass (perf r1c0 #1, #2)\n- a deed collected before a mid-walk fetch failure still fails the attempt,\n  and the incomplete walk is logged (security r1c0 #1)\n- exactly two stageFailure gate entries in the budget pin (testing #4),\n  Test strategy #8 citations on the two prompt pins (testing #3), and the\n  session-list endpoint on the nine pre-existing fakes (Test strategy #9)\n\nGate not run: the shell tool is permission-denied in this stage, so neither\nnpx prettier nor npm test could be executed; every added line was\nhand-formatted to the package's prettier config (printWidth 100, no added\nline over 100 chars, no tabs or trailing whitespace)."}
+{"commitMessage": "test(orchestration): pin the bounded session-list crawl and the escalate-pair budget shape\n\nTest update for design 007 after the round-1 fix stage; tests only, no\nweakening or removal of any existing pin.\n\n- child-deeds-retry.test.ts: the Test strategy #6 budget pin asserted two\n  `stageFailure` gate entries. Design 007 §3 keeps gate entries and the\n  escalation flow untouched, so the unchanged shape is one `stageFailure` for\n  attempt 1 plus the run's `escalate` naming that stage (03-build-notes\n  addendum 3 puts the fix in the pin, not the runner). The pair and the\n  escalate entry naming the stage are now pinned.\n- child-session-deeds.test.ts: new pin that a `session.list` enumeration which\n  repeats its `cursor.next` bounds itself and degrades to the logged partial\n  audit instead of hanging the attempt in the post-reply audit (performance\n  r1c0 finding 3, correctness r1c0 finding 2).\n- child-session-deeds.test.ts: new pin that the walk still runs for a resumed\n  attempt whose `subagent` part sits outside the audit window, so an\n  out-of-window delegation cannot hide the child's in-window deed (performance\n  r1c0 finding 1's status/`since` clause).\n- The nine pre-existing fakes stay unchanged: their attempts hold no\n  `subagent` part, so the delegation guard skips the walk entirely and their\n  run records carry no partial-audit line — Test strategy #9's session-list\n  extension is not needed on their flows any more.\n\nGate note: the shell tool is denied at this stage, so `npx prettier --write`\nand `npm test` could not be run. The two touched files were hand-checked\nagainst the package's prettier config (no line over 100 chars, single quotes,\ntrailing commas, no import changes, break shapes copied from the same files)"}
 ```

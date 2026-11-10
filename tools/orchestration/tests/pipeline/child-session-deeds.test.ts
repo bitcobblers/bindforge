@@ -323,8 +323,11 @@ function tmpRepo(): string {
  * comes back empty. Message timestamps ride the real clock so the audit's
  * `since` filter keeps them visible. `listCalls()` counts the `session.list`
  * calls, i.e. how many times the audit enumerated the session tree.
+ * `loop: true` makes every page repeat its `cursor.next` — the shape of a
+ * server whose pagination never advances.
  */
-function delegatingClient({ delegate = true }: { delegate?: boolean } = {}) {
+function delegatingClient(opts: { delegate?: boolean; loop?: boolean } = {}) {
+  const { delegate = true, loop = false } = opts;
   const approve = JSON.stringify({ verdict: 'approve', findings: [] });
   const sessions = new Map<string, { prompts: number; lists: number }>();
   let clock = 0;
@@ -351,7 +354,7 @@ function delegatingClient({ delegate = true }: { delegate?: boolean } = {}) {
         listCalls += 1;
         return {
           data: [...sessions.keys()].map((id) => ({ id })),
-          cursor: { previous: null, next: null },
+          cursor: { previous: null, next: loop ? '0' : null },
         };
       },
     },
@@ -563,6 +566,144 @@ describe('the walk is keyed to delegation at the audit call site', () => {
 
     expect(outcome.ok).toBe(true);
     expect(fake.listCalls()).toBe(0);
+  });
+
+  // proves: Test strategy #5 — a session-list crawl bounds itself: a server
+  // that answers every page with the same `cursor.next` cannot hang the
+  // attempt in the post-reply audit. The walk gives up, the partial audit is
+  // logged, and the attempt is judged on its own message list alone (code
+  // review performance r1c0 finding 3, correctness r1c0 finding 2).
+  it('degrades to the partial audit when the session-list cursor never advances', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fake = delegatingClient({ loop: true });
+    const outcome = await runSeat(fake.client);
+
+    expect(outcome.ok).toBe(true);
+    // The crawl stops asking instead of paging forever: against this in-memory
+    // stub an unbounded crawl would reach thousands of calls inside the 5 s
+    // stage window, a bounded one a handful.
+    expect(fake.listCalls()).toBeLessThan(100);
+    const warns = warn.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(warns).toMatch(/ses_\w+/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The guard that keys the walk to delegation must key on the DELEGATION, not
+// on a completed in-window part (code review performance r1c0 finding 1): a
+// resumed attempt keeps its earlier `subagent` part outside the audit window
+// while that child's own deeds sit inside it. Skipping the walk because the
+// part is out of window would hide the deed the text exemption traded away.
+// ---------------------------------------------------------------------------
+
+/**
+ * Stub in that shape: the attempt session's `subagent` part is stamped long
+ * before the attempt began, and the one child session it delegated to holds an
+ * in-window `read` of a run-records file.
+ */
+function staleDelegationClient(): OpenCodeClient {
+  const approve = JSON.stringify({ verdict: 'approve', findings: [] });
+  const sessions = new Map<string, { prompts: number; lists: number }>();
+  let clock = 0;
+  let created = 0;
+  const stale = Date.now() - 600_000;
+  const stamp = () => {
+    clock = Math.max(Date.now(), clock + 1);
+    return clock;
+  };
+  return {
+    session: {
+      create: async () => {
+        created += 1;
+        const id = created === 1 ? 'ses_stale' : `ses_${String(created)}`;
+        sessions.set(id, { prompts: 0, lists: 0 });
+        return { id };
+      },
+      prompt: async (input: { sessionID: string }) => {
+        const s = sessions.get(input.sessionID);
+        if (s) s.prompts += 1;
+      },
+      remove: async () => undefined,
+      children: async (input: { sessionID: string }) =>
+        input.sessionID === 'ses_stale' ? [{ id: 'ses_stale_child' }] : [],
+    },
+    message: {
+      list: async (input: { sessionID: string }) => {
+        if (input.sessionID === 'ses_stale_child') {
+          return {
+            data: [
+              {
+                id: 'm_stale_deed',
+                time: { created: stamp() },
+                type: 'assistant',
+                content: [
+                  {
+                    type: 'tool',
+                    id: 'p_stale_deed',
+                    name: 'read',
+                    state: {
+                      status: 'completed',
+                      input: { filePath: 'docs/designs/002-x/transcripts/proposal-r0.md' },
+                      content: [],
+                    },
+                  },
+                ],
+              },
+            ],
+            cursor: { previous: null, next: null },
+          };
+        }
+        const s = sessions.get(input.sessionID);
+        if (!s) return { data: [], cursor: { previous: null, next: null } };
+        s.lists += 1;
+        const visible = Math.max(0, Math.min(s.lists - 1, s.prompts));
+        const messages: SessionMessageInfo[] = [];
+        for (let i = 0; i < visible; i += 1) {
+          messages.push({
+            id: `m_del${String(i)}`,
+            time: { created: stale },
+            type: 'assistant',
+            content: [
+              {
+                type: 'tool',
+                id: 'p_del',
+                name: 'subagent',
+                state: {
+                  status: 'completed',
+                  input: { task: 'run the package tests and summarize', agent: 'explore' },
+                  content: [],
+                },
+              },
+            ],
+          });
+          messages.push({
+            id: `m_a${String(i)}`,
+            time: { created: stamp() },
+            type: 'assistant',
+            content: [{ type: 'text', text: approve }],
+          });
+          messages.push({ id: `m_i${String(i)}`, time: { created: stamp() }, type: 'idle' });
+        }
+        return { data: messages, cursor: { previous: null, next: null } };
+      },
+    },
+  } as unknown as OpenCodeClient;
+}
+
+describe('a resumed attempt still walks the tree it delegated', () => {
+  // proves: Test strategy #6 — the child deed still fails the attempt when the
+  // parent's delegation part predates the attempt window: the walk is keyed to
+  // the delegation, not to an in-window completed part, so the exemption cannot
+  // hide the deed behind an older part.
+  it('fails the attempt on a child deed behind an out-of-window delegation', async () => {
+    const outcome = await runSeat(staleDelegationClient());
+
+    expect(outcome.ok).toBe(false);
+    const failure = outcome.failure ?? '';
+    expect(failure).toContain('independence violation');
+    expect(failure).toContain('transcripts');
+    expect(failure).toContain('(via child session');
+    expect(failure).toContain('ses_stale_child');
   });
 });
 

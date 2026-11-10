@@ -272,9 +272,16 @@ describe('child deeds fail the parent attempt end to end', () => {
       expect(result.failure).toContain('(via child session');
     }
     expect(saved.stageFailures['implement']).toBeDefined();
-    // One gate entry per failure: attempt 1 and its retry. The run escalates
-    // right after the retry, so nothing else in this scenario failed.
-    expect(saved.gateLog.filter((g) => g.gate === 'stageFailure')).toHaveLength(2);
+    // One gate entry per failure: the failed attempt lands a `stageFailure`,
+    // the exhausted retry lands the run's `escalate` naming that stage. The
+    // pair — not two `stageFailure` lines — is the budget-unchanged shape:
+    // §3 lists gate entries and the escalation flow among what stays as-is,
+    // so a second failure entry would mean the retry became a new attempt.
+    const stageFailures = saved.gateLog.filter((g) => g.gate === 'stageFailure');
+    const escalations = saved.gateLog.filter((g) => g.gate === 'escalate');
+    expect(stageFailures).toHaveLength(1);
+    expect(escalations).toHaveLength(1);
+    expect(escalations[0]?.reason).toContain('implement');
   });
 
   // proves: Test strategy #6 — the enumeration route every real run takes:
