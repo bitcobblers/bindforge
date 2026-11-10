@@ -17,8 +17,7 @@ prompt lines the run proved necessary — a design-review bright line and a
 test-engineer formatter duty — have no test pins.
 
 The one design principle across all three changes: **the audit judges where a
-tool looks, never what text it carries.** That sentence lives here, once; every
-other section references it.
+tool looks, never what text it carries.**
 
 ## Goals / Non-goals
 
@@ -113,8 +112,8 @@ would leave the documented failure unfixed.
   fields at all — delegation text is not an access (source §1). Its evidence is
   the child walk (§2).
 - Replace the unknown-tool branch of `accessValues` (independence.ts:168–177):
-  instead of `stringValues(input)`, collect string values found under an
-  allowlist of access-naming keys, recursively, in any nesting depth:
+  instead of `stringValues(input)`, collect string values under an allowlist
+  of access-naming keys, via a node-capped queue that drops the deepest nodes:
 
   ```ts
   const PATH_ACCESS_KEYS = new Set([
@@ -126,52 +125,57 @@ would leave the documented failure unfixed.
   Payload keys (`code`, `prompt`, `content`, `text`, `question`, …) are never
   scanned — extending the `write`-content and `grep`-query exemptions (already
   pinned at independence.test.ts:134–153,201–212) from named tools to the
-  general rule stated in Context. Unknown tools' `pattern` is treated as a
-  glob-style access, matching the glob precedent; the grep-style reading of
-  `pattern` as query text is a known residual (Risks row 2).
+  general rule stated in Context. Unknown tools' `pattern` is read glob-style;
+  query-text `pattern` on an unknown tool is a known false positive — the
+  violation names key and value, so a mis-scan is a one-line allowlist fix.
 - The existing nested-path pin survives untouched: its fixture value sits
   under key `path`, which the allowlist keeps. The research expectation that
   the pin be "re-shaped or replaced" resolves as "kept as-is."
-- Update the two doc comments that promise the full scan
-  (independence.ts:64–68 and the header scope-discipline block) to state the
-  path-key rule and the delegation rule.
+- Update the two doc comments promising the full scan (independence.ts:64–68
+  and the header scope-discipline block) to state the path-key and delegation
+  rules.
 
 ### 2. Deeds of children (`src/pipeline/runner.ts`)
 
-New helper beside `listSessionMessages`:
+New async-generator helper beside `listSessionMessages`, so peak memory is one message list:
 
 ```ts
-async function listChildSessionMessages(
+async function* listChildSessionMessages(
   client: OpenCodeClient, sessionID: string, requestTimeoutMs: number,
-): Promise<Array<{ sessionID: string; messages: SessionMessageInfo[] }>>
+): AsyncGenerator<{ sessionID: string; messages: SessionMessageInfo[] }>
 ```
 
 - BFS over the attempt session's descendant sessions (visited set, so a
-  malformed parentID graph cannot loop). For each session: list children —
-  `client.session.children({ sessionID })` if the installed SDK exposes it,
-  else `client.session.list()` filtered by `parentID === sessionID` (A3, A4 —
-  implementation step 1 confirms which, `npm install` then read the client's
-  type declarations). For each descendant: fetch its messages with the
-  existing `listSessionMessages` (A6).
+  malformed parentID graph cannot loop), one enumeration per walk, not per
+  node: per session `client.session.children({ sessionID })` when the SDK
+  exposes it, else one `client.session.list()` paged with `cursor.next` like
+  `listSessionMessages` (A6) and indexed by `parentID` into a Map the BFS
+  walks (A3, A4 — implementation step 1 confirms which).
+- The walk is a point-in-time snapshot taken after the reply: a descendant
+  still running at that moment contributes only its completed parts (Risks).
 - At the audit call site (runner.ts:839–849), run the pure
-  `auditSessionIndependence` once per message list — parent first, then each
-  descendant with the same `IndependenceAuditOptions` (`since`, `reviewStage`,
-  `ownReportPath`) — and append child violations as
-  `` `${violation} (via child session ${sessionID})` ``. The matcher itself is
-  unchanged in signature and stays synchronous; children need no
-  creation-time filter because the message-level `since` filter already
-  excludes messages from before this attempt (A7, A8).
+  `auditSessionIndependence` on the parent list first; when it already
+  returns violations, skip the descendant walk and fail on what is in hand.
+  Otherwise audit each descendant list with the same `IndependenceAuditOptions`
+  (`since`, `reviewStage`, `ownReportPath`), appending child violations as
+  `` `${violation} (via child session ${sessionID})` ``. `since` bounds what
+  the matcher judges, not what the walk fetches (A7, A8).
 - A child-walk fetch error after `bounded()`'s single retry is caught, logged
-  (`console.warn`), and the audit proceeds on the parent list alone —
-  consistent with the fence-primary posture (A10); failing the stage on an
-  infrastructure fault would be a new failure mode the source does not ask for.
-- Cost: one children call plus one paged message fetch per descendant per
-  attempt, once per attempt after the reply — off the poll loop, bounded
-  (research Platform notes).
+  (`console.warn` plus one `gateLog` line naming the session it could not
+  enumerate), and the audit proceeds on the parent list alone — a stage
+  failure on an infrastructure fault is not what the source asks for (A10).
+  Tripwire: `console.warn` also fires when an audited message list holds a
+  completed `subagent` part yet the walk enumerated zero descendants, so an
+  empty-but-successful enumeration never masquerades as a clean audit.
+- Cost per attempt: one children call per session (or one session-list call
+  and a `parentID` index on the fallback) plus one full paged message fetch
+  per descendant — including entirely pre-`since` lists on the resumable
+  lane — each inside `requestTimeoutMs` with `bounded()`'s retry, once per
+  attempt after the reply, off the poll loop.
 
-The violation text keeps naming the rule and the offending path (built through
-`brief()`/`printable()`), so the gate log and — via §3 — the attempt-2 prompt
-carry the rule that was broken.
+The violation text keeps naming the rule and the offending path (via
+`brief()`/`printable()`), so the gate log and — via §3 — attempt 2's prompt
+carry it.
 
 ### 3. Retry feedback (`src/pipeline/runner.ts`)
 
@@ -187,22 +191,19 @@ carry the rule that was broken.
   template:
 
   ```
-  Your previous attempt at this stage failed (<failureNote>).
+  Previous attempt's gate failure (log excerpt): <failureNote>.
   Do not repeat the behavior that caused that failure.
   ```
 
-  mirroring the in-repo precedent `repairPrompt` (runner.ts:1133–1140) for the
-  resumable lane. The note is passed through `printable()` at the injection
-  point (same posture as `gateLog`, runner.ts:1144–1161); quoting forbidden
-  paths in it is safe (A9).
-- Both non-resumable attempt-2 construction sites set it:
-  `runWithRetry` (runner.ts:1468–1484) and `runReviewPass`'s `runSeat`
-  (runner.ts:1259–1276), each with `failureNote: printable(out.failure ?? 'no reply')`.
-  For an independence violation the text already names the broken rule and the
-  paths (§1–§2 violation strings).
-- Untouched: `retryInSameSession`, the nudge loop, `state.stageFailures`,
-  gate entries, and the one-retry-then-escalate flow — attempt 2 stays exactly
-  one attempt.
+  mirroring the `repairPrompt` precedent (runner.ts:1133–1140) for the
+  resumable lane. The block is labeled a log excerpt and bounded through
+  `brief()` after `printable()` (same posture as `gateLog`,
+  runner.ts:1144–1161); quoting forbidden paths in it is safe (A9).
+- Both non-resumable attempt-2 sites set it — `runWithRetry`
+  (runner.ts:1468–1484) and `runReviewPass`'s `runSeat` (runner.ts:1259–1276) —
+  each with `failureNote: brief(printable(out.failure ?? 'no reply'))`.
+- Untouched: `retryInSameSession`, the nudge loop, `state.stageFailures`, gate
+  entries, and the one-retry-then-escalate flow — attempt 2 stays one attempt.
 
 ### 4. Prompt lines and their pins (`prompts/`, `tests/pipeline/prompts.test.ts`)
 
@@ -238,11 +239,11 @@ copy prohibition sentences into delegation text.
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| The pinned client SDK exposes no children/list method, so the child walk needs another seam | Low–Medium (A4 unverified) | Medium (defect 1's detection half stalls) | Implementation step 1 is `npm install` + read `@opencode/client` types; two named candidates (children endpoint, `session.list` + `parentID` filter), and both exist server-side (A3) |
 | An unknown tool names its access under a key outside `PATH_ACCESS_KEYS` → missed violation | Medium | Low–Medium (audit is defense-in-depth; the fence is the primary control — A10) | Allowlist covers the key names the platform's tools actually use; the child walk catches delegated effects; the miss class is the same accepted class as obfuscated shells (independence.ts:30–41) |
+| A descendant still running at the snapshot contributes no completed parts, so its deeds go unseen for that attempt (a net loss vs today's delegation-text scan) | Low (background delegations outliving the parent's reply) | Medium (detection gap for one attempt) | Stated snapshot semantics (§2); the fence still blocks the access (A10); same accepted-gap posture as the fetch-error row |
 | Child actions misattributed to this attempt (a resumed or sibling session's older children) | Low | Medium (false failure) | Walk is parent-scoped from this attempt's own sessionID; the `since` filter skips pre-attempt messages in any fetched list (A7); pinned by Test strategy #5 |
-| Child-walk fetch fails and the attempt audited parent-only | Low | Low (detection gap for one attempt, fence still holds) | `console.warn` names it; A10 posture; not treated as a stage failure |
-| Failure note quotes forbidden paths into the attempt-2 prompt/transcript | Low | Low | Prompt text is not audit input (A9); `printable()` keeps it control-byte-free |
+| Child-walk fetch fails and the attempt audited parent-only | Low | Low (detection gap for one attempt, fence still holds) | `console.warn` plus a `gateLog` line name the partial audit in the run record; A10 posture; not treated as a stage failure |
+| Failure note quotes forbidden paths into the attempt-2 prompt/transcript | Low | Low | Prompt text is not audit input (A9); the note enters as a labeled log excerpt bounded by `brief(printable(...))` |
 | The formatter prompt line is guidance, not a gate — an engineer can still skip it | Medium | Low (today's failure mode unchanged, and the fix→format ownership route still catches it) | Pinned prompt (Test strategy #8) keeps the line from being silently reverted, which is what the source asks for |
 
 ## Compatibility matrix
@@ -253,7 +254,7 @@ copy prohibition sentences into delegation text.
 | macOS | no | Untested; no OS-specific code touched (Linux-only CI, Test strategy #9) |
 | Windows | no | Untested; the audit is pure string matching over server records, so no OS dependency is added |
 | OpenCode server with `GET /session/:id/children` | yes | Child walk's primary path (A3) |
-| OpenCode server/SDK without a children method | unknown | Method name unverifiable here (A4); `session.list` + `parentID` filter is the named fallback; resolved at implementation step 1 |
+| OpenCode server/SDK without a children method | yes | Determinate at step 1: SDK `session.children`, else SDK `session.list` + `parentID` filter, else a direct `GET /session/:id/children` against the configured `baseUrl` with the client's auth headers — all three exist server-side (A3), so the walk always has a route (A4 decides which, not whether) |
 | Existing checkpoints and configs | yes | No `PipelineState`/`PipelineConfig` schema change; `failureNote` is in-memory handle state |
 | Runs already in flight across the merge | yes | No wire or state format changes; a straddling `pipeline resume` just gets the new audit from its next attempt |
 
@@ -273,8 +274,9 @@ copy prohibition sentences into delegation text.
    the path; with `reviewStage: true`, a child `glob` over `reviews/**` fails;
    the child's `write` of a report other than `ownReportPath` fails.
 5. Unit — `listChildSessionMessages` against a fake client: grandchildren are
-   reached (depth 2), a parentID cycle terminates, and child messages older
-   than `since` produce no violation when passed through the matcher.
+   reached (depth 2), a parentID cycle terminates, pre-`since` child messages
+   yield no violation through the matcher, and at the call site a completed
+   `subagent` part with zero enumerated descendants warns.
 6. Integration — full `runPipeline` attempt on a temp git repo with the mock
    client: a stage session whose child session reads a `transcripts/` file
    fails the attempt with `independence violation` naming the path (and
@@ -297,9 +299,8 @@ copy prohibition sentences into delegation text.
 
 ## Rollout
 
-1. Implementation step 1: `npm install` in `tools/orchestration` and read
-   `@opencode/client`'s type declarations to fix the children-method name
-   (A4) before writing the walk.
+1. Implementation step 1: `npm install` in `tools/orchestration`, read
+   `@opencode/client`'s types, and fix the walk's enumeration route (A4).
 2. Merge; nothing to flip — the matcher change and the retry note take effect
    on the next run's attempts. No migrations, no config, no persisted field.
 3. The two prompt lines land with their pins (source §3: re-landed as reviewed
@@ -311,16 +312,15 @@ copy prohibition sentences into delegation text.
 ## Deferred / out of scope
 
 - Detecting accesses that never name the run-records segment in a recorded
-  plain-text field (obfuscated shells, a script file written first) — stays
-  the documented residual in `independence.ts:30–41`; the same posture extends
-  to off-allowlist keys; no follow-up document.
+  plain-text field (obfuscated shells, a script file written first) — the
+  documented residual in `independence.ts:30–41`, extended to off-allowlist
+  keys and to values beyond the §1 walk's node cap; no follow-up document.
 - Server-side effect records ("what a tool actually touched") as audit input —
   an OpenCode platform surface, not this repo; no follow-up yet.
 - Identity-level misattribution guards beyond `since` + parent-scoped
   enumeration (e.g., a run-id stamped on sessions) — no follow-up yet.
-- Structuring the retry note beyond the printable failure string (a separate
-  "rule broken" field) — deferred; the violation strings already name the
-  rule (Chosen design §2); no follow-up yet.
+- A structured "rule broken" field beyond the bounded failure string —
+  deferred; the violation strings already name the rule (Chosen design §2).
 - Subagent-prompt hardening guidance for in-flight runs (source "Notes for the
   stages of this very run") — process note owned by the source document for
   this run only; nothing ships.
@@ -330,12 +330,12 @@ copy prohibition sentences into delegation text.
 - r0: Chosen design → Matcher — decided: unknown tools judged on a path-key
   allowlist, not the payload scan; the nested-path pin is kept, not re-shaped
   (resolves research Q1).
-- r0: Chosen design → Deeds of children — decided: transitive BFS over the
-  attempt's session subtree, reject depth-1; fetch errors fall back to
-  parent-only audit (resolves research Q2, Q7).
-- r0: Chosen design → Retry feedback — decided: one `failureNote` seam on
-  `StageHandle`, covering both `runWithRetry` and `runReviewPass`; raw
-  printable text, no structured schema (resolves research Q3, Q4).
+- r1: Chosen design → Deeds of children (+ Compatibility matrix row) — one
+  paged enumeration per walk, determinate endpoint route, snapshot semantics,
+  gate-logged partial audits, zero-descendant tripwire (resolves Q2, Q7).
+- r1: Chosen design → Retry feedback — one `failureNote` seam on `StageHandle`
+  covering both lanes; labeled log excerpt bounded by `brief(printable(...))`,
+  no structured schema (resolves research Q3, Q4).
 - r0: Test strategy — decided: prompt pins are `toContain` on rendered
   content, extending the existing design-review block (resolves research Q5);
   no gate-side formatter companion, the ownership line stands alone

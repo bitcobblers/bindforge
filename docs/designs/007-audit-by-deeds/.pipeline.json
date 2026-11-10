@@ -8,7 +8,7 @@
     "path": "docs/prompts/audit-by-deeds.md"
   },
   "status": "running",
-  "lastStage": "proposal",
+  "lastStage": "design-review",
   "designRound": 1,
   "codeRound": 0,
   "designBudgetUsed": 1,
@@ -19,7 +19,8 @@
   "stageFailures": {},
   "stageCommits": [
     "87eb2a3728e9c42b8f594b549f7133690de09907",
-    "63f4f3c126eac4ec6384715eee2065239c16bbfd"
+    "63f4f3c126eac4ec6384715eee2065239c16bbfd",
+    "e02ad362c9b3c60d89f9bffef934309a91d53e4b"
   ],
   "forceNext": null,
   "results": [
@@ -250,11 +251,181 @@
       "proceed": true,
       "reason": "brief is non-empty",
       "at": 1794348961844
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: compatibility, security, performance",
+      "at": 1794349831475
     }
   ],
   "startedAt": 1794348961824,
-  "updatedAt": 1794349831447,
+  "updatedAt": 1794349831475,
   "baseRef": "7844c17171465dd779f8db6671801eb058bd2eb3",
-  "designCycle": 0,
-  "designStamp": "ce95f3b6b5756a5fb08196351bd60ee4ff2866f5"
+  "designCycle": 1,
+  "designStamp": "ce95f3b6b5756a5fb08196351bd60ee4ff2866f5",
+  "seats": {
+    "design": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "ce95f3b6b5756a5fb08196351bd60ee4ff2866f5",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Assumption register A8 and Chosen design → Deeds of children: \"`SessionInfo` timestamp fields unverifiable here\" / \"children need no creation-time filter because the message-level `since` filter already excludes messages from before this attempt (A7, A8)\"",
+            "problem": "The A8 basis is contradicted by repo evidence: src/opencode-runner.ts:264–265 already reads session.time.created/session.time.updated off the typed v2 client.session.create result, so the source §1 requirement to enumerate only child sessions \"created at or after the attempt's `since` stamp\" is implementable at the session level. The omission is safe for fresh attempts (children of a newly created session are always newer than `since`) but not fully closed on the resumable lane: a background child spawned by attempt 1 in the same session can emit post-`since` messages during attempt 2, and Risks row 3's mitigation (\"the `since` filter skips pre-attempt messages\") covers only pre-attempt messages.",
+            "fix": "Correct A8's basis to cite src/opencode-runner.ts:264–265, then either apply the creation-time filter in the BFS (the session objects the walk already fetches carry the stamp, replacing the current unconditional inclusion of all descendants) or state the still-active-older-child residual explicitly in Risks row 3 instead of implying `since` closes it."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Matcher §1: \"the grep-style reading of `pattern` as query text is a known residual (Risks row 2)\"",
+            "problem": "Risks row 2 is \"An unknown tool names its access under a key outside `PATH_ACCESS_KEYS` → missed violation\" — a false-negative class. The pattern-as-query residual is a false positive (an unknown search tool whose query text contains `transcripts/` fails the attempt — the same words-not-acts defect the design removes, narrowed to unknown tools), and no Risks row covers it, so the pointer anchors the residual to a row that does not describe it.",
+            "fix": "Add a Risks row — \"an unknown search-like tool names its query under `pattern` → false violation; Low–Medium/Low: named `grep` is exempt at independence.ts:74 and pinned at independence.test.ts:201–212, so only unknown search tools carry it\" — and point §1 at that row instead of the outside-allowlist row."
+          },
+          {
+            "severity": "minor",
+            "location": "Assumption register A3: \"the server exposes `GET /session/:id/children` and `GET /session` | verified | https://opencode.ai/docs/server/\"",
+            "problem": "The cited server-docs page is the OpenCode V1 docs (top banner: \"These are the docs for OpenCode V1. The latest docs, for OpenCode V2, are at .../llms.txt\"), while the design pins @opencode/client ^2.1.4 (V2) and the repo records that the v2 client namespaces routes to /api/session (src/opencode-runner.ts:17–18). The V1 page supports the children endpoint and parentID for V1 only, so the Compatibility row \"OpenCode server with `GET /session/:id/children` | yes ... (A3)\" and Risks row 1's \"both exist server-side (A3)\" rest a V2 claim on a V1 source.",
+            "fix": "Re-anchor the endpoint half of A3 to the V2 API reference (opencode.ai/docs/api/) or mark it \"verified on V1 server; V2 surface resolved at implementation step 1 (A4)\", and note that the V2 JavaScript client docs (opencode.ai/docs/build/client/) already show client.session.list(...) exists, which firms up the named fallback."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Matcher §1: \"Update the two doc comments that promise the full scan (independence.ts:64–68 and the header scope-discipline block)\"",
+            "problem": "Only the 64–68 comment promises the full scan; the header scope-discipline block (independence.ts:18–28) already states the opposite rule (\"Only the fields that NAME where a tool looks are scanned\"), so characterizing both as promising the full scan misdescribes the code even though the intended edit is fine.",
+            "fix": "Reword as: \"update the independence.ts:64–68 comment to state the path-key rule, and extend the scope-discipline block with one line adding the delegation rule\"."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "request-changes",
+        "stamp": "ce95f3b6b5756a5fb08196351bd60ee4ff2866f5",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Compatibility matrix — row \"| OpenCode server/SDK without a children method | unknown | Method name unverifiable here (A4); `session.list` + `parentID` filter is the named fallback; resolved at implementation step 1 |\"",
+            "problem": "A support-status cell reading `unknown` is a major under the compatibility checklist (item 1): the matrix leaves the environment combination \"SDK exposes neither a children method nor a session-list method\" unclassified, and both named remedies are conditional on resolving A4 during implementation rather than a decision the matrix records. The design's core (a child walk over server-verified endpoints) must have a determinate support status before implementation starts.",
+            "fix": "Make the row determinate: re-status it `yes` and state the step-1 decision rule in the Notes cell — if the installed `@opencode/client` exposes neither `session.children` nor `session.list`, the walk uses a direct `GET /session/:id/children` against the configured baseUrl with the client's auth headers (endpoint existence already verified server-side in A3) — so no matrix row remains `unknown`."
+          }
+        ]
+      },
+      "security": {
+        "verdict": "request-changes",
+        "stamp": "ce95f3b6b5756a5fb08196351bd60ee4ff2866f5",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design §2 Deeds of children — \"once per attempt after the reply — off the poll loop, bounded\"",
+            "problem": "The child walk is a point-in-time snapshot and the design never states what happens to a descendant still running at that moment. A background subagent (or any child that outlives the parent's reply) contributes no completed parts, so its read of a transcripts/ file is never audited for that attempt and the subtree is never re-audited later. Because subagent: [] removes the delegation-text signal entirely, this is a net detection loss in exactly the class the mechanism exists to catch (source §1: \"The child's deeds are the violation\"). Neither §2, the Risks table (which covers misattribution and fetch failure only), nor Test strategy #5-#6 (all fixtures completed) acknowledge it.",
+            "fix": "State the snapshot semantics in §2 (\"the audit does not wait for descendants still running at reply time\") and add the matching Risks row with the A10 mitigation, the same treatment already given to the fetch-error fallback; if a mechanism is preferred, reuse the existing bounded() single-retry pattern for one settle re-fetch of descendants that had in-flight parts at snapshot time, replacing the flat \"once per attempt\" sentence."
+          },
+          {
+            "severity": "major",
+            "location": "Chosen design §2 Deeds of children — \"else `client.session.list()` filtered by `parentID === sessionID`\"",
+            "problem": "The fallback enumeration has an unguarded silent failure mode. The message fetch is explicitly paged (A6, cursor.next) but the session-list fallback is specified with no paging and no shape assumption, so children past page 1, or a SessionInfo without parentID (A8 concedes it is unverifiable here), yield an empty subtree: no error, no log, detection inert on every attempt while all stages pass. A missing session.children method at least lands in the §2 fetch-error catch; an empty-but-successful enumeration lands nowhere. Tests #5-#6 cannot catch it because their fake clients always return children. With subagent: [] the walk is the only signal for delegated deeds.",
+            "fix": "In §2, page the fallback exactly like listSessionMessages (cursor.next until exhausted) and add one tripwire: when an audited message list contains a completed subagent part but the walk enumerated zero descendants, console.warn naming the enumeration gap — same log-only posture the design already chose for fetch errors, no new failure mode."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design §2 Deeds of children — \"A child-walk fetch error after `bounded()`'s single retry is caught, logged (`console.warn`), and the audit proceeds on the parent list alone\"",
+            "problem": "The r0 rejection of failing the stage on an infrastructure fault is sound and is not re-argued, but the degradation is recorded only on stdout, which is not the run's record. In the gate log an attempt audited on a partial subtree is indistinguishable from a fully audited clean attempt, and that verdict then feeds the attempt-2 prompt via §3.",
+            "fix": "Keep parent-only proceeding and additionally write one gate-log line through the existing gateLog/printable() path (runner.ts:1144–1161) naming the partial audit and the session that could not be enumerated; log only, no stage failure, no schema change."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design §1 Matcher — \"Unknown tools' `pattern` is treated as a glob-style access, matching the glob precedent; the grep-style reading of `pattern` as query text is a known residual (Risks row 2).\"",
+            "problem": "That residual is a false positive (a search tool's regex query naming transcripts fails an attempt that looked nowhere), but Risks row 2 is the opposite direction: \"An unknown tool names its access under a key outside `PATH_ACCESS_KEYS` → missed violation\". The cited mitigation therefore does not exist, and the false-positive class this document exists to eliminate (run 005's 977 s loss, the quote-the-rule loop) is asserted then left untracked. The same applies to `command`, whose value can name transcripts/ inside a message string.",
+            "fix": "Keep the r0 allowlist decision; correct the cross-reference by adding a Risks row for the false-positive direction, mitigated by the design's existing property that the violation string names the offending key and value (so a mis-scanned key is a one-line allowlist fix), and note the known search/glob tools are already in ACCESS_FIELDS with pinned exemptions, so the FP only reaches genuinely unknown tools."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design §3 Retry feedback — \"each with `failureNote: printable(out.failure ?? 'no reply')`\" and the appended \"Do not repeat the behavior that caused that failure.\"",
+            "problem": "This is the design's only new data flow into an agent and it is classified for one threat only: A9 proves quoting forbidden paths is safe for the audit, and printable() strips control bytes. Neither bounds content. For non-audit gates out.failure can carry verbatim tool or test output that an injected or misbehaving agent influenced, now injected into a fresh session's prompt with no length limit on top of the rendered template.",
+            "fix": "Build failureNote through the existing brief() helper (already used for violation text in §2) so it is length-bounded, and label the appended block as a quoted log excerpt at the injection point (\"Previous attempt's gate failure (log excerpt): …\"). Does not require the structured \"rule broken\" field r0 rejected."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design §1 Matcher — \"collect string values found under an allowlist of access-naming keys, recursively, in any nesting depth\"",
+            "problem": "The traversal into server-recorded, agent-produced tool input is unbounded recursion, and the §2 error catch covers fetch/parse faults, not a RangeError thrown while matching the parent's own list. Since this branch is being rewritten anyway, the bound is free.",
+            "fix": "Use an iterative queue with a node/depth cap that drops the deepest nodes instead of throwing, so a hostile or merely enormous tool input cannot take the audit call site down."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design §2 Deeds of children — \"`client.session.list()`\"",
+            "problem": "The fallback reads every session on the server to select descendants, a broader read than the walk needs, and the design never scopes what happens to the rest of that data.",
+            "fix": "Add one clause stating the list result is used only to build the descendant set and is never logged or persisted, so unrelated sessions' metadata cannot reach the gate log or the attempt-2 note."
+          }
+        ]
+      },
+      "performance": {
+        "verdict": "request-changes",
+        "stamp": "ce95f3b6b5756a5fb08196351bd60ee4ff2866f5",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design → §2 Deeds of children — \"else `client.session.list()` filtered by `parentID === sessionID`\" and the Cost bullet \"one children call plus one paged message fetch per descendant per attempt, once per attempt after the reply — off the poll loop, bounded\"",
+            "problem": "The named fallback enumerates the whole server session table once per BFS node, so the walk costs O(k × S): k descendants × S = every session the server has ever recorded, which grows unbounded across runs and is never enumerated by this repo today. It repeats per attempt and multiplies across concurrent review seats (maxParallelReviews semaphore, runner.ts:1203,1292). The design's only cost argument is the word \"bounded\", which restates the research Platform note that already assumed it — no subtree size, session count, or page count is given, so the expected cost cannot be checked against any baseline. The claim is true for the `session.children` endpoint (subtree-proportional) but false for the fallback as specified.",
+            "fix": "One enumeration per walk, not per node: if the SDK exposes `children`, keep the per-node call (subtree-proportional); if it falls back to `list()`, call `client.session.list()` once per attempt, index the result by `parentID` into a Map, and BFS that map. In the Cost bullet replace bare \"bounded\" with the explicit worst case: one session-list call + one children call + one paged message fetch per descendant, each request inside requestTimeoutMs with bounded()'s single retry."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → §2, child-filter bullet — \"children need no creation-time filter because the message-level `since` filter already excludes messages from before this attempt (A7, A8)\"",
+            "problem": "The sentence sits beside the Cost bullet and reads as a cost justification, but it is only a correctness argument: `since` is applied inside the matcher (independence.ts:112–114) after `listSessionMessages` has already paged the descendant's entire history (runner.ts:473–499, limit 200 per page until cursor.next is empty; the server has no time-bounded message fetch). Every attempt therefore pays a full paged fetch per descendant even when that list is entirely older than `since`, and on the resumable lane the attempt-1 children are re-enumerated and their full lists re-fetched and discarded.",
+            "fix": "Split the claims in that sentence — the `since` filter bounds what the matcher judges, not what the walk fetches — and state the fetch honestly in the Cost bullet: one full paged message fetch per descendant per attempt, including descendant lists that are wholly pre-`since`."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → §2, helper signature — \"Promise<Array<{ sessionID: string; messages: SessionMessageInfo[] }>>\"",
+            "problem": "The return shape forces the entire subtree's message history into memory at once: the runner holds the parent's already-fetched `lastSeen` plus every descendant's complete message list simultaneously, and that peak grows with subtree size, which §2 deliberately leaves uncapped (transitive BFS; custom agents can fan out subagents). The matcher is per-list and stateless, so nothing requires them together.",
+            "fix": "Hand lists over one at a time rather than collecting them: give `listChildSessionMessages` a per-list callback (`(sessionID, messages) => void` that appends the \"(via child session …)\" violation and drops the list), or return an async generator. Same walk, same violations, peak memory = one list."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → §2, audit call site — \"run the pure `auditSessionIndependence` once per message list — parent first, then each descendant\"",
+            "problem": "The child walk runs unconditionally, including on attempts the parent audit has already failed: the attempt fails on the parent's violations either way, so fetching the whole subtree only adds round-trips (each up to requestTimeoutMs, doubled by bounded()'s retry) to the failure path that leads into attempt 2.",
+            "fix": "State that the parent list is audited first and, when it already yields violations, the walk is skipped and the attempt fails on what is in hand. Keep the walk unconditional otherwise — do not gate it on the absence of a completed `subagent` part, which would narrow detection."
+          }
+        ]
+      },
+      "complexity": {
+        "verdict": "approve",
+        "stamp": "ce95f3b6b5756a5fb08196351bd60ee4ff2866f5",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design §1 (Matcher: paths only, not payloads) — \"const PATH_ACCESS_KEYS = new Set([ 'path', 'filePath', 'file', 'directory', 'dir', 'workdir', 'command', 'include', 'pattern', ]);\"",
+            "problem": "The new allowlist is a hand-typed second copy of access keys that already exist in ACCESS_FIELDS (independence.ts:69–82): six of its nine entries (path, filePath, workdir, command, include, pattern) are exactly the values already listed for the nine known tools, so independence.ts ends up with two lists that must be kept in sync by hand. The other three (file, directory, dir) are speculative — no tool in the repo's own mapping uses them — and the proposal's own Risks row 2 mitigation promises the allowlist \"covers the key names the platform's tools actually use\". Does not re-open the r0 Revision-log decision (allowlist-not-payload-scan stands); only the list's source changes.",
+            "fix": "Derive it instead of duplicating it: `const PATH_ACCESS_KEYS = new Set(Object.values(ACCESS_FIELDS).flat());` — one list, known and unknown tools cannot drift, and the three speculative keys drop out unless a named platform tool justifies them. Semantics for the six shared keys are unchanged (pattern stays scanned, already accepted in Risks row 2)."
+          },
+          {
+            "severity": "minor",
+            "location": "Test strategy #9 — \"the nine fake clients in `tests/pipeline/` (reply-contract, pass-finalize, parallel-integration, parallel-fanout, budget, parallel-escalation, stage-lifecycle, funnel, proposal-size) extended with the session-list method their flows need\"",
+            "problem": "Test scope the design does not need. Each of those fakes is an object literal cast `as unknown as OpenCodeClient` (funnel.test.ts:110–152, budget.test.ts:146), so TypeScript does not require the new method, and Chosen design §2 already specifies that a child-walk fetch error is caught after bounded()'s retry, logged, and audited parent-only — which is exactly what a fake without a children/list method produces. Nine file edits buy nothing beyond suppressing console.warn noise.",
+            "fix": "Name the method only in the fakes used by Test strategy #5–#7 (the flows that must reach a child session) and add one sentence to #9 that the other flows exercise §2's fetch-error fallback on purpose — replaces nine edits with a line."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design §2 (Deeds of children) — \"`client.session.children({ sessionID })` if the installed SDK exposes it, else `client.session.list()` filtered by `parentID === sessionID`\"",
+            "problem": "The design carries two implementations of one call and picks between them only at implementation step 1, leaving the fake-client shape Test strategy #5 asserts and the \"session-list method\" of #9 ambiguous between the two paths (two paths to test versus one).",
+            "fix": "Commit to `session.list()` + `parentID` filter as the implementation (no per-session endpoint needed, matches what #9's fakes are already given) and keep the children endpoint as a one-line note that it may replace the filter if the SDK exposes it."
+          }
+        ]
+      }
+    }
+  },
+  "lastReviewPass": {
+    "phase": "design",
+    "round": 1,
+    "cycle": 0,
+    "seats": [
+      "compatibility",
+      "security",
+      "performance"
+    ]
+  }
 }
