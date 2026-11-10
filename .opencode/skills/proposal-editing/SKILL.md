@@ -30,3 +30,11 @@ Editor notes: <section> — "<quote>" is ambiguous; author to clarify.
 The editorial review round checks your diff for accidental meaning changes.
 Write only the proposal path named by the caller. Reply with the JSON
 verdict object only.
+
+## Making the edits
+
+`read` the passage you are about to change and copy it into `oldString`
+verbatim: `read` and `grep` previews pad the line-number prefix, so any
+indentation counted from them is off by one. Start `oldString` after a
+line's leading whitespace and take enough text to be unique. After a
+failed edit, re-`read` the passage rather than adjusting the guess.

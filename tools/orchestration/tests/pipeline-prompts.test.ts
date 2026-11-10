@@ -16,6 +16,7 @@ import {
   writeTranscript,
 } from '../src/pipeline/prompts.js';
 import { DEFAULT_CONFIG, STAGE_NAMES, stageDef } from '../src/pipeline/stages.js';
+import { StageReplySchemas } from '../src/pipeline/types.js';
 
 const PROMPTS_DIR = fileURLToPath(new URL('../prompts/', import.meta.url));
 
@@ -81,7 +82,7 @@ describe('transcripts', () => {
 describe('stage registry', () => {
   it('every non-null template exists on disk', async () => {
     for (const name of STAGE_NAMES) {
-      const def = stageDef(name, 'correctness', DEFAULT_CONFIG);
+      const def = stageDef(name, 'correctness');
       if (def.template) {
         const text = await loadTemplate(PROMPTS_DIR, def.template);
         expect(text.length, `template ${def.template}`).toBeGreaterThan(0);
@@ -91,20 +92,22 @@ describe('stage registry', () => {
   });
 
   it('review stages resolve specialty agents and reject missing specialties', () => {
-    expect(stageDef('design-review', 'security', DEFAULT_CONFIG).agent).toBe(
-      'review/design-security',
-    );
-    expect(stageDef('code-review', 'testing', DEFAULT_CONFIG).agent).toBe(
-      'codereview/code-testing',
-    );
-    expect(() => stageDef('design-review', undefined, DEFAULT_CONFIG)).toThrow(
-      /requires a review specialty/,
-    );
+    expect(stageDef('design-review', 'security').agent).toBe('review/design-security');
+    expect(stageDef('code-review', 'testing').agent).toBe('codereview/code-testing');
+    expect(() => stageDef('design-review', undefined)).toThrow(/requires a review specialty/);
   });
 
-  it('steps caps come from the registry, not agent files', () => {
-    expect(stageDef('implement', undefined, DEFAULT_CONFIG).steps).toBe(60);
-    expect(stageDef('research', undefined, DEFAULT_CONFIG).steps).toBe(DEFAULT_CONFIG.stepsDefault);
+  it('revise reply admits reasoned non-changes', () => {
+    const r = StageReplySchemas.revise.safeParse({
+      changed: false,
+      summary: 'finding A is already resolved in section 4',
+    });
+    expect(r.success).toBe(true);
+    expect(stageDef('proposal-revise', undefined).kind).toBe('revise');
+  });
+
+  it('stages carry no step cap: the stage timeout is the only bound', () => {
+    expect(DEFAULT_CONFIG).not.toHaveProperty('stepsDefault');
   });
 
   it('template hashes are stable and short', () => {
@@ -169,5 +172,123 @@ describe('extractJsonObject empty-object rejection', () => {
   it('skips empty objects from hallucinated tool snippets', () => {
     const out = extractJsonObject('<tool_call>{}</tool_call> real: {"verdict": "approve"}');
     expect(out).toEqual({ verdict: 'approve' });
+  });
+});
+
+describe('run-2 stage guidance', () => {
+  // Run 1 churned because the instructions never told reviewers how to
+  // anchor findings in a document that renumbers every round, or where the
+  // Revision log and prior-round reports live (harness-audit T1/T2/T4).
+  // These pins keep that guidance from being silently reverted again.
+  it('tells design reviewers the round, the prior reports, and the Revision log', async () => {
+    const text = renderTemplate(await loadTemplate(PROMPTS_DIR, 'design-review.md'), {
+      designDir: 'docs/designs/002-x',
+      sourcePath: 'docs/adrs/002-x.md',
+      round: 9,
+      specialty: 'correctness',
+      scope: 'the whole document',
+      passNote: 'dissent pass c2: the last revision was written to answer YOUR findings',
+      reportPath: 'docs/designs/002-x/reviews/design/correctness-r9c2.md',
+      reviewFiles: '',
+    });
+    expect(text).toContain('round 9');
+    expect(text).toContain('correctness-r9c2.md');
+    expect(text).toContain('dissent pass c2');
+    expect(text).toContain('docs/designs/002-x/reviews/');
+    expect(text).toContain('Revision log');
+    // T4: "Apply only this change set: the whole document" is contradictory.
+    expect(text).not.toContain('Apply only this change set');
+  });
+
+  it('anchors review findings by section + quote, not file:line', async () => {
+    const text = await readFile(
+      fileURLToPath(new URL('../../../.opencode/skills/design-review/SKILL.md', import.meta.url)),
+      'utf8',
+    );
+    expect(text).toContain('section name plus a short verbatim');
+    expect(text).toContain('Confirm a location once');
+    expect(text).toContain('Revision log');
+    expect(text).toContain('re-raised');
+    expect(text).toContain('regression');
+  });
+
+  it('caps proposal-revise at slice reading', async () => {
+    const text = renderTemplate(await loadTemplate(PROMPTS_DIR, 'proposal-revise.md'), {
+      designDir: 'docs/designs/002-x',
+      round: 6,
+      specialty: 'correctness',
+      scope: 'the whole document',
+      reviewFiles: 'docs/designs/002-x/reviews/design/correctness-r5.md',
+    });
+    expect(text).toContain('Read in slices');
+    expect(text).toContain('never re-read a passage you are not going to change');
+    expect(text).toContain('anchored by section name (never a');
+  });
+
+  // Run 002-run2 answered every finding by adding text: 8 revise rounds took the
+  // proposal from 401 lines to 2,696. Revision guidance must offer the other moves.
+  it('lets a revise resolve a finding by deleting or deferring', async () => {
+    const text = renderTemplate(await loadTemplate(PROMPTS_DIR, 'proposal-revise.md'), {
+      designDir: 'docs/designs/002-x',
+      round: 6,
+      specialty: 'correctness',
+      scope: 'the whole document',
+      reviewFiles: 'docs/designs/002-x/reviews/design/correctness-r5.md',
+    });
+    expect(text).toContain('Deleting content is a');
+    expect(text).toContain('net-zero or net-negative line count');
+    expect(text).toContain('delete the passage or sub-system');
+
+    const skill = await readFile(
+      fileURLToPath(new URL('../../../.opencode/skills/design-proposal/SKILL.md', import.meta.url)),
+      'utf8',
+    );
+    expect(skill).toContain('addition is the last resort');
+  });
+
+  it('names a deferred-scope boundary the reviewers respect', async () => {
+    const template = await readFile(
+      fileURLToPath(
+        new URL(
+          '../../../.opencode/skills/design-proposal/references/template.md',
+          import.meta.url,
+        ),
+      ),
+      'utf8',
+    );
+    expect(template).toContain('## Deferred / out of scope');
+    expect(template).toContain('## Revision log');
+    expect(template.indexOf('## Deferred / out of scope')).toBeLessThan(
+      template.indexOf('## Revision log'),
+    );
+
+    const skill = await readFile(
+      fileURLToPath(new URL('../../../.opencode/skills/design-review/SKILL.md', import.meta.url)),
+      'utf8',
+    );
+    expect(skill).toContain('A deferral consistent with the source document is');
+    expect(skill).toContain('the smallest change that resolves the finding');
+
+    // The reviewer prompt must be able to name the source document.
+    const review = renderTemplate(await loadTemplate(PROMPTS_DIR, 'design-review.md'), {
+      designDir: 'docs/designs/002-x',
+      sourcePath: 'docs/adrs/002-x.md',
+      round: 3,
+      specialty: 'complexity',
+      scope: 'the whole document',
+      passNote: 'full-panel pass c0',
+      reportPath: 'docs/designs/002-x/reviews/design/complexity-r3c0.md',
+      reviewFiles: '',
+    });
+    expect(review).toContain('re-open one only if it contradicts docs/adrs/002-x.md');
+  });
+
+  it('records the revision log as a ledger that replaces superseded entries', async () => {
+    const skill = await readFile(
+      fileURLToPath(new URL('../../../.opencode/skills/design-proposal/SKILL.md', import.meta.url)),
+      'utf8',
+    );
+    expect(skill).toContain('never stack a');
+    expect(skill).not.toContain('then append to the Revision log');
   });
 });

@@ -34,5 +34,16 @@ carries information the prose does not.
 ## Rollout
 Steps from merged branch to shipped feature; migrations; defaults.
 
+## Deferred / out of scope
+One line per concern this design deliberately does not answer, naming the
+document that owns it (or "no follow-up yet"). An entry here is not a
+weakness; it is the boundary of the decision.
+
 ## Revision log
-- r<N>: addressed findings <ids>; did not change <x> because <reason>.
+Ledger of this run's decisions, kept current — not a transcript. One entry per
+finding that is still material, at most two lines, disposition first. When a
+round supersedes an earlier decision, replace that entry in place.
+
+- r<N>: <finding id> — addressed by <deleting | rewriting | deferring> <what>
+- r<N>: <finding id> — rejected: <reason>
+- r<N>: <finding id> — deferred to <ADR>

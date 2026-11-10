@@ -28,6 +28,11 @@ const commitMessage = z.string().min(3).optional();
 export const StageReplySchemas = {
   research: z.object({ summary: z.string().min(1), commitMessage }),
   proposal: z.object({ commitMessage }),
+  revise: z.object({
+    changed: z.boolean().default(true),
+    summary: z.string().min(1).optional(),
+    commitMessage: z.string().min(1).optional(),
+  }),
   'proposal-final': z.object({
     ambiguities: z.array(z.string()).default([]),
     commitMessage,
@@ -62,6 +67,52 @@ export interface StageResult {
   at: number;
   reply: unknown;
   transcript: string;
+  /** Wall-clock duration of the attempt (operator observability). */
+  durationMs?: number;
+  /** Nudges the runner sent to this session before the reply closed. */
+  nudges?: number;
+  /** Failure text when the attempt failed; absent when it succeeded. */
+  failure?: string;
+  /**
+   * Design-scope size meter, recorded for the stages that write
+   * `02-proposal.md`: lines in the document afterwards, and the worktree delta
+   * that produced them. Run 2 grew 401 -> 2,696 lines over 8 revise rounds and
+   * nothing in the checkpoint or `pipeline status` showed it, so the design
+   * grew past its ADR while the operator watched findings instead. The runner
+   * measures this itself; a stage cannot report its own growth.
+   */
+  docLines?: number;
+  docLinesAdded?: number;
+  docLinesRemoved?: number;
+}
+
+/**
+ * One seat's latest verdict for a funnel phase (ADR-002). `stamp` is the
+ * revision the verdict describes: the blob id of `02-proposal.md` for design,
+ * HEAD for code. A seat is stale when its stamp no longer matches the current
+ * one — panel selection is a function of these records and the stamp alone.
+ */
+export interface SeatRecord {
+  verdict: 'approve' | 'request-changes';
+  /** Revision the verdict was taken on (git blob id or commit sha). */
+  stamp: string;
+  /** Passes in which this seat dissented (operator-facing, not gating). */
+  dissents: number;
+}
+
+/** Per-seat ledger for the funnel phases. Editorial has no seats. */
+export interface SeatBoard {
+  design?: Record<string, SeatRecord>;
+  code?: Record<string, SeatRecord>;
+}
+
+/** The review pass the next revise/fix stage must consume (ADR-002 scope). */
+export interface LastReviewPass {
+  phase: 'design' | 'editorial' | 'code';
+  round: number;
+  /** Pass index within the round; undefined for the single-pass editorial. */
+  cycle?: number;
+  seats: string[];
 }
 
 export interface GateLogEntry {
@@ -73,6 +124,18 @@ export interface GateLogEntry {
 }
 
 export type RunStatus = 'running' | 'done' | 'escalated';
+
+/** Checkpoint file name inside the design directory. */
+export const STATE_FILE = '.pipeline.json';
+
+/**
+ * Run-identity grammar. `nnn-slug` is used as a single path segment (the
+ * design directory) and as a git branch name, so both parts are constrained;
+ * the generator in identity.ts must obey this grammar too, or a validator that
+ * rejects it makes runs unresumable by their own checkpoint.
+ */
+export const NNN_RE = /^\d{3}$/;
+export const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
 
 export interface PipelineState {
   version: 1;
@@ -102,8 +165,45 @@ export interface PipelineState {
   testsNeedUpdate: boolean;
   /** Stage failures consumed so far (step exhaustion, invalid reply). */
   stageFailures: Record<string, number>;
+  /**
+   * SHAs of commits the runner authored (oldest first, bounded window).
+   * Ownership enforcement reverts paths from these commits only: models never
+   * commit, so any other commit inside a stage window is operator work and is
+   * reported instead of reverted. Optional so checkpoints written before it
+   * existed still load (they own no commits).
+   */
+  stageCommits?: string[];
   /** One-shot forced stage for `pipeline run --stage <name>`. */
   forceNext: string | null;
+  /**
+   * Review rounds granted beyond `maxRounds` by an explicit `--extend-budget`.
+   * Consumed one per round entry and logged, so an over-cap round always has
+   * an operator consent line in the gate log. Run 1 reached 9/5 because a
+   * forced `proposal-revise` re-entered review with no cap check at entry.
+   */
+  extensionRounds?: number;
+  /**
+   * Review sessions granted beyond `maxReviews` by `--extend-budget` (ADR-002
+   * counts cost in sessions, not rounds). Consumed one per over-cap pass entry,
+   * each consumption logged, so an over-cap pass always has an operator
+   * consent line in the gate log.
+   */
+  extensionSessions?: number;
+  /** Per-seat verdict ledger for the funnel phases; absent pre-ADR-002. */
+  seats?: SeatBoard;
+  /** Review passes already run inside the current design/code round. */
+  designCycle?: number;
+  codeCycle?: number;
+  /**
+   * Revision the current round's verdicts must describe: blob id of
+   * `02-proposal.md` (design) and HEAD (code), refreshed at every pass entry.
+   */
+  designStamp?: string;
+  codeStamp?: string;
+  /** The last proposal-revise replied `changed: false` (deadlock stop input). */
+  reviseNoChange?: boolean;
+  /** Which reports the next revise/fix stage was handed. */
+  lastReviewPass?: LastReviewPass;
   results: StageResult[];
   gateLog: GateLogEntry[];
   startedAt: number;

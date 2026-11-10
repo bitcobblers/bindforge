@@ -41,6 +41,8 @@ export interface TranscriptInput {
   /** Stage key; review stages use `<phase>-review:<specialty>`. */
   stage: string;
   round: number;
+  /** Funnel pass within the round (ADR-002); absent for single-pass stages. */
+  pass?: number;
   agent: string;
   model?: ModelInfo;
   templateFile: string | null;
@@ -54,8 +56,13 @@ export interface TranscriptInput {
   gate?: { name: string; proceed: boolean; reason: string };
 }
 
+/** `rN` or `rNcM` when the stage ran inside a review pass of round N. */
+export function roundLabel(t: Pick<TranscriptInput, 'round' | 'pass'>): string {
+  return `r${String(t.round)}${t.pass === undefined ? '' : `c${String(t.pass)}`}`;
+}
+
 export function transcriptFileName(t: TranscriptInput): string {
-  return `${t.stage.replace(/:/g, '-')}-r${t.round}.md`;
+  return `${t.stage.replace(/:/g, '-')}-${roundLabel(t)}.md`;
 }
 
 /** Write the transcript under <designDir>/transcripts/ and return its path. */
@@ -72,10 +79,10 @@ export async function writeTranscript(designDir: string, t: TranscriptInput): Pr
     : '(no gate)';
 
   const body = [
-    `# Transcript: ${t.stage} r${t.round}`,
+    `# Transcript: ${t.stage} ${roundLabel(t)}`,
     '',
     '## Provenance',
-    `- stage: ${t.stage} (round ${t.round})`,
+    `- stage: ${t.stage} (round ${roundLabel(t)})`,
     `- agent: ${t.agent}`,
     `- model: ${model}`,
     `- template: ${t.templateFile ?? '(built-in)'}${t.templateSha256 ? ` @ ${t.templateSha256}` : ''}`,

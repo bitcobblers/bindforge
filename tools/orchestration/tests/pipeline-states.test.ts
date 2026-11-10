@@ -29,22 +29,42 @@ function freshState(): PipelineState {
   };
 }
 
-/** Apply the same round/budget increments the runner's drive loop applies. */
+/**
+ * Apply what the runner's drive loop applies at a funnel pass: rounds spend
+ * budget only on entry to a NEW round, a pass refreshes the revision stamp,
+ * and finishing a pass advances the cycle counter.
+ */
 function enterReview(state: PipelineState, step: NextStep): void {
   if (step.kind !== 'review') return;
   if (step.phase === 'design') {
+    if (step.round > state.designRound) {
+      state.designCycle = 0;
+      state.designBudgetUsed += 1;
+    }
     state.designRound = step.round;
-    state.designBudgetUsed += 1;
+    state.designStamp = `s${String(step.round)}`;
+    state.designCycle = (state.designCycle ?? 0) + 1;
   } else if (step.phase === 'code') {
+    if (step.round > state.codeRound) {
+      state.codeCycle = 0;
+      state.codeBudgetUsed += 1;
+    }
     state.codeRound = step.round;
-    state.codeBudgetUsed += 1;
+    state.codeStamp = `h${String(step.round)}`;
+    state.codeCycle = (state.codeCycle ?? 0) + 1;
   } else {
     state.designRound = step.round; // editorial: numbering only
   }
   state.lastStage = `${step.phase}-review`;
 }
 
-function withVerdicts(state: PipelineState, phase: ReviewPhase, reply: VerdictReply): void {
+/** Record the pass's verdicts both places the runner keeps them. */
+function withVerdicts(
+  state: PipelineState,
+  phase: ReviewPhase,
+  reply: VerdictReply,
+  seats?: Record<string, 'approve' | 'request-changes'>,
+): void {
   const specialties = phase === 'code' ? CODE_SPECIALTIES : DESIGN_SPECIALTIES;
   const round = phase === 'code' ? state.codeRound : state.designRound;
   for (const specialty of specialties) {
@@ -57,6 +77,23 @@ function withVerdicts(state: PipelineState, phase: ReviewPhase, reply: VerdictRe
       reply,
       transcript: 't',
     });
+    if (phase === 'design' || phase === 'code') {
+      const board = phase === 'design' ? 'design' : 'code';
+      const seatStamp = phase === 'design' ? (state.designStamp ?? '') : (state.codeStamp ?? '');
+      const verdict =
+        seats?.[specialty] ?? (reply.verdict === 'approve' ? 'approve' : 'request-changes');
+      state.seats = {
+        ...state.seats,
+        [board]: {
+          ...state.seats?.[board],
+          [specialty]: {
+            verdict,
+            stamp: seatStamp,
+            dissents: verdict === 'request-changes' ? 1 : 0,
+          },
+        },
+      };
+    }
   }
 }
 
@@ -124,7 +161,29 @@ describe('decideNext: review loops and budgets', () => {
     withVerdicts(s, 'design', reject);
     expect(stageOf(decideNext(s, DEFAULT_CONFIG))).toBe('proposal-revise');
     s.lastStage = 'proposal-revise';
-    expect(decideNext(s, DEFAULT_CONFIG)).toEqual({ kind: 'review', phase: 'design', round: 2 });
+    // ADR-002: the revision goes back to the dissenters inside round 1, at a
+    // higher pass number — a new round would spend a revise-round grant.
+    expect(decideNext(s, DEFAULT_CONFIG)).toEqual({ kind: 'review', phase: 'design', round: 1 });
+  });
+
+  it('revisiting stale approvals runs a ratification pass in the same round', () => {
+    const s = freshState();
+    s.lastStage = 'proposal';
+    enterReview(s, decideNext(s, DEFAULT_CONFIG)); // design r1 c0, full panel
+    withVerdicts(s, 'design', approve);
+    expect(stageOf(decideNext(s, DEFAULT_CONFIG))).toBe('proposal-final');
+    s.lastStage = 'proposal-final';
+    enterReview(s, decideNext(s, DEFAULT_CONFIG)); // editorial r2
+    withVerdicts(s, 'editorial', reject);
+    expect(stageOf(decideNext(s, DEFAULT_CONFIG))).toBe('proposal-revise');
+    s.lastStage = 'proposal-revise';
+    // No design dissenter: the next design review is a NEW round whose seats
+    // are all stale approvals — a ratification pass, not a fresh full panel.
+    const step = decideNext(s, DEFAULT_CONFIG);
+    expect(step).toEqual({ kind: 'review', phase: 'design', round: 3 });
+    enterReview(s, step); // refreshes the stamp; approvals are now stale
+    const g = decideNext(s, DEFAULT_CONFIG);
+    expect(g).toEqual({ kind: 'review', phase: 'design', round: 3 }); // same round: ratify
   });
 
   it('escalates when the design budget is exhausted', () => {
@@ -142,6 +201,8 @@ describe('decideNext: review loops and budgets', () => {
     s.lastStage = 'editorial-review';
     s.designRound = 3;
     s.designBudgetUsed = 3;
+    s.designStamp = 's3';
+    withVerdicts(s, 'design', approve);
     withVerdicts(s, 'editorial', reject);
     expect(stageOf(decideNext(s, DEFAULT_CONFIG))).toBe('proposal-revise');
     s.designBudgetUsed = 5;
@@ -167,6 +228,18 @@ describe('decideNext: review loops and budgets', () => {
     s.testsGreen = true;
     expect(stageOf(decideNext(s, DEFAULT_CONFIG))).toBe('test-update');
     s.lastStage = 'test-update';
+    expect(decideNext(s, DEFAULT_CONFIG)).toEqual({ kind: 'review', phase: 'code', round: 1 });
+  });
+
+  it('implement with testsNeedUpdate routes through test-update before review', () => {
+    const s = freshState();
+    s.lastStage = 'implement';
+    s.testsGreen = true;
+    s.testsNeedUpdate = true;
+    expect(stageOf(decideNext(s, DEFAULT_CONFIG))).toBe('test-update');
+    // The runner clears the flag once test-update has run.
+    s.lastStage = 'test-update';
+    s.testsNeedUpdate = false;
     expect(decideNext(s, DEFAULT_CONFIG)).toEqual({ kind: 'review', phase: 'code', round: 1 });
   });
 

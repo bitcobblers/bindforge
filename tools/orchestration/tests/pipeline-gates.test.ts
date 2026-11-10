@@ -143,6 +143,16 @@ describe('sourceAdmissible', () => {
     expect(p.hasContext).toBe(true);
     expect(p.hasDecision).toBe(false);
   });
+
+  it('a section body starting with a blank line is still non-empty', () => {
+    const doc = ['## Context', '', 'real content', '', '## Decision', 'yes'].join('\n');
+    const p = parseSource(doc, 'adr');
+    expect(p.hasContext).toBe(true);
+    expect(p.hasDecision).toBe(true);
+    // a genuinely empty section stays empty
+    const empty = ['## Context', '', '## Decision', 'yes'].join('\n');
+    expect(parseSource(empty, 'adr').hasContext).toBe(false);
+  });
 });
 
 describe('allReviewsApproved', () => {

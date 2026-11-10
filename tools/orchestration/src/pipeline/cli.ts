@@ -63,6 +63,23 @@ export async function main(argv: string[] = process.argv): Promise<number> {
             .option('stage', {
               type: 'string',
               describe: 'Force the next stage (human-directed retry)',
+            })
+            .option('nnn', {
+              type: 'string',
+              describe: 'Pin the run number instead of reading it from the source',
+            })
+            .option('slug', {
+              type: 'string',
+              describe: 'Pin the run slug, e.g. --slug run2 for a second attempt',
+            })
+            .option('force', {
+              type: 'boolean',
+              describe: 'Start even if the run identity is already taken',
+              default: false,
+            })
+            .option('extend-budget', {
+              type: 'number',
+              describe: 'Grant this many review SESSIONS beyond the cap (recorded)',
             }),
       )
       .command('resume <slug>', 'Resume a run from its checkpoint', (cmd) =>
@@ -70,7 +87,11 @@ export async function main(argv: string[] = process.argv): Promise<number> {
           .positional('slug', { describe: 'design slug, e.g. 002-my-feature', type: 'string' })
           .option('stage', {
             type: 'string',
-            describe: 'Force the next stage (human-directed retry)',
+            describe: 'Force the next stage or review round (human-directed retry)',
+          })
+          .option('extend-budget', {
+            type: 'number',
+            describe: 'Grant this many review SESSIONS beyond the cap (recorded)',
           }),
       )
       .command('status <slug>', 'Explain where a run is and why it is stuck', (cmd) =>
@@ -107,6 +128,9 @@ export async function main(argv: string[] = process.argv): Promise<number> {
         promptsDir: PROMPTS_DIR,
         client,
         forceStage: args.stage as string | undefined,
+        pin: { nnn: args.nnn as string | undefined, slug: args.slug as string | undefined },
+        force: Boolean(args.force),
+        extendBudget: args.extendBudget as number | undefined,
       });
       return status === 'done' ? 0 : 2;
     }
@@ -117,6 +141,7 @@ export async function main(argv: string[] = process.argv): Promise<number> {
         promptsDir: PROMPTS_DIR,
         client,
         forceStage: args.stage as string | undefined,
+        extendBudget: args.extendBudget as number | undefined,
       });
       return status === 'done' ? 0 : 2;
     }

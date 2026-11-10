@@ -35,7 +35,10 @@ export function parseSource(content: string, kind: 'adr' | 'brief'): ParsedSourc
   const status = /status:\s*(\w+)/.exec(front?.[1] ?? '')?.[1] ?? 'none';
   const body = front ? content.slice(front[0].length) : content;
   const section = (name: string): boolean => {
-    const re = new RegExp(`^## ${name}[ \\t]*\r?\n([\\s\\S]*?)(?=^## |$)`, 'm');
+    // The end anchor must be end-of-string, not multiline `$`: `$` matches
+    // before every newline, so a section whose body starts with a blank line
+    // would capture nothing and read as empty.
+    const re = new RegExp(`^## ${name}[ \\t]*\r?\n([\\s\\S]*?)(?=^## |$(?![\\r\\n]))`, 'm');
     const m = re.exec(body);
     return m !== null && m[1]!.trim().length > 0;
   };
@@ -99,6 +102,22 @@ export function verdictsFor(
     }
   }
   return out;
+}
+
+/** The newest valid verdict reply a seat produced in this phase, if any. */
+export function lastSeatReply(
+  state: PipelineState,
+  phase: string,
+  specialty: string,
+): VerdictReply | undefined {
+  const matches = state.results.filter(
+    (r) =>
+      r.stage === `${phase}-review:${specialty}` &&
+      r.reply !== undefined &&
+      r.reply !== null &&
+      typeof r.reply === 'object',
+  );
+  return matches.at(-1)?.reply as VerdictReply | undefined;
 }
 
 export function openBlockingFindings(
