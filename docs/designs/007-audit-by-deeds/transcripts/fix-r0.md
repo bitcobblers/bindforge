@@ -5,8 +5,8 @@
 - agent: code/coder
 - model: strata/qwen3.8-flash-next-iq3_s
 - template: tools/orchestration/prompts/fix-tests.md @ cc84dfde4c8f
-- started: 2026-11-10T23:02:57.260Z
-- ended: 2026-11-10T23:13:56.971Z
+- started: 2026-11-10T23:13:57.973Z
+- ended: 2026-11-10T23:14:48.209Z
 - parameters: {"note":"not exposed by endpoint"}
 - gate: (no gate)
 
@@ -38,5 +38,5 @@ JSON Schema: {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"o
 
 ## Raw reply
 ```text
-{"testsNeedUpdate": false, "commitMessage": "fix: clear lint and format drift in the child-session audit walk"}
+{"testsNeedUpdate": false, "commitMessage": "fix(orchestration): attach cause when wrapping child-walk fetch errors"}
 ```

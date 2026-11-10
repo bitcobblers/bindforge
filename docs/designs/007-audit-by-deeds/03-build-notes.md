@@ -123,3 +123,17 @@ over 100 chars in them is an unbreakable string literal, and the
 pre-existing over-100 lines elsewhere are unchanged code that was green
 before design 007. No test file needs changing: `testsNeedUpdate` stays
 false.
+
+## Fix-stage addendum 2 (gate actually run)
+
+Shell was available this round. `npm run check` in `tools/orchestration`
+was red on one rule: `@typescript-eslint/preserve-caught-error` flagged
+the three child-walk error wrappers in `runner.ts` (`descendantMessages`
+and `listChildSessionMessages`' two fetch sites) for rethrowing a new
+`Error` inside `catch` without the original error. Fixed by passing
+`{ cause: error }` — the house pattern already used at
+`opencode-runner.ts` and `state-store.ts` — with no message or control
+flow changes (a small addition beyond the design's letter, listed with
+the other error-wrapping additions above). `npm run format` found no
+drift; `npm run check` then exited green: lint clean, prettier clean,
+241/241 tests passing. No test file was touched.

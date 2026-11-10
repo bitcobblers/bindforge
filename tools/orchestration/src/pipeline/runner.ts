@@ -571,6 +571,7 @@ async function descendantMessages(
     throw new Error(
       `fetching the message list of ${sessionID}: ` +
         String(error instanceof Error ? error.message : error),
+      { cause: error },
     );
   }
 }
@@ -608,6 +609,7 @@ export async function* listChildSessionMessages(
         throw new Error(
           `enumerating the children of ${parent}: ` +
             String(error instanceof Error ? error.message : error),
+          { cause: error },
         );
       }
       for (const child of sessionEntries(listed)) {
@@ -647,6 +649,7 @@ export async function* listChildSessionMessages(
       throw new Error(
         `listing sessions to find the children of ${sessionID}: ` +
           String(error instanceof Error ? error.message : error),
+        { cause: error },
       );
     }
     for (const entry of sessionEntries(page)) {
