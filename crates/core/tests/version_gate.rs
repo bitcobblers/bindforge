@@ -45,8 +45,7 @@ fn rejects_a_document_declaring_an_unsupported_major_naming_the_supported_majors
     let document = profile_doc_declaring("unsupported-major", Some("v99"), &[]);
 
     let err = bindforge_core::parse(&document)
-        .err()
-        .expect("a profile declaring `version = \"v99\"` must be rejected, not parsed");
+        .expect_err("a profile declaring `version = \"v99\"` must be rejected, not parsed");
     assert_version_rejection(err, "the v99 profile document");
 }
 
@@ -58,8 +57,7 @@ fn rejects_a_document_that_declares_no_version_naming_the_supported_majors() {
     let document = profile_doc_declaring("missing-version", None, &[]);
 
     let err = bindforge_core::parse(&document)
-        .err()
-        .expect("a profile with no `version` entry must be rejected rather than read as v1");
+        .expect_err("a profile with no `version` entry must be rejected rather than read as v1");
     assert_version_rejection(err, "the versionless profile document");
 }
 

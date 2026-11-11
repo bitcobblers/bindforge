@@ -75,7 +75,7 @@ fn io_error(path: &Path, err: std::io::Error) -> CoreError {
 /// the document is refused. A hub's upload policy still checks
 /// `Content-Length` first (`schemas/README.md`); this is what makes the check
 /// unskippable.
-pub fn read_reader(mut source: impl Read) -> Result<String, CoreError> {
+pub fn read_reader(source: impl Read) -> Result<String, CoreError> {
     let budget = MAX_DOCUMENT_BYTES as u64 + 1;
     let mut bytes = Vec::new();
     source
@@ -300,15 +300,11 @@ impl Cursor<'_> {
         if digits.starts_with('_') || digits.ends_with('_') || digits.contains("__") {
             return Err(self.error("`_` may only separate digits in an integer"));
         }
-        let plain = digits.replace('_');
+        let plain = digits.replace('_', "");
         if plain != "0" && plain.starts_with('0') {
             return Err(self.error("an integer may not have a leading zero"));
         }
-        let text = if negative {
-            format!("-{plain}")
-        } else {
-            plain
-        };
+        let text = if negative { format!("-{plain}") } else { plain };
         let Ok(value) = text.parse::<i64>() else {
             return Err(self.error(format!("`{text}` is not an integer this grammar allows")));
         };
@@ -340,9 +336,9 @@ impl Cursor<'_> {
                 }
                 None => return Err(self.error("unterminated array")),
                 Some(other) => {
-                    return Err(self.error(format!(
-                        "expected `,` or `]` in an array, found `{other}`"
-                    )));
+                    return Err(
+                        self.error(format!("expected `,` or `]` in an array, found `{other}`"))
+                    );
                 }
             }
         }

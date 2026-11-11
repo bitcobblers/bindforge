@@ -50,7 +50,10 @@ fn rejects_a_chain_that_derives_from_itself() {
 /// accepted: the bound is a limit, not an off-by-one wall.
 #[test]
 fn accepts_a_chain_of_exactly_max_chain_depth_links() {
-    let text = profile_doc("at-the-boundary", &ancestor_chain(bindforge_core::MAX_CHAIN_DEPTH));
+    let text = profile_doc(
+        "at-the-boundary",
+        &ancestor_chain(bindforge_core::MAX_CHAIN_DEPTH),
+    );
 
     assert!(
         guard_error(&text).is_none(),

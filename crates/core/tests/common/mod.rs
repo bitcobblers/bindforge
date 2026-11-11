@@ -331,8 +331,8 @@ fn read_dir_sorted(path: &Path) -> Vec<PathBuf> {
         .unwrap_or_else(|err| panic!("reading directory {}: {err}", path.display()));
     let mut paths: Vec<PathBuf> = entries
         .map(|entry| {
-            let entry = entry
-                .unwrap_or_else(|err| panic!("reading directory {}: {err}", path.display()));
+            let entry =
+                entry.unwrap_or_else(|err| panic!("reading directory {}: {err}", path.display()));
             entry.path()
         })
         .collect();

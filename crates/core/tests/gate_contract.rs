@@ -95,7 +95,6 @@ fn action_references(workflow: &str) -> Vec<String> {
         .filter_map(|line| line.strip_prefix("- uses:"))
         .map(|reference| {
             reference
-                .trim()
                 .split_whitespace()
                 .next()
                 .unwrap_or_default()
@@ -153,7 +152,7 @@ fn report_capture(line: &str) -> Option<&'static str> {
 
 /// The file a `>` or `2>` redirect on a command line writes to.
 fn redirect_target(line: &str) -> Option<String> {
-    let target = line.split_once('>')?.1.trim().split_whitespace().next()?;
+    let target = line.split_once('>')?.1.split_whitespace().next()?;
     if target.is_empty() {
         return None;
     }
@@ -171,7 +170,12 @@ fn quoted_list(text: &str, marker: &str) -> Vec<String> {
         Some(end) => end,
         None => return Vec::new(),
     };
-    rest[..end].split('"').skip(1).step_by(2).map(str::to_string).collect()
+    rest[..end]
+        .split('"')
+        .skip(1)
+        .step_by(2)
+        .map(str::to_string)
+        .collect()
 }
 
 /// proves: Test strategy #5 — the PR gate's `rust` job runs the three cargo gate
@@ -235,8 +239,12 @@ fn the_two_gate_jobs_cannot_break_each_other() {
         "the `rust` job must be cargo-only, or a broken TypeScript build fails it: {rust_lines:?}"
     );
     assert!(
-        orchestration_lines.iter().any(|line| line.contains("npm run check"))
-            && !orchestration_lines.iter().any(|line| line.contains("cargo ")),
+        orchestration_lines
+            .iter()
+            .any(|line| line.contains("npm run check"))
+            && !orchestration_lines
+                .iter()
+                .any(|line| line.contains("cargo ")),
         "the `orchestration` job must be npm-only and run the package's own `npm run check`: \
          {orchestration_lines:?}"
     );
@@ -369,7 +377,11 @@ fn the_lockfile_scan_is_scheduled_not_a_pr_check_and_builds_on_its_own_toolchain
         // consumer.
         let restricted: Vec<&str> = ["advisories", "bans", "licenses", "sources"]
             .into_iter()
-            .filter(|section| after_subcommand.split_whitespace().any(|word| word == *section))
+            .filter(|section| {
+                after_subcommand
+                    .split_whitespace()
+                    .any(|word| word == *section)
+            })
             .collect();
         assert!(
             restricted.is_empty(),
@@ -476,7 +488,7 @@ fn the_scan_uploads_the_report_it_captured_as_the_weeks_triage_record() {
              week's findings would be gone before anyone triaged them"
         )
     };
-    let revision = after_upload.trim_start().split_whitespace().next().unwrap_or_default();
+    let revision = after_upload.split_whitespace().next().unwrap_or_default();
     assert_eq!(
         revision.len(),
         40,

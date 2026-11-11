@@ -38,7 +38,10 @@ fn version_tree() -> PathBuf {
 fn load() -> ReachTables {
     let dir = version_tree();
     bindforge_core::load_reach_tables(&dir).unwrap_or_else(|err| {
-        panic!("the reach-class tables under {} must load: {err}", dir.display())
+        panic!(
+            "the reach-class tables under {} must load: {err}",
+            dir.display()
+        )
     })
 }
 
@@ -109,8 +112,16 @@ fn the_loader_keeps_the_left_and_right_hand_tables_distinct() {
         "the table filed under the right hand must report that hand"
     );
 
-    let left_ids: Vec<&str> = left.classes().iter().map(|class| class.id.as_str()).collect();
-    let right_ids: Vec<&str> = right.classes().iter().map(|class| class.id.as_str()).collect();
+    let left_ids: Vec<&str> = left
+        .classes()
+        .iter()
+        .map(|class| class.id.as_str())
+        .collect();
+    let right_ids: Vec<&str> = right
+        .classes()
+        .iter()
+        .map(|class| class.id.as_str())
+        .collect();
     assert_eq!(
         left_ids,
         ["near", "mid", "extended"],
@@ -122,7 +133,8 @@ fn the_loader_keeps_the_left_and_right_hand_tables_distinct() {
         "the right-hand table must hold exactly the classes `right.toml` lists, in table order"
     );
     assert_ne!(
-        left_ids, right_ids,
+        left_ids,
+        right_ids,
         "the loader must keep a separate table per hand; {} holds one table for both hands",
         version_tree().display()
     );
@@ -168,8 +180,7 @@ fn the_loader_refuses_a_table_file_whose_hand_entry_contradicts_its_file_name() 
     scratch.write("right.toml", TABLE_DECLARING_LEFT);
 
     let err = bindforge_core::load_reach_tables(scratch.path())
-        .err()
-        .expect("a table whose `hand` entry contradicts its file name must be refused");
+        .expect_err("a table whose `hand` entry contradicts its file name must be refused");
     let detail = err.to_string();
     let path_text = scratch.path().display().to_string();
 
@@ -188,8 +199,7 @@ fn the_loader_refuses_a_table_file_whose_hand_entry_contradicts_its_file_name() 
 /// file in a served or synced tree is refused rather than loaded into memory.
 #[test]
 fn the_loader_refuses_a_table_file_larger_than_the_parse_budget() {
-    let budget = usize::try_from(bindforge_core::MAX_DOCUMENT_BYTES)
-        .expect("MAX_DOCUMENT_BYTES is a byte count, so it fits in a usize");
+    let budget = bindforge_core::MAX_DOCUMENT_BYTES;
     let mut oversized = String::from(TABLE_DECLARING_LEFT);
     oversized.push_str(&"#".repeat(budget + 1 - oversized.len()));
 
@@ -199,8 +209,7 @@ fn the_loader_refuses_a_table_file_larger_than_the_parse_budget() {
     scratch.write("right.toml", &fixture_text(&shipped_right));
 
     let err = bindforge_core::load_reach_tables(scratch.path())
-        .err()
-        .expect("a table file larger than MAX_DOCUMENT_BYTES must be refused, not loaded");
+        .expect_err("a table file larger than MAX_DOCUMENT_BYTES must be refused, not loaded");
     assert!(
         matches!(err, CoreError::DocumentTooLarge { .. }),
         "expected the `DocumentTooLarge` refusal for an oversized table file, got {err:?}"

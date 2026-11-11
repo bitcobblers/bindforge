@@ -119,11 +119,16 @@ pub fn parse(text: &str) -> Result<Document, CoreError> {
         }
         "reach-classes" => {
             reject_unknown_entry(&entries, "reach-classes", REACH_CLASSES_ENTRIES)?;
-            Ok(Document::ReachClasses(parse_reach_classes(&entries, version)?))
+            Ok(Document::ReachClasses(parse_reach_classes(
+                &entries, version,
+            )?))
         }
         other => Err(CoreError::UnknownFormat {
             declared: other.to_string(),
-            supported: SUPPORTED_FORMATS.iter().map(|name| name.to_string()).collect(),
+            supported: SUPPORTED_FORMATS
+                .iter()
+                .map(|name| name.to_string())
+                .collect(),
         }),
     }
 }
@@ -209,7 +214,11 @@ fn parse_profile(entries: &BTreeMap<String, Value>, version: String) -> Result<P
         None => Vec::new(),
         Some(value) => string_array("derives", value)?,
     };
-    Ok(Profile { version, id, derives })
+    Ok(Profile {
+        version,
+        id,
+        derives,
+    })
 }
 
 fn parse_reach_classes(

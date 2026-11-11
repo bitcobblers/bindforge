@@ -83,14 +83,25 @@ impl fmt::Display for CoreError {
                 write!(f, "document is larger than the {limit} byte parse budget")
             }
             CoreError::NestingTooDeep { limit } => {
-                write!(f, "document nests tables or arrays deeper than {limit} levels")
+                write!(
+                    f,
+                    "document nests tables or arrays deeper than {limit} levels"
+                )
             }
             CoreError::Malformed { line, message } => {
-                write!(f, "malformed document on line {line}: {}", one_line(message))
+                write!(
+                    f,
+                    "malformed document on line {line}: {}",
+                    one_line(message)
+                )
             }
             CoreError::NotUtf8 => write!(f, "document is not valid UTF-8"),
             CoreError::MissingEntry { key } => {
-                write!(f, "document is missing the required `{}` entry", one_line(key))
+                write!(
+                    f,
+                    "document is missing the required `{}` entry",
+                    one_line(key)
+                )
             }
             CoreError::UnsupportedVersion {
                 declared: None,
@@ -109,7 +120,10 @@ impl fmt::Display for CoreError {
                 one_line(declared),
                 supported.join(", ")
             ),
-            CoreError::UnknownFormat { declared, supported } => write!(
+            CoreError::UnknownFormat {
+                declared,
+                supported,
+            } => write!(
                 f,
                 "document declares unknown format `{}`; supported formats: {}",
                 one_line(declared),

@@ -69,9 +69,9 @@ const EXCLUDED_TOML_CONSTRUCTS: [&str; 5] = [
 /// guards have nothing to reject.
 #[test]
 fn rejects_a_profile_carrying_an_entry_outside_the_grammar() {
-    let err = bindforge_core::parse(PROFILE_WITH_AN_ALIASED_ENTRY)
-        .err()
-        .expect("a profile carrying `derives_` must be refused, not read as having no ancestors");
+    let err = bindforge_core::parse(PROFILE_WITH_AN_ALIASED_ENTRY).expect_err(
+        "a profile carrying `derives_` must be refused, not read as having no ancestors",
+    );
 
     let detail = err.to_string();
     assert!(
@@ -86,8 +86,7 @@ fn rejects_a_profile_carrying_an_entry_outside_the_grammar() {
 #[test]
 fn rejects_a_reach_classes_table_carrying_an_entry_outside_the_grammar() {
     let err = bindforge_core::parse(TABLE_WITH_AN_UNDEFINED_ENTRY)
-        .err()
-        .expect("a reach-classes table carrying `scope` must be refused, not ignored");
+        .expect_err("a reach-classes table carrying `scope` must be refused, not ignored");
 
     let detail = err.to_string();
     assert!(

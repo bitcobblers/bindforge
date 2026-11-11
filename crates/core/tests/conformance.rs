@@ -48,8 +48,8 @@ fn every_valid_fixture_re_serializes_to_a_semantically_equal_value() {
     for dir in &format_dirs() {
         for path in fixtures(dir, "valid") {
             let label = path.display().to_string();
-            let text = fs::read_to_string(&path)
-                .unwrap_or_else(|err| panic!("reading {label}: {err}"));
+            let text =
+                fs::read_to_string(&path).unwrap_or_else(|err| panic!("reading {label}: {err}"));
 
             let document = bindforge_core::parse(&text)
                 .unwrap_or_else(|err| panic!("{label} is a valid fixture and must parse: {err}"));
@@ -119,7 +119,11 @@ fn load_corpus_table(label: &str, text: &str) {
     // The contract's `classes` entry lists reach-class ids in table order
     // (`spec.md`), so the comparison is on ids: nothing in this design makes an
     // id-shaped string part of `ReachClass`'s public surface.
-    let loaded: Vec<String> = table.classes().iter().map(|class| class.id.clone()).collect();
+    let loaded: Vec<String> = table
+        .classes()
+        .iter()
+        .map(|class| class.id.clone())
+        .collect();
     assert_eq!(
         loaded, classes,
         "the loader must file {label}'s classes, in table order, under the hand it declares"
@@ -135,8 +139,8 @@ fn every_invalid_fixture_is_rejected_with_a_structured_error() {
     for dir in &format_dirs() {
         for path in fixtures(dir, "invalid") {
             let label = path.display().to_string();
-            let text = fs::read_to_string(&path)
-                .unwrap_or_else(|err| panic!("reading {label}: {err}"));
+            let text =
+                fs::read_to_string(&path).unwrap_or_else(|err| panic!("reading {label}: {err}"));
 
             match rejection(&text) {
                 Err(error) => assert!(
@@ -220,8 +224,8 @@ fn every_invalid_fixture_is_rejected_with_a_single_line_message() {
     for dir in &format_dirs() {
         for path in fixtures(dir, "invalid") {
             let label = path.display().to_string();
-            let text = fs::read_to_string(&path)
-                .unwrap_or_else(|err| panic!("reading {label}: {err}"));
+            let text =
+                fs::read_to_string(&path).unwrap_or_else(|err| panic!("reading {label}: {err}"));
 
             let detail = match rejection(&text) {
                 Err(error) => error.detail(),
@@ -253,8 +257,7 @@ fn a_rejection_truncates_an_untrusted_value_rather_than_echoing_it() {
     );
 
     let rejected = bindforge_core::parse(&document)
-        .err()
-        .expect("a version string carrying a forged newline must be rejected");
+        .expect_err("a version string carrying a forged newline must be rejected");
     let detail = rejected.to_string();
     assert!(
         !detail.contains(tail),

@@ -34,14 +34,12 @@ use common::{ScratchDir, fixture_text, fixtures, profile_doc_declaring, version_
 /// The byte budget as a `usize`, so the boundary arithmetic below stays
 /// comparable with `String::len()`.
 fn document_budget() -> usize {
-    usize::try_from(bindforge_core::MAX_DOCUMENT_BYTES)
-        .expect("MAX_DOCUMENT_BYTES is a byte count, so it fits in a usize")
+    bindforge_core::MAX_DOCUMENT_BYTES
 }
 
 /// The nesting budget as a `usize`, for the same reason.
 fn nesting_limit() -> usize {
-    usize::try_from(bindforge_core::MAX_NESTING_DEPTH)
-        .expect("MAX_NESTING_DEPTH is an array level count, so it fits in a usize")
+    bindforge_core::MAX_NESTING_DEPTH
 }
 
 /// A valid profile padded with a comment line — legal in the v1 grammar — to
@@ -61,7 +59,11 @@ fn document_of_exactly(bytes: usize) -> String {
 /// A profile whose `derives` value nests arrays `levels` deep, counting the
 /// outer array `derives = [` is written as.
 fn document_with_array_nesting(levels: usize) -> String {
-    let inner = format!("{}\"deep\"{}", "[".repeat(levels - 1), "]".repeat(levels - 1));
+    let inner = format!(
+        "{}\"deep\"{}",
+        "[".repeat(levels - 1),
+        "]".repeat(levels - 1)
+    );
     format!("format = \"profile\"\nversion = \"v1\"\nid = \"nested\"\nderives = [{inner}]\n")
 }
 
@@ -84,8 +86,7 @@ fn refuses_a_document_one_byte_past_max_document_bytes() {
     let text = document_of_exactly(document_budget() + 1);
 
     let err = bindforge_core::parse(&text)
-        .err()
-        .expect("a document larger than MAX_DOCUMENT_BYTES must be refused, not parsed");
+        .expect_err("a document larger than MAX_DOCUMENT_BYTES must be refused, not parsed");
     match err {
         CoreError::DocumentTooLarge { limit, .. } => assert_eq!(
             limit,
@@ -104,11 +105,13 @@ fn refuses_a_document_one_byte_past_max_document_bytes() {
 #[test]
 fn refuses_a_profile_file_larger_than_max_document_bytes() {
     let scratch = ScratchDir::new("parse-budget-file");
-    let oversized = scratch.write("oversized.toml", &document_of_exactly(document_budget() + 1));
+    let oversized = scratch.write(
+        "oversized.toml",
+        &document_of_exactly(document_budget() + 1),
+    );
 
     let err = bindforge_core::parse_file(&oversized)
-        .err()
-        .expect("parse_file must refuse a file larger than MAX_DOCUMENT_BYTES");
+        .expect_err("parse_file must refuse a file larger than MAX_DOCUMENT_BYTES");
     match err {
         CoreError::DocumentTooLarge { limit, .. } => assert_eq!(
             limit,
@@ -125,7 +128,10 @@ fn refuses_a_profile_file_larger_than_max_document_bytes() {
 #[test]
 fn parses_a_profile_file_within_max_document_bytes() {
     let scratch = ScratchDir::new("parse-budget-file-ok");
-    let path = scratch.write("basic.toml", &profile_doc_declaring("basic", Some("v1"), &[]));
+    let path = scratch.write(
+        "basic.toml",
+        &profile_doc_declaring("basic", Some("v1"), &[]),
+    );
 
     bindforge_core::parse_file(&path)
         .unwrap_or_else(|err| panic!("a small valid profile file must parse: {err}"));
@@ -141,8 +147,7 @@ fn refuses_a_stream_one_byte_past_max_document_bytes() {
     let text = document_of_exactly(document_budget() + 1);
 
     let err = bindforge_core::parse_reader(Cursor::new(text.as_bytes()))
-        .err()
-        .expect("parse_reader must refuse a stream larger than MAX_DOCUMENT_BYTES");
+        .expect_err("parse_reader must refuse a stream larger than MAX_DOCUMENT_BYTES");
     match err {
         CoreError::DocumentTooLarge { limit, .. } => assert_eq!(
             limit,
@@ -172,8 +177,7 @@ fn refuses_arrays_nested_one_level_past_max_nesting_depth() {
     let text = document_with_array_nesting(nesting_limit() + 1);
 
     let err = bindforge_core::parse(&text)
-        .err()
-        .expect("arrays nested past MAX_NESTING_DEPTH must be refused, not parsed");
+        .expect_err("arrays nested past MAX_NESTING_DEPTH must be refused, not parsed");
     match err {
         CoreError::NestingTooDeep { limit, .. } => assert_eq!(
             limit,
@@ -232,10 +236,9 @@ fn the_invalid_corpus_ships_the_nesting_boundary() {
 #[test]
 fn refuses_a_stream_that_is_not_utf8() {
     let err = bindforge_core::parse_reader(Cursor::new(&[0xff_u8, 0xfe, 0x00, 0x00]))
-        .err()
-        .expect("parse_reader must refuse non-UTF-8 bytes, not decode them lossily");
+        .expect_err("parse_reader must refuse non-UTF-8 bytes, not decode them lossily");
     assert!(
-        matches!(err, CoreError::NotUtf8 { .. }),
+        matches!(err, CoreError::NotUtf8),
         "expected the `NotUtf8` variant for a stream of non-UTF-8 bytes, got {err:?}"
     );
 }
@@ -252,11 +255,12 @@ fn refuses_a_stream_that_is_not_utf8() {
 fn an_io_refusal_names_its_file_only_through_source_path() {
     let scratch = ScratchDir::new("parse-io-source-path");
     let absent = scratch.path().join("absent.toml");
-    let path_text = absent.to_str().expect("a temp-directory path is valid UTF-8");
+    let path_text = absent
+        .to_str()
+        .expect("a temp-directory path is valid UTF-8");
 
     let err = bindforge_core::parse_file(&absent)
-        .err()
-        .expect("a file that is not there must be refused, not read as an empty document");
+        .expect_err("a file that is not there must be refused, not read as an empty document");
     let message = err.to_string();
     let named = err.source_path().unwrap_or_default();
 
