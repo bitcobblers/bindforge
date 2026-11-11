@@ -2540,7 +2540,9 @@ async function drive(
         state.testsGreen = await runChecks(opts.repoDir);
         gateLog(state, 'testsGreen', 0, {
           proceed: state.testsGreen,
-          reason: state.testsGreen ? 'npm run check green' : 'npm run check red',
+          reason: state.testsGreen
+            ? 'npm run check + cargo gate green'
+            : 'npm run check + cargo gate red',
         });
       }
       await checkpoint(designDir, state);

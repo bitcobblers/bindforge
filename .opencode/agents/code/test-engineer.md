@@ -32,6 +32,18 @@ permissions:
   - action: shell
     resource: "npm test*"
     effect: allow
+  - action: shell
+    resource: "cargo test*"
+    effect: allow
+  - action: shell
+    resource: "cargo check*"
+    effect: allow
+  - action: shell
+    resource: "cargo fmt*"
+    effect: allow
+  - action: shell
+    resource: "cargo clippy*"
+    effect: allow
 ---
 
 Load the `test-strategy` and `repo-practices` skills and follow them using

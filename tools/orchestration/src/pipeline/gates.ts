@@ -197,13 +197,43 @@ export function packageDirs(repoDir: string): string[] {
   return dirs;
 }
 
-/** Run `npm run check` in every package and return overall pass/fail. */
+/** A cargo workspace at the repo root is gated by cargo, not by npm. */
+export function hasCargoWorkspace(repoDir: string): boolean {
+  return existsSync(join(repoDir, 'Cargo.toml'));
+}
+
+const CARGO_GATE: readonly string[][] = [
+  ['fmt', '--all', '--', '--check'],
+  ['clippy', '--workspace', '--all-targets', '--', '-D', 'warnings'],
+  ['test', '--workspace', '--locked'],
+];
+
+/** Run the cargo gate mirroring `repo-practices`: fmt check, clippy, tests. */
+async function cargoGreen(repoDir: string): Promise<boolean> {
+  for (const args of CARGO_GATE) {
+    const ok = await new Promise<boolean>((resolve) => {
+      const child = spawn('cargo', args, { cwd: repoDir, stdio: 'ignore' });
+      child.on('error', () => resolve(false));
+      child.on('exit', (code) => resolve(code === 0));
+    });
+    if (!ok) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * The check gate: `npm run check` in every package, plus the cargo gate when the
+ * repo has a cargo workspace. A repo with neither has no gate to pass and fails.
+ */
 export async function testsGreen(repoDir: string): Promise<boolean> {
   const pkgs = packageDirs(repoDir);
-  if (pkgs.length === 0) {
+  const cargo = hasCargoWorkspace(repoDir);
+  if (pkgs.length === 0 && !cargo) {
     return false;
   }
-  const results = await Promise.all(
+  const npmResults = await Promise.all(
     pkgs.map(
       (cwd) =>
         new Promise<boolean>((resolve) => {
@@ -213,7 +243,9 @@ export async function testsGreen(repoDir: string): Promise<boolean> {
         }),
     ),
   );
-  return results.every(Boolean);
+  const npmOk = npmResults.every(Boolean);
+  const cargoOk = cargo ? await cargoGreen(repoDir) : true;
+  return npmOk && cargoOk;
 }
 
 const COMMIT_RE = /^[a-z]+(\([a-z0-9-]+\))?: [a-z0-9].{1,90}$/;

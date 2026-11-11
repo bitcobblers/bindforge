@@ -32,6 +32,18 @@ permissions:
   - action: shell
     resource: "npm run format*"
     effect: allow
+  - action: shell
+    resource: "cargo test*"
+    effect: allow
+  - action: shell
+    resource: "cargo check*"
+    effect: allow
+  - action: shell
+    resource: "cargo fmt*"
+    effect: allow
+  - action: shell
+    resource: "cargo clippy*"
+    effect: allow
 ---
 
 Load the `repo-practices` skill and follow it. Implement or fix what the

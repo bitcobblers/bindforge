@@ -35,6 +35,18 @@ permissions:
   - action: shell
     resource: "npm test*"
     effect: allow
+  - action: shell
+    resource: "cargo test*"
+    effect: allow
+  - action: shell
+    resource: "cargo check*"
+    effect: allow
+  - action: shell
+    resource: "cargo fmt*"
+    effect: allow
+  - action: shell
+    resource: "cargo clippy*"
+    effect: allow
   - action: webfetch
     resource: "*"
     effect: allow
