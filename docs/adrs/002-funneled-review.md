@@ -1,9 +1,16 @@
 ---
-status: proposed
+status: accepted
 date: 2026-11-09
 ---
 
 # ADR 002: Send a revision only to the reviewers who dissented
+
+Recorded retrospectively: this decision was implemented directly in the
+pipeline harness (commit `e06628f`), not by a pipeline run, and every run
+since — 003, 004, 005, 006, and 007 — has designed and reviewed itself under
+the funnel (dissent passes, ratification passes, session-counted budgets).
+The status above records that acceptance; the "Ordering" note at the end of
+the Decision was written before the harness landed.
 
 A revision goes back to the reviewers whose blocking findings it was written to
 answer, and no further. Reviewers who already approved see it exactly once,
