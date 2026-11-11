@@ -11,7 +11,7 @@ sentence:
 
 ```sh
 pipeline run docs/adrs/007-shared-binding-format.md    # a decision to execute
-pipeline run docs/prompts/add-timeout-flag.md          # a brief (small job)
+pipeline run docs/prompts/<name>.md                    # a brief (small job)
 ```
 
 An ADR that feeds the pipeline must have frontmatter `status: proposed` and
