@@ -36,7 +36,8 @@ deviations below.
    (`stageFailure`, `operatorExtension`, `operatorForce`, `design-review`)
    or filters `!g.proceed`, and the new entry is named
    `independenceAudit` with `proceed: true`. No pre-existing test's verdict
-   changes.
+   changes. *(Superseded: the test-update stages later extended all nine
+   fakes — see the Test-update addendum at the end.)*
 
 3. **Gate name chosen for the partial-audit gate-log line:**
    `independenceAudit` (the design mandates the line but not its gate name;
@@ -99,7 +100,9 @@ deviations below.
   line (`npx prettier --write` kept on one line so the substring pins
   match).
 
-No test files were modified. Budget, escalation wording, `retryInSameSession`,
+No test files were modified at the implement stage *(superseded — the test
+stages later modified 14 test paths; see the Test-update addendum at the
+end)*. Budget, escalation wording, `retryInSameSession`,
 the nudge loop, and the checkpoint schema are untouched.
 
 ## Fix-stage addendum (clearing the red `npm run check`)
@@ -253,3 +256,68 @@ plus one `escalate` naming the same stage — or count
 No deviation from the proposal: no source file changed this round, and no
 test file was touched (the runner reverts those paths anyway).
 `testsNeedUpdate: true`.
+
+## Test-update addendum (2026-11-10: the test side lands; final change set)
+
+The test-authoring and test-update stages completed everything the fix-stage
+addendums listed as "not done here (test files are not editable at this
+stage)". Deviation 2 and this file's "No test files were modified" line are
+superseded by this round and describe the implement-stage state only — they
+are kept as the stage record, not the final record.
+
+Test files in the final change set:
+
+- `tests/pipeline/child-session-deeds.test.ts` (new) — Test strategy #5 at
+  walk and call-site level: BFS reaches grandchildren, a parentID cycle
+  terminates, pre-`since` child messages are fetched but not judged, the
+  `list` route via the `parentID` index, one enumeration per walk (perf #3's
+  pin), `cursor.next` paging across pages, the zero-descendant tripwire warn,
+  zero walk cost for an attempt that delegated nothing (perf #1's pin), the
+  repeated-cursor and page-budget crawls degrading to the partial audit, a
+  child deed behind an out-of-window delegation still failing, and security
+  #1's pin (a deed collected before a later child fetch throws still fails
+  the attempt).
+- `tests/pipeline/child-deeds-retry.test.ts` (new) — Test strategy #6 and #7
+  end to end on a temp git repo with a mock client: a child's `transcripts/`
+  read fails the attempt with `(via child session …)`, the fresh attempt-2
+  prompts on both the single-stage and review-seat lanes carry attempt 1's
+  failure reason, and the budget is unchanged. The red pin addendum 3
+  diagnosed is fixed exactly as it prescribed — one `stageFailure` (attempt
+  1) plus one `escalate` (attempt 2) gate entry — with no runner change.
+- `tests/pipeline/independence.test.ts` — matcher pins for Test strategy
+  #1–#4 (subagent delegation text, execute payload literals, the path-key
+  rule under a non-access key, and child-level read/glob/other-report
+  violations); the pre-existing nested-path pin at :124 survives untouched.
+- `tests/pipeline/prompts.test.ts` — the bright-line `toContain` in the
+  design-review block and the formatter-duty pins for `test-authoring` and
+  `test-update`, each carrying its `// proves: Test strategy #8` citation
+  (testing #3 closed).
+- The nine pre-existing fakes extended per Test strategy #9 — budget,
+  funnel, parallel-escalation, parallel-fanout, parallel-integration,
+  pass-finalize, proposal-size (two fixtures), reply-contract,
+  stage-lifecycle: each session stub gains
+  `list: async () => ({ data: [], cursor: { previous: null, next: null } })`
+  (the truth for fixtures that create no child sessions). With the perf #1
+  guard they still never walk, so no verdict changes.
+
+Code-review round 1 ended with all five seats (security, performance,
+testing, compatibility, correctness) approving; the c2 ratification passes
+found no regression. Left open and non-blocking at HEAD:
+
+- security-r1c2 minor: the direct-HTTP third enumeration route
+  (`directChildSessions` + `ServerConnection`) is executed by no test — no
+  fetch stub exists; the compat matrix's "always has a route" claim is
+  verified by inspection only.
+- correctness-r1c2 minors/nits: the walk guard is keyed on the recorded part
+  name `subagent` (fixture-only evidence); `directChildSessions` replaces a
+  path component of a `--base-url` that carries one (fails closed); the
+  zero-descendant tripwire inspects the parent list only;
+  `npm run typecheck` (not part of `check`) has never been run — shell was
+  denied in every seat that asked.
+- testing-r1c2 nit: the walk's deadline clamp (`budgetMs`) and its
+  "truncated at the stage deadline" throw are live in production but carry
+  no test pin — no test passes a `deadline` option.
+
+Addition to the additions list (correctness r1c2 nit 5): `listChildSessionMessages`
+is exported from `runner.ts` (the design's snippet kept it module-private) so
+the unit tests can drive the walk directly.

@@ -340,3 +340,64 @@ do not copy prohibition sentences into delegation text.
   content, extending the existing design-review block (resolves research Q5);
   no gate-side formatter companion, the ownership line stands alone
   (resolves research Q6).
+
+## As-built (2026-11-10)
+
+Record of what shipped on this run's branch versus this approved design. No
+design decision below was changed; this records the deltas. The stage-by-stage
+log is in `03-build-notes.md`.
+
+**Drift**
+
+1. *Enumeration route not fixed at install time* (§2; Rollout step 1;
+   Compatibility matrix row 6; A4/A8). `npm install` could not run in the
+   worktree, so the SDK's types never picked the route. Instead the route is
+   probed per client at call time: `session.children` → paged `session.list`
+   + `parentID` index (50-page budget, repeated-`cursor.next` stop) → direct
+   `GET /api/session/:id/children`. The third route required a new OPTIONAL
+   in-memory `server: { baseUrl, username?, password? }` connection on
+   `RunOptions`/`ResumeOptions`, threaded by `pipeline/cli.ts`, and a
+   `basicAuthHeader` extraction/export from `opencode-runner.ts`. The
+   implemented endpoint carries the `/api` prefix the matrix row's wording
+   omits (noted by compatibility-r1c2).
+2. *Walk-failure semantics strengthened* (§2). On a mid-walk fetch failure
+   the child violations already collected are KEPT and fail the attempt; the
+   `console.warn`/gate line names the kept count. §2's "the audit proceeds on
+   the parent list alone" is superseded to mean the unseen remainder
+   (code-review security-r1c0 #1).
+3. *Cost guards added around the once-per-attempt walk* (§2). The walk is
+   skipped entirely unless the attempt's own list holds a `subagent` part
+   (`countDelegationParts`), and runs at most once per growth of that count
+   (`walkedDelegations`); every walk request is clamped to the stage
+   deadline. The guard keys on the recorded part name `subagent` — a
+   fixture-only fact (correctness-r1c2 minor, left open).
+4. *Partial-audit gate line named `independenceAudit`* (§2 mandated the line,
+   not its gate name).
+5. *§3 attempt-2 block placement:* appended after the rendered template but
+   BEFORE the `replyFormat(schema)` footer, keeping the existing
+   footer-last prompt posture.
+6. *§1 matcher additions within its letter:* the node cap pinned at
+   `MAX_PATH_SCAN_NODES = 256` with ONE `ScanBudget` shared by the payload
+   traversal and the value subtrees under access keys; `brief` exported from
+   `independence.ts`; `listChildSessionMessages` exported from `runner.ts`
+   (design's snippet was module-private; the export serves the unit tests);
+   wrapped fetch errors carry `{ cause }` and session-naming messages.
+7. *Test strategy #9 landed late (§4).* The nine pre-existing fakes got an
+   empty-page `session.list` in the test-update stages, not at implement; the
+   initially red budget pin in `child-deeds-retry.test.ts` now asserts one
+   `stageFailure` (attempt 1) plus one `escalate` (attempt 2) — the design's
+   "one gate entry per failure" posture, not a second `stageFailure`.
+
+**Reason.** The implement and fix stages had no shell: `npm install` never ran
+(Rollout step 1 not executed, A4/A8 still register-unverified), and
+`npm run check` could not be run there. All other deltas are code-review
+fixes (security-r1c0 #1–#4, performance-r1c0 #1–#5) and the test-update
+stages landing the review-required pins.
+
+**Affected sections.** Chosen design §2 (route, failure semantics, cost
+guards, gate name), §3 (block placement), Compatibility matrix row
+"OpenCode server/SDK without a children method" (runtime-probed, third route
+is `/api/session/:id/children`), Rollout step 1 (not performed), Test
+strategy #5/#9 (pins landed in the later test stages). Unverified residue as
+built: the direct-HTTP third route has no test pin (security-r1c2 minor,
+open, non-blocking), and the `subagent` part-name guard rests on fixtures.

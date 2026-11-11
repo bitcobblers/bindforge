@@ -39,7 +39,8 @@
     "5ea1b4ff2a71fb1321ba255fad30834c381e2206",
     "5be92d3c0f24efda46df0d69426ef556305cd5e7",
     "1ce23f4dff33a4bbe52ed6e716afb3590749fcdd",
-    "f0dd0e7af6697e196a22fe5d7a15bae8ef81b78c"
+    "f0dd0e7af6697e196a22fe5d7a15bae8ef81b78c",
+    "15c594a1ee3c34962faa117b052cf11b30cd849b"
   ],
   "forceNext": null,
   "results": [
@@ -1212,10 +1213,17 @@
       "proceed": false,
       "reason": "code-review:performance: independence violation: read a review report: docs/designs/007-audit-by-deeds/reviews/code/*",
       "at": 1794355675628
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794355810611
     }
   ],
   "startedAt": 1794348961824,
-  "updatedAt": 1794355810576,
+  "updatedAt": 1794355810611,
   "baseRef": "7844c17171465dd779f8db6671801eb058bd2eb3",
   "designCycle": 3,
   "designStamp": "f4f64f9c7a62e1487a3ad86706965ae11544eb87",
@@ -1350,112 +1358,99 @@
     "code": {
       "correctness": {
         "verdict": "approve",
-        "stamp": "95b73560fab5571ad65610ffe4f790d080d715c1",
+        "stamp": "f0dd0e7af6697e196a22fe5d7a15bae8ef81b78c",
         "dissents": 0,
         "findings": [
           {
             "severity": "minor",
-            "location": "tools/orchestration/src/pipeline/runner.ts:1070-1111",
-            "problem": "The child-walk audit sits inside executeInference's outer poll/parse loop, and every nudge path (continue at 1148/1174/1190/1212) re-enters it, so the descendant walk runs up to MAX_NUDGES+1 = 9 times per attempt. The proposal's cost paragraph fixes it as 'once per attempt after the reply, off the poll loop'. Consequences are new side effects: up to 9 near-identical 'independenceAudit' gate entries per attempt when the walk route is missing (which is every audited attempt of the nine pre-existing fakes, and of any client exposing neither SDK route), crowding the six-entry 'recent gates' view (runner.ts:2300-2302) and the persisted checkpoint, plus a repeat of the whole session-list crawl and one full paged message fetch per descendant on each nudge cycle.",
-            "fix": "Run the descendant walk at most once per attempt: hoist a walkAudited flag (or compute the descendant violations before the parse/nudge paths and reuse them), leaving the idempotent parent-list audit where it is."
+            "location": "tools/orchestration/src/pipeline/runner.ts:859-871,1247-1248",
+            "problem": "The new perf guard gates the entire child walk on countDelegationParts matching the recorded part name 'subagent' (the tripwire keys the same name). If a real server records the delegation part under another name — the question left open by r1 nit 5, established only by fixtures — the walk is now skipped silently (no enumeration, no warn, no gate line), whereas the proposal ran the walk after every passing parent audit and caught the child's deeds regardless of the part's name. The declared cost rule closes a cost hole but removes the design's name-agnostic safety net; the build notes justify it for cost and the stale-window case, not this one.",
+            "fix": "Verify the recorded delegation part name against one real session message list; if it differs from 'subagent', map the real name in countDelegationParts (and ACCESS_FIELDS) so the guard and the exemption key on what production records."
           },
           {
             "severity": "minor",
-            "location": "tools/orchestration/src/pipeline/runner.ts:637-668",
-            "problem": "The session.list fallback pagination breaks only when pageCursorNext(page) is absent. If the endpoint ignores the cursor parameter (A4/A8 leave it unverified) but answers with a cursor.next, the for(;;) crawl never terminates: the BFS visited set cannot stop it because the pagination loop is separate, and byParent accumulates the same page's ids forever, hanging the attempt in the post-reply audit with only per-request timeouts.",
-            "fix": "Break when the returned cursor equals the cursor just sent (or has been seen before), and add a page/node cap on the enumeration."
-          },
-          {
-            "severity": "minor",
-            "location": "docs/designs/007-audit-by-deeds/03-build-notes.md:28,99-100",
-            "problem": "The notes state 'test files are not editable at this stage' and 'No test files were modified', and 'Files touched' lists no test files, while the change under review carries tests/pipeline/child-session-deeds.test.ts, tests/pipeline/child-deeds-retry.test.ts and extended pins at tests/pipeline/prompts.test.ts:207-212,359-372. A reviewer handed that diff and these notes is misled about the change set (and about the Test strategy #1-#8 pins existing).",
-            "fix": "List the test files in the change set, noting the test-authoring stage authored them, so the notes describe the diff a reviewer receives."
+            "location": "docs/designs/007-audit-by-deeds/03-build-notes.md:27-39,102",
+            "problem": "Carried r1 finding 3, unfixed and now sharper: deviation 2 still states the nine pre-existing fakes expose only session.create/prompt/remove, and line 102 still states 'No test files were modified', while this diff adds session.list to all nine fakes (Test strategy #9, landed by the test-update stages) and modifies 14 test paths including the child-deeds-retry gate-pair pin rework prescribed by addendum 3. No addendum records the test-update stages' outcome, so the notes contradict the change set a reviewer receives.",
+            "fix": "Append one short addendum listing the test files in the final change set (nine fakes' session.list stubs, the two child-deeds suites' new pins, the prompts.test.ts citations, the corrected child-deeds-retry gate pin), noting the test-update stage authored them."
           },
           {
             "severity": "nit",
-            "location": "tools/orchestration/src/pipeline/runner.ts:585",
-            "problem": "listChildSessionMessages is exported, while the proposal's snippet keeps it module-private; the export exists only so child-session-deeds.test.ts:80-86 can drive the walk against fake clients. The widened module surface is undeclared.",
-            "fix": "Record the export in 03-build-notes.md's additions list (or drive the walk solely through the audit call site)."
+            "location": "tools/orchestration/src/pipeline/runner.ts:614",
+            "problem": "directChildSessions builds the URL with an absolute path in new URL('/api/session/…', connection.baseUrl), which drops any path component of a configured baseUrl, while createClient hands the whole base URL to the SDK. A --base-url with a path prefix makes the third enumeration route 404 into the caught partial-audit path (fails closed; the default URL has no path).",
+            "fix": "Join the SDK's path prefix instead of using an absolute path, or document the no-path-prefix constraint on ServerConnection."
           },
           {
             "severity": "nit",
-            "location": "tools/orchestration/src/pipeline/independence.ts:97-98",
-            "problem": "The delegation exemption keys on the tool-part name 'subagent', established only by fixtures (independence.test.ts:249-262). If a real server records the delegation part under another name, 'subagent: []' is inert: the false positive is still cured because the unknown-tool path never scans payload keys, but pin (a) would pin nothing production exercises.",
-            "fix": "Confirm the recorded delegation part name from one real session message list and map that name in ACCESS_FIELDS as well."
+            "location": "tools/orchestration/tests/pipeline/child-deeds-retry.test.ts:120-124, tests/pipeline/child-session-deeds.test.ts (list-route pin comments)",
+            "problem": "The new pin comments state as fact that the pinned SDK 'exposes no session.children', but the package is not installed in this worktree and Rollout step 1 never ran — A4 remains register-unverified and the walk's real route stays a runtime probe. The comments pin an unverified platform claim.",
+            "fix": "Reword the comments to name this as one probed/assumed shape rather than a verified SDK fact."
           },
           {
             "severity": "nit",
-            "location": "tools/orchestration/src/pipeline/runner.ts:1084-1092",
-            "problem": "The zero-descendant tripwire inspects only the parent list (hasCompletedDelegation(lastSeen, ...)). Proposal 2 says 'an audited message list'; a child list that itself holds a completed subagent part whose own descendants went unenumerated triggers no warning.",
-            "fix": "Apply hasCompletedDelegation to each audited child list too, or note the narrower parent-only reading in the build notes."
+            "location": "tools/orchestration/src/pipeline/runner.ts:655",
+            "problem": "Carried r1 nit: listChildSessionMessages remains exported (the proposal's snippet keeps it module-private; the export exists for the unit tests), and the widened module surface is still not recorded in the build notes' additions list.",
+            "fix": "Record the export in 03-build-notes.md's additions list, or drive the walk solely through the audit call site."
           },
           {
             "severity": "nit",
-            "location": "docs/designs/007-audit-by-deeds/03-build-notes.md:127-139",
-            "problem": "Claims this seat could not evaluate: shell was denied, so 'npm run check green / 241/241 tests' and the exact diff boundary were not executed or reproduced here; note also that 'check' does not run typecheck (package.json:23), so a type slip in the new code would not fail the gate the notes cite as evidence.",
-            "fix": "No change required for the code: re-run 'npm run check' and 'npm run typecheck' in a seat that has shell and record the output."
+            "location": "tools/orchestration/src/pipeline/runner.ts:1265",
+            "problem": "Carried r1 nit: the zero-descendant tripwire inspects only the parent list. A child list that itself holds a completed subagent part whose own descendants went unenumerated triggers no warning; the narrower parent-only reading remains undeclared.",
+            "fix": "Apply hasCompletedDelegation to each audited child list too, or note the parent-only reading in the build notes."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/package.json:23",
+            "problem": "Carried r1 nit: npm run check was re-verified green in this seat (250/241-consistent tests), but check still excludes typecheck and npm run typecheck was denied shell in every review seat, so no seat has recorded tsc --noEmit over the new code.",
+            "fix": "Have one seat with shell run 'npm run typecheck' in tools/orchestration and record the output in the build notes."
           }
         ]
       },
       "compatibility": {
         "verdict": "approve",
-        "stamp": "95b73560fab5571ad65610ffe4f790d080d715c1",
+        "stamp": "f0dd0e7af6697e196a22fe5d7a15bae8ef81b78c",
         "dissents": 0,
-        "findings": [
-          {
-            "severity": "minor",
-            "location": "tools/orchestration/src/pipeline/runner.ts:629-634",
-            "problem": "The Compatibility matrix row 'OpenCode server/SDK without a children method' promises a three-route chain (SDK session.children, else SDK session.list + parentID filter, else a direct GET /session/:id/children against baseUrl) and asserts 'the walk always has a route'. The code implements only the two SDK-method probes; when the client exposes neither, listChildSessionMessages throws and the audit degrades to parent-only. A4 (the pinned @opencode/client exposes a children- or list-method) remains unverified — node_modules is not installed in the worktree and the diff carries no evidence Rollout step 1 (install, read the SDK types, fix the route) was performed — so the third, promised route has no code path (checklist item 1: a supported environment lacks the promised path). Degradation is at least logged (warn + independenceAudit gate entry), hence minor.",
-            "fix": "Implement the direct GET /session/:id/children fallback against the configured baseUrl with the client's auth headers, or verify the pinned @opencode/client ^2.1.4 exposes session.list and amend the matrix row to the two routes actually implemented, recording the Rollout step 1 result."
-          },
-          {
-            "severity": "minor",
-            "location": "tools/orchestration/tests/pipeline/budget.test.ts:109-125 (all nine named stubs: reply-contract, pass-finalize, parallel-integration, parallel-fanout, budget, parallel-escalation, stage-lifecycle, funnel, proposal-size); consequence at tools/orchestration/src/pipeline/runner.ts:1103",
-            "problem": "Test strategy #9 required the nine fake clients be 'extended with the session-list method their flows need'; the diff touches none of their session stubs (create/prompt/remove only). Every clean attempt in those existing integration flows now deterministically takes the walk's throw path: each appends an independenceAudit proceed:true entry to the checkpoint gate log and a console.warn. The suites still pass (no test asserts gate-log length or exact contents), but CI no longer exercises those flows through the walk's success path, and checkpoints/CI output accumulate degradation noise the design did not ask for (checklist item 7: plan-named test work not delivered).",
-            "fix": "Add a minimal `list: async () => ({ data: [...], cursor: { previous: null, next: null } })` to the nine stubs' session objects, as child-session-deeds.test.ts's delegatingClient already does, so those flows walk successfully."
-          }
-        ]
+        "findings": []
       },
       "security": {
         "verdict": "approve",
-        "stamp": "1ce23f4dff33a4bbe52ed6e716afb3590749fcdd",
+        "stamp": "f0dd0e7af6697e196a22fe5d7a15bae8ef81b78c",
         "dissents": 1,
         "findings": [
           {
             "severity": "minor",
-            "location": "tools/orchestration/src/pipeline/runner.ts:609-624",
-            "problem": "The third enumeration route implemented to close security r1 finding #2 — directChildSessions plus the ServerConnection wiring in cli.ts — is executed by no test: every fake client in the suite exposes session.list or session.children, so route three is never reached, and the tests' ChildWalk type does not even pass the options argument. The compat matrix's 'the walk always has a route' claim over a credential-bearing fetch path is verified by inspection only.",
-            "fix": "Pin the route: stub globalThis.fetch, use a fake client with neither session.children nor session.list, and call listChildSessionMessages with { connection: { baseUrl, username, password } }; assert the recorded request hits /api/session/<id>/children with the expected Authorization header, that its (sessionEntries-shaped) records feed the same audit — a child transcript read fails the attempt — and that a non-OK status lands in the caught partial-audit path."
+            "location": "tools/orchestration/src/pipeline/runner.ts:609-624,789-825",
+            "problem": "Carried open from the c1 seat and unaddressed by the revisions: the third enumeration route (directChildSessions plus the ServerConnection wiring) is executed by no test. At current HEAD no pipeline test stubs globalThis.fetch, no fake client lacks both session.children and session.list, the tests' ChildWalk type (tests/pipeline/child-session-deeds.test.ts:107-111) still takes no options argument, and nothing passes { connection }. The compat matrix's 'the walk always has a route' claim over a credential-bearing fetch path remains verified by inspection only. Non-blocking: the route is unreachable-by-default behind the two SDK routes, and every throw path into it lands in the caught partial-audit handler.",
+            "fix": "Pin the route: stub globalThis.fetch, use a fake client exposing neither session.children nor session.list, and call listChildSessionMessages(client, id, ms, { connection: { baseUrl, username, password } }); assert the recorded request hits /api/session/<id>/children with the expected Authorization header, that its (sessionEntries-shaped) records feed the same audit — a child transcripts read fails the attempt — and that a non-OK status lands in the caught partial-audit path."
           }
         ]
       },
       "performance": {
         "verdict": "approve",
-        "stamp": "1ce23f4dff33a4bbe52ed6e716afb3590749fcdd",
+        "stamp": "f0dd0e7af6697e196a22fe5d7a15bae8ef81b78c",
         "dissents": 1,
         "findings": []
       },
       "testing": {
         "verdict": "approve",
-        "stamp": "1ce23f4dff33a4bbe52ed6e716afb3590749fcdd",
+        "stamp": "f0dd0e7af6697e196a22fe5d7a15bae8ef81b78c",
         "dissents": 1,
         "findings": [
           {
             "severity": "minor",
-            "location": "tools/orchestration/src/pipeline/runner.ts:609-624,789-830; tools/orchestration/cli.ts:171-179",
-            "problem": "The fix round added the compat matrix's third enumeration route (directChildSessions: direct GET /api/session/:id/children with basic auth, its BFS, and the no-routes error throw) and wired a ServerConnection through the CLI, but no test passes `connection` to listChildSessionMessages or stubs fetch for it; a shape regression in the URL path, auth header, or response parsing, or the throw at 827-830, ships untested (checklist item 7). Not blocking: the pinned SDK exposes session.list so production never reaches this branch, and the call site already catches it as a partial audit.",
+            "location": "tools/orchestration/src/pipeline/runner.ts:609-624,789-830; tools/orchestration/src/pipeline/cli.ts:167-177",
+            "problem": "Carried open from r1c1: the compat matrix's third enumeration route (directChildSessions direct GET /api/session/:id/children with basic auth, its BFS, and the no-routes throw at 827-830) is still untested — no test passes `connection` to listChildSessionMessages and no fetch stub exercises the URL path, auth header, or response parsing. The later fixes neither addressed nor regressed it; production still never reaches the branch (pinned SDK exposes session.list) and the call site catches it as a partial audit, so it does not block ratification.",
             "fix": "One walk test with a fake client lacking both session.children and session.list plus vi.stubGlobal('fetch', ...) (pattern at tests/opencode-runner.test.ts:56), passing connection: { baseUrl }: assert the request path /api/session/<id>/children, that a child enumerated that way is audited, and that a no-route client without connection lands in the caught partial-audit path."
           },
           {
             "severity": "nit",
-            "location": "tools/orchestration/src/pipeline/runner.ts:664-677",
-            "problem": "budgetMs() clamps each walk request to the stage deadline and throws 'truncated at the stage deadline' once it expires; no test fires the clamp or the expired-budget path. The new tests cover the repeated-cursor stop and list-route cost, but the deadline clamp the walk's comment claims to finally exercise stays unpinned.",
-            "fix": "Call listChildSessionMessages with an already-expired `deadline` option and assert the throw (or, at the call site, the caught partial-audit outcome with the truncation named)."
+            "location": "tools/orchestration/src/pipeline/runner.ts:668-677,1256",
+            "problem": "Carried open from r1c1: the walk's deadline clamp (budgetMs) and its 'truncated at the stage deadline' throw remain unpinned — no test passes a `deadline` option to listChildSessionMessages. The post-approval call-site wiring (runner.ts:1256 passes the live stage deadline) makes the clamp live in production but did not add a pin.",
+            "fix": "Call listChildSessionMessages with an already-expired `deadline` option and assert the throw, or pin the caught partial-audit outcome with the truncation named at the call site."
           },
           {
             "severity": "minor",
             "location": "checklist item 6 — tools/orchestration `npm run check`",
-            "problem": "This seat's shell tool was permission-denied for the whole dissent pass, so I could not run npm run check and cannot paste its tail. Per the skill rule an un-evaluated checklist item is a finding, not a pass. Static cross-checks of every new assertion against the implementation (route dispatch, delegation guard, stageFailure/escalate gate shape, list-route paging) found no contradiction, and the run's runner verifies the suite independently.",
+            "problem": "This seat's shell tool was permission-denied for the whole ratification pass (every git/npm command rejected), so I could not run npm run check, could not mechanically re-derive the scoped 1ce23f4..HEAD diff, and cannot paste the check tail. Per the skill rule an un-evaluated checklist item is a finding, not a pass. Static cross-checks of every current assertion against the implementation (route dispatch, delegation guard, partial-audit evidence retention, stageFailure/escalate gate shape, list-route paging) found no contradiction.",
             "fix": "No code change; the runner's independent npm run check record stands in for this seat's execution."
           }
         ]
@@ -1465,14 +1460,16 @@
   "lastReviewPass": {
     "phase": "code",
     "round": 1,
-    "cycle": 1,
+    "cycle": 2,
     "seats": [
+      "correctness",
+      "compatibility",
       "security",
       "performance",
       "testing"
     ]
   },
   "reviseNoChange": false,
-  "codeCycle": 2,
+  "codeCycle": 3,
   "codeStamp": "f0dd0e7af6697e196a22fe5d7a15bae8ef81b78c"
 }
