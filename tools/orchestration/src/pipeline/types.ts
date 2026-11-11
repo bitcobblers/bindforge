@@ -25,6 +25,24 @@ export type VerdictReply = z.infer<typeof VerdictSchema>;
 /** Optional model-authored commit message every mutating stage may include. */
 const commitMessage = z.string().min(3).optional();
 
+/**
+ * ADR-005: one file move, declared as data. The stage never touches the paths;
+ * the runner validates the list and performs the renames itself.
+ */
+export const MovePairSchema = z.object({
+  from: z.string().min(1).max(200),
+  to: z.string().min(1).max(200),
+});
+export type MovePair = z.infer<typeof MovePairSchema>;
+
+/**
+ * The move list a reply may carry. The bounds cap the validation and apply work
+ * one reply can make the runner spend; an endpoint over the length cap or a
+ * list over the pair cap fails `safeParse` like any invalid reply. Optional
+ * with default `[]` keeps the checkpoint additive (A13): `version` stays 1.
+ */
+const moves = z.array(MovePairSchema).max(64).default([]);
+
 export const StageReplySchemas = {
   research: z.object({ summary: z.string().min(1), commitMessage }),
   proposal: z.object({ commitMessage }),
@@ -41,9 +59,9 @@ export const StageReplySchemas = {
     testsAdded: z.number().int().min(0).default(0),
     commitMessage,
   }),
-  'test-update': z.object({ commitMessage }),
-  implement: z.object({ testsNeedUpdate: z.boolean(), commitMessage }),
-  fix: z.object({ testsNeedUpdate: z.boolean(), commitMessage }),
+  'test-update': z.object({ commitMessage, moves }),
+  implement: z.object({ testsNeedUpdate: z.boolean(), commitMessage, moves }),
+  fix: z.object({ testsNeedUpdate: z.boolean(), commitMessage, moves }),
   'doc-sync': z.object({ drifted: z.boolean(), commitMessage }),
   review: VerdictSchema,
 } as const;
@@ -141,6 +159,13 @@ export type RunStatus = 'running' | 'done' | 'escalated';
 
 /** Checkpoint file name inside the design directory. */
 export const STATE_FILE = '.pipeline.json';
+
+/**
+ * Run lock file at the repository root. Named here rather than in runner.ts so
+ * the moves validator can reject it as a path segment without importing the
+ * runner (which imports the validator).
+ */
+export const LOCK_FILE = '.pipeline.lock';
 
 /**
  * Run-identity grammar. `nnn-slug` is used as a single path segment (the

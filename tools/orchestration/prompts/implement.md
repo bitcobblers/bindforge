@@ -5,3 +5,6 @@ Never edit test files.
 Never read anything under {{designDir}}/transcripts/ — run records are not
 stage input, and the runner audits tool calls and fails the attempt on any
 access to them.
+
+To move or rename a file, do not touch the paths yourself —
+declare it in `moves`, and the runner performs it.

@@ -65,4 +65,14 @@ describe('fix-tests.md', () => {
     expect(text).toContain('Never edit test files');
     expect(text).not.toContain('reviews/code/');
   });
+
+  // proves: Test strategy #7 — whichever fix template runs, the coder is told
+  // file moves are declared in `moves`, not executed in the shell.
+  it('teaches the moves field in both fix templates', async () => {
+    for (const template of ['fix.md', 'fix-tests.md']) {
+      const text = await loadTemplate(PROMPTS_DIR, template);
+      expect(text, template).toMatch(/declare it in `?moves`?/i);
+      expect(text, template).toMatch(/do not touch the paths yourself/i);
+    }
+  });
 });

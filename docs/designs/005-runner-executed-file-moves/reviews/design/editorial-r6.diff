@@ -1,0 +1,102 @@
+diff --git a/tmp/bindforge-editorial-runner-executed-file-moves-r6.md b/home/mike/.local/share/opencode/worktree/f852d4/quiet-orchid/docs/designs/005-runner-executed-file-moves/02-proposal.md
+index 967d5e8..fc7e601 100644
+--- a/tmp/bindforge-editorial-runner-executed-file-moves-r6.md
++++ b/home/mike/.local/share/opencode/worktree/f852d4/quiet-orchid/docs/designs/005-runner-executed-file-moves/02-proposal.md
+@@ -8,7 +8,7 @@ stage replies: the `implement`, `fix`, and `test-update` replies gain a
+ touching anything, and the runner — still the only committer — executes the
+ renames during the stage's finalize, before the ownership sweep and
+ `commitStage`. Run 004 escalated with `tests not green at the code-review
+-budget limit`, because its 23 test-file moves were inexpressible to any stage
++budget limit` because its 23 test-file moves were inexpressible to any stage
+ (A12). ADR-005 defers its earlier item 5, read-only git in stage shells, to a
+ follow-up ADR, so this change ships items 1-4 only.
+ Grounding: docs/designs/005-runner-executed-file-moves/01-research.md; this run
+@@ -73,8 +73,7 @@ behavior (see Sweep interaction, pinned by Test strategy #4).
+ ## Chosen design
+ 
+ **Reply field** (`tools/orchestration/src/pipeline/types.ts`). A shared
+-`MovePairSchema = z.object({ from: z.string().min(1).max(200), to: z.string()
+-.min(1).max(200) })` and `moves: z.array(MovePairSchema).default([]).max(64)`
++`MovePairSchema = z.object({ from: z.string().min(1).max(200), to: z.string().min(1).max(200) })` and `moves: z.array(MovePairSchema).default([]).max(64)`
+ are added to the `implement`, `fix`, and `test-update` entries of
+ `StageReplySchemas`
+ (types.ts:44-46). The bounds cap the validation and apply work one reply can make the
+@@ -124,18 +123,18 @@ failure names the offending pair. Rules:
+ `headBefore` parameter, passed only by `executeStage` (runner.ts:1077-1079);
+ review schemas have no `moves`, so `runReviewPass` passes nothing. After
+ `schema.safeParse` succeeds (runner.ts:912-916), if the parsed reply carries a
+-non-empty `moves`, run `validateMoves`; a failure, a returned issue or a throw
+-from a rule, takes the existing schema-failure branch (nudge with the issue
++non-empty `moves`, run `validateMoves`; a failure — a returned issue or a throw
++from a rule — takes the existing schema-failure branch (nudge with the issue
+ message, then final failure `invalid-reply: moves — <issue>`), so
+ `retryInSameSession` (runner.ts:1121-1126), the repair prompt, and
+ second-failure escalation behave exactly as for any invalid reply.
+ 
+ **Apply** (`moves.applyMoves(repoDir, headBefore, moves)`, called from
+-`finalizeStage` between reply acceptance and the `enforceOwnership` call, i.e.
++`finalizeStage` between reply acceptance and the `enforceOwnership` call, i.e.,
+ before runner.ts:1049, ahead of `commitStage` at 1053). Immediately before the
+ first rename it re-runs rules 4–7 as one guard across the inference→finalize
+ window; a guard refusal takes the same `moves-apply-failed` outcome and
+-preserved worktree as that of a rename error. Then per pair, in reply order,
++preserved worktree as a rename error. Then per pair, in reply order,
+ `fs.renameSync` (A8), under the `.pipeline.lock` single-writer invariant
+ (runner.ts:354-383). On the first error, completed renames roll back in
+ reverse, which is exact because the pairs are disjoint, and the outcome becomes
+@@ -152,12 +151,12 @@ leaves the pair alone (Sweep interaction, below), `git add -A` stages
+ delete+add, and reviewers see one commit whose `git show --name-status -M`
+ reports `R` entries at the default 50% threshold (A5).
+ 
+-**Sweep interaction.** No new code in `enforceOwnership`: a validated pair's
++**Sweep interaction**. No new code in `enforceOwnership`: a validated pair's
+ endpoints satisfy `stagePathAllowed` for the executing stage, so neither the
+ deleted `from` nor the new `to` enters the violation list (A4) and unsanctioned
+ deletions keep today's restore-from-`headBefore` behavior (Options 5, #4).
+ 
+-**Prompts.** One sentence each in `tools/orchestration/prompts/implement.md`,
++**Prompts**. One sentence each in `tools/orchestration/prompts/implement.md`,
+ `fix.md`, `fix-tests.md`, and `test-update.md`: to move or rename a file, do not
+ touch the paths yourself — declare it in `moves`, and the runner performs it.
+ 
+@@ -168,7 +167,7 @@ touch the paths yourself — declare it in `moves`, and the runner performs it.
+ | Moves validation failures burn code budget (A3) | medium | medium | In-attempt nudge loop repairs before the attempt fails; validator messages name the offending pair; prompts teach the field |
+ | `to`/`from` state changes between validation and apply (TOCTOU) | low | medium | `applyMoves` re-runs rules 4–7 as one guard immediately before the first rename; reverse rollback; `.pipeline.lock` single-writer invariant (runner.ts:354-383) |
+ | Crash between apply and commit leaves a dirty half-state | low | medium | Converges on resume by ownership: the next attempt re-captures `headBefore` and the sweep keeps or restores the pair; a rollback rename that itself fails stops at the operator as `moves-rollback-failed` |
+-| Sweep semantics now rest on "validator and sweep share `stagePathAllowed`" (item 4 as invariant) | low | medium | One predicate, one call site each (gates.ts:260) — a future fork of the predicate breaks Test strategy #4, not production silently; broader reply-as-authorization trust belongs to ADR-006 (Deferred) |
++| Sweep semantics now rest on "validator and sweep share `stagePathAllowed`" (item 4 as invariant) | low | medium | One predicate, one call site each (gates.ts:260) — a future fork of the predicate breaks Test strategy #4 rather than silently breaking production; broader reply-as-authorization trust belongs to ADR-006 (Deferred) |
+ | Prompt-pin drift (`fix-tests.md` content assertions) | high | low | Test strategy #7 updates `fix-trigger.test.ts` and `prompts.test.ts` pins in the same commit |
+ | Case-insensitive checkouts behave unexpectedly (A10) | medium | low | Rule 6's comparisons and the `.git` endpoint predicate are case-folded on every platform; rule 5's disk check adds the checkout-level guard; macOS is `yes (unverified)`, Windows not exercised |
+ 
+@@ -232,7 +231,7 @@ touch the paths yourself — declare it in `moves`, and the runner performs it.
+    with the validator message in the reason.
+ 10. Integration — budget: a `fix` stage whose moves list is rejected burns
+     exactly one `codeBudgetUsed` (extends `budget.test.ts`).
+-11. Integration — apply failure: a pair made unappliable between validation
++11. Integration — apply failure: a pair that can no longer be applied between validation
+     and apply produces no commit, a byte-identical worktree, and an
+     un-swept preserved worktree for attempt 2 (same shape as a failed reply).
+ 12. Platform — on macOS, one move round trip plus a `notes.md` → `readme.md` move
+@@ -246,13 +245,13 @@ touch the paths yourself — declare it in `moves`, and the runner performs it.
+ 
+ 1. One merged branch; ADR-005's `status: proposed → accepted` flip happens on
+    this run's done-gate (gates.ts:230-238), like every ADR run.
+-2. No migration: checkpoint `version` stays 1, `moves` is optional-defaulting
++2. No migration: checkpoint `version` stays 1, `moves` is optional, defaulting
+    to `[]` (A13), so in-flight and old checkpoints re-parse unchanged
+    (state-store.ts:145-155).
+ 3. No config knob or feature flag: with the default `[]`, behavior is today's
+    exactly; the feature is inert until a stage emits a non-empty list.
+ 4. Dogfood acceptance (ADR-005, Consequences): the next file-moving change run shows
+-   no `operatorForce`/`operatorExtension` gate entries, no `stageFailure`
++   no `operatorForce`/`operatorExtension` gate entries and no `stageFailure`
+    reason containing `moves`, and its moves land as `R` entries
+    (`git show --name-status -M`) in one stage commit.
+ 
+@@ -290,3 +289,6 @@ touch the paths yourself — declare it in `moves`, and the runner performs it.
+ - Compatibility matrix — no new git floor (the validator adds one `git ls-tree`);
+   Node floor raised to ≥22.23.4 (r4: the 22.x line with the October 2026 security
+   release, engines included); macOS `yes (unverified)` behind #12's contrast.
++
++Editor notes: Deferred / out of scope — "Directory moves as single pairs — this
++ADR-005 if a real change needs them" is ambiguous; author to clarify.

@@ -8,7 +8,7 @@ date: 2026-11-10
 Mechanical reorganization, no semantic change: `tools/orchestration/tests/`
 stops encoding subsystem names as filename prefixes and starts mirroring the
 `src/` directory layout. (This slot was freed by renumbering the
-self-update checkpoint ADR to ADR-005.)
+self-update checkpoint ADR, now ADR-006.)
 
 ## Context
 

@@ -318,6 +318,22 @@ describe('run-2 stage guidance', () => {
   });
 });
 
+describe('moves guidance in stage prompts', () => {
+  // proves: Test strategy #7 — the four prompts the move-capable stages run
+  // must carry the moves sentence from the proposal's Prompts section: "to move
+  // or rename a file, do not touch the paths yourself — declare it in `moves`,
+  // and the runner performs it". Fragments are pinned, not exact punctuation.
+  for (const template of ['implement.md', 'fix.md', 'fix-tests.md', 'test-update.md']) {
+    it(`${template} routes file moves through the moves reply field`, async () => {
+      const text = await loadTemplate(PROMPTS_DIR, template);
+      expect(text, template).toMatch(/move or rename a file/i);
+      expect(text, template).toMatch(/do not touch the paths yourself/i);
+      expect(text, template).toMatch(/declare it in `?moves`?/i);
+      expect(text, template).toMatch(/runner performs it/i);
+    });
+  }
+});
+
 describe('test-tree convention', () => {
   function gitRoot(): string {
     return execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();

@@ -260,3 +260,89 @@ describe('review budget at round entry', () => {
     expect(existsSync(join(dir, '.pipeline.lock'))).toBe(false);
   });
 });
+
+describe('a rejected moves list is one budget event', () => {
+  // proves: Test strategy #10 — every `fix` entry burns exactly one unit of the
+  // code budget (A3), so a forced fix stage whose `moves` list the validator
+  // rejects on both attempts leaves codeBudgetUsed at 1 — the retry is a same-
+  // session repair, not a second entry.
+  it('burns exactly one codeBudgetUsed for a fix stage whose moves list is rejected', async () => {
+    const state = exhaustedState();
+    state.lastStage = 'code-review';
+    state.codeRound = 1;
+    const { dir, options } = tmpRepo(state);
+
+    const invalidFix = JSON.stringify({
+      testsNeedUpdate: false,
+      commitMessage: 'fix: land the moves',
+      moves: [{ from: 'tools/ghost.ts', to: 'tools/landed.ts' }],
+    });
+    const sessions = new Map<string, { prompts: number; lists: number; reply: string }>();
+    const created: string[] = [];
+    let clock = 0;
+    const client = {
+      session: {
+        create: async (input: { title?: string }) => {
+          const key = (input.title ?? '').split(': ').slice(1).join(': ');
+          created.push(key);
+          const id = `ses_fix_${String(created.length)}`;
+          sessions.set(id, {
+            prompts: 0,
+            lists: 0,
+            reply:
+              key === 'fix' ? invalidFix : JSON.stringify({ verdict: 'approve', findings: [] }),
+          });
+          return { id };
+        },
+        prompt: async (input: { sessionID: string }) => {
+          const s = sessions.get(input.sessionID);
+          if (s) s.prompts += 1;
+        },
+        remove: async () => undefined,
+      },
+      message: {
+        list: async (input: { sessionID: string }) => {
+          const s = sessions.get(input.sessionID) ?? { prompts: 0, lists: 0, reply: '{}' };
+          s.lists += 1;
+          const visible = Math.max(0, Math.min(s.lists - 1, s.prompts));
+          const messages: SessionMessageInfo[] = [];
+          for (let i = 0; i < visible; i += 1) {
+            clock += 1;
+            messages.push({
+              id: `m_a${String(i)}`,
+              time: { created: clock },
+              type: 'assistant',
+              content: [{ type: 'text', text: s.reply }],
+            });
+            clock += 1;
+            messages.push({ id: `m_i${String(i)}`, time: { created: clock }, type: 'idle' });
+          }
+          return { data: messages, cursor: { previous: null, next: null } };
+        },
+      },
+    } as unknown as OpenCodeClient;
+
+    // A moves rejection now rides the same nudge pacing floor as a schema
+    // mismatch (correctness review, finding 5), so this case pins
+    // `minNudgeIntervalMs` to 0 the way reply-contract.test.ts's `reviewConfig`
+    // does. With FAST's default floor the 4 s stage deadline would end the
+    // attempt as `stage-timeout` before the nudge budget can produce the
+    // `invalid-reply: moves` failure this test is about.
+    const cfg: PipelineConfig = { ...FAST, minNudgeIntervalMs: 0 };
+    const status = await resumePipeline({ ...options({ forceStage: 'fix', cfg }), client });
+
+    const saved = JSON.parse(
+      readFileSync(join(dir, 'docs', 'designs', '002-x', '.pipeline.json'), 'utf8'),
+    ) as PipelineState;
+    expect(status).toBe('escalated');
+    expect(saved.codeBudgetUsed).toBe(1);
+    const fixFailures = saved.results
+      .filter((r) => r.stage === 'fix')
+      .map((r) => r.failure ?? '')
+      .join('\n');
+    expect(fixFailures).toContain('invalid-reply: moves');
+    // One session served both attempts: the rejection rides the invalid-reply
+    // retry path, and attempt 2 resumes the same session.
+    expect(created.filter((k) => k === 'fix')).toHaveLength(1);
+  });
+});

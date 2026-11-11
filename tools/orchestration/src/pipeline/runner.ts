@@ -26,6 +26,7 @@ import {
   brief,
   printable,
 } from './independence.js';
+import { applyMoves, validateMoves } from './moves.js';
 import {
   type PassPlan,
   hasSeats,
@@ -70,7 +71,14 @@ import {
   reviewBudgetUsed,
   specialtiesFor,
 } from './states.js';
-import type { Finding, LockInfo, PipelineState, StageResult } from './types.js';
+import {
+  type Finding,
+  LOCK_FILE,
+  type LockInfo,
+  type MovePair,
+  type PipelineState,
+  type StageResult,
+} from './types.js';
 
 // ---------------------------------------------------------------------------
 // The inference lane. Mutating stages keep exactly one session at a time, each
@@ -121,8 +129,6 @@ export interface ResumeOptions {
   /** Connection for the child walk's direct-HTTP enumeration fallback. */
   server?: ServerConnection;
 }
-
-const LOCK_FILE = '.pipeline.lock';
 
 // --- git helpers (the runner is the only committer; models never touch git) --
 
@@ -1041,6 +1047,35 @@ export function stageTemplate(
 }
 
 /**
+ * ADR-005: a schema-valid reply that carries a non-empty `moves` list is only
+ * accepted once `validateMoves` clears the whole list against `headBefore` and
+ * the disk. The issue text (including one from a rule that threw internally)
+ * comes back here so the caller can put it on the existing invalid-reply path;
+ * a stage with no declared moves is unaffected. A moves-bearing reply whose
+ * window has no base revision fails closed: without `headBefore` the list
+ * cannot be validated, and accepting it would apply it in finalize unvalidated.
+ */
+function movesValidationIssue(
+  opts: RunOptions,
+  stageName: string,
+  headBefore: string | undefined,
+  reply: unknown,
+): string | null {
+  const moves = (reply as { moves?: MovePair[] } | undefined)?.moves;
+  if (!Array.isArray(moves) || moves.length === 0) {
+    return null;
+  }
+  if (headBefore === undefined) {
+    return `${stageName} declared moves without a base revision to validate them against`;
+  }
+  try {
+    return validateMoves(opts.repoDir, headBefore, stageName, moves);
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+/**
  * The git-free inference phase of one stage attempt: render the prompt,
  * create (or resume) the session, poll/nudge to a validated reply, write the
  * transcript, and append the `StageResult`. No git mutation lives here — the
@@ -1052,6 +1087,13 @@ export function stageTemplate(
  * once and hands it to every seat, so the only await before `session.create`
  * is the semaphore's — keeping session-creation order the handed seat order
  * at any N (ADR-003 §Execution).
+ *
+ * `headBefore` is handed only by the single-stage path (`executeStage`): a
+ * reply that declares `moves` is validated against it before it is accepted,
+ * which is why the inference phase needs the window's base revision. Review
+ * schemas carry no moves, so the pass fan-out passes nothing; a moves-bearing
+ * reply that arrives without a base revision is rejected rather than applied
+ * unvalidated in finalize.
  */
 async function executeInference(
   opts: RunOptions,
@@ -1059,6 +1101,7 @@ async function executeInference(
   handle: StageHandle,
   cfg: PipelineConfig,
   templateText?: string,
+  headBefore?: string,
 ): Promise<StageOutcome> {
   const def = stageDef(handle.stage, handle.specialty);
   const template = stageTemplate(def, handle.stage, state);
@@ -1122,12 +1165,11 @@ async function executeInference(
     { sessionID, text: fullPrompt },
     { signal: AbortSignal.timeout(requestTimeoutMs) },
   );
-
-  // Assistant-message count observed immediately after the most recent prompt
-  // (stage prompt or nudge). An idle marker closes a prompt only once the
-  // session has actually produced a new turn: without growth past this
-  // baseline the poll below would re-read the previous reply and burn the
-  // whole nudge budget in seconds on a slow backend.
+  // Assistant-message count observed right after the stage (or resume) prompt
+  // goes in. An idle marker closes a prompt only once the session has actually
+  // produced a new turn: without growth past this baseline the poll below would
+  // re-read the previous reply and burn the whole nudge budget in seconds on a
+  // slow backend.
   let assistantBaseline = (
     await listSessionMessages(opts.client, sessionID, requestTimeoutMs)
   ).filter((m) => m.type === 'assistant').length;
@@ -1141,6 +1183,12 @@ async function executeInference(
   let model: ModelInfo | undefined;
   let nudges = 0;
   let outcome: StageOutcome;
+  // The moves issue this attempt was last nudged for. A session that answers the
+  // moves nudge with narration, or with nothing at all, still died on that list:
+  // the exhausted-nudge branch below would label it `invalid-reply: not JSON` and
+  // the gate log and repair prompt would never name the pair. The proposal names
+  // the final failure of a rejected list `invalid-reply: moves — <issue>`.
+  let lastMovesIssue: string | undefined;
   // The most complete message list seen while polling this attempt; the
   // independence audit reads the tool calls and shells out of it.
   let lastSeen: SessionMessageInfo[] = [];
@@ -1360,13 +1408,33 @@ async function executeInference(
         ).filter((m) => m.type === 'assistant').length;
         continue;
       }
-      outcome = { ok: false, failure: 'invalid-reply: not JSON' };
+      outcome = {
+        ok: false,
+        failure:
+          lastMovesIssue === undefined
+            ? 'invalid-reply: not JSON'
+            : `invalid-reply: moves — ${lastMovesIssue}`,
+      };
       break;
     }
     const checked = schema.safeParse(parsed);
-    if (checked.success) {
+    const movesIssue = checked.success
+      ? movesValidationIssue(opts, def.name, headBefore, checked.data)
+      : null;
+    if (checked.success && movesIssue === null) {
       outcome = { ok: true, reply: checked.data };
       break;
+    }
+    // A rejected moves list rides the invalid-reply path exactly like a schema
+    // mismatch — same pacing floor, same nudge with the issue, same same-session
+    // attempt 2, same escalate on the second failure (proposal, Wiring into
+    // retry: "behave exactly as for any invalid reply"). `moves — ` is what
+    // makes it nameable in the gate log and the repair prompt.
+    const problem = checked.success
+      ? `moves — ${movesIssue ?? 'rejected'}`
+      : (checked.error.issues[0]?.message ?? 'schema mismatch');
+    if (checked.success) {
+      lastMovesIssue = movesIssue ?? 'rejected';
     }
     const gate = nudges < MAX_NUDGES ? await nudgeGate() : 'go';
     if (gate === 'over') {
@@ -1384,7 +1452,7 @@ async function executeInference(
         {
           sessionID: sessionID,
           text: [
-            `Your reply did not validate: ${checked.error.issues[0]?.message ?? 'schema mismatch'}.`,
+            `Your reply did not validate: ${problem}.`,
             'Reply again with ONLY the JSON object. No other text.',
             '',
             replyShapeExample(schema),
@@ -1393,15 +1461,16 @@ async function executeInference(
         { signal: AbortSignal.timeout(requestTimeoutMs) },
       );
       lastPromptAt = Date.now();
+      // Re-baseline, exactly as the narration nudges above do: without it the
+      // idle-count check cannot tell "the session produced the repair" from
+      // "idle with no new turn", and the poll re-reads the reply it already
+      // rejected as if it were the answer to this nudge.
       assistantBaseline = (
         await listSessionMessages(opts.client, sessionID, requestTimeoutMs)
       ).filter((m) => m.type === 'assistant').length;
       continue;
     }
-    outcome = {
-      ok: false,
-      failure: `invalid-reply: ${checked.error.issues[0]?.message ?? 'schema'}`,
-    };
+    outcome = { ok: false, failure: `invalid-reply: ${problem}` };
     break;
   }
 
@@ -1488,7 +1557,20 @@ function applyOwnershipReport(
   }
 }
 
-/** One stage's window: today's sweep + commit, skipped when the stage failed. */
+/**
+ * One stage's window: the declared moves, then the sweep and commit. Skipped
+ * when the stage failed.
+ *
+ * The moves land first, ahead of `enforceOwnership`: a validated pair's
+ * endpoints already satisfy `stagePathAllowed` for this stage, so the sweep
+ * leaves the delete and the add alone and `git add -A` in `commitStage` stages
+ * them as one rename (rename detection is diff-time, A5). A failed apply is
+ * environmental, not a reply defect: the list has already rolled back, so
+ * finalize returns without sweeping, staging, or committing and leaves exactly
+ * the preserved-worktree state a failed reply leaves today — attempt 2 starts a
+ * fresh session because the failure carries no `invalid-reply` prefix, and its
+ * sweep is the first thing that touches those paths (A4).
+ */
 function finalizeStage(
   repoDir: string,
   state: PipelineState,
@@ -1496,9 +1578,34 @@ function finalizeStage(
   stageName: string,
   stageKey: string,
   outcome: StageOutcome,
-): void {
+): StageOutcome {
   if (!outcome.ok) {
-    return;
+    return outcome;
+  }
+  const moves = (outcome.reply as { moves?: MovePair[] } | undefined)?.moves;
+  if (Array.isArray(moves) && moves.length > 0) {
+    const failure = applyMoves(repoDir, headBefore, moves);
+    if (failure !== null) {
+      const text =
+        `${failure.rollbackFailed ? 'moves-rollback-failed' : 'moves-apply-failed'}: ` +
+        failure.error;
+      // The ledger entry for this attempt was pushed when its reply last
+      // validated — before this window ran. A move failure lands after that
+      // write, so amend the entry: the retry decision, the gate log, and the
+      // operator-facing results all key on the failed attempt's `failure`, and
+      // an `ok` ledger next to a known-damaged worktree is a lie.
+      for (let i = state.results.length - 1; i >= 0; i -= 1) {
+        if (state.results[i].sessionID === outcome.sessionID) {
+          state.results[i].failure = text;
+          break;
+        }
+      }
+      // No sweep, no staging, no commit — the same preserved state a failed
+      // reply leaves. `dirtyFiles` lists untracked paths file by file
+      // (`--untracked-files=all`), so attempt 2's sweep sees every path
+      // whether or not the index holds them.
+      return { ...outcome, ok: false, failure: text };
+    }
   }
   applyOwnershipReport(enforceOwnership(repoDir, headBefore, stageName, state), state, stageName);
   if (typeof (outcome.reply as { testsNeedUpdate?: boolean })?.testsNeedUpdate === 'boolean') {
@@ -1514,6 +1621,7 @@ function finalizeStage(
       outcome.reply,
     ),
   );
+  return outcome;
 }
 
 /**
@@ -1529,9 +1637,8 @@ export async function executeStage(
 ): Promise<StageOutcome> {
   const stageName = stageDef(handle.stage, handle.specialty).name;
   const headBefore = git(opts.repoDir, ['rev-parse', 'HEAD']).trim();
-  const outcome = await executeInference(opts, state, handle, cfg);
-  finalizeStage(opts.repoDir, state, headBefore, stageName, handle.stageKey, outcome);
-  return outcome;
+  const outcome = await executeInference(opts, state, handle, cfg, undefined, headBefore);
+  return finalizeStage(opts.repoDir, state, headBefore, stageName, handle.stageKey, outcome);
 }
 
 /**
@@ -1570,13 +1677,28 @@ function finalizeReviewPass(
 /**
  * Only a missing reply is retried in the same session: a timed-out session was
  * cancelled as a zombie, and a stage whose agent does not exist has no work to
- * resume.
+ * resume. ADR-005 keeps the two retryable moves outcomes on opposite sides of
+ * this test: a validator rejection arrives as `invalid-reply: moves — <issue>`
+ * and repairs in the same session, while `moves-apply-failed:` is environmental
+ * and starts a fresh one. The third class never reaches this choice at all —
+ * `escalatesWithoutRetry` stops it before attempt 2 is built.
  */
 export function retryInSameSession(
   failure: string | undefined,
   sessionID: string | undefined,
 ): boolean {
   return sessionID !== undefined && (failure ?? '').startsWith('invalid-reply');
+}
+
+/**
+ * The one failure class that must not start attempt 2: a rollback rename that
+ * itself failed left the worktree half-moved, the one state nothing in-process
+ * can undo (proposal, Apply; Risks). Retrying would point a new session at the
+ * damaged tree and commit the half-applied list, so the driver escalates to the
+ * operator instead.
+ */
+export function escalatesWithoutRetry(failure: string | undefined): boolean {
+  return (failure ?? '').startsWith('moves-rollback-failed');
 }
 
 /**
@@ -1913,6 +2035,22 @@ async function drive(
           reason: `${handle.stageKey}: ${out.failure}`,
         });
         await checkpoint(designDir, state);
+        // A rollback rename that itself failed leaves a half-moved worktree,
+        // the one state nothing in-process can undo. Attempt 2 would point a
+        // fresh session at that tree, and its sweep cannot see the damage — the
+        // half-applied pair's endpoints satisfy `stagePathAllowed` by
+        // construction — so a valid attempt-2 reply would commit it. Stop at the
+        // operator instead (proposal, Apply; Risks row 3).
+        if (escalatesWithoutRetry(out.failure)) {
+          await finalizeEscalate(
+            opts.repoDir,
+            state,
+            `stage ${handle.stageKey} failed with a half-applied moves list ` +
+              `(${out.failure}) — no retry: the worktree is known-damaged`,
+            cfg,
+          );
+          throw new StopDriving();
+        }
         // A reply failure means the work is usually done and only the closing
         // object was missing: retry in the same session, where the report and
         // the reading are still there. A timeout is different — that session

@@ -1,0 +1,96 @@
+diff --git a/tmp/bindforge-editorial-runner-executed-file-moves-r3.md b/home/mike/.local/share/opencode/worktree/f852d4/quiet-orchid/docs/designs/005-runner-executed-file-moves/02-proposal.md
+index 2168fac..e458bff 100644
+--- a/tmp/bindforge-editorial-runner-executed-file-moves-r3.md
++++ b/home/mike/.local/share/opencode/worktree/f852d4/quiet-orchid/docs/designs/005-runner-executed-file-moves/02-proposal.md
+@@ -8,7 +8,7 @@ stage replies: the `implement`, `fix`, and `test-update` replies gain a
+ touching anything, and the runner — still the only committer — executes the
+ renames during the stage's finalize, before the ownership sweep and
+ `commitStage`. Run 004 escalated with `tests not green at the code-review
+-budget limit` because its 23 test-file moves were inexpressible to any stage
++budget limit`, because its 23 test-file moves were inexpressible to any stage
+ (A12). ADR-005 defers its earlier item 5, read-only git in stage shells, to a
+ follow-up ADR, so this change ships items 1-4 only.
+ Grounding: docs/designs/005-runner-executed-file-moves/01-research.md; this run
+@@ -23,7 +23,7 @@ follows run 004 (ADR-005, Ordering).
+     existing invalid-reply retry/escalation path.
+   - A failed apply never leaves a half-applied list inside finalize.
+ - Non-goals:
+-  - Any agent git write access, any scope (ADR-005 Alternatives; see Options 1).
++  - Any agent git write access, at any scope (ADR-005 Alternatives; see Options 1).
+   - Directory moves and case-only renames (see Deferred).
+   - Review protocol, gates, and non-move ownership semantics stay untouched
+     (ADR-005, Consequences); the checkpoint-trust question belongs to ADR-006.
+@@ -75,9 +75,10 @@ behavior (see Sweep interaction, pinned by Test strategy #4).
+ **Reply field** (`tools/orchestration/src/pipeline/types.ts`). A shared
+ `MovePairSchema = z.object({ from: z.string().min(1).max(200), to: z.string()
+ .min(1).max(200) })` and `moves: z.array(MovePairSchema).default([]).max(64)`
+-join the `implement`, `fix`, and `test-update` entries of `StageReplySchemas`
++are added to the `implement`, `fix`, and `test-update` entries of
++`StageReplySchemas`
+ (types.ts:44-46). The bounds cap the validation and apply work one reply can make the
+-runner spend; an over-limit list fails `safeParse` like any invalid reply. Optional
++runner spend; a list over either cap fails `safeParse` like any invalid reply. Optional
+ with default `[]` keeps the checkpoint additive per A13; `version` stays 1 and
+ `state-store.ts` is untouched. `replyFormat` renders the schema into every prompt
+ (runner.ts:709-710), so the field documents itself to the model.
+@@ -102,7 +103,7 @@ failure names the offending pair. Rules:
+ 4. `from` is a tracked **file** at `headBefore` (`git cat-file -t
+    <headBefore>:<from>` equals `blob` — this is the file-only rule) and still
+    exists on disk (its dirty content is what rides along).
+-5. `to` exists nowhere: not on disk (`existsSync` — this is also the
++5. `to` does not exist anywhere: not on disk (`existsSync` — this is also the
+    case-insensitive-checkout guard, A10) and not tracked at `headBefore`, while
+    its parent directory does exist, so a missing parent fails as a reply error
+    here rather than as an environmental apply failure later.
+@@ -111,7 +112,7 @@ failure names the offending pair. Rules:
+    a path-prefix of another — rejecting swaps (`A→B, B→A`), chains (`A→B, B→C`),
+    moves into a moved-out path, and case-only moves (`README.md` → `readme.md`);
+    the fold is deliberate conservatism, since a repo with case-variant filenames
+-   cannot move both in one reply. What is left is a matching whose apply order is
++   cannot move both in one reply. What remains is a matching whose apply order is
+    irrelevant.
+ 7. Containment: the realpath of `from` and of `to`'s parent (rule 5) stay inside the
+    repo's realpath, which also catches a symlink escaping into the real gitdir; rule
+@@ -121,26 +122,28 @@ failure names the offending pair. Rules:
+ `headBefore` parameter, passed only by `executeStage` (runner.ts:1077-1079);
+ review schemas have no `moves`, so `runReviewPass` passes nothing. After
+ `schema.safeParse` succeeds (runner.ts:912-916), if the parsed reply carries a
+-non-empty `moves`, run `validateMoves`; a failure — a returned issue or a throw
+-from a rule — takes the existing schema-failure branch (nudge with the issue
++non-empty `moves`, run `validateMoves`; a failure, a returned issue or a throw
++from a rule, takes the existing schema-failure branch (nudge with the issue
+ message, then final failure `invalid-reply: moves — <issue>`), so
+ `retryInSameSession` (runner.ts:1121-1126), the repair prompt, and
+ second-failure escalation behave exactly as for any invalid reply.
+ 
+ **Apply** (`moves.applyMoves(repoDir, headBefore, moves)`, called from
+ `finalizeStage` between reply acceptance and the `enforceOwnership` call, i.e.
+-before runner.ts:1049, ahead of `commitStage` at 1053). Immediately before the first
+-rename it re-runs rules 4–7 as one guard across the inference→finalize window; a
+-guard refusal takes the same `moves-apply-failed` outcome and preserved worktree as a
+-rename error. Then per pair, in reply order, `fs.renameSync` (A8), under the
+-`.pipeline.lock` single-writer invariant (runner.ts:354-383). On the first error,
+-completed renames roll back in reverse — exact because pairs are disjoint — and the
+-outcome becomes `moves-apply-failed: <error>` without the `invalid-reply` prefix: the
+-failure being environmental, attempt 2 starts a fresh session. Finalize returns
+-without sweeping or committing, the preserved-worktree state a failed reply leaves
+-today (runner.ts:1046-1048). A rollback rename that itself fails is the one state
+-nothing in-process can undo: `moves-rollback-failed: <error>` escalates to the
+-operator instead of starting attempt 2 on a known-damaged worktree.
++before runner.ts:1049, ahead of `commitStage` at 1053). Immediately before the
++first rename it re-runs rules 4–7 as one guard across the inference→finalize
++window; a guard refusal takes the same `moves-apply-failed` outcome and
++preserved worktree as that of a rename error. Then per pair, in reply order,
++`fs.renameSync` (A8), under the `.pipeline.lock` single-writer invariant
++(runner.ts:354-383). On the first error, completed renames roll back in
++reverse, which is exact because the pairs are disjoint, and the outcome becomes
++`moves-apply-failed: <error>` without the `invalid-reply` prefix: the failure
++being environmental, attempt 2 starts a fresh session. Finalize returns without
++sweeping or committing, leaving the preserved-worktree state that a failed
++reply leaves today (runner.ts:1046-1048). A rollback rename that itself fails
++is the one state nothing in-process can undo: `moves-rollback-failed: <error>`
++escalates to the operator instead of starting attempt 2 on a known-damaged
++worktree.
+ 
+ After a successful apply the existing machinery finishes the job: the sweep
+ leaves the pair alone (Sweep interaction, below), `git add -A` stages

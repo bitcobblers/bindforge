@@ -1,5 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -156,5 +163,46 @@ describe('enforceOwnership', () => {
     expect(readFileSync(join(dir, 'docs', 'designs', '002-x', '02-proposal.md'), 'utf8')).toBe(
       'v2\n',
     );
+  });
+
+  // proves: Test strategy #4 — the sweep needs no reply-moves branch: a
+  // runner-applied move pair (delete of a tracked file + untracked add) whose
+  // endpoints both satisfy `stagePathAllowed` for the executing stage is absent
+  // from `report.reverted` and stays applied. This pins the invariant that the
+  // moves validator and the sweep share one `stagePathAllowed` predicate; a
+  // future fork of the predicate breaks this test instead of silently breaking
+  // production.
+  it('leaves an in-ownership move pair applied and out of the reverted list', () => {
+    const { dir, base } = tmpRepo();
+    renameSync(
+      join(dir, 'docs', 'designs', '002-x', '02-proposal.md'),
+      join(dir, 'docs', 'designs', '002-x', '03-renamed.md'),
+    );
+
+    const report = enforceOwnership(dir, base, 'design-review', state());
+
+    expect(report.reverted).toEqual([]);
+    expect(existsSync(join(dir, 'docs', 'designs', '002-x', '03-renamed.md'))).toBe(true);
+    expect(existsSync(join(dir, 'docs', 'designs', '002-x', '02-proposal.md'))).toBe(false);
+  });
+
+  // proves: Test strategy #4 — the same delete+add shape whose endpoints fail
+  // `stagePathAllowed` is unsanctioned: the deleted path is still restored from
+  // `headBefore` and the planted add removed. Here `implement` (everything but
+  // tests) renames a tracked test file, so both endpoints are violations.
+  it('restores an unsanctioned delete+add pair from headBefore', () => {
+    const { dir } = tmpRepo();
+    mkdirSync(join(dir, 'tests'), { recursive: true });
+    writeFileSync(join(dir, 'tests', 'old.test.ts'), "test('old', () => {});\n");
+    gitAt(dir, ['add', '-A']);
+    gitAt(dir, ['commit', '-q', '-m', 'test: add a tracked test file']);
+    const base = gitAt(dir, ['rev-parse', 'HEAD']).trim();
+    renameSync(join(dir, 'tests', 'old.test.ts'), join(dir, 'tests', 'new.test.ts'));
+
+    const report = enforceOwnership(dir, base, 'implement', state());
+
+    expect(report.reverted.sort()).toEqual(['tests/new.test.ts', 'tests/old.test.ts']);
+    expect(readFileSync(join(dir, 'tests', 'old.test.ts'), 'utf8')).toContain("test('old'");
+    expect(existsSync(join(dir, 'tests', 'new.test.ts'))).toBe(false);
   });
 });

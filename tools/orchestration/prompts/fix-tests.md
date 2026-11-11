@@ -13,3 +13,6 @@ it red burns a fix round.
 
 Stay faithful to {{designDir}}/02-proposal.md. Never edit test files; if a
 test itself must change, set testsNeedUpdate in your reply.
+
+To move or rename a file, do not touch the paths yourself —
+declare it in `moves`, and the runner performs it.

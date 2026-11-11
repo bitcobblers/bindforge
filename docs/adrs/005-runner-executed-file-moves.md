@@ -1,9 +1,9 @@
 ---
-status: proposed
+status: accepted
 date: 2026-11-10
 ---
 
-# ADR 006: Let stages declare file moves; the runner executes them
+# ADR 005: Let stages declare file moves; the runner executes them
 
 ## Context
 
@@ -51,12 +51,18 @@ as every other stage mutation.
 4. **Sweep accounts for sanctioned deletions.** `enforceOwnership` treats a
    deleted `from` path as sanctioned by the validated reply instead of a
    stray removal; unsanctioned deletions keep today's revert behavior.
-5. **Read-only git in stage shells.** Stage agent shells additionally allow
-   `git status`, `git log`, `git diff`, `git show` - plumbing that cannot
-   write refs, the index, or HEAD. `git config` stays denied because config
-   controls hook execution. This closes the smaller half of run 004's
-   friction: fix stages burned rounds re-deriving state they could not even
-   `git status` for.
+
+**Deferred — read-only git in stage shells.** An earlier item 5 additionally
+allowed `git status`, `git log`, `git diff`, `git show` in stage agent shells.
+Design round 1 of this run showed its attack surface — a stage planting
+`.git/config`/hooks or other git config sources, then having the runner's own
+next git calls execute them, through sinks the ownership sweep can neither see
+nor undo — is a separable, non-terminating problem, in the same family the
+checkpoint-trust carve-out (ADR-006) exists for. It is deferred to a follow-up
+ADR. Items 1-4 stand without it: run 004's blocker was that the pipeline
+cannot execute a file move at all, and items 1-4 close that; the friction of
+fix stages re-deriving state without `git status` costs extra rounds, not the
+run.
 
 ## Alternatives considered
 
@@ -82,7 +88,7 @@ Accepted costs: finalize gains a validated mutation surface (bounded by
 item 2's checks); `moves` is a new checkpoint field (additive with
 defaults, ADR-003's rule); stage prompts for implement/fix/test-update
 must teach the field. Untouched: review protocol, gates, ownership
-semantics for non-move edits, and ADR-005's checkpoint-trust scope.
+semantics for non-move edits, and ADR-006's checkpoint-trust scope.
 
 Ordering: run after 004 completes. Dogfood acceptance: a later run of any
 file-moving change, green without a single escalation.

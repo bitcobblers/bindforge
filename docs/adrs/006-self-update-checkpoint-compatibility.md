@@ -3,7 +3,7 @@ status: proposed
 date: 2026-11-09
 ---
 
-# ADR 005: Make the pipeline checkpoint resumable across a self-update
+# ADR 006: Make the pipeline checkpoint resumable across a self-update
 
 Carved out of ADR-003, which no longer carries any of it. **Not scheduled to be
 run:** ADR-003 should land and be exercised once before this is worth designing,
