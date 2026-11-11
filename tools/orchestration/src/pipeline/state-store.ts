@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 
 import { z } from 'zod';
 
@@ -18,13 +19,8 @@ export function designDirOf(state: PipelineState): string {
   return join('docs', 'designs', `${state.nnn}-${state.slug}`);
 }
 
-/**
- * The persisted shape, as data. Run 1's own compatibility reviewer raised the
- * risk this guards against from the inside: a validator that rejects what the
- * generator produces makes a run unresumable by its own checkpoint. So the
- * grammar here is the *same* NNN_RE / SLUG_RE that deriveIdentity validates,
- * and every field added after run 1 is optional.
- */
+/** A seat's persisted verdict record; the StateSchema header below owns the
+ * compatibility rules the whole shape follows. */
 const SeatSchema = z.object({
   verdict: z.enum(['approve', 'request-changes']),
   stamp: z.string(),
@@ -38,6 +34,28 @@ const SeatSchema = z.object({
   findings: z.array(FindingSchema).optional(),
 });
 
+/**
+ * The cross-version resume contract (ADR-006 §2), stated as rule set:
+ *
+ * - GUARANTEED: any runner loads and resumes any `version: 1` checkpoint
+ *   written by an earlier runner. Evolution rules: new fields are added
+ *   optional with behavior-safe defaults; no field is ever removed, retyped,
+ *   renamed, or re-interpreted — `updatedAt` keeps meaning "when this
+ *   snapshot was taken" and `stageCommits` keeps its bounded-window meaning,
+ *   as named contract, not comment. Backfill at resume happens only where
+ *   absence changes behavior (the `baseRef` precedent in the runner).
+ * - MAY REFUSE: an unknown `version` value, or a shape this schema rejects.
+ *   Refusal never writes or deletes anything.
+ * - A version bump is a separate, deliberate step: introducing `2` requires
+ *   per-version readers at the version seam below plus a golden fixture per
+ *   era (`tests/pipeline/fixtures/checkpoints/`) before the bump may ship.
+ *
+ * Run 1's own compatibility reviewer raised the risk this grammar guards
+ * against from the inside: a validator that rejects what the generator
+ * produces makes a run unresumable by its own checkpoint. So the grammar
+ * here is the *same* NNN_RE / SLUG_RE that deriveIdentity validates, and
+ * every field added after run 1 is optional.
+ */
 const StateSchema = z.object({
   version: z.literal(1),
   nnn: z.string().regex(NNN_RE),
@@ -111,15 +129,44 @@ const StateSchema = z.object({
   updatedAt: z.number(),
 });
 
+/**
+ * Ceiling on the raw checkpoint read (security r1, finding 5). The file is
+ * untrusted input — the committed copy can carry pre-fence model-authored
+ * bytes (Risks row 2) — so the loader sizes it before parsing rather than
+ * after: an over-cap file is refused with the same operator postures the
+ * version refusal offers, spending bounded memory. Real checkpoints sit far
+ * under this; the cap only ever fires on hostile or corrupt input.
+ */
+const MAX_CHECKPOINT_BYTES = 8 * 1024 * 1024;
+
 /** Load a run's checkpoint, or null if none exists yet. */
 export async function loadState(designDir: string): Promise<PipelineState | null> {
   const file = statePath(designDir);
   let raw: string;
   try {
+    const info = await stat(file);
+    if (info.size > MAX_CHECKPOINT_BYTES) {
+      throw new Error(
+        `pipeline checkpoint is too large: ${file} is ${String(info.size)} bytes, over the ` +
+          `ceiling of ${String(MAX_CHECKPOINT_BYTES)}. Restore the committed copy ` +
+          `(git checkout HEAD -- ${file}) or start a fresh run.`,
+      );
+    }
     raw = await readFile(file, 'utf8');
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
       return null;
+    }
+    if (code === 'EISDIR' || code === 'ENOTDIR' || code === 'ENOTEMPTY') {
+      // A directory (or a non-directory parent) occupies the checkpoint path.
+      // A rename cannot repair that in place (A5); name the repair instead of
+      // throwing a bare errno at `resume` and `status`.
+      throw new Error(
+        `pipeline checkpoint path is occupied: ${file} is not a readable checkpoint file. ` +
+          `Repair it with: rm -r ${file} && git checkout HEAD -- ${file}`,
+        { cause: error },
+      );
     }
     throw error;
   }
@@ -132,10 +179,7 @@ export async function loadState(designDir: string): Promise<PipelineState | null
     throw new Error(
       `pipeline checkpoint is not readable: ${file} (${String(
         (error as Error).message,
-      )}). It was interrupted mid-write; recover it with: git checkout HEAD -- ${join(
-        designDir,
-        STATE_FILE,
-      )}`,
+      )}). It was interrupted mid-write; recover it with: git checkout HEAD -- ${file}`,
       { cause: error },
     );
   }
@@ -144,7 +188,15 @@ export async function loadState(designDir: string): Promise<PipelineState | null
   }
   const version = (parsed as { version?: unknown }).version;
   if (version !== 1) {
-    throw new Error(`unsupported pipeline state version: ${String(version)}`);
+    // The refusal seam a future per-version reader ladder would mount at
+    // (ADR-006 §2). The message keeps today's stem, names the supported
+    // version, and states the ADR's own two interim postures. Refusal has
+    // touched nothing on disk: `loadState` is read-only.
+    throw new Error(
+      `unsupported pipeline state version: ${String(version)}. This runner reads ` +
+        `version 1 checkpoints. Until a compatible reader exists, restore the committed ` +
+        `copy (git checkout HEAD -- ${file}) and resume, or start a fresh run.`,
+    );
   }
   const checked = StateSchema.safeParse(parsed);
   if (!checked.success) {
@@ -153,6 +205,16 @@ export async function loadState(designDir: string): Promise<PipelineState | null
       .join('; ');
     throw new Error(`pipeline checkpoint is invalid: ${file} (${issues})`);
   }
+  // ADR-006 §1, correctness r1 finding 1: seed the in-process authorship
+  // record with the bytes this loader just read. Without it, trust starts
+  // empty in a fresh process and the resumed run's own newest checkpoint copy
+  // — dirty at the sweep whenever an interruption landed between the last
+  // loop-tail save and a single-stage resume — is reported as tampering and
+  // reverted to `headBefore`, contradicting §1's "dirty ⇒ runner". Seeding
+  // trusts exactly the bytes the run inherited from the last runner; a stage
+  // write or delete afterwards still mismatches the record and is still
+  // reverted, so the fence keeps its teeth.
+  recordRunnerWrite(file, raw);
   return parsed as PipelineState;
 }
 
@@ -172,6 +234,84 @@ export async function loadState(designDir: string): Promise<PipelineState | null
  * every `createStateWriter.enqueue` inside a pass. Both write paths keep the
  * persisted field meaning "when this snapshot was taken".
  */
+/**
+ * Every checkpoint write-path failure (`saveState`'s mkdir/writeFile/rename
+ * trio) surfaces as this class (ADR-006 §3). A structurally unwritable
+ * checkpoint is an escalation-worthy condition, not a crash: the drive loop
+ * tells the two apart by this type. A refused invalid snapshot keeps plain
+ * Error semantics — a refused write rejects its caller only.
+ */
+export class CheckpointWriteFailure extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = 'CheckpointWriteFailure';
+  }
+}
+
+/**
+ * ADR-006 §1 — what the runner itself wrote, kept in memory. The ownership
+ * sweep is author-agnostic (it filters every touched path, runner saves
+ * included), so it pairs the reserved-name rule with this authorship test:
+ * a match is skipped while it still holds the bytes `saveState` last wrote
+ * for it, or is absent because the runner deleted it, and reverted otherwise.
+ * Per-process state; `loadState` seeds it from the checkpoint it just read,
+ * so a new process starts trusting exactly the bytes the last runner left on
+ * disk and "dirty ⇒ runner" survives the process boundary (correctness r1,
+ * finding 1). Anything a stage then writes or deletes mismatches the record
+ * and is still reverted.
+ */
+const runnerBytes = new Map<string, string>();
+const runnerDeleted = new Set<string>();
+
+/** Record the bytes the runner is about to have at `path`. */
+export function recordRunnerWrite(path: string, bytes: string): void {
+  runnerBytes.set(resolve(path), bytes);
+}
+
+/**
+ * The bytes the runner last recorded for `path`, if any. The ownership sweep
+ * uses these to restore a tampered untracked checkpoint (correctness r1,
+ * finding 2): with nothing committed at the path yet, the recorded bytes are
+ * the only good copy the run has.
+ */
+export function runnerBytesFor(path: string): string | undefined {
+  return runnerBytes.get(resolve(path));
+}
+
+/** Record that the runner itself deleted `path`. */
+export function recordRunnerDelete(path: string): void {
+  runnerDeleted.add(resolve(path));
+}
+
+/**
+ * True while `path` still holds the bytes the runner last wrote there, or is
+ * absent because the runner deleted it — the one match the ownership sweep
+ * skips (a stage write to a reserved path is a content mismatch against it).
+ */
+export function holdsRunnerBytes(path: string): boolean {
+  const abs = resolve(path);
+  // A recorded delete outranks a recorded write. One process often does both
+  // to the same reserved path — `finalizeEscalate` writes `ESCALATION.md` and
+  // records its bytes, the next `resumePipeline` deletes the marker (§3) — and
+  // §1's rule is that a match is skipped while it holds the runner's bytes OR
+  // "is absent because the runner deleted it". Testing the write record first
+  // made the read fail on the runner's own delete and the sweep resurrected
+  // the marker from `headBefore`, undoing the §3 repair. A stage that
+  // re-creates the path is a content mismatch again and is still reverted.
+  if (runnerDeleted.has(abs)) {
+    return !existsSync(abs);
+  }
+  const bytes = runnerBytes.get(abs);
+  if (bytes !== undefined) {
+    try {
+      return readFileSync(abs, 'utf8') === bytes;
+    } catch {
+      return false; // deleted or replaced: not what the runner left
+    }
+  }
+  return false;
+}
+
 export async function saveState(designDir: string, state: PipelineState): Promise<void> {
   // Write nothing the loader would refuse to read back: a checkpoint the run
   // cannot resume is worse than a crash.
@@ -184,9 +324,27 @@ export async function saveState(designDir: string, state: PipelineState): Promis
   }
   const target = statePath(designDir);
   const tmp = `${target}.${randomBytes(4).toString('hex')}.tmp`;
-  await mkdir(designDir, { recursive: true });
-  await writeFile(tmp, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
-  await rename(tmp, target);
+  const text = `${JSON.stringify(state, null, 2)}\n`;
+  try {
+    await mkdir(designDir, { recursive: true });
+    await writeFile(tmp, text, 'utf8');
+    await rename(tmp, target);
+  } catch (error) {
+    // A failed rename must not leave a stray `.pipeline.json.<hex>.tmp`
+    // lying where the next boundary's `git add -A` would sweep it.
+    await unlink(tmp).catch(() => undefined);
+    const code = (error as NodeJS.ErrnoException).code;
+    const occupied = code === 'EISDIR' || code === 'ENOTDIR' || code === 'ENOTEMPTY';
+    throw new CheckpointWriteFailure(
+      `checkpoint save failed: ${String((error as Error).message)}` +
+        (occupied
+          ? ` — the checkpoint path is occupied; repair it with: ` +
+            `rm -r ${target} && git checkout HEAD -- ${target}`
+          : ''),
+      { cause: error },
+    );
+  }
+  recordRunnerWrite(target, text);
 }
 
 /**

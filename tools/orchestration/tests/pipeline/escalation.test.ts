@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -202,5 +203,123 @@ describe('finalizeEscalate', () => {
       encoding: 'utf8',
     }).trim();
     expect(subjects).toBe('docs: 002-x pipeline escalated');
+  });
+
+  // proves: Test strategy #7 — finalizeEscalate with an unwritable checkpoint
+  // (a directory occupies the checkpoint path): no error escapes, ESCALATION.md
+  // still records the gate reason plus the `checkpoint save failed` line, the
+  // commit is still made, and the repair printed names the rm -r posture.
+  it('escalates with a full record when its own checkpoint save fails', async () => {
+    const dir = tmpRepo();
+    const designDir = join(dir, 'docs', 'designs', '002-x');
+    mkdirSync(designDir, { recursive: true });
+    mkdirSync(join(designDir, '.pipeline.json')); // directory replaces the file path
+
+    const state = stateWith(
+      review('performance', 3, [
+        { severity: 'blocker', location: 'Test strategy 13', problem: 'bar unsatisfiable' },
+      ]),
+    );
+    const errors: string[] = [];
+    const spy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      errors.push(args.join(' '));
+      return undefined;
+    });
+
+    let escaped: unknown;
+    try {
+      await finalizeEscalate(
+        dir,
+        state,
+        'checkpoint save failed: EISDIR: illegal operation on a directory, rename',
+        DEFAULT_CONFIG,
+      );
+    } catch (err) {
+      escaped = err;
+    } finally {
+      spy.mockRestore();
+    }
+
+    // A failing save turns the escalation into a crash no more.
+    expect(escaped).toBeUndefined();
+
+    // The terminal record exists next to the broken path and names both the
+    // findings that opened the escalation and the save that failed during it.
+    const report = readFileSync(join(designDir, 'ESCALATION.md'), 'utf8');
+    expect(report).toContain('2 blocking findings open');
+    expect(report).toContain('checkpoint save failed');
+    // testing r1 #6 / correctness r1 #5: the appended line is the failure
+    // message alone — its stem already begins `checkpoint save failed:`, so
+    // the stem never appears doubled on one line (deviation 13).
+    expect(report).toMatch(/^checkpoint save failed: (?!checkpoint save failed)/m);
+    expect(report).not.toMatch(/checkpoint save failed: checkpoint save failed/);
+
+    // The escalation commit is still recorded — the run is not left without a
+    // terminal commit just because the checkpoint save failed.
+    expect(state.stageCommits).toHaveLength(1);
+    const subject = execFileSync('git', ['log', '--format=%s', '-1'], {
+      cwd: dir,
+      encoding: 'utf8',
+    }).trim();
+    expect(subject).toBe('docs: 002-x pipeline escalated');
+
+    // The operator is printed the repair, rm -r variant included, and the
+    // planted directory is left exactly where it is for them to act on.
+    const printed = errors.join('\n');
+    expect(printed).toContain('rm -r');
+    expect(printed).toContain('git checkout HEAD --');
+    expect(statSync(join(designDir, '.pipeline.json')).isDirectory()).toBe(true);
+  });
+
+  // proves: ADR-006 §3 (security r1 #1/#2, deviation 10) — the marker defends
+  // its own path. A stage owning docs/** plants `ESCALATION.md/probe`: the
+  // sweep reverts the file but never lists the (then-empty, untracked)
+  // directory residue, so escalation must clear the directory, write the
+  // marker atomically through a tmp+rename pair, and land a full record —
+  // not crash with no terminal record at all.
+  it('escalates with a full record when a directory occupies the marker path', async () => {
+    const dir = tmpRepo();
+    const designDir = join(dir, 'docs', 'designs', '002-x');
+    mkdirSync(join(designDir, 'ESCALATION.md'), { recursive: true });
+    writeFileSync(join(designDir, 'ESCALATION.md', 'probe'), 'planted\n', 'utf8');
+
+    const state = stateWith(
+      review('performance', 3, [
+        { severity: 'blocker', location: 'Test strategy 13', problem: 'bar unsatisfiable' },
+      ]),
+    );
+    const errors: string[] = [];
+    const spy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      errors.push(args.join(' '));
+      return undefined;
+    });
+
+    let escaped: unknown;
+    try {
+      await finalizeEscalate(dir, state, 'design review: 1 blocking findings open', DEFAULT_CONFIG);
+    } catch (err) {
+      escaped = err;
+    } finally {
+      spy.mockRestore();
+    }
+
+    // An EISDIR at the marker path escapes to the drive loop no more: the
+    // run keeps its terminal record either way.
+    expect(escaped).toBeUndefined();
+
+    const marker = join(designDir, 'ESCALATION.md');
+    expect(statSync(marker).isFile()).toBe(true); // the planted directory is cleared
+    const report = readFileSync(marker, 'utf8');
+    expect(report).toContain('**design** phase');
+    expect(report).toContain('2 blocking findings open');
+
+    // The marker write is atomic (tmp+rename like saveState): no tmp residue
+    // and no planted residue survive beside it.
+    expect(
+      readdirSync(designDir).filter((f) => f.startsWith('ESCALATION') && f !== 'ESCALATION.md'),
+    ).toEqual([]);
+
+    // The escalation commit still lands, as for every other escalation.
+    expect(state.stageCommits).toHaveLength(1);
   });
 });

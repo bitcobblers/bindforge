@@ -1,0 +1,202 @@
+{
+  "version": 1,
+  "slug": "code-driven-pipeline",
+  "nnn": "001",
+  "branch": "pipeline/001-code-driven-pipeline",
+  "source": {
+    "kind": "adr",
+    "path": "docs/adrs/001-code-driven-agent-pipeline.md"
+  },
+  "status": "done",
+  "lastStage": "doc-sync",
+  "designRound": 3,
+  "codeRound": 1,
+  "designBudgetUsed": 3,
+  "codeBudgetUsed": 1,
+  "editorialDone": true,
+  "testsGreen": true,
+  "testsNeedUpdate": false,
+  "stageFailures": {},
+  "forceNext": null,
+  "results": [
+    {
+      "stage": "research",
+      "round": 0,
+      "sessionID": "ses_001_research",
+      "agent": "research/researcher",
+      "at": 1775000001000,
+      "reply": {
+        "summary": "researched the pipeline surface",
+        "commitMessage": "docs: add research for the code-driven pipeline"
+      },
+      "transcript": "docs/designs/001-code-driven-pipeline/transcripts/research-r0.md"
+    },
+    {
+      "stage": "proposal",
+      "round": 0,
+      "sessionID": "ses_001_proposal",
+      "agent": "design/designer",
+      "at": 1775000002000,
+      "reply": {
+        "commitMessage": "docs: add design proposal for the code-driven pipeline"
+      },
+      "transcript": "docs/designs/001-code-driven-pipeline/transcripts/proposal-r0.md"
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_001_review_c1",
+      "agent": "review/design-correctness",
+      "at": 1775000003000,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Decision",
+            "problem": "the gate order contradicts the drive loop"
+          }
+        ]
+      },
+      "transcript": "docs/designs/001-code-driven-pipeline/transcripts/design-review-correctness-r1.md"
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_001_revise_1",
+      "agent": "design/designer",
+      "at": 1775000004000,
+      "reply": {
+        "changed": true,
+        "summary": "closed it",
+        "commitMessage": "docs: address r1 design review findings"
+      },
+      "transcript": "docs/designs/001-code-driven-pipeline/transcripts/proposal-revise-r1.md"
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_001_review_c2",
+      "agent": "review/design-correctness",
+      "at": 1775000005000,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/001-code-driven-pipeline/transcripts/design-review-correctness-r1-attempt2.md"
+    },
+    {
+      "stage": "proposal-final",
+      "round": 0,
+      "sessionID": "ses_001_final",
+      "agent": "design/editor",
+      "at": 1775000006000,
+      "reply": {
+        "ambiguities": [],
+        "commitMessage": "docs: final language pass on the pipeline proposal"
+      },
+      "transcript": "docs/designs/001-code-driven-pipeline/transcripts/proposal-final-r0.md"
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_001_tests",
+      "agent": "code/test-engineer",
+      "at": 1775000007000,
+      "reply": {
+        "testsAdded": 21,
+        "commitMessage": "test: pin the pipeline contracts"
+      },
+      "transcript": "docs/designs/001-code-driven-pipeline/transcripts/test-authoring-r0.md"
+    },
+    {
+      "stage": "implement",
+      "round": 0,
+      "sessionID": "ses_001_implement",
+      "agent": "code/coder",
+      "at": 1775000008000,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "feat: code-driven agent pipeline"
+      },
+      "transcript": "docs/designs/001-code-driven-pipeline/transcripts/implement-r0.md"
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_001_codereview_c",
+      "agent": "codereview/code-correctness",
+      "at": 1775000009000,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/001-code-driven-pipeline/transcripts/code-review-correctness-r1.md"
+    },
+    {
+      "stage": "doc-sync",
+      "round": 1,
+      "sessionID": "ses_001_docsync",
+      "agent": "ops/doc-sync",
+      "at": 1775000010000,
+      "reply": {
+        "drifted": true,
+        "commitMessage": "docs: record as-built pipeline behavior"
+      },
+      "transcript": "docs/designs/001-code-driven-pipeline/transcripts/doc-sync-r1.md"
+    }
+  ],
+  "gateLog": [
+    {
+      "gate": "sourceAdmissible",
+      "round": 0,
+      "proceed": true,
+      "reason": "ADR is proposed and complete",
+      "at": 1775000000000
+    },
+    {
+      "gate": "allDesignReviewsApproved",
+      "round": 1,
+      "proceed": false,
+      "reason": "1 blocking findings open",
+      "at": 1775000003000
+    },
+    {
+      "gate": "allDesignReviewsApproved",
+      "round": 1,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1775000005000
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1775000008000
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check green",
+      "at": 1775000008500
+    },
+    {
+      "gate": "allCodeReviewsApproved",
+      "round": 1,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1775000009000
+    },
+    {
+      "gate": "done",
+      "round": 0,
+      "proceed": true,
+      "reason": "pipeline complete",
+      "at": 1775000010000
+    }
+  ],
+  "startedAt": 1775000000000,
+  "updatedAt": 1775009000000
+}

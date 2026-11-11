@@ -1,0 +1,1382 @@
+{
+  "version": 1,
+  "slug": "self-update-checkpoint-compatibility",
+  "nnn": "006",
+  "branch": "pipeline/006-self-update-checkpoint-compatibility",
+  "source": {
+    "kind": "adr",
+    "path": "docs/adrs/006-self-update-checkpoint-compatibility.md"
+  },
+  "status": "done",
+  "lastStage": "doc-sync",
+  "designRound": 2,
+  "codeRound": 1,
+  "designBudgetUsed": 1,
+  "codeBudgetUsed": 4,
+  "editorialDone": false,
+  "testsGreen": true,
+  "testsNeedUpdate": false,
+  "stageFailures": {
+    "code-review:correctness": 1,
+    "code-review:testing": 1,
+    "doc-sync": 1
+  },
+  "stageCommits": [
+    "a4d9449a5c52c19bbb18df52023b347a03c9b71f",
+    "3188adfcc16d85bc71cfae0cf3207d63072e4cae",
+    "37f4566395ddca45e1810fa5897633bb14a7ec3c",
+    "a72ac58686c093f5bd51134235b90c7ee9ea1a01",
+    "707a30b61eda2fe78da80d95665e55036d8ed46f",
+    "f69f0ecadc55fee8855015979de60bc95b72417c",
+    "ca62f725fe94012d2cfe232167cae7623d42eb68",
+    "ae0c43ae7751a1c6e42f8faaf74dd53ea0968eb3",
+    "b8c090f6aea4576b5d344321680f71e6db63789a",
+    "b0f6f05d38343d314a894a55c729dd7cc9f61488",
+    "f503647b48e68aa67f487a7008a8af3cecf433a3",
+    "4fc97b316349ed487b5ef49430175c04aabc1e61",
+    "7f1845f5f9ac19e63a95d90da0a6ba380668ece0",
+    "273f2419655f2516d8c8538c138aa285272ab979",
+    "fc2c59e971c4a8759c9dbd6459162289ea8c34d8",
+    "640c289bdd01611c1fcd07a504af78eb59fb3fc7",
+    "2d49432b9f4945729e0b4d4cbf11f966133f4259",
+    "a31075f3ddc305ccfec175bf3aa8d306ecbf201c",
+    "a43af81bf7e65585ecf62f52e46e5b1aa471fccd"
+  ],
+  "forceNext": null,
+  "results": [
+    {
+      "stage": "research",
+      "round": 0,
+      "sessionID": "ses_e37dca43dffe49lCvcMAowpgpL",
+      "agent": "research/researcher",
+      "at": 1794359538194,
+      "reply": {
+        "summary": "Research artifact written to docs/designs/006-self-update-checkpoint-compatibility/01-research.md, organized around ADR-006's three questions. Key findings: cross-version compatibility today is only the additive-optional field discipline plus one backfill, with a hard-rejected literal version 1 and no migration mechanism; the worktree checkpoint sits inside every document/review stage's write-set while the committed copy is already the de facto recovery anchor (git checkout HEAD hint, save-before-commit); and when the checkpoint can't be written, the escalation record dies with it since finalizeEscalate writes through the failing save path. Prior art covers Terraform state compatibility/locking, Step Functions immutable versions, Temporal replay versioning, SQLite journal-marker recovery, POSIX rename and Node fs primitives, plus the run-2 postmortem read from git history; the check-then-write lockfile and checkpoint-to-prompt findings re-injection are flagged under the security lens. Applied lenses: Prior art, Security landscape, Platform notes. All internal citations verified against current file line numbers; external quotes re-fetched and verified.",
+        "commitMessage": "docs: add research for ADR-006 self-update checkpoint compatibility"
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/research-r0.md",
+      "durationMs": 415259,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal",
+      "round": 0,
+      "sessionID": "ses_e37d64dc4ffebUDkHjMM7e6lYU",
+      "agent": "design/designer",
+      "at": 1794359743712,
+      "reply": {
+        "commitMessage": "docs: add 006 checkpoint-compatibility design proposal"
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/proposal-r0.md",
+      "durationMs": 205457,
+      "nudges": 0,
+      "docLines": 323,
+      "docLinesAdded": 323,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e37d32aecffdU1VQphvX2jLjwu",
+      "agent": "review/design-security",
+      "at": 1794359900823,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "§1 Fence runner-reserved paths in the ownership matrix — \"return `false` when the path's last segment is `STATE_FILE` (`.pipeline.json`), starts with `${STATE_FILE}.`\"",
+            "problem": "new — The last-segment rule is an exact-string match with no case normalization. On case-insensitive filesystems (macOS is listed `yes` in the Compatibility matrix), a stage writing `.Pipeline.json`/`.PIPELINE.JSON` passes the string rule while hitting the same on-disk file the fence exists to protect, so the Goals claim that the copies \"can only carry runner-authored bytes\" is not guaranteed on a supported platform.",
+            "fix": "Make the reserved-name comparison case-insensitive when the underlying filesystem is case-insensitive (practically: on `darwin`/`win32`) in the same §1 sentence, and add one note to the macOS row of the Compatibility matrix that the fence rule is case-folded there. This qualifies the existing rule; it introduces no new mechanism."
+          },
+          {
+            "severity": "nit",
+            "location": "Compatibility matrix — \"Node `>= 22.23.4` (engine floor)\"",
+            "problem": "new — Advisory check (checklist item 5): 22.23.4 is itself the fixed release for CVE-2026-111497 (Brotli RCE, High), and Node has pre-alerted another 22.x security release for 2026-11-11 (highest severity High, details not yet public). Because the design states a floor (`>=`), not a pin, no unfixed advisory is forced on the design — informational only.",
+            "fix": "One sentence in the matrix row: the floor is a minimum; operators run the newest patched 22.x (the 2026-11-11 security release once it lands)."
+          },
+          {
+            "severity": "nit",
+            "location": "§3 An escalation that survives its own failing write — \"prints the repair commands — `git checkout HEAD -- <designDir>/.pipeline.json`, ... `rm -r <designDir>/.pipeline.json && git checkout HEAD -- …`\"",
+            "problem": "new — Path-interpolated command strings the operator copy-pastes; an unquoted path mis-tokenizes in a shell. The commands are printed, never executed by the runner, so this is exposure via operator copy-paste only (run slugs are conventionally simple).",
+            "fix": "Specify the printed commands with the interpolated paths single-quoted."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/design-review-security-r1c0.md",
+      "durationMs": 157003,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e37d32aecffe7ssneleFcf5CKS",
+      "agent": "review/design-compatibility",
+      "at": 1794359929025,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Compatibility matrix — \"| Windows | unknown | No CI workflow exists to exercise it\"",
+            "problem": "Checklist item 1: an `unknown` status must appear as a finding. The matrix is the document's compatibility contract, and an `unknown` cell ships an undecided answer while the design makes Windows-differing primitives (rename, 'wx', the §3 repair commands) load-bearing, so operators get no Windows posture from the document that decides this. Not a reopening of the Deferred item (deferring the CI work is ADR-consistent); the status column must still record a decision.",
+            "fix": "Change the cell to an explicit status — e.g. `no (unverified)` — keeping the existing note text; only the status cell changes. A later dated Windows smoke job may flip it to `yes`."
+          },
+          {
+            "severity": "major",
+            "location": "Compatibility matrix / Test strategy (Platform) — \"macOS | yes | POSIX semantics hold; not exercised by CI in this repo\" and \"the macOS, Windows, and network-FS rows are not exercised by this run\"",
+            "problem": "Checklist item 7: the Test strategy must name a platform test for every platform the matrix claims as supported. macOS is claimed `yes` but no named test run covers it; the POSIX-parity claim rests on documentation (A5/A6), not an exercised check.",
+            "fix": "Add one Platform-paragraph line naming a concrete macOS run of the existing suites (a dated manual/dev-machine run satisfies item 7 without CI), or demote the macOS row to the `partial` status the network row already uses."
+          },
+          {
+            "severity": "minor",
+            "location": "Test strategy (Platform) vs Assumption register A12 — \"Linux CI exercises all of the above\" vs A12 \"nothing in this repo exercises it (no CI workflow found)\"",
+            "problem": "The document contradicts itself about whether a CI runner exists. If none exists, \"Linux CI\" names a non-existent artifact and the Linux platform-test claim has no named runner; if one exists, A12's basis is stale.",
+            "fix": "Replace \"Linux CI exercises all of the above\" with the actual runner — \"the existing `tools/orchestration` test suite, run on Linux\" — or add a Linux CI workflow as a named Rollout deliverable and correct A12."
+          },
+          {
+            "severity": "minor",
+            "location": "§1 Fence — \"return `false` when the path's last segment is `STATE_FILE` (`.pipeline.json`), starts with `${STATE_FILE}.`\"",
+            "problem": "The rule never states how the last segment is derived or how case is compared (checklist item 6: separators and case handled by a library). On a case-insensitive filesystem — macOS is claimed `yes` — a write reported as `.PIPELINE.JSON` passes an exact-string fence while the filesystem routes it to the checkpoint's file, breaking §1's \"neither copy can ever again carry model-authored bytes\"; naive splitting also misparses Windows path shapes.",
+            "fix": "One sentence binding the matcher to path-library semantics — `path.basename` comparison, case-insensitive comparison on case-insensitive platforms — reusing the moves validator's existing normalization (moves.ts:107–131) instead of new string logic."
+          },
+          {
+            "severity": "nit",
+            "location": "§3 finalizeEscalate — \"prints the repair commands — `git checkout HEAD -- <designDir>/.pipeline.json`\"",
+            "problem": "The printed repair commands (including the `rm -r …` variant) are POSIX-shell only — consistent while Windows is undecided, but unusable if Windows ever becomes a support claim.",
+            "fix": "Conditional: if the Windows row becomes a support claim, name the PowerShell equivalents of the repair commands alongside the POSIX ones."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/design-review-compatibility-r1c0.md",
+      "durationMs": 185205,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e37d0c564ffeu3SSAWbD0zeOSN",
+      "agent": "review/design-performance",
+      "at": 1794360041844,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "§3 An escalation that survives its own failing write — \"`resumePipeline` (`runner.ts:1983–1989`) writes a `gateLog` entry (`terminalSaveFailed`, reason quoting the marker's failure line) before deleting the marker\"",
+            "problem": "new: the design adds a writer to a persisted, append-only array on the escalate → repair → resume cycle without stating whether `gateLog` is bounded, while §2 explicitly names the bound for the neighboring field (\"`stageCommits` keeps its bounded-window meaning … as named contract, not comment\"). This design's subject is checkpoints that outlive the run that wrote them and that operators repair and resume repeatedly, and `gateLog` is re-parsed by `loadState` on every resume, re-serialized on every save, and scanned by the escalation report (A4: \"escalationMarkdown renders the last denied gate-log entries from the in-memory state\"), so an unbounded growth path there is exactly the memory-growth question the checklist asks; the silence reads as unexamined rather than deliberate.",
+            "fix": "Extend the §2 contract bullet (or add one clause to §3's split-record bullet) naming the `gateLog` growth limit the same way — \"windowed like `stageCommits`\" or \"append-only, bounded by the run's stage-and-attempt count, at the byte size the golden fixtures pin\" — replacing the silence with a named-contract sentence rather than adding a trimming mechanism."
+          },
+          {
+            "severity": "nit",
+            "location": "§1 Fence runner-reserved paths / §3 split record / §4 Atomic lock acquisition — \"gains a first rule that precedes the per-stage rules\", \"checks for the marker alongside the loaded state\", \"on `EEXIST`, read the holder and apply today's pid-liveness logic unchanged\"",
+            "problem": "new: the design adds three new per-operation costs (a segment test per swept path, one extra stat per `pipeline status` call plus one extra read per resume, one extra read and one `'wx'` retry per contended lock acquire) and states no cost expectation for any of them; no baseline, number, or performance statement appears anywhere in the document, so a reader cannot tell whether \"these are free\" was reasoned about or assumed. The research baseline could not be quoted in this seat (not among its inputs), so the checklist's baseline-vs-expectation comparison has nothing to compare against in the text.",
+            "fix": "One sentence at the head of Risks or end of §4: \"the fence is a constant-time segment check added to the existing per-path sweep; the split-record check is one `stat` per `status` call and one read per resume; the lock path gains one read and one retry only under contention; nothing here is on a per-event path, so no runtime budget applies\" — plus a citation to the research document's checkpoint size/load baseline if it carries one."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/design-review-performance-r1c0.md",
+      "durationMs": 140988,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e37d0573affe43wvT5b79hLMG4",
+      "agent": "review/design-complexity",
+      "at": 1794360066024,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design §1 Fence runner-reserved paths in the ownership matrix — Q2 — \"starts with `${STATE_FILE}.` (the saveState tmp pattern, `state-store.ts:186`)\"",
+            "problem": "The tmp-name convention is minted in saveState (state-store.ts:186) but the fence re-derives it inline in gates.ts as a hard-coded prefix rule. The design's 'share one vocabulary' move exports the reserved names to types.ts yet leaves the reserved pattern duplicated across two files, so a future change to the tmp scheme in state-store.ts silently desynchronizes the fence's second rule.",
+            "fix": "Export the pattern from state-store.ts where it is minted (a small predicate such as isStateTmpSegment, or the tmp base-name constant) and have gates.ts consume it instead of rebuilding the prefix inline — the same single-vocabulary move the design already makes for STATE_FILE/ESCALATION.md."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design §2 The cross-version resume contract — Q1 — \"Canonical statement, written into the `StateSchema` header in `state-store.ts` and into `docs/workflows.md` for operators\"",
+            "problem": "The full rule set is written verbatim in two places and nothing in the Test strategy pins the two copies together, so the operator-facing doc can silently drift from the contract the golden fixtures enforce.",
+            "fix": "Keep the full contract in one home (the StateSchema header, where the engineer adding a field reads it) and let docs/workflows.md carry only the operator-facing subset (refusal message, recovery postures) with a pointer to the header — reducing rather than adding duplicated text."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/design-review-complexity-r1c0.md",
+      "durationMs": 136974,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e37d32aedffeiv4Wxe6wvnoFGm",
+      "agent": "review/design-correctness",
+      "at": 1794360193039,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "blocker",
+            "location": "§1 Chosen design \"Fence runner-reserved paths in the ownership matrix\" — \"`stagePathAllowed(stage, path)` (`gates.ts:260–273`) gains a first rule that precedes the per-stage rules: return `false` when the path's last segment is `STATE_FILE`\"",
+            "problem": "new — The fence lands in the same author-agnostic predicate enforceOwnership uses for its violation set (runner.ts:260–261: own-commit paths + dirtyFiles), which is A3's own cited basis. At every boundary sweep the checkpoint is dirty by the runner's own save (pass writes drain before the sweep at runner.ts:1871; checkpoint() re-saves after the commit at runner.ts:2298, 2336), so the sweep reverts or deletes the runner's own checkpoint writes: mid-run boundary commits never advance the committed copy (contradicting A7's `verified` \"newest good state at every stage boundary\"); a new run's untracked checkpoint is deleted at the first sweep and never committed until terminal, so §3's `git checkout HEAD --` repair, the loadState message, and Test #13 reference a path absent from HEAD; and resume's ESCALATION.md deletion (runner.ts:1983–1989) is restored at the next sweep, making the split-record line misfire. Test #2's \"byte-identical to headBefore\" assertion is exactly the misfire output, so no listed test catches it.",
+            "fix": "Keep the stagePathAllowed rule for attribution/reporting, but replace §1's third-bullet behavior (\"the sweep restores the file from `headBefore` and removes the planted tree\") with a reserved-name branch in the sweep: restore the path to the runner's authoritative content — re-save from the in-memory PipelineState via checkpoint() for .pipeline.json, re-apply resume's deletion for ESCALATION.md — instead of headBefore restore or removal."
+          },
+          {
+            "severity": "minor",
+            "location": "§2 cross-version resume contract — \"name the operator's two postures — resume with the pipeline that wrote it, or start a fresh run after archiving the run directory (ADR-006:55–57)\"",
+            "problem": "new — The cited ADR lines give a different pair: \"`git checkout HEAD -- docs/designs/<run>/.pipeline.json` or a fresh run\". The quoted first posture appears nowhere in the ADR and the ADR's first posture is missing from the pair; the refusal message and docs/workflows.md inherit an unsupported attribution.",
+            "fix": "Cite ADR-006:55–57 only as the precedent for naming operator postures in an error, and present the refusal pair as this design's own addition, or restate the pair to match the ADR's."
+          },
+          {
+            "severity": "nit",
+            "location": "§1 — \"starts with `${STATE_FILE}.` (the `saveState` tmp pattern, `state-store.ts:186`)\"",
+            "problem": "new — The prefix rule fences any name beginning `.pipeline.json.` at any depth, so a legitimate doc file such as `.pipeline.json-notes.md` can never be written by a stage.",
+            "fix": "Either state the breadth is deliberate and pin Test #1 on a neighboring name being forbidden, or match the tmp shape exactly (`/^\\.pipeline\\.json\\.[0-9a-f]{8}\\.tmp$/` on the last segment)."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/design-review-correctness-r1c0.md",
+      "durationMs": 449219,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e37cc4fc7ffe3RcXO270Pfo0TA",
+      "agent": "design/designer",
+      "at": 1794360501147,
+      "reply": {
+        "changed": true,
+        "summary": "Blocker (§1 fence): the sweep is author-agnostic, so the reserved-name rule is no longer a bare name test — `enforceOwnership` now skips a touched reserved path while it still holds the bytes `saveState` last wrote (or is absent because the runner deleted it), which restores A7, the first boundary commit of a new run's untracked checkpoint, and resume's `ESCALATION.md` deletion; Test #2 was rewritten to pin both directions instead of asserting byte-identity with `headBefore`. Compat majors: the Windows cell is now `no (unverified)` with a note limited to what A12 supports, and macOS is demoted to `partial` since no named run covers it. Compat minors: the Platform paragraph names the `tools/orchestration` suite on Linux (matching A12's no-CI basis, now marked verified) instead of a non-existent Linux CI, and the fence matcher is bound to segment-wise, case-insensitive comparison reusing moves.ts:134–147. Correctness minor/nit: §2's refusal now quotes the ADR's actual postures (restore the committed copy, or a fresh run), and the tmp rule matches the exact `.pipeline.json.<8 hex>.tmp` shape with Test #1 pinning `.pipeline.json-notes.md` as allowed. Offsetting deletions: the duplicated auto-reconcile option and the Non-goals/Deferred repeats were consolidated into Deferred, the schema-change paragraph at the end of §4 was removed, and §2/§3 prose was tightened — net −1 line overall.",
+        "commitMessage": "docs: make the checkpoint fence author-aware and settle platform rows"
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/proposal-revise-r1.md",
+      "durationMs": 308046,
+      "nudges": 0,
+      "docLines": 322,
+      "docLinesAdded": 69,
+      "docLinesRemoved": 70
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e37c79c38ffdffinLgdj2In99A",
+      "agent": "review/design-compatibility",
+      "at": 1794360639993,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "§1 Fence — \"compared segment-by-segment and case-insensitively the way the moves validator already compares these names (`moves.ts:134–147`)\"",
+            "problem": "new — the cited precedent compares these very names case-sensitively: moves.ts:136 is `segment === STATE_FILE` and :139 `segment === LOCK_FILE`; the only case-folded comparison in that block is `segment.toLowerCase() === '.git'` (line 142). The sentence binds the fence's case handling to code that does the opposite for exactly STATE_FILE/LOCK_FILE, so an implementer who follows the cited precedent builds a case-sensitive fence and fails Test #1's `.PIPELINE.JSON` case — the gap this revision was written to close.",
+            "fix": "Keep the behavior sentence and re-anchor the precedent: \"following the `segment.toLowerCase() === '.git'` pattern at moves.ts:142, widening the existing `segment === STATE_FILE` comparison at moves.ts:136 rather than copying it\", and state the fold applies on every platform, so on case-sensitive Linux it deliberately over-matches `.Pipeline.json` (Test #1 already pins that)."
+          },
+          {
+            "severity": "nit",
+            "location": "FYI — §2 May refuse — \"restore the committed copy (`git checkout HEAD -- …`) or start a fresh run (ADR-006:55–57)\"",
+            "problem": "not a compatibility finding; noted for the correctness seat. This is now verbatim the ADR's interim posture, which is right for the schema-rejection half of the bullet but cannot help the unknown-`version` half: the committed copy carries the same version as the worktree copy.",
+            "fix": "If the correctness seat agrees, let the refusal message differ per refusal cause: committed-copy restore for a rejected shape, resume-with-the-writing-pipeline / fresh run for an unknown version."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/design-review-compatibility-r1c1.md",
+      "durationMs": 138767,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e37c79c38ffeg3oTXVoTgH05Pj",
+      "agent": "review/design-correctness",
+      "at": 1794360750750,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "§1 Fence — \"compared segment-by-segment and case-insensitively the way the moves validator already compares these names (`moves.ts:134–147`)\"",
+            "problem": "new — The cited validator compares STATE_FILE/LOCK_FILE segments with plain `===` (case-sensitive, moves.ts:136, 139); only `.git` uses `toLowerCase()` (moves.ts:142). The claimed existing precedent for case-insensitive comparison of the reserved names is false, and the revision log entry repeats the same mis-citation. The case-insensitive choice itself is sound (Test #1 pins `.PIPELINE.JSON`), but since Non-goals keep moves.ts:134–147 unchanged, the sentence implies a shared precedent that does not exist.",
+            "fix": "Reword to attribute case-insensitivity to this design: \"segment-wise like the moves validator (`moves.ts:134–147`), with case-insensitivity added here (the validator's only case-insensitive name is `.git`, moves.ts:142)\"; correct the matching r1 revision-log entry."
+          },
+          {
+            "severity": "minor",
+            "location": "§1 Fence consequences — \"A stage write to the checkpoint is a content mismatch, reverted before that stage's `git add -A`\" + \"a new run's untracked checkpoint is committed by its first `commitStage`\"",
+            "problem": "new — For a new run before its first `commitStage`, the checkpoint is absent from `headBefore`, and the cited revert mechanics (runner.ts:263–276) remove violations not present in `headBefore`: a tampered, untracked checkpoint is deleted outright — no copy in HEAD or worktree until the next `checkpoint()` (runner.ts:2336) re-saves from memory, and a crash in that window leaves nothing for §3's `git checkout HEAD --` repair to restore. The unconditional first-commit claim is false in exactly the tamper case the fence targets.",
+            "fix": "Extend the §1 authorship branch: a reserved-name match with a content mismatch that is absent from `headBefore` is re-saved from the in-memory PipelineState via `checkpoint()`, instead of the restore-or-remove branch of runner.ts:263–276; add the case to Test #2."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/design-review-correctness-r1c1.md",
+      "durationMs": 249525,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e37c3cd3affdENQlW1mBjPiTIO",
+      "agent": "review/design-performance",
+      "at": 1794360871591,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/design-review-performance-r1c2.md",
+      "durationMs": 120754,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e37c3cd39ffe4i6DqYVmmZhGSm",
+      "agent": "review/design-complexity",
+      "at": 1794360897755,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/design-review-complexity-r1c2.md",
+      "durationMs": 146918,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e37c3cd3affeCovuVqQ4V4gKk0",
+      "agent": "review/design-security",
+      "at": 1794360931936,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "§1 Fence runner-reserved paths in the ownership matrix — \"a match is skipped while it still holds the bytes `saveState` last wrote for it, kept in memory (or is absent because the runner deleted it), and reverted otherwise\"",
+            "problem": "new — the absence branch states a cause (\"because the runner deleted it\") but not the test that establishes it. Read as \"absent ⇒ skip\", a stage that deletes `.pipeline.json` (its write set covers `docs/**`, A1) escapes the revert and the next `commitStage` commits the deletion; after that the §3 repair the design prints, `git checkout HEAD -- <designDir>/.pipeline.json`, restores nothing because HEAD now records the deletion, so the committed recovery anchor (A7; ADR-006:55–57) is destroyed by a model-authored action. Same shape for a stage deleting the `ESCALATION.md` marker, which §3's split-record `status` check and `resumePipeline`'s gate-log entry both depend on. The text I approved in r1 restored unconditionally (\"the sweep restores the file from `headBefore`\"), so this is introduced by the revision, and Test strategy #2 pins planted edit/tmp/directory-replacement and the runner's own save but no stage-side deletion.",
+            "fix": "In the same sentence, make the skip require a recorded authorship by this process (its last `saveState` snapshot, or a delete this process itself performed) and state that every other state — including absence it did not author — is restored from `headBefore`; add one Test #2 case: a stage-deleted `.pipeline.json` and a stage-deleted `ESCALATION.md` are both restored. Qualifies the existing predicate; no new mechanism."
+          },
+          {
+            "severity": "minor",
+            "location": "§1 Fence (authorship test) vs §3 escalation — \"the bytes `saveState` last wrote for it\"",
+            "problem": "new — the exemption is keyed only to `saveState` snapshots and runner deletes, so the runner's own `ESCALATION.md` write is not exempt: §1 says the sweep filters \"every touched path, runner saves included\", and `finalizeEscalate` writes `ESCALATION.md` then \"still runs `commitStage`\". Under the exemption as written, that marker is a reserved match holding nothing `saveState` wrote, so it is reverted and the terminal record never lands — contradicting §3's guarantee (ADR-006 question 3) and Test #7's assertion that `ESCALATION.md` is written with no error escaping, and unmaking the `status` split-record line.",
+            "fix": "Generalize the exempted set in that clause to \"bytes this process last wrote at that path — the `saveState` snapshot for the checkpoint, the escalation report writer's bytes for `ESCALATION.md`\", i.e. make the Revision log's intent (\"skips what the runner itself wrote in-window\") operative; this replaces the saveState-only wording rather than adding a mechanism."
+          },
+          {
+            "severity": "nit",
+            "location": "§3 An escalation that survives its own failing write — \"prints the repair commands — `git checkout HEAD -- <designDir>/.pipeline.json`, with the `rm -r <designDir>/.pipeline.json && git checkout HEAD -- …` variant\"",
+            "problem": "re-raised — unchanged from r1: interpolated paths are printed unquoted, so a run slug containing a space or shell metacharacter mis-tokenizes when the operator copy-pastes (checklist item 3; exposure via copy-paste only, the runner never executes them). The §2 revision widens the pattern with one more printed string — \"restore the committed copy (`git checkout HEAD -- …`)\" — so the quoting rule is now better stated once than per site.",
+            "fix": "Specify the printed commands with the interpolated paths single-quoted, and let Test #5 (which already asserts the message names the `rm -r` + `git checkout HEAD --` repair) assert the quoted form."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/design-review-security-r1c2.md",
+      "durationMs": 181099,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-final",
+      "round": 0,
+      "sessionID": "ses_e37c1097dffeyyRvpxyd7gXdcL",
+      "agent": "design/editor",
+      "at": 1794361012266,
+      "reply": {
+        "ambiguities": [],
+        "commitMessage": "docs: language-only edit pass on ADR-006 checkpoint proposal"
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/proposal-final-r0.md",
+      "durationMs": 80274,
+      "nudges": 0,
+      "docLines": 322,
+      "docLinesAdded": 10,
+      "docLinesRemoved": 10
+    },
+    {
+      "stage": "editorial-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e37bfcfacffdIRWiUVrj2jH5bh",
+      "agent": "review/design-compatibility",
+      "at": 1794361066675,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/editorial-review-compatibility-r2.md",
+      "durationMs": 54322,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:security",
+      "round": 2,
+      "sessionID": "ses_e37bfcfabffeTB0cVkORc0RKwZ",
+      "agent": "review/design-security",
+      "at": 1794361098878,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/editorial-review-security-r2.md",
+      "durationMs": 86526,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:performance",
+      "round": 2,
+      "sessionID": "ses_e37befb49ffeGSRhaHXLh0F0AK",
+      "agent": "review/design-performance",
+      "at": 1794361131102,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/editorial-review-performance-r2.md",
+      "durationMs": 64389,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e37bfcfacffeExWqaQKBwGrbYj",
+      "agent": "review/design-correctness",
+      "at": 1794361137144,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/editorial-review-correctness-r2.md",
+      "durationMs": 124791,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:complexity",
+      "round": 2,
+      "sessionID": "ses_e37be7d7dffeK3xvBrgx8YyTkB",
+      "agent": "review/design-complexity",
+      "at": 1794361143166,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/editorial-review-complexity-r2.md",
+      "durationMs": 44258,
+      "nudges": 0
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_e37bdd061ffePqaXoizaXKGP9Z",
+      "agent": "code/test-engineer",
+      "at": 1794361896189,
+      "reply": {
+        "testsAdded": 34
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/test-authoring-r0.md",
+      "durationMs": 752970,
+      "nudges": 1
+    },
+    {
+      "stage": "implement",
+      "round": 0,
+      "sessionID": "ses_e37b252ddffeN8gPqqvHtDUx4S",
+      "agent": "code/coder",
+      "at": 1794362519918,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "feat(orchestration): fence runner-reserved checkpoint paths, guard checkpoint saves, harden run lock, state the cross-version resume contract",
+        "moves": []
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/implement-r0.md",
+      "durationMs": 623659,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e37a8c9e7ffe1DYY6HZBNf804C",
+      "agent": "code/coder",
+      "at": 1794363209106,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "fix(orchestration): sort runner.ts import specifiers to clear the prettier gate",
+        "moves": []
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/fix-r0.md",
+      "durationMs": 687971,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e379e4613ffew3y5ciP9357kJ3",
+      "agent": "code/test-engineer",
+      "at": 1794363480542,
+      "reply": {
+        "commitMessage": "test(orchestration): repair ADR-006 resume fixtures and pin the resume promise, not the funnel",
+        "moves": []
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/test-update-r0.md",
+      "durationMs": 270299,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e379a1061ffdsHaUU67xGU60Ga",
+      "agent": "codereview/code-security",
+      "at": 1794363914747,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "tools/orchestration/src/pipeline/runner.ts:2738–2745",
+            "problem": "finalizeEscalate writes ESCALATION.md with an unguarded bare writeFileSync. A stage that plants a file under a directory named ESCALATION.md in the design dir gets the inner file reverted by the sweep, but the then-empty untracked directory is invisible to git status (file-only with --untracked-files=all) and survives; the next escalation's marker write hits EISDIR, which is not a CheckpointWriteFailure, so it escapes the drive-loop branch (or the try entirely for decideNext escalations) and the run crashes with no terminal record, no commit, and status stuck running — the run-2 blocker §3 exists to close, reachable via the marker path because ESCALATION.md is untracked at first escalation and no directory-clear (as restoreCommittedCheckpoint does for the checkpoint) covers it.",
+            "fix": "Before writing the marker, clear a directory occupying reportRel using the existing existsSync(abs) && statSync(abs).isDirectory() → rmSync(abs,{recursive:true,force:true}) pattern from restoreCommittedCheckpoint, and wrap the marker write in try/catch that prints the full report to stderr as a fallback record. Add a regression test: plant ESCALATION.md/<file>, pass a stage boundary, force escalation, assert ESCALATION.md exists and no error escapes."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:2722–2724,2744",
+            "problem": "The comment claims the ESCALATION.md write is 'Atomic tmp+rename, like every other checkpoint write', but line 2744 is a direct writeFileSync; a crash mid-write truncates the one terminal marker §3 defines as the journal-equivalent, and resumePipeline's failure-line extraction then reads a partial record.",
+            "fix": "Write the marker through a tmp+rename pair (same shape as saveState) and align the comment with the code."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:2124–2127,2669",
+            "problem": "finalizeDone's checkpoint() call sits outside the drive loop's try (which starts at 2195), so a checkpoint unwritable at the completion boundary (directory-replacement class) raises a raw CheckpointWriteFailure that escapes runPipeline/resumePipeline: the done record and its commit never land and the CLI gets a crash — the same hostile-input class §3 converts to an escalation with a repair everywhere else.",
+            "fix": "Guard finalizeDone's save with the same CheckpointWriteFailure branch: on failure restore the committed checkpoint and escalate (or at minimum print the §3 repair commands) instead of throwing."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/types.ts:190–202",
+            "problem": "namesReservedSegment omits LOCK_FILE, so stagePathAllowed admits .pipeline.lock to implement/fix stages, and the lock is gitignored (.gitignore:3) so the ownership sweep structurally cannot see or restore it. A stage can delete or rewrite the lock, breaking the single-flight premise §1's trust posture leans on (§4's own goal: 'the runner is the only writer' holds across processes): the next acquireLock admits a second writer, or a planted live-pid holder blocks resume. The moves validator already names LOCK_FILE reserved (moves.ts:139–141), so the ownership-fence exclusion looks like an oversight.",
+            "fix": "Add LOCK_FILE to the reserved-segment set, and re-assert the lock at stage boundaries: if the lock file is absent or no longer names this pid/stage, recreate it with the 'wx' path before continuing (distinct from the Deferred lock-ID nonce)."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/state-store.ts:133–137",
+            "problem": "loadState reads the raw checkpoint without a size bound before JSON.parse. The security checklist's untrusted-file rule is 'schema-validated, size-limited', and the committed copy stays the recovery anchor for pre-fence history the design's own Risks row admits can carry model-authored bytes, so a multi-MB hostile checkpoint makes resume/status allocate unbounded memory before the schema rejects it.",
+            "fix": "Stat the file (or read a bounded prefix) and refuse oversize checkpoints with a message in the existing recovery-posture style before parsing."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/code-review-security-r1c0.md",
+      "durationMs": 428588,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e379a1062ffea937rFgFKHGg46",
+      "agent": "codereview/code-correctness",
+      "at": 1794363959338,
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/code-review-correctness-r1c0.md",
+      "durationMs": 473182,
+      "nudges": 0,
+      "failure": "independence violation: read a review report: docs/designs/006-self-update-checkpoint-compatibility/reviews/code/*"
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e379a1061ffe0lnUkZoGZuVHmT",
+      "agent": "codereview/code-compatibility",
+      "at": 1794364064148,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/types.ts:181 (with tools/orchestration/src/pipeline/state-store.ts:277)",
+            "problem": "The fence's tmp-shape matcher STATE_TMP_RE hard-codes the checkpoint literal, the 8-hex suffix width and '.tmp' as a second, independent copy of the naming rule that lives in saveState (`${target}.${randomBytes(4).toString('hex')}.tmp`). Nothing links them: if the writer's tmp name ever changes, saveState keeps working while the fence silently stops matching the runner's own tmp files, so stray checkpoint tmps reach `git add -A` instead of being swept. Tests cannot catch the drift because ownership.test.ts:245 plants a hand-written 8-hex name that matches the literal regardless of what saveState writes.",
+            "fix": "Define the shape once: export a stateTmpName(target) helper from state-store.ts, or build STATE_TMP_RE from STATE_FILE, and add a case that takes a tmp name actually produced by saveState and asserts namesReservedSegment denies it."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/state-store.ts:149 and state-store.ts:293 (consumed at runner.ts:2445 and runner.ts:2743)",
+            "problem": "The loadState and CheckpointWriteFailure repair messages interpolate `file`/`target`, which are absolute whenever the runner passes an absolute design dir (it always does). That text is not only printed: it becomes the escalation reason persisted in the gate log and re-saved by the next resume, and it is appended verbatim to ESCALATION.md. The run's terminal record therefore carries one machine's worktree path — the run-3-live fixture (line 408) shows exactly this shape — while ADR-006's own scenario is a resume after a self-update, possibly in a different worktree. finalizeEscalate already formats the same repair repo-relative (runner.ts:2758-2763), so the store-side messages are the inconsistent half.",
+            "fix": "Keep the path structured rather than pre-formatted: put `path` on CheckpointWriteFailure, render loadState's message from the design-dir-relative form, and let the printers emit repo-relative commands as runner.ts:2761 already does."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/runner.test.ts:392-403 (claim at runner.ts:423 and the proposal's Compatibility matrix network-FS row)",
+            "problem": "Test #10's concurrency case does not exercise the platform claim §4 makes. acquireLock is fully synchronous, so Promise.all of two in-process calls simply serializes; the test passes unchanged against the deleted existsSync+writeFileSync code and pins nothing about 'wx'. The real local-FS window is still open and untested: a contender that reads the lock between the exclusive create and the write gets an empty file, holderOf() returns null, the code warns and unlinkSyncs the live holder's lock, then re-creates — two winners on a local filesystem, while the matrix attributes all residual risk to network/shared filesystems.",
+            "fix": "Make #10's third case contend two real processes (spawn/execFileSync of process.execPath running acquireLock against the same fixture repo) and assert exactly one succeeds; and either narrow the docstring/matrix claim to the create itself or state the empty/unparseable-lock window alongside the deferred lock-ID nonce."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/types.ts:183-189 (precedent cited at moves.ts:136-142; matrix macOS row)",
+            "problem": "The code comment (and the proposal's §1 citation) claims the reserved-name comparison is case-insensitive 'the way the moves validator already compares these names'. moves.ts compares STATE_FILE and LOCK_FILE case-sensitively — only .git is lower-cased. Two reserved-name sets now diverge in both directions (namesReservedSegment adds ESCALATION.md and the tmp shape, moves.ts keeps LOCK_FILE which the fence omits) while a comment asserts parity. Separately, the Compatibility matrix justifies macOS 'partial' purely on rename/'wx' POSIX semantics and never flags that its default filesystem is case-insensitive — the assumption this case-based anti-evasion rule rests on, and the one the repo already models at moves.test.ts:675-687 — even though the revert branch resolves case through git's case-sensitive tree lookup (runner.ts:294-299).",
+            "fix": "Correct the comment; decide the reserved-name set once (adding LOCK_FILE to namesReservedSegment is free for the sweep, since .pipeline.lock is gitignored) or document the divergence; and add a case-insensitive-checkout row to the matrix, with a runIf(process.platform === 'darwin') companion case following the moves.test.ts pattern."
+          },
+          {
+            "severity": "nit",
+            "location": "docs/workflows.md (new 'A state file from another pipeline version' section) vs tools/orchestration/src/pipeline/state-store.ts:176-186",
+            "problem": "The operator doc says the refusal message 'says to run the version that wrote it, or to restore the checkpoint or start a fresh run'. The message actually printed names only the supported version, the committed-copy restore and a fresh run; the 'run the version that wrote it' posture is absent, and it also sits oddly against §2's guarantee that any runner resumes any version 1 checkpoint.",
+            "fix": "Reword the doc to the two postures §2 names, or print the third posture in the refusal message."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/code-review-compatibility-r1c0.md",
+      "durationMs": 577989,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e379385fcffe4UUdnDCQHc2e4T",
+      "agent": "codereview/code-performance",
+      "at": 1794364221264,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1783-1800 (unbounded gateLog push) with the new writer at runner.ts:2078, consumed at runner.ts:284 -> state-store.ts:253-264 and retained at state-store.ts:235 via recordRunnerWrite (state-store.ts:298)",
+            "problem": "gateLog is appended to on every gate verdict, every escalation, and now once per split-record resume, with no bound and no documented bound, while the sibling stageCommits is explicitly windowed at 200 (runner.ts:379-384) and named as contract in the proposal. The diff adds a consumer whose cost is linear in that serialized blob on a repeated occasion: the ownership sweep runs at every stage/pass boundary (runner.ts:1673, 1724) and the checkpoint is dirty at every sweep by design, so holdsRunnerBytes does one full readFileSync plus full string compare of a monotonically growing file per boundary. Practical cost is small (run-003 fixture is 1,366 lines, ~55 KB analytical estimate, unmeasured because the shell tool was denied), but the growth of the multiplier is unexamined rather than deliberate.",
+            "fix": "Window gateLog the way stageCommits is windowed (splice at a named cap inside gateLog()), or state the bound in one sentence at runner.ts:1783 and in the proposal's section 2 contract text, so the growth is a named contract instead of an accident; do not leave report.ts:225's last-8 window as the only trimming."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/state-store.ts:253-264 (readFileSync + string compare), called for every swept violation at runner.ts:284; recorded at state-store.ts:239-241,298",
+            "problem": "The authorship test re-reads and fully re-compares bytes the same process wrote moments earlier, on every ownership sweep, even though it only needs to detect a different writer. The cost scales with the unbounded checkpoint (finding 1) and buys nothing in the common case; no cost note or test keeps the check cheap as the checkpoint grows.",
+            "fix": "Record { bytes, size } (or a digest) in recordRunnerWrite and in holdsRunnerBytes compare statSync(abs).size first, reading and comparing (or hashing) content only when the size matches, keeping the content comparison as the final authority so the trust property is unchanged; add one ownership.test.ts case (same size, different bytes) that still reverts."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:276,284,290-291",
+            "problem": "Per violation path the sweep recomputes work it already has: resolve(repoDir, p) is computed twice (284 and 290) and namesReservedSegment(p) runs again at 291 after stagePathAllowed already ran it in the filter at 276; namesReservedSegment also allocates a segment array plus a lowercased string per call. Trivial against the git subprocess per path, but it is duplicated allocation in a per-path loop.",
+            "fix": "Hoist once per iteration (const abs = resolve(repoDir, p); const reserved = namesReservedSegment(p)) or have the filter yield { path, reserved } pairs, and reuse both in the authorship skip, the directory-clear branch, and the restore branch."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/code-review-performance-r1c0.md",
+      "durationMs": 306483,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e3792d7d0ffeELEtaZxqUXHDN0",
+      "agent": "codereview/code-correctness",
+      "at": 1794364532512,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "tools/orchestration/src/pipeline/state-store.ts:235-264 (runnerBytes/holdsRunnerBytes), consumed at tools/orchestration/src/pipeline/runner.ts:284",
+            "problem": "The fence's authorship skip is per-process memory that loadState never seeds, so in a fresh process the run's own dirty checkpoint is an unmatched reserved path. The dirty copy is the normal state (the loop-tail save at runner.ts:2440 runs after that stage's commitStage), so a run interrupted mid-loop leaves the newest checkpoint uncommitted; on resume, when the next step is a single stage (proposal-revise, fix, implement, doc-sync, test-*), finalizeStage's sweep (runner.ts:1673) runs before any save in this process, holdsRunnerBytes returns false, and the sweep restores the checkpoint to headBefore and reports it as reverted — the operator sees `ownership: reverted 1 file(s) changed by <stage>: docs/designs/<run>/.pipeline.json`, a deterministic false tamper report on the ADR's own resume scenario. This contradicts proposal §1 (\"the runner's own save is skipped ... even though the file is dirty at every sweep\") and the Deferred rationale \"the §1 fence makes 'dirty ⇒ runner' true\", which holds only inside one process; review passes avoid it only accidentally (the loop saves at runner.ts:2333 before the pass). Undeclared in 03-build-notes.md.",
+            "fix": "Seed the in-process record from what the loader read: in loadState, after the schema check, call recordRunnerWrite(file, raw) — or have runPipeline/resumePipeline save once before drive(). A later stage write or delete still mismatches the record and is still reverted, so the fence keeps its teeth while 'dirty ⇒ runner' becomes true across processes."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:294-304",
+            "problem": "A reserved-path violation whose path has no blob in headBefore — the run's own untracked checkpoint at the first stage of a new run, after the entry save recorded bytes for it — falls into the else branch and is deleted (git rm -f + rmSync) instead of restored. The run then has no checkpoint file at all until the next save (loop tail runner.ts:2440 or finalizeEscalate), and a crash in that window leaves nothing for `pipeline resume` to load. Proposal §1 promises the sweep \"removes it and restores the file\".",
+            "fix": "When namesReservedSegment(p) is true and runnerBytes holds bytes for that absolute path, write those recorded bytes back instead of deleting, so the checkpoint survives tampering regardless of what headBefore contains."
+          },
+          {
+            "severity": "minor",
+            "location": "docs/workflows.md (new \"A state file from another pipeline version\" section) with tools/orchestration/src/pipeline/state-store.ts:176-181 and 03-build-notes.md:41-45",
+            "problem": "The operator docs and the build notes both claim the version-refusal message names an exit of \"run the version that wrote it\"; the shipped message names version 1 and offers only the proposal's two ADR postures — restore the committed copy, or start a fresh run. The code matches §2, the docs overstate it.",
+            "fix": "Drop the \"run the version that wrote it\" clause from docs/workflows.md and the build note, or add that posture to the refusal message and to §2's rule set."
+          },
+          {
+            "severity": "minor",
+            "location": "docs/designs/006-self-update-checkpoint-compatibility/03-build-notes.md:83 and :88-131 (Red-gate diagnosis)",
+            "problem": "Checklist item 5: the notes' claims are no longer true of HEAD. The three failures reported as living in untouched test files are fixed at HEAD — approveClient in checkpoint-integration.test.ts and runner.test.ts now models turn growth (visible = max(0, min(lists-1, prompts))), ownership.test.ts:221 destructures only dir (the unused-base ESLint error is gone), and commit 4fc97b3 re-pinned the funnel created[0] assertions. Line 83's \"No test files were touched\" is also false of the diff under review.",
+            "fix": "Mark the red-gate section as the diagnosis at that fix round and record what the later test commit changed, so the next seat does not chase three already-closed items."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:2741-2745 with tools/orchestration/src/pipeline/state-store.ts:289-294",
+            "problem": "The appended marker line re-prefixes a stem the error already carries: CheckpointWriteFailure.message starts with \"checkpoint save failed: \", so ESCALATION.md reads \"checkpoint save failed: checkpoint save failed: EISDIR ...\". The loadState EISDIR message likewise prints the same path twice (${file} and join(designDir, STATE_FILE) are the same string).",
+            "fix": "Append printable(saveFailure.message) without adding the prefix, and reuse `file` in both halves of the repair sentence."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/code-review-correctness-attempt2-r1c0.md",
+      "durationMs": 573138,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e37913e67ffevNyxH40IGRoLsj",
+      "agent": "codereview/code-testing",
+      "at": 1794364784134,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "tools/orchestration/tests/pipeline/runner.test.ts:392-401",
+            "problem": "The test that is meant to pin ADR-006 §4 (\"two concurrent acquireLock calls admit exactly one winner\") cannot fail under the pre-fix code. acquireLock is synchronous (runner.ts:423, writeFileSync with 'wx'), so Promise.all([tryAcquire(dir), tryAcquire(dir)]) runs the two acquisitions strictly sequentially: the first creates the lock file before the second call starts, and the second is refused by the pid-liveness branch against the winner's own pid. Reverting to the old existsSync+writeFileSync pair keeps the test green, so the atomic exclusive create — §1's single-flight premise — has no coverage, and the test name promises more than the body proves.",
+            "fix": "Race two real processes on one temp dir (Promise.all of two execFileAsync children that import acquireLock and exit 0/1; assert exactly one exit 0 and that .pipeline.lock holds that child's pid), or pin O_EXCL in-process: pre-write .pipeline.lock with {slug:'other',pid:process.pid,stage:'start',at:0}, call acquireLock, expect the throw AND readFileSync still byte-identical to the pre-write (a plain writeFileSync would have clobbered it)."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/runner.test.ts:370-381",
+            "problem": "§4 promises \"a live holder throws with today's message\", but the case pins only not.toMatch(/is not a function/) and /lock/i — an assertion that the seam exists, not that the operator-facing contract holds. Any rewrite of the refusal, including the new race-loser message at runner.ts:462-465, passes it.",
+            "fix": "Write the fixture lock as a full LockInfo instead of {pid} and assert the shape: expect(message).toMatch(/^another pipeline run holds the lock: slug=\\S+ stage=\\S+ pid=\\d+$/); reuse the same assertion for the race-loser branch."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/ownership.test.ts:239-296",
+            "problem": "The §1 core case is untested: a stage editing the checkpoint after the runner saved it in the same process. The suite covers \"no recorded bytes → revert\" (:239) and \"recorded bytes match → skip\" (:286), but never \"recorded bytes exist and differ → revert\". An implementation that skipped on runnerBytes.has(path) rather than comparing content — trusting the map's presence instead of the bytes — would keep every test green.",
+            "fix": "Add a case: saveState(...) the advanced state, then writeFileSync a tampered body over the same path, then enforceOwnership(dir, base, 'design-review', advanced); assert report.reverted contains the checkpoint and the file is restored to headBefore (lastStage: 'proposal')."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/runner.test.ts:332-352 (and state-store.ts:244,253)",
+            "problem": "No test pins §1's promise that resume's marker deletion is not restored from headBefore — the only consumer of recordRunnerDelete/runnerDeleted. In the split-record test the ESCALATION.md marker is written after tmpRepo() commits, so it is untracked: its deletion never appears in dirtyFiles, the sweep never sees it, and holdsRunnerBytes' runnerDeleted.has(abs) && !existsSync(abs) branch is never reached with a real violation. In checkpoint-integration.test.ts:275-310 the marker is committed and the branch does run, but nothing asserts it stays deleted, so removing recordRunnerDelete(markerAbs) from runner.ts would leave the suite green while resurrecting a terminal marker at the next boundary.",
+            "fix": "Commit the marker in the fixture before resuming (as an escalation commit does), then after the run assert existsSync(marker) === false and that git status --porcelain still lists ' D docs/designs/002-x/ESCALATION.md'. Alternative unit shape: committed marker → unlinkSync + recordRunnerDelete → enforceOwnership(...).reverted excludes it."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/checkpoint-integration.test.ts:275-310",
+            "problem": "restoreCommittedCheckpoint (runner.ts:2687-2704, called at :2765) has two branches and only the no-op branch is asserted: escalation.test.ts:212-267 pins the \"nothing committed at that path → planted directory stays\" case, while here the restore branch runs (the checkpoint is in the base commit) but the test immediately does its own rmSync + git checkout (:298-305), so it cannot distinguish runner repair from operator repair and never checks the function's stated promise that planted bytes never reach the escalation commit's git add -A.",
+            "fix": "Assert right after expect(status).toBe('escalated'): readFileSync(checkpoint) parses and equals the last runner-authored save; existsSync(join(checkpoint,'planted.md')) === false; git show --name-only HEAD names no reserved path except ESCALATION.md. Keep the operator repair steps only for the second resume leg."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/pipeline/escalation.test.ts:248-250 and tools/orchestration/tests/pipeline/runner.test.ts:348",
+            "problem": "The marker's failure line shape is unpinned, and it currently self-duplicates: runner.ts:2743 appends `checkpoint save failed: ${saveFailure.message}` while saveState's message already starts with \"checkpoint save failed:\", so ESCALATION.md — and the terminalSaveFailed gate-log reason that quotes that line — reads \"checkpoint save failed: checkpoint save failed: EISDIR …\". toContain('checkpoint save failed') cannot detect it.",
+            "fix": "Pin the line once, e.g. expect(report.match(/checkpoint save failed/g)).toHaveLength(1) or /^checkpoint save failed: (?!checkpoint save failed)/m, and assert the resume gate-log reason equals that exact line (the code-side dedupe belongs to the correctness seat)."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/code-review-testing-r1c0.md",
+      "durationMs": 719962,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e378641d2ffeAVE6EGBlXo4G0r",
+      "agent": "code/coder",
+      "at": 1794365241264,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "fix: close code review round 1 findings for checkpoint trust, escalation marker, and lock",
+        "moves": []
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/fix-r1.md",
+      "durationMs": 457068,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 1,
+      "sessionID": "ses_e377f43edffevz6RL0yfpS7qir",
+      "agent": "code/test-engineer",
+      "at": 1794365842352,
+      "reply": {
+        "commitMessage": "test: pin the accepted r1 review findings across the checkpoint suites",
+        "moves": []
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/test-update-r1.md",
+      "durationMs": 599941,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e37761798fferQUIfKh8UV7x1s",
+      "agent": "code/coder",
+      "at": 1794366466809,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "fix: stop committing the run lock and honor runner-authored deletes in the ownership sweep",
+        "moves": []
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/fix-r1.md",
+      "durationMs": 623216,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e376c7e4affe7fuAJxMDDp5MvQ",
+      "agent": "codereview/code-correctness",
+      "at": 1794366967024,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:2765-2791 (finalizeDone's ADR flip before the terminal save, with deviation 11's new CheckpointWriteFailure guard)",
+            "problem": "finalizeDone flips the source ADR (status: proposed → accepted) and writes it to the worktree BEFORE the terminal `done` save. The new guard added in this diff turns a failed done save into finalizeEscalate, whose commitStage then COMMITS the flipped accepted ADR alongside an `escalated` checkpoint and ESCALATION.md — previously the crash left the flip dirty and uncommitted. Proposal Rollout #4 says the ADR flips 'when that run completes'; an escalated run has not completed, yet the accepted ADR lands in history, and a later finalizeDone re-run takes flipAdrStatus's null branch and warns 'ADR status not flipped (unexpected format)'.",
+            "fix": "Move the ADR flip after the terminal save succeeds — it must precede commitStage, not checkpoint(): flip between the successful save and the completion commit, so an escalated commit never carries the accepted flip."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/code-review-correctness-r1c1.md",
+      "durationMs": 494345,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e376c7e49ffeuUyM7PLiPNAOcy",
+      "agent": "codereview/code-security",
+      "at": 1794366969031,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:2783–2792",
+            "problem": "The done-boundary save guard added to answer security r1 finding 3 is correct by inspection but untested: finalizeDone is module-private and no integration test fails the save at that boundary — the mid-run directory fixture (checkpoint-integration.test.ts:279–322) plants the directory at the first prompt, so escalation fires at the stage-tail save (2546) instead. The §3-class conversion at the completion boundary is a defensive branch no test exercises.",
+            "fix": "Add a fixture hook that replaces .pipeline.json with a directory only after the last code-phase stage completes (or export finalizeDone for a unit test shaped like escalation.test.ts:280–324), and assert the run ends escalated with ESCALATION.md, the rm -r repair printed, and the escalation commit recorded — not a crash."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/code-review-security-r1c1.md",
+      "durationMs": 496354,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e376c7e49ffdtLO40typqJVloy",
+      "agent": "codereview/code-testing",
+      "at": 1794367149712,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/runner.test.ts:408-421",
+            "problem": "Test strategy #10's third clause (\"two concurrent acquireLock calls admit exactly one winner\") is still pinned only by proxy. The replacement pre-writes a full live-holder LockInfo and asserts refusal plus byte-identity of the holder's bytes; the pre-design existsSync+writeFileSync pair passes this unchanged (the exists-check throws on the live holder before any write, so the bytes survive there too). The test now catches the realistic forward regression — dropping {flag:'wx'} — which closes the core of my r1 major, but cross-process single-flight itself remains untested and the proposal clause has no literal two-acquisition test.",
+            "fix": "Optional strictness: race two execFileAsync children that import acquireLock and exit 0/1; under 'wx' exactly one exits 0 deterministically (deterministic assertion for the current code) while the check-then-write pair admits both winners."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:536-574 and runner.ts:353-356",
+            "problem": "The new boundary re-assertion (ensureLockHeld, security r1 #4) has four branches — self-held return, foreign-live-pid refuse, missing/dead re-take, race-loser refuse — and no test reaches any throw, yet docs/workflows.md promises operators \"if another live process has taken it, the run refuses to continue.\" Likewise stageAll's lock-unstage runs only incidentally (escalation.test.ts/budget.test.ts fixtures do not gitignore the lock) and is never asserted; checkpoint-integration.test.ts:83-85 gitignores the lock, so its committed-file scan cannot catch removal of the reset at runner.ts:355 committing the run's lock.",
+            "fix": "Add (a) a resume-integration case that rewrites .pipeline.lock to a live foreign pid (process.ppid) before resuming and expects the run to end on the \"lost the pipeline lock at a stage boundary\" refusal rather than complete, and (b) in a non-gitignored full-run fixture, assert no commit on the branch names .pipeline.lock (scan git log --all --name-only)."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:2782-2792",
+            "problem": "The new finalizeDone guard converting a terminal CheckpointWriteFailure into restoreCommittedCheckpoint + finalizeEscalate (security r1 #3) has no test: every directory-at-path scenario in the suite sabotages mid-run (checkpoint-integration.test.ts:289-295, exercising the drive-loop guard), never the done boundary. Removing the try/catch would crash the completion path with no terminal record and leave the suite green — the exact run-2 class this design closes (checklist item 7: untested new branch).",
+            "fix": "Add a checkpoint-integration variant whose sabotage client replaces the checkpoint path at the final boundary, asserting status 'escalated', an ESCALATION.md, and a recorded terminal commit instead of an escape."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/pipeline/ownership.test.ts:390-405",
+            "problem": "The marker-delete unit case never recordRunnerWrite's the marker's bytes before rmSync + recordRunnerDelete, so it pins only the plain delete-skip; the delete-outranks-write ordering in holdsRunnerBytes (state-store.ts:290-303) is pinned today only through the checkpoint-integration second-resume leg.",
+            "fix": "Call recordRunnerWrite(marker, body) when planting the fixture marker so the ordering fix is pinned at unit level too."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/code-review-testing-r1c1.md",
+      "durationMs": 677032,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e37622942ffeFZ2HALAyjBNFYT",
+      "agent": "codereview/code-security",
+      "at": 1794367325124,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:2783–2792",
+            "problem": "Carried forward unchanged from my r1c1 finding, not a regression: the done-boundary save guard remains untested. finalizeDone is module-private and no test in tools/orchestration/tests/pipeline references it or a completion-boundary save failure; the mid-run directory fixture (checkpoint-integration.test.ts:287–295) plants the directory at the first prompt, so escalation fires at a stage-tail save instead. The scoped diff (640c289..HEAD excluding docs/designs) contains no source or test changes, so this gap is exactly as large as when I approved it in r1c1.",
+            "fix": "Add a fixture hook that replaces .pipeline.json with a directory only after the last code-phase stage completes (or export finalizeDone for a unit test shaped like escalation.test.ts:280–324), and assert the run ends escalated with ESCALATION.md, the rm -r repair printed, and the escalation commit recorded — not a crash."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/code-review-security-r1c2.md",
+      "durationMs": 175321,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e37622943ffdOKgI9892HDU2aO",
+      "agent": "codereview/code-compatibility",
+      "at": 1794367533131,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:2880 (with tools/orchestration/src/pipeline/types.ts:181-208 and tools/orchestration/tests/pipeline/gates.test.ts:352-366)",
+            "problem": "The revised finalizeEscalate writes ESCALATION.md through a new runner tmp shape, ESCALATION.md.<8hex>.tmp, which is not covered by the reserved-name fence: namesReservedSegment matches ESCALATION.md exactly and STATE_TMP_RE only the .pipeline.json.<8hex>.tmp prefix. Residue from a kill between the tmp writeFileSync and the renameSync — exactly ADR-006's kill-mid-escalation scenario resumed later on the new branch — survives every boundary sweep and is committed by the next git add -A, and a stage can plant an ESCALATION.md.<hex>.tmp copycat under docs/** that likewise reaches a run commit. This breaks the §1 'keeping git add -A clean' promise the fence was approved on, for the escalation marker's own tmp, and is a third independent copy of the tmp-suffix naming rule (after saveState and STATE_TMP_RE).",
+            "fix": "Define the tmp shape once: make a segment reserved when it matches `<reserved-name>.<8hex>.tmp` for any reserved name (STATE_FILE or ESCALATION_FILE), built from the same constants the writers use, so STATE_TMP_RE and the marker tmp become instances of one grammar; add the ESCALATION.md.<hex>.tmp shape to gates.test.ts RESERVED_PATHS plus one sweep case."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/code-review-compatibility-r1c2.md",
+      "durationMs": 383327,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e37622943ffeE1Tjts1WuvlqjQ",
+      "agent": "codereview/code-correctness",
+      "at": 1794367593655,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:2765-2798 (finalizeDone's ADR flip before the guarded terminal save) and 2917-2922 (finalizeEscalate's commitStage)",
+            "problem": "Carried from r1c1, still open and unchanged by the post-c1 revisions: finalizeDone flips the source ADR (proposed → accepted) before the guarded done save; a CheckpointWriteFailure routes to finalizeEscalate, whose commitStage then commits the accepted ADR alongside an escalated checkpoint and ESCALATION.md. Proposal Rollout #4 ties the flip to run completion; an escalated run has not completed, and a later finalizeDone re-run only warns via flipAdrStatus's null branch. The 640c289 delta neither fixes nor worsens this.",
+            "fix": "Move the ADR flip between the successful terminal save and the completion commit — never before the save — so an escalated commit never carries the accepted flip."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/state-store.ts:263-313 (holdsRunnerBytes recorded-delete precedence added in 640c289)",
+            "problem": "A recorded delete outranks a recorded write permanently: recordRunnerWrite never clears runnerDeleted. If the runner deletes a reserved path and later rewrites it in the same process (resume's marker delete at runner.ts:2192, then a re-escalation's marker write at runner.ts:2884), holdsRunnerBytes returns false even though the file holds exactly the runner's fresh bytes, so any later sweep would revert the runner's own write. Latent only today — no ownership sweep runs between those two actions before finalizeEscalate's commitStage — but the pair is a state machine with a stranded delete flag.",
+            "fix": "Make the authorship records last-action-wins: recordRunnerWrite should runnerDeleted.delete(abs), keeping the delete-outranks-write read without stranding a stale delete record."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/code-review-correctness-r1c2.md",
+      "durationMs": 443852,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e375f7c35ffeJma70UiApgofSm",
+      "agent": "codereview/code-performance",
+      "at": 1794367619852,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1883-1900 (gateLog push, unbounded) with consumers at report.ts:225 (last-8) and runner.ts:2948-2950 (last-6), read per sweep via state-store.ts:304-310",
+            "problem": "Carried from r1 and unchanged: gateLog still has no push-side bound and no documented bound, while the sibling stageCommits keeps its explicit 200-entry window (runner.ts:411-415) named as §2 contract. The post-approval fixes did not add growth (no new high-frequency gateLog call sites; the new 8 MiB loadState ceiling bounds only the load side, not the per-boundary read+compare of the serialized checkpoint). The state I approved stands; the growth remains an accident rather than a named contract.",
+            "fix": "Window gateLog at a named cap inside gateLog() the way stageCommits is windowed, or state the bound at runner.ts:1883 and in the proposal's §2 contract text."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/state-store.ts:304-310 (full readFileSync + string compare per swept violation), called at runner.ts:287",
+            "problem": "Carried from r1 and unchanged: the authorship test still re-reads and fully re-compares checkpoint bytes on every ownership sweep. The later fix's delete-before-write reorder (state-store.ts:301-303) removed one wasted failed read for runner-deleted paths — a small improvement — but kept the full-compare for recorded-write paths; the proposed stat-size-first refinement did not land. No regression; still acceptable as approved.",
+            "fix": "Optional refinement as in r1: compare statSync(abs).size before reading content, keeping the content comparison as final authority; add an ownership.test.ts case with same size, different bytes."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:287,293,294,305,311 (per-violation loop)",
+            "problem": "Carried from r1 and marginally worse after the later fixes: resolve(repoDir, p) is computed at 287 and 293 (and 311 on the delete fallback), and namesReservedSegment(p) now runs up to three times per violation path — once in the filter at 279 via stagePathAllowed, once at 294, and the recorded-bytes restore branch added a third call at 305. Trivial against the per-path git subprocesses, but the fix round added to the duplication rather than hoisting.",
+            "fix": "Hoist const abs = resolve(repoDir, p) and const reserved = namesReservedSegment(p) once per loop iteration and reuse at 287, 294, 305, and 311."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/code-review-performance-r1c2.md",
+      "durationMs": 294702,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e375c4fafffegj4hoWDi9NKbEZ",
+      "agent": "codereview/code-testing",
+      "at": 1794367752903,
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/code-review-testing-r1c2.md",
+      "durationMs": 219744,
+      "nudges": 0,
+      "failure": "independence violation: glob accessed run records: docs/designs/006-self-update-checkpoint-compatibility/transcripts/*.md"
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e3758f52effe94BCld1uY2h2Qd",
+      "agent": "codereview/code-testing",
+      "at": 1794367885516,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/runner.test.ts:408-421",
+            "problem": "Unchanged since r1c1 (no code or test landed in this range): Test strategy #10's third clause (\"two concurrent acquireLock calls admit exactly one winner\") is still pinned only by proxy — pre-written live holder, refusal, and byte-identity, which the pre-design existsSync+writeFileSync pair also passes. Cross-process single-flight itself remains untested.",
+            "fix": "Optional strictness: race two execFileAsync children that import acquireLock and exit 0/1; under 'wx' exactly one exits 0 deterministically, while the check-then-write pair admits both winners."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:536-574 and runner.ts:353-356",
+            "problem": "Unchanged since r1c1: ensureLockHeld's four branches (self-held return, foreign-live-pid refuse, missing/dead re-take, race-loser refuse) have no test reaching any throw, and stageAll's lock-unstage is never asserted — checkpoint-integration.test.ts:83-85 gitignores the lock, so its committed-file scan cannot catch removal of the reset at runner.ts:355 committing the run's lock.",
+            "fix": "Add (a) a resume-integration case rewriting .pipeline.lock to a live foreign pid (process.ppid) before resuming, expecting the \"lost the pipeline lock at a stage boundary\" refusal rather than completion, and (b) in a non-gitignored full-run fixture, assert no commit on the branch names .pipeline.lock (scan git log --all --name-only)."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:2783-2792",
+            "problem": "Unchanged since r1c1: the finalizeDone guard converting a terminal CheckpointWriteFailure into restoreCommittedCheckpoint + finalizeEscalate has no test; every directory-at-path scenario sabotages mid-run (checkpoint-integration.test.ts:289-295), never the done boundary. Removing the try/catch would crash the completion path with no terminal record and leave the suite green.",
+            "fix": "Add a checkpoint-integration variant whose sabotage client replaces the checkpoint path at the final boundary, asserting status 'escalated', an ESCALATION.md, and a recorded terminal commit instead of an escape."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/pipeline/ownership.test.ts:390-405",
+            "problem": "Unchanged since r1c1: the marker-delete unit case never recordRunnerWrite's the marker's bytes before rmSync + recordRunnerDelete, so it pins only the plain delete-skip; the delete-outranks-write ordering in holdsRunnerBytes (state-store.ts:290-305) remains pinned only through the checkpoint-integration second-resume leg.",
+            "fix": "Call recordRunnerWrite(marker, body) when planting the fixture marker so the ordering fix is pinned at unit level too."
+          }
+        ]
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/code-review-testing-attempt2-r1c2.md",
+      "durationMs": 132584,
+      "nudges": 0
+    },
+    {
+      "stage": "doc-sync",
+      "round": 1,
+      "sessionID": "ses_e3756ef03ffeLcSJ6rlNjamIYM",
+      "agent": "ops/doc-sync",
+      "at": 1794368014543,
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/doc-sync-r1.md",
+      "durationMs": 128954,
+      "nudges": 0,
+      "failure": "independence violation: read accessed run records: /home/mike/repos/bindforge/docs/designs/006-self-update-checkpoint-compatibility/transcripts; glob accessed run records: docs/designs/006-self-update-checkpoint-compatibility/transcripts/*"
+    },
+    {
+      "stage": "doc-sync",
+      "round": 1,
+      "sessionID": "ses_e3754f72bffe5q4EHMeoQ6qDgv",
+      "agent": "ops/doc-sync",
+      "at": 1794368139350,
+      "reply": {
+        "drifted": true,
+        "commitMessage": "docs: add as-built note and ship state to design 006 records"
+      },
+      "transcript": "docs/designs/006-self-update-checkpoint-compatibility/transcripts/doc-sync-attempt2-r1.md",
+      "durationMs": 124769,
+      "nudges": 0
+    }
+  ],
+  "gateLog": [
+    {
+      "gate": "sourceAdmissible",
+      "round": 0,
+      "proceed": true,
+      "reason": "ADR is proposed and complete",
+      "at": 1794359122856
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: correctness, compatibility",
+      "at": 1794360193074
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c2 pending: security, performance, complexity",
+      "at": 1794360750779
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794360931965
+    },
+    {
+      "gate": "editorial-review",
+      "round": 2,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1794361143194
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794362521106
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794363210215
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check green",
+      "at": 1794363486099
+    },
+    {
+      "gate": "stageFailure",
+      "round": 1,
+      "proceed": false,
+      "reason": "code-review:correctness: independence violation: read a review report: docs/designs/006-self-update-checkpoint-compatibility/reviews/code/*",
+      "at": 1794363959339
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: correctness, security, testing",
+      "at": 1794364784167
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794365242381
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check red",
+      "at": 1794365843552
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check green",
+      "at": 1794366472618
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c2 pending: compatibility, performance",
+      "at": 1794367149747
+    },
+    {
+      "gate": "stageFailure",
+      "round": 1,
+      "proceed": false,
+      "reason": "code-review:testing: independence violation: glob accessed run records: docs/designs/006-self-update-checkpoint-compatibility/transcripts/*.md",
+      "at": 1794367752910
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794367885560
+    },
+    {
+      "gate": "stageFailure",
+      "round": 1,
+      "proceed": false,
+      "reason": "doc-sync: independence violation: read accessed run records: /home/mike/repos/bindforge/docs/designs/006-self-update-checkpoint-compatibility/transcripts; glob accessed run records: docs/designs/006-self-update-checkpoint-compatibility/transcripts/*",
+      "at": 1794368014543
+    },
+    {
+      "gate": "done",
+      "round": 0,
+      "proceed": true,
+      "reason": "pipeline complete",
+      "at": 1794368139382
+    }
+  ],
+  "startedAt": 1794359122835,
+  "updatedAt": 1794368139382,
+  "baseRef": "846ca090053b43ec99295a7cedafb47910043df9",
+  "designCycle": 3,
+  "designStamp": "305aa36b5d0805333c5ea658ef1186d540e78016",
+  "seats": {
+    "design": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "305aa36b5d0805333c5ea658ef1186d540e78016",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "§1 Fence — \"compared segment-by-segment and case-insensitively the way the moves validator already compares these names (`moves.ts:134–147`)\"",
+            "problem": "new — The cited validator compares STATE_FILE/LOCK_FILE segments with plain `===` (case-sensitive, moves.ts:136, 139); only `.git` uses `toLowerCase()` (moves.ts:142). The claimed existing precedent for case-insensitive comparison of the reserved names is false, and the revision log entry repeats the same mis-citation. The case-insensitive choice itself is sound (Test #1 pins `.PIPELINE.JSON`), but since Non-goals keep moves.ts:134–147 unchanged, the sentence implies a shared precedent that does not exist.",
+            "fix": "Reword to attribute case-insensitivity to this design: \"segment-wise like the moves validator (`moves.ts:134–147`), with case-insensitivity added here (the validator's only case-insensitive name is `.git`, moves.ts:142)\"; correct the matching r1 revision-log entry."
+          },
+          {
+            "severity": "minor",
+            "location": "§1 Fence consequences — \"A stage write to the checkpoint is a content mismatch, reverted before that stage's `git add -A`\" + \"a new run's untracked checkpoint is committed by its first `commitStage`\"",
+            "problem": "new — For a new run before its first `commitStage`, the checkpoint is absent from `headBefore`, and the cited revert mechanics (runner.ts:263–276) remove violations not present in `headBefore`: a tampered, untracked checkpoint is deleted outright — no copy in HEAD or worktree until the next `checkpoint()` (runner.ts:2336) re-saves from memory, and a crash in that window leaves nothing for §3's `git checkout HEAD --` repair to restore. The unconditional first-commit claim is false in exactly the tamper case the fence targets.",
+            "fix": "Extend the §1 authorship branch: a reserved-name match with a content mismatch that is absent from `headBefore` is re-saved from the in-memory PipelineState via `checkpoint()`, instead of the restore-or-remove branch of runner.ts:263–276; add the case to Test #2."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "305aa36b5d0805333c5ea658ef1186d540e78016",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "§1 Fence — \"compared segment-by-segment and case-insensitively the way the moves validator already compares these names (`moves.ts:134–147`)\"",
+            "problem": "new — the cited precedent compares these very names case-sensitively: moves.ts:136 is `segment === STATE_FILE` and :139 `segment === LOCK_FILE`; the only case-folded comparison in that block is `segment.toLowerCase() === '.git'` (line 142). The sentence binds the fence's case handling to code that does the opposite for exactly STATE_FILE/LOCK_FILE, so an implementer who follows the cited precedent builds a case-sensitive fence and fails Test #1's `.PIPELINE.JSON` case — the gap this revision was written to close.",
+            "fix": "Keep the behavior sentence and re-anchor the precedent: \"following the `segment.toLowerCase() === '.git'` pattern at moves.ts:142, widening the existing `segment === STATE_FILE` comparison at moves.ts:136 rather than copying it\", and state the fold applies on every platform, so on case-sensitive Linux it deliberately over-matches `.Pipeline.json` (Test #1 already pins that)."
+          },
+          {
+            "severity": "nit",
+            "location": "FYI — §2 May refuse — \"restore the committed copy (`git checkout HEAD -- …`) or start a fresh run (ADR-006:55–57)\"",
+            "problem": "not a compatibility finding; noted for the correctness seat. This is now verbatim the ADR's interim posture, which is right for the schema-rejection half of the bullet but cannot help the unknown-`version` half: the committed copy carries the same version as the worktree copy.",
+            "fix": "If the correctness seat agrees, let the refusal message differ per refusal cause: committed-copy restore for a rejected shape, resume-with-the-writing-pipeline / fresh run for an unknown version."
+          }
+        ]
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "305aa36b5d0805333c5ea658ef1186d540e78016",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "§1 Fence runner-reserved paths in the ownership matrix — \"a match is skipped while it still holds the bytes `saveState` last wrote for it, kept in memory (or is absent because the runner deleted it), and reverted otherwise\"",
+            "problem": "new — the absence branch states a cause (\"because the runner deleted it\") but not the test that establishes it. Read as \"absent ⇒ skip\", a stage that deletes `.pipeline.json` (its write set covers `docs/**`, A1) escapes the revert and the next `commitStage` commits the deletion; after that the §3 repair the design prints, `git checkout HEAD -- <designDir>/.pipeline.json`, restores nothing because HEAD now records the deletion, so the committed recovery anchor (A7; ADR-006:55–57) is destroyed by a model-authored action. Same shape for a stage deleting the `ESCALATION.md` marker, which §3's split-record `status` check and `resumePipeline`'s gate-log entry both depend on. The text I approved in r1 restored unconditionally (\"the sweep restores the file from `headBefore`\"), so this is introduced by the revision, and Test strategy #2 pins planted edit/tmp/directory-replacement and the runner's own save but no stage-side deletion.",
+            "fix": "In the same sentence, make the skip require a recorded authorship by this process (its last `saveState` snapshot, or a delete this process itself performed) and state that every other state — including absence it did not author — is restored from `headBefore`; add one Test #2 case: a stage-deleted `.pipeline.json` and a stage-deleted `ESCALATION.md` are both restored. Qualifies the existing predicate; no new mechanism."
+          },
+          {
+            "severity": "minor",
+            "location": "§1 Fence (authorship test) vs §3 escalation — \"the bytes `saveState` last wrote for it\"",
+            "problem": "new — the exemption is keyed only to `saveState` snapshots and runner deletes, so the runner's own `ESCALATION.md` write is not exempt: §1 says the sweep filters \"every touched path, runner saves included\", and `finalizeEscalate` writes `ESCALATION.md` then \"still runs `commitStage`\". Under the exemption as written, that marker is a reserved match holding nothing `saveState` wrote, so it is reverted and the terminal record never lands — contradicting §3's guarantee (ADR-006 question 3) and Test #7's assertion that `ESCALATION.md` is written with no error escaping, and unmaking the `status` split-record line.",
+            "fix": "Generalize the exempted set in that clause to \"bytes this process last wrote at that path — the `saveState` snapshot for the checkpoint, the escalation report writer's bytes for `ESCALATION.md`\", i.e. make the Revision log's intent (\"skips what the runner itself wrote in-window\") operative; this replaces the saveState-only wording rather than adding a mechanism."
+          },
+          {
+            "severity": "nit",
+            "location": "§3 An escalation that survives its own failing write — \"prints the repair commands — `git checkout HEAD -- <designDir>/.pipeline.json`, with the `rm -r <designDir>/.pipeline.json && git checkout HEAD -- …` variant\"",
+            "problem": "re-raised — unchanged from r1: interpolated paths are printed unquoted, so a run slug containing a space or shell metacharacter mis-tokenizes when the operator copy-pastes (checklist item 3; exposure via copy-paste only, the runner never executes them). The §2 revision widens the pattern with one more printed string — \"restore the committed copy (`git checkout HEAD -- …`)\" — so the quoting rule is now better stated once than per site.",
+            "fix": "Specify the printed commands with the interpolated paths single-quoted, and let Test #5 (which already asserts the message names the `rm -r` + `git checkout HEAD --` repair) assert the quoted form."
+          }
+        ]
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "305aa36b5d0805333c5ea658ef1186d540e78016",
+        "dissents": 0,
+        "findings": []
+      },
+      "complexity": {
+        "verdict": "approve",
+        "stamp": "305aa36b5d0805333c5ea658ef1186d540e78016",
+        "dissents": 0,
+        "findings": []
+      }
+    },
+    "code": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "2d49432b9f4945729e0b4d4cbf11f966133f4259",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:2765-2798 (finalizeDone's ADR flip before the guarded terminal save) and 2917-2922 (finalizeEscalate's commitStage)",
+            "problem": "Carried from r1c1, still open and unchanged by the post-c1 revisions: finalizeDone flips the source ADR (proposed → accepted) before the guarded done save; a CheckpointWriteFailure routes to finalizeEscalate, whose commitStage then commits the accepted ADR alongside an escalated checkpoint and ESCALATION.md. Proposal Rollout #4 ties the flip to run completion; an escalated run has not completed, and a later finalizeDone re-run only warns via flipAdrStatus's null branch. The 640c289 delta neither fixes nor worsens this.",
+            "fix": "Move the ADR flip between the successful terminal save and the completion commit — never before the save — so an escalated commit never carries the accepted flip."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/state-store.ts:263-313 (holdsRunnerBytes recorded-delete precedence added in 640c289)",
+            "problem": "A recorded delete outranks a recorded write permanently: recordRunnerWrite never clears runnerDeleted. If the runner deletes a reserved path and later rewrites it in the same process (resume's marker delete at runner.ts:2192, then a re-escalation's marker write at runner.ts:2884), holdsRunnerBytes returns false even though the file holds exactly the runner's fresh bytes, so any later sweep would revert the runner's own write. Latent only today — no ownership sweep runs between those two actions before finalizeEscalate's commitStage — but the pair is a state machine with a stranded delete flag.",
+            "fix": "Make the authorship records last-action-wins: recordRunnerWrite should runnerDeleted.delete(abs), keeping the delete-outranks-write read without stranding a stale delete record."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "2d49432b9f4945729e0b4d4cbf11f966133f4259",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:2880 (with tools/orchestration/src/pipeline/types.ts:181-208 and tools/orchestration/tests/pipeline/gates.test.ts:352-366)",
+            "problem": "The revised finalizeEscalate writes ESCALATION.md through a new runner tmp shape, ESCALATION.md.<8hex>.tmp, which is not covered by the reserved-name fence: namesReservedSegment matches ESCALATION.md exactly and STATE_TMP_RE only the .pipeline.json.<8hex>.tmp prefix. Residue from a kill between the tmp writeFileSync and the renameSync — exactly ADR-006's kill-mid-escalation scenario resumed later on the new branch — survives every boundary sweep and is committed by the next git add -A, and a stage can plant an ESCALATION.md.<hex>.tmp copycat under docs/** that likewise reaches a run commit. This breaks the §1 'keeping git add -A clean' promise the fence was approved on, for the escalation marker's own tmp, and is a third independent copy of the tmp-suffix naming rule (after saveState and STATE_TMP_RE).",
+            "fix": "Define the tmp shape once: make a segment reserved when it matches `<reserved-name>.<8hex>.tmp` for any reserved name (STATE_FILE or ESCALATION_FILE), built from the same constants the writers use, so STATE_TMP_RE and the marker tmp become instances of one grammar; add the ESCALATION.md.<hex>.tmp shape to gates.test.ts RESERVED_PATHS plus one sweep case."
+          }
+        ]
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "2d49432b9f4945729e0b4d4cbf11f966133f4259",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:2783–2792",
+            "problem": "Carried forward unchanged from my r1c1 finding, not a regression: the done-boundary save guard remains untested. finalizeDone is module-private and no test in tools/orchestration/tests/pipeline references it or a completion-boundary save failure; the mid-run directory fixture (checkpoint-integration.test.ts:287–295) plants the directory at the first prompt, so escalation fires at a stage-tail save instead. The scoped diff (640c289..HEAD excluding docs/designs) contains no source or test changes, so this gap is exactly as large as when I approved it in r1c1.",
+            "fix": "Add a fixture hook that replaces .pipeline.json with a directory only after the last code-phase stage completes (or export finalizeDone for a unit test shaped like escalation.test.ts:280–324), and assert the run ends escalated with ESCALATION.md, the rm -r repair printed, and the escalation commit recorded — not a crash."
+          }
+        ]
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "2d49432b9f4945729e0b4d4cbf11f966133f4259",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1883-1900 (gateLog push, unbounded) with consumers at report.ts:225 (last-8) and runner.ts:2948-2950 (last-6), read per sweep via state-store.ts:304-310",
+            "problem": "Carried from r1 and unchanged: gateLog still has no push-side bound and no documented bound, while the sibling stageCommits keeps its explicit 200-entry window (runner.ts:411-415) named as §2 contract. The post-approval fixes did not add growth (no new high-frequency gateLog call sites; the new 8 MiB loadState ceiling bounds only the load side, not the per-boundary read+compare of the serialized checkpoint). The state I approved stands; the growth remains an accident rather than a named contract.",
+            "fix": "Window gateLog at a named cap inside gateLog() the way stageCommits is windowed, or state the bound at runner.ts:1883 and in the proposal's §2 contract text."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/state-store.ts:304-310 (full readFileSync + string compare per swept violation), called at runner.ts:287",
+            "problem": "Carried from r1 and unchanged: the authorship test still re-reads and fully re-compares checkpoint bytes on every ownership sweep. The later fix's delete-before-write reorder (state-store.ts:301-303) removed one wasted failed read for runner-deleted paths — a small improvement — but kept the full-compare for recorded-write paths; the proposed stat-size-first refinement did not land. No regression; still acceptable as approved.",
+            "fix": "Optional refinement as in r1: compare statSync(abs).size before reading content, keeping the content comparison as final authority; add an ownership.test.ts case with same size, different bytes."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:287,293,294,305,311 (per-violation loop)",
+            "problem": "Carried from r1 and marginally worse after the later fixes: resolve(repoDir, p) is computed at 287 and 293 (and 311 on the delete fallback), and namesReservedSegment(p) now runs up to three times per violation path — once in the filter at 279 via stagePathAllowed, once at 294, and the recorded-bytes restore branch added a third call at 305. Trivial against the per-path git subprocesses, but the fix round added to the duplication rather than hoisting.",
+            "fix": "Hoist const abs = resolve(repoDir, p) and const reserved = namesReservedSegment(p) once per loop iteration and reuse at 287, 294, 305, and 311."
+          }
+        ]
+      },
+      "testing": {
+        "verdict": "approve",
+        "stamp": "2d49432b9f4945729e0b4d4cbf11f966133f4259",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/runner.test.ts:408-421",
+            "problem": "Unchanged since r1c1 (no code or test landed in this range): Test strategy #10's third clause (\"two concurrent acquireLock calls admit exactly one winner\") is still pinned only by proxy — pre-written live holder, refusal, and byte-identity, which the pre-design existsSync+writeFileSync pair also passes. Cross-process single-flight itself remains untested.",
+            "fix": "Optional strictness: race two execFileAsync children that import acquireLock and exit 0/1; under 'wx' exactly one exits 0 deterministically, while the check-then-write pair admits both winners."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:536-574 and runner.ts:353-356",
+            "problem": "Unchanged since r1c1: ensureLockHeld's four branches (self-held return, foreign-live-pid refuse, missing/dead re-take, race-loser refuse) have no test reaching any throw, and stageAll's lock-unstage is never asserted — checkpoint-integration.test.ts:83-85 gitignores the lock, so its committed-file scan cannot catch removal of the reset at runner.ts:355 committing the run's lock.",
+            "fix": "Add (a) a resume-integration case rewriting .pipeline.lock to a live foreign pid (process.ppid) before resuming, expecting the \"lost the pipeline lock at a stage boundary\" refusal rather than completion, and (b) in a non-gitignored full-run fixture, assert no commit on the branch names .pipeline.lock (scan git log --all --name-only)."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:2783-2792",
+            "problem": "Unchanged since r1c1: the finalizeDone guard converting a terminal CheckpointWriteFailure into restoreCommittedCheckpoint + finalizeEscalate has no test; every directory-at-path scenario sabotages mid-run (checkpoint-integration.test.ts:289-295), never the done boundary. Removing the try/catch would crash the completion path with no terminal record and leave the suite green.",
+            "fix": "Add a checkpoint-integration variant whose sabotage client replaces the checkpoint path at the final boundary, asserting status 'escalated', an ESCALATION.md, and a recorded terminal commit instead of an escape."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/pipeline/ownership.test.ts:390-405",
+            "problem": "Unchanged since r1c1: the marker-delete unit case never recordRunnerWrite's the marker's bytes before rmSync + recordRunnerDelete, so it pins only the plain delete-skip; the delete-outranks-write ordering in holdsRunnerBytes (state-store.ts:290-305) remains pinned only through the checkpoint-integration second-resume leg.",
+            "fix": "Call recordRunnerWrite(marker, body) when planting the fixture marker so the ordering fix is pinned at unit level too."
+          }
+        ]
+      }
+    }
+  },
+  "lastReviewPass": {
+    "phase": "code",
+    "round": 1,
+    "cycle": 2,
+    "seats": [
+      "correctness",
+      "compatibility",
+      "security",
+      "performance",
+      "testing"
+    ]
+  },
+  "reviseNoChange": false,
+  "codeCycle": 3,
+  "codeStamp": "2d49432b9f4945729e0b4d4cbf11f966133f4259"
+}

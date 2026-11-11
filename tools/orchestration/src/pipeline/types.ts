@@ -168,6 +168,46 @@ export const STATE_FILE = '.pipeline.json';
 export const LOCK_FILE = '.pipeline.lock';
 
 /**
+ * Escalation marker at the design directory root — the run's terminal record
+ * when a gate stops it. Like the checkpoint, only the runner writes it
+ * (ADR-006 §1).
+ */
+export const ESCALATION_FILE = 'ESCALATION.md';
+
+/**
+ * The `saveState` tmp-file shape (`state-store.ts`): the checkpoint name plus
+ * a random 8-hex suffix and `.tmp`. Part of the runner-reserved name set.
+ */
+export const STATE_TMP_RE = /^\.pipeline\.json\.[0-9a-f]{8}\.tmp$/i;
+
+/**
+ * True when any `/`-separated segment of `path` names a runner-reserved file:
+ * the checkpoint (`STATE_FILE`), a `saveState` tmp, the escalation marker, or
+ * the run lock (`LOCK_FILE`). Compared segment-by-segment and case-
+ * insensitively — the way the moves validator already compares these names —
+ * so the ADR-006 §1 fence cannot be routed around by case or by burying the
+ * name in a deeper directory. The lock is included because §1's trust posture
+ * leans on single-flight (§4): the moves validator already names it reserved
+ * (moves.ts rule 2), and leaving the *write* side open let a coder-class
+ * stage delete or rewrite the lock and break that premise (security r1,
+ * finding 4); the boundary re-assert in the runner closes the loop.
+ */
+export function namesReservedSegment(path: string): boolean {
+  for (const segment of path.split('/')) {
+    const lower = segment.toLowerCase();
+    if (
+      lower === STATE_FILE.toLowerCase() ||
+      lower === ESCALATION_FILE.toLowerCase() ||
+      lower === LOCK_FILE.toLowerCase() ||
+      STATE_TMP_RE.test(segment)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Run-identity grammar. `nnn-slug` is used as a single path segment (the
  * design directory) and as a git branch name, so both parts are constrained;
  * the generator in identity.ts must obey this grammar too, or a validator that

@@ -1,0 +1,57 @@
+diff --git a/tmp/bindforge-editorial-self-update-checkpoint-compatibility-r2.md b/home/mike/repos/bindforge/docs/designs/006-self-update-checkpoint-compatibility/02-proposal.md
+index 305aa36..93cf394 100644
+--- a/tmp/bindforge-editorial-self-update-checkpoint-compatibility-r2.md
++++ b/home/mike/repos/bindforge/docs/designs/006-self-update-checkpoint-compatibility/02-proposal.md
+@@ -21,7 +21,7 @@ change: `version` stays `1`, following ADR-003's additive rule
+ ## Goals / Non-goals
+ 
+ - Goals:
+-  - Make every stage write to the checkpoint (or its tmp pattern, or
++  - Make every stage write to the checkpoint (or its tmp shape, or
+     `ESCALATION.md`) a deterministic ownership violation, so the worktree copy
+     and the committed copy can only carry runner-authored bytes (Q2).
+   - State the cross-version resume contract as a rule set with tests —
+@@ -145,7 +145,7 @@ Canonical statement, written into the `StateSchema` header in
+   the supported version plus the ADR's own two interim postures — restore the
+   committed copy (`git checkout HEAD -- …`) or start a fresh run
+   (ADR-006:55–57). Today's bare `unsupported pipeline state version`
+-  (state-store.ts:147) gains that sentence; the v99 test's regex still passes.
++  (state-store.ts:147) gains that wording; the v99 test's regex still passes.
+ - **A version bump is a separate, deliberate step:** introducing `2` requires
+   per-version readers at the `state-store.ts:145–148` seam plus a golden
+   fixture per era before the bump may ship; this design ships no schema change.
+@@ -187,18 +187,18 @@ load-and-resume inputs.
+   (`runner.ts:1983–1989`) writes a `gateLog` entry
+   (`terminalSaveFailed`, reason quoting the marker's failure line) before
+   deleting the marker, so the new run's gate log explains the gap it repaired.
+-- `loadState` names that repair instead of a raw errno for a directory at the
+-  checkpoint path: catch `EISDIR`/`ENOTDIR`/`ENOTEMPTY` with today's `ENOENT`
+-  handling (`state-store.ts:117–125`).
++- For a directory at the checkpoint path, `loadState` names that repair
++  instead of a raw errno: catch `EISDIR`/`ENOTDIR`/`ENOTEMPTY` alongside
++  today's `ENOENT` handling (`state-store.ts:117–125`).
+ 
+ ### 4. Atomic lock acquisition (supports the single-flight premise of §1)
+ 
+ `acquireLock` (`runner.ts:383–404`) replaces check-then-write with: try
+ `writeFileSync(path, info, { flag: 'wx' })` (A6); on `EEXIST`, read the holder
+-and apply today's pid-liveness logic unchanged — live holder throws with
+-today's message (the Terraform fatal posture is already the behavior), dead
+-holder is cleared with today's warning and one `'wx'` retry, racing loser
+-re-reads and throws. Two winners from the old `existsSync`+`writeFileSync`
++and apply today's pid-liveness logic unchanged — a live holder throws with
++today's message (the Terraform fatal posture is already the behavior), a dead
++holder is cleared with today's warning and one `'wx'` retry, and a racing
++loser re-reads and throws. Two winners from the old `existsSync`+`writeFileSync`
+ race become impossible on local filesystems; stale-clear keeps a narrow race,
+ and the lock-ID nonce that would close it is Deferred.
+ 
+@@ -267,7 +267,7 @@ Integration (mock client, temp git repos, as in
+     driving continues after `lastStage`, `baseRef` backfills, and no refusal
+     occurs — the self-update resume guarantee end to end.
+ 12. A run interrupted between a stage commit and the next save resumes from
+-    the committed checkpoint and never writes the checkpoint outside the
++    the committed checkpoint, and the checkpoint is never written outside the
+     runner's own write path (fence untouched).
+ 13. Checkpoint path replaced by a directory mid-run: the run ends escalated
+     (exit 2), not crashed, with `ESCALATION.md` naming the repair; after the

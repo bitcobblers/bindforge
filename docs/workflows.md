@@ -133,6 +133,46 @@ gate log, the seat board, and open findings — and exits non-zero. Read
 Only one pipeline may run at a time: the runner holds `.pipeline.lock` at
 the repo root and exits loudly if another run holds it. If the holder
 process is dead, the lock is cleared on the next invocation with a warning.
+The lock is also a runner-reserved name: a stage that writes it is an
+ownership violation, and the runner re-asserts it at every stage boundary —
+if another live process has taken it, the run refuses to continue rather
+than work beside a second writer.
+
+## Self-update checkpoint recovery
+
+A stage that writes anywhere inside another design's `docs/designs/<id>/`
+directory is rejected, and the write is reverted. The pipeline's own record
+— the state file, its temporary files, and the escalation marker — is
+reserved the same way: a stage that writes one is rejected, and the
+committed bytes are restored.
+
+### A replaced or unreadable checkpoint
+
+If the checkpoint is replaced with something the pipeline cannot read (a
+directory, for example), the run escalates and says which command restores
+the committed copy:
+
+```sh
+rm -r docs/designs/002-example/.pipeline.json && git checkout HEAD -- docs/designs/002-example/.pipeline.json
+```
+
+The checkpoint is committed at every stage boundary, so the last boundary is
+restored exactly. Then `pipeline resume` as usual.
+
+### A split record
+
+An escalation marker can survive when its state save also failed; the record
+then says the run is still running while the marker says it stopped.
+`pipeline status` says so in one line, and resuming records that the
+operator accepted the split under the previous run's failure.
+
+### A state file from another pipeline version
+
+A state file written by an unsupported pipeline version is never resumed,
+and it is never rewritten: the run refuses, and the message names the
+unsupported version, the version this runner reads, and the two operator
+recovery options — restore the committed checkpoint (`git checkout HEAD --
+docs/designs/<id>/.pipeline.json`), or start a fresh run.
 
 ## Tuning
 

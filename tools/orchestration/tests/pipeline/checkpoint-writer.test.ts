@@ -1,10 +1,15 @@
-import { mkdtemp, readdir } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { createStateWriter, loadState, saveState } from '../../src/pipeline/state-store.js';
+import {
+  CheckpointWriteFailure,
+  createStateWriter,
+  loadState,
+  saveState,
+} from '../../src/pipeline/state-store.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
 
 // ---------------------------------------------------------------------------
@@ -114,5 +119,60 @@ describe('drained checkpoint writer', () => {
 
     const loaded = await loadState(dir);
     expect(loaded?.updatedAt).toBe(1000); // untouched
+  });
+});
+
+describe('checkpoint write failures', () => {
+  // proves: Test strategy #6 — a write-path failure (a directory sits at the
+  // checkpoint path) surfaces as CheckpointWriteFailure, not a bare errno, so
+  // the drive loop can tell an escalation-worthy failure from a crash
+  it('wraps a write-path failure in CheckpointWriteFailure', async () => {
+    const dir = await tmpDir();
+    await mkdir(join(dir, '.pipeline.json')); // the directory-replacement posture
+
+    const err = await saveState(dir, base(1000)).then(
+      () => undefined,
+      (reason: unknown) => reason,
+    );
+    expect(err).toBeInstanceOf(CheckpointWriteFailure);
+  });
+
+  // proves: Test strategy #6 — one failed write does not wedge the queue: the
+  // failed enqueue rejects its caller, and once the path is repaired the
+  // writer keeps landing later writes
+  it('keeps landing writes after a write-path failure', async () => {
+    const dir = await tmpDir();
+    const writer = createStateWriter(dir);
+
+    await mkdir(join(dir, '.pipeline.json'));
+    const err = await writer.enqueue(base(1000)).then(
+      () => undefined,
+      (reason: unknown) => reason,
+    );
+    expect(err).toBeInstanceOf(CheckpointWriteFailure);
+
+    await rm(join(dir, '.pipeline.json'), { recursive: true }); // operator repair
+    await writer.enqueue(base(2000));
+    await writer.drain();
+
+    const loaded = await loadState(dir);
+    expect(loaded?.updatedAt).toBe(2000);
+  });
+
+  // proves: Test strategy #6 — a refused invalid snapshot rejects only its
+  // caller (§3 chain semantics): a later enqueue queued behind it still lands
+  it('lets the queue land a later write after a refused invalid snapshot', async () => {
+    const dir = await tmpDir();
+    const writer = createStateWriter(dir);
+
+    const broken = { ...base(1000), gateLog: 'not-an-array' } as unknown as PipelineState;
+    const refused = writer.enqueue(broken);
+    void writer.enqueue(base(2000));
+
+    await expect(refused).rejects.toThrow(/refusing to write an invalid pipeline checkpoint/);
+    await writer.drain();
+
+    const loaded = await loadState(dir);
+    expect(loaded?.updatedAt).toBe(2000);
   });
 });

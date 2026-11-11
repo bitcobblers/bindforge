@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -9,6 +10,7 @@ import { DEFAULT_BASE_URL, createClient } from '../opencode-runner.js';
 import { type ServerConnection, renderStatus, resumePipeline, runPipeline } from './runner.js';
 import { DEFAULT_CONFIG } from './stages.js';
 import { loadState } from './state-store.js';
+import { ESCALATION_FILE } from './types.js';
 
 // ---------------------------------------------------------------------------
 // `pipeline` CLI: run / resume / status. Prompts are always files; the CLI
@@ -190,7 +192,10 @@ export async function main(argv: string[] = process.argv): Promise<number> {
         console.error(`no pipeline checkpoint for ${slug}`);
         return 1;
       }
-      console.log(renderStatus(state));
+      // ADR-006 §3: the marker sits alongside the loaded state, and status
+      // prints the split-record line when they disagree.
+      const marker = existsSync(join(repo, 'docs', 'designs', slug, ESCALATION_FILE));
+      console.log(renderStatus(state, marker));
       return 0;
     }
     case 'run': {

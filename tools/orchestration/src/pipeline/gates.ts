@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { PipelineConfig } from './stages.js';
+import { namesReservedSegment } from './types.js';
 import type { Finding, PipelineState, VerdictReply } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -258,6 +259,16 @@ export const TEST_PATH_RE = /(^|\/)tests\/|\.test\.ts$/;
  * enforces this matrix deterministically after every successful stage.
  */
 export function stagePathAllowed(stage: string, path: string): boolean {
+  // ADR-006 §1: the checkpoint, its `saveState` tmp shape, the escalation
+  // marker, and the run lock are runner-reserved. This rule precedes every
+  // per-stage rule, so no stage class — document, coder, or test — can own
+  // them at any depth or under another case. The worktree and committed
+  // copies can then only ever carry runner-authored bytes, and the §4
+  // single-flight premise holds inside a run: no stage may write the lock
+  // (security r1, finding 4; the runner re-asserts it at stage boundaries).
+  if (namesReservedSegment(path)) {
+    return false;
+  }
   const inDocs = /^docs\//.test(path);
   const inTests = TEST_PATH_RE.test(path);
   if (stage === 'implement' || stage === 'fix') {

@@ -1,5 +1,15 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
@@ -58,10 +68,15 @@ import {
 } from './stages.js';
 import type { PipelineConfig } from './stages.js';
 import {
+  CheckpointWriteFailure,
   type CheckpointWriter,
   createStateWriter,
   designDirOf,
+  holdsRunnerBytes,
   loadState,
+  recordRunnerDelete,
+  recordRunnerWrite,
+  runnerBytesFor,
   saveState,
 } from './state-store.js';
 import {
@@ -72,12 +87,15 @@ import {
   specialtiesFor,
 } from './states.js';
 import {
+  ESCALATION_FILE,
   type Finding,
   LOCK_FILE,
   type LockInfo,
   type MovePair,
   type PipelineState,
+  STATE_FILE,
   type StageResult,
+  namesReservedSegment,
 } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -261,15 +279,40 @@ export function enforceOwnership(
   const violations = [...touched].filter((p) => !stagePathAllowed(stage, p));
   const reverted: string[] = [];
   for (const p of violations) {
+    // ADR-006 §1: the sweep is author-agnostic, so it pairs the reserved-name
+    // rule with an authorship test. A match still holding the bytes the
+    // runner last wrote (or absent by the runner's own hand — the resume
+    // marker delete) is the runner's own work: keep it, so boundary commits
+    // advance the committed checkpoint instead of restoring `headBefore`.
+    if (holdsRunnerBytes(resolve(repoDir, p))) {
+      continue;
+    }
+    // A directory planted at a reserved path (the checkpoint replacement):
+    // clear it first so the restore can land the committed file again and no
+    // planted byte reaches a `git add -A`.
+    const abs = resolve(repoDir, p);
+    if (namesReservedSegment(p) && existsSync(abs) && statSync(abs).isDirectory()) {
+      rmSync(abs, { recursive: true, force: true });
+    }
     if (gitOk(repoDir, ['cat-file', '-e', `${headBefore}:${p}`])) {
       git(repoDir, ['restore', `--source=${headBefore}`, '--staged', '--worktree', '--', p]);
     } else {
-      gitOk(repoDir, ['rm', '-f', '--', p]);
-      try {
-        rmSync(resolve(repoDir, p), { force: true });
-      } catch (error) {
-        // Deleting an out-of-ownership path must never take the run down.
-        console.warn(`ownership: could not remove ${p}: ${(error as Error).message}`);
+      // Correctness r1, finding 2: a tampered reserved path with nothing
+      // committed at it yet — a new run's untracked checkpoint — is the run's
+      // only copy: §1 promises the sweep "removes it and restores the file",
+      // so write back the bytes the runner last recorded instead of deleting
+      // what the run must resume from.
+      const recorded = namesReservedSegment(p) ? runnerBytesFor(abs) : undefined;
+      if (recorded !== undefined) {
+        writeFileSync(abs, recorded, 'utf8');
+      } else {
+        gitOk(repoDir, ['rm', '-f', '--', p]);
+        try {
+          rmSync(resolve(repoDir, p), { force: true });
+        } catch (error) {
+          // Deleting an out-of-ownership path must never take the run down.
+          console.warn(`ownership: could not remove ${p}: ${(error as Error).message}`);
+        }
       }
     }
     reverted.push(p);
@@ -278,7 +321,7 @@ export function enforceOwnership(
     // Committed violations: revert commit so the committed tree honors
     // ownership too. The paths go in the commit body: a count alone made the
     // 10:53 event in run 1 unreconstructable.
-    git(repoDir, ['add', '-A']);
+    stageAll(repoDir);
     if (!gitOk(repoDir, ['diff', '--cached', '--quiet'])) {
       git(repoDir, [
         'commit',
@@ -291,6 +334,25 @@ export function enforceOwnership(
     }
   }
   return { reverted, foreign };
+}
+
+/**
+ * Stage everything the run owns, and only that.
+ *
+ * `LOCK_FILE` is a process artifact, never a tree artifact: the repo normally
+ * gitignores it, but the §1 fence and the §4 lock cannot depend on the
+ * operator's ignore file. In a repo that does not ignore it, a plain
+ * `git add -A` would commit the run's own lock and then leave its deletion
+ * dirty at the end — an unowned change in every boundary gate. So the lock is
+ * unstaged straight after the staging pass: nothing between the two calls is
+ * committed, so the path never reaches a commit or the run's terminal record.
+ * (A pathspec exclusion is not the tool here: git exits non-zero when a
+ * literal pathspec names an ignored, untracked file, which is exactly the
+ * normal state of the lock.)
+ */
+function stageAll(repoDir: string): void {
+  git(repoDir, ['add', '-A']);
+  gitOk(repoDir, ['reset', '-q', '--', LOCK_FILE]);
 }
 
 // Hygiene is NOT done here, and the runner never executes a formatter.
@@ -324,7 +386,7 @@ function commitStage(
   if (dirtyFiles(repoDir).length === 0) {
     return null;
   }
-  git(repoDir, ['add', '-A']);
+  stageAll(repoDir);
   if (gitOk(repoDir, ['diff', '--cached', '--quiet'])) {
     return null;
   }
@@ -380,7 +442,98 @@ function pidAlive(pid: number): boolean {
   }
 }
 
-function acquireLock(repoDir: string, slug: string, stage: string): void {
+/**
+ * Atomic exclusive create (ADR-006 §4, A6): the old `existsSync`+`writeFileSync`
+ * pair was check-then-write and admitted two winners in a race. `'wx'` is one
+ * atomic create, so on local filesystems exactly one pipeline process takes
+ * the lock. On `EEXIST` apply today's pid-liveness logic unchanged: a live
+ * holder throws with today's fatal message, a dead holder is cleared with
+ * today's warning and one `'wx'` retry; a racing loser re-reads and throws.
+ * The stale-clear keeps a narrow race — the lock-ID nonce that would close it
+ * is Deferred.
+ */
+export function acquireLock(repoDir: string, slug = 'unknown', stage = 'start'): void {
+  const path = join(repoDir, LOCK_FILE);
+  const info: LockInfo = { slug, pid: process.pid, stage, at: Date.now() };
+  const bytes = JSON.stringify(info);
+  // The lock is a reserved name (§1 fence), so the ownership sweep sees it
+  // whenever the repo does not gitignore it. Recording the bytes this process
+  // wrote is what tells the sweep "runner-authored": it leaves the lock alone
+  // mid-run, and restores these exact bytes if a stage deletes or rewrites it.
+  try {
+    writeFileSync(path, bytes, { flag: 'wx' });
+    recordRunnerWrite(path, bytes);
+    return;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+      throw error;
+    }
+  }
+  const holderOf = (): LockInfo | null => {
+    try {
+      return JSON.parse(readFileSync(path, 'utf8')) as LockInfo;
+    } catch {
+      return null;
+    }
+  };
+  const holder = holderOf();
+  if (holder && pidAlive(holder.pid)) {
+    throw new Error(
+      `another pipeline run holds the lock: slug=${holder.slug} stage=${holder.stage} pid=${holder.pid}`,
+    );
+  }
+  // Stale lock: cleared with a warning, per ADR-001.
+  console.warn(
+    `clearing stale pipeline lock held by ${holder?.slug ?? 'unknown'} (pid ${holder?.pid ?? '?'})`,
+  );
+  try {
+    unlinkSync(path);
+  } catch {
+    /* already gone */
+  }
+  try {
+    writeFileSync(path, bytes, { flag: 'wx' });
+    recordRunnerWrite(path, bytes);
+  } catch {
+    // A racing winner re-took the path between the clear and the retry:
+    // re-read the holder and refuse like a live one.
+    const rival = holderOf();
+    throw new Error(
+      `another pipeline run holds the lock: slug=${rival?.slug ?? 'unknown'} ` +
+        `stage=${rival?.stage ?? 'unknown'} pid=${String(rival?.pid ?? '?')}`,
+    );
+  }
+}
+
+function releaseLock(repoDir: string): void {
+  const path = join(repoDir, LOCK_FILE);
+  try {
+    unlinkSync(path);
+  } catch {
+    /* already gone */
+  }
+  // The run's own last act on the path: recorded so the §1 sweep reads its
+  // absence as runner-authored. A stage that re-creates the lock is a content
+  // mismatch against the recorded bytes and is still reverted.
+  recordRunnerDelete(path);
+}
+
+/**
+ * ADR-006 §4, security r1 finding 4: re-assert single-flight at every stage
+ * boundary. `LOCK_FILE` is in the reserved-segment set (types.ts), so a stage
+ * write to it is an ownership violation the sweep reverts — the bytes recorded
+ * at `acquireLock`/`ensureLockHeld` are what marks a match runner-authored —
+ * and `stageAll` never stages the path, so committing the lock is not a route
+ * to trusting it either. The boundary re-assertion stands on its own: during a
+ * stage window a coder-class stage can still delete or rewrite it before any
+ * sweep runs, after which the next `acquireLock` would admit a second writer
+ * or a planted live-pid holder could block `resume`. A lock that is missing,
+ * unreadable, or names a dead pid is re-taken with the same `'wx'` exclusive
+ * create as `acquireLock` (dead-holder posture unchanged); a lock held live by
+ * another pid means this run has already lost single-flight, and it refuses to
+ * continue rather than run unlocked beside a rival.
+ */
+function ensureLockHeld(repoDir: string, slug: string): void {
   const path = join(repoDir, LOCK_FILE);
   if (existsSync(path)) {
     let holder: LockInfo | null;
@@ -389,25 +542,34 @@ function acquireLock(repoDir: string, slug: string, stage: string): void {
     } catch {
       holder = null;
     }
-    if (holder && pidAlive(holder.pid)) {
+    if (holder !== null && holder.pid === process.pid) {
+      return;
+    }
+    if (holder !== null && pidAlive(holder.pid)) {
       throw new Error(
-        `another pipeline run holds the lock: slug=${holder.slug} stage=${holder.stage} pid=${holder.pid}`,
+        `lost the pipeline lock at a stage boundary: another run holds it ` +
+          `(slug=${holder.slug} stage=${holder.stage} pid=${String(holder.pid)})`,
       );
     }
-    // Stale lock: cleared with a warning, per ADR-001.
-    console.warn(
-      `clearing stale pipeline lock held by ${holder?.slug ?? 'unknown'} (pid ${holder?.pid ?? '?'})`,
-    );
+    // Missing bytes to trust: clear and re-take, the same stale-holder
+    // posture as `acquireLock`.
+    try {
+      unlinkSync(path);
+    } catch {
+      /* already gone */
+    }
   }
-  const info: LockInfo = { slug, pid: process.pid, stage, at: Date.now() };
-  writeFileSync(path, JSON.stringify(info));
-}
-
-function releaseLock(repoDir: string): void {
+  const info: LockInfo = { slug, pid: process.pid, stage: 'boundary', at: Date.now() };
+  const bytes = JSON.stringify(info);
   try {
-    unlinkSync(join(repoDir, LOCK_FILE));
+    writeFileSync(path, bytes, { flag: 'wx' });
+    recordRunnerWrite(path, bytes);
   } catch {
-    /* already gone */
+    // Lost the race to a rival that took the path between the clear and the
+    // re-take: refuse to continue — two writers is exactly what §4 forbids.
+    throw new Error(
+      'lost the pipeline lock at a stage boundary: another run re-took it; refusing to continue',
+    );
   }
 }
 
@@ -1595,8 +1757,9 @@ function finalizeStage(
       // operator-facing results all key on the failed attempt's `failure`, and
       // an `ok` ledger next to a known-damaged worktree is a lie.
       for (let i = state.results.length - 1; i >= 0; i -= 1) {
-        if (state.results[i].sessionID === outcome.sessionID) {
-          state.results[i].failure = text;
+        const entry = state.results[i];
+        if (entry !== undefined && entry.sessionID === outcome.sessionID) {
+          entry.failure = text;
           break;
         }
       }
@@ -1935,7 +2098,17 @@ export async function runPipeline(opts: RunOptions): Promise<PipelineState['stat
     }
     state.baseRef = git(opts.repoDir, ['rev-parse', 'HEAD']).trim();
     ensureBranch(opts.repoDir, state.branch);
-    await checkpoint(join(opts.repoDir, designDirOf(state)), state);
+    try {
+      await checkpoint(join(opts.repoDir, designDirOf(state)), state);
+    } catch (error) {
+      // ADR-006 §3: the entry save gets the same guard as the drive loop —
+      // an unwritable checkpoint is an escalation with a record, not a crash.
+      if (error instanceof CheckpointWriteFailure) {
+        await finalizeEscalate(opts.repoDir, state, printable(error.message), cfg);
+        return state.status;
+      }
+      throw error;
+    }
     const verdict = await sourceAdmissible(sourceAbs, id.kind);
     gateLog(state, 'sourceAdmissible', 0, verdict);
     if (!verdict.proceed) {
@@ -1956,6 +2129,10 @@ export async function resumePipeline(opts: ResumeOptions): Promise<PipelineState
   if (!state) {
     throw new Error(`no pipeline checkpoint at ${designDirRel}`);
   }
+  // The status as persisted, before this resume flips it to `running`: the
+  // split-record test below compares the marker against what the checkpoint
+  // itself claimed.
+  const persistedStatus = state.status;
   if (opts.forceStage) {
     assertForceableStage(opts.forceStage);
   }
@@ -1981,11 +2158,38 @@ export async function resumePipeline(opts: ResumeOptions): Promise<PipelineState
       });
     }
     // A resume means the cause was addressed; drop the stale marker (the
-    // record lives on in the gate log and git history).
-    try {
-      unlinkSync(join(opts.repoDir, designDirRel, 'ESCALATION.md'));
-    } catch {
-      /* no marker */
+    // record lives on in the gate log and git history). ADR-006 §3: a marker
+    // next to a checkpoint that still says `running` is a SPLIT record — the
+    // terminal save failed mid-escalation. Gate-log what the marker recorded
+    // (its failure line) before deleting it, so the new run's gate log
+    // explains the gap it repaired; the checkpoint keeps its last good save.
+    const markerAbs = join(opts.repoDir, designDirRel, ESCALATION_FILE);
+    if (existsSync(markerAbs)) {
+      if (persistedStatus === 'running') {
+        let failureLine = '';
+        try {
+          failureLine =
+            readFileSync(markerAbs, 'utf8')
+              .split('\n')
+              .find((line) => line.includes('checkpoint save failed')) ?? '';
+        } catch {
+          /* unreadable marker: name the split without quoting it */
+        }
+        gateLog(state, 'terminalSaveFailed', 0, {
+          proceed: true,
+          reason:
+            'resumed a split record: ESCALATION.md was present while the checkpoint still said running; ' +
+            (failureLine !== '' ? failureLine : 'the terminal checkpoint save failed'),
+        });
+      }
+      try {
+        unlinkSync(markerAbs);
+      } catch {
+        /* no marker */
+      }
+      // The sweep is author-agnostic; record the delete so the marker's
+      // removal is not restored from `headBefore` at the next boundary.
+      recordRunnerDelete(markerAbs);
     }
     if (!state.baseRef) {
       // Backfill for checkpoints written before baseRef existed: fork point
@@ -2018,7 +2222,7 @@ async function drive(
     state.forceNext = null;
 
     if (next.kind === 'done') {
-      await finalizeDone(opts.repoDir, state);
+      await finalizeDone(opts.repoDir, state, cfg);
       return;
     }
     if (next.kind === 'escalate') {
@@ -2089,6 +2293,12 @@ async function drive(
     };
 
     try {
+      // §4 (security r1, finding 4): the lock may only be gone because a
+      // stage destroyed it — §1 fences the name, and the sweep can put it back
+      // only from the bytes this process recorded. Re-assert it at this stage
+      // boundary before the next window opens; a rival holding it stops the
+      // run rather than admitting a second writer.
+      ensureLockHeld(opts.repoDir, state.slug);
       if (next.kind === 'review') {
         const phase = next.phase;
         if (phase === 'editorial') {
@@ -2338,6 +2548,15 @@ async function drive(
       if (error instanceof StopDriving) {
         return;
       }
+      if (error instanceof CheckpointWriteFailure) {
+        // ADR-006 §3: the checkpoint is the run's spine — a structurally
+        // unwritable checkpoint escalates with a record instead of crashing
+        // without one (the run-2 blocker). This also converts the seat's
+        // checkpoint rejection inside a pass (the `Promise.allSettled`
+        // rethrow) into an escalation. Then stop driving.
+        await finalizeEscalate(opts.repoDir, state, printable(error.message), cfg);
+        return;
+      }
       throw error;
     }
   }
@@ -2537,7 +2756,11 @@ function writeEditorialDiff(
 
 // --- finalization -----------------------------------------------------------------
 
-async function finalizeDone(repoDir: string, state: PipelineState): Promise<void> {
+async function finalizeDone(
+  repoDir: string,
+  state: PipelineState,
+  cfg: PipelineConfig,
+): Promise<void> {
   const designDir = join(repoDir, designDirOf(state));
   if (state.source.kind === 'adr') {
     const adrPath = join(repoDir, state.source.path);
@@ -2553,13 +2776,53 @@ async function finalizeDone(repoDir: string, state: PipelineState): Promise<void
   gateLog(state, 'done', 0, { proceed: true, reason: 'pipeline complete' });
   // Save BEFORE committing so the completion commit contains the terminal
   // status; a save after the commit would leave the checkpoint dirty.
-  await checkpoint(designDir, state);
+  // Security r1, finding 3: the `done` save is a terminal save like every
+  // other §3 guards — the directory-at-the-checkpoint-path class converts to
+  // an escalation with a record here too, instead of crashing the completion
+  // path with no `done`/`escalated` record and no commit.
+  try {
+    await checkpoint(designDir, state);
+  } catch (error) {
+    if (!(error instanceof CheckpointWriteFailure)) {
+      throw error;
+    }
+    restoreCommittedCheckpoint(repoDir, designDirOf(state));
+    await finalizeEscalate(repoDir, state, printable(error.message), cfg);
+    return;
+  }
   recordStageCommit(
     state,
     commitStage(repoDir, `${state.nnn}-${state.slug}`, 'done', 'docs', {
       commitMessage: `docs: ${state.nnn}-${state.slug} pipeline complete`,
     }),
   );
+}
+
+/**
+ * In-process equivalent of the printed repair, run after a failed terminal
+ * save: when HEAD holds a file at the checkpoint path, clear the replacement
+ * and land the committed copy back. Without it the escalation commit's
+ * `git add -A` could stage planted bytes at a reserved path into the run's
+ * terminal record. Silent best-effort: when nothing is committed at that
+ * path (a run that never landed a checkpoint) the planted path stays exactly
+ * where it is for the operator, and the printed repair stands.
+ */
+function restoreCommittedCheckpoint(repoDir: string, designDirRel: string): void {
+  const cpRel = join(designDirRel, STATE_FILE);
+  if (!gitOk(repoDir, ['cat-file', '-e', `HEAD:${cpRel}`])) {
+    return;
+  }
+  try {
+    const abs = resolve(repoDir, cpRel);
+    if (existsSync(abs) && statSync(abs).isDirectory()) {
+      rmSync(abs, { recursive: true, force: true });
+    }
+    git(repoDir, ['restore', '--source=HEAD', '--staged', '--worktree', '--', cpRel]);
+  } catch (error) {
+    console.warn(
+      `could not restore the committed checkpoint: ${printable((error as Error).message)}`,
+    );
+  }
 }
 
 export async function finalizeEscalate(
@@ -2570,8 +2833,8 @@ export async function finalizeEscalate(
 ): Promise<void> {
   // The reason usually quotes failure text the model or the server chose (a
   // seat failure, an independence violation naming a path). It lands in the
-  // gate log, on the operator's terminal, and in ESCALATION.md: keep it on one
-  // line and free of control/escape bytes.
+  // gate log, on the operator's terminal, and in ESCALATION.md: keep it on
+  // one line and free of control/escape bytes.
   const safeReason = printable(reason);
   state.status = 'escalated';
   gateLog(state, 'escalate', 0, { proceed: false, reason: safeReason });
@@ -2581,14 +2844,55 @@ export async function finalizeEscalate(
   const phase = escalationPhase(state);
   // Atomic tmp+rename, like every other checkpoint write: this is the one
   // record the operator must be able to read afterwards, and interrupting a
-  // run is most likely exactly when it is being written.
-  await checkpoint(designDir, state);
-  const reportRel = join(designDirRel, 'ESCALATION.md');
-  writeFileSync(
-    join(repoDir, reportRel),
-    escalationMarkdown(state, phase, cfg.blockingSeverities),
-    'utf8',
-  );
+  // run is most likely exactly when it is being written. ADR-006 §3: the
+  // save is guarded, because an escalation that dies on its own failing
+  // write leaves no terminal record at all (the run-2 blocker). The reason
+  // survives in the in-memory gate log the report renders from (A4).
+  let saveFailure: CheckpointWriteFailure | undefined;
+  try {
+    await checkpoint(designDir, state);
+  } catch (error) {
+    if (error instanceof CheckpointWriteFailure) {
+      saveFailure = error;
+    } else {
+      throw error;
+    }
+  }
+  const reportRel = join(designDirRel, ESCALATION_FILE);
+  const markerAbs = join(repoDir, reportRel);
+  const markdown =
+    escalationMarkdown(state, phase, cfg.blockingSeverities) +
+    // `saveFailure.message` already begins `checkpoint save failed:` (the
+    // `saveState` stem); appending the prefix again made ESCALATION.md — and
+    // the `terminalSaveFailed` reason that quotes this line — read the stem
+    // twice (correctness r1, finding 5).
+    (saveFailure === undefined ? '' : `\n${printable(saveFailure.message)}\n`);
+  // Security r1, findings 1 and 2: a stage can plant a directory at the
+  // marker path — the boundary sweep reverts the files under it, but an
+  // empty untracked directory is invisible to `dirtyFiles` and survives
+  // invisibly, exactly the residue class §3 closes for the checkpoint. Clear
+  // it first, then land the marker through a tmp+rename pair like every
+  // other terminal write, and if even that fails, print the whole report to
+  // stderr: the run's one terminal record must survive either way.
+  if (existsSync(markerAbs) && statSync(markerAbs).isDirectory()) {
+    rmSync(markerAbs, { recursive: true, force: true });
+  }
+  const markerTmp = `${markerAbs}.${randomBytes(4).toString('hex')}.tmp`;
+  try {
+    writeFileSync(markerTmp, markdown, 'utf8');
+    renameSync(markerTmp, markerAbs);
+    recordRunnerWrite(markerAbs, markdown);
+  } catch (error) {
+    try {
+      unlinkSync(markerTmp);
+    } catch {
+      /* no stray tmp */
+    }
+    console.error(
+      `\npipeline ESCALATED — the terminal marker could not be written ` +
+        `(${printable((error as Error).message)}). Full report:\n${markdown}`,
+    );
+  }
   // Nothing printed on escalation in run 1: a 47-minute resume that ended
   // escalated looked like a quiet success on the operator's terminal.
   console.error(
@@ -2597,6 +2901,19 @@ export async function finalizeEscalate(
       `  status: pipeline status ${state.nnn}-${state.slug}\n` +
       `  retry after a fix: pipeline resume ${state.nnn}-${state.slug}`,
   );
+  if (saveFailure !== undefined) {
+    // The split record is accepted, bounded, and visible: the checkpoint
+    // keeps its last good save, ESCALATION.md is the terminal marker, and
+    // `resume` repairs the gap (gate-logging it). Print the exact repair;
+    // the `rm -r` variant covers a directory at the checkpoint path (A5).
+    const cpRel = join(designDirRel, STATE_FILE);
+    console.error(
+      `  checkpoint save failed: the checkpoint keeps its last good save.\n` +
+        `    repair a replaced path with: rm -r ${cpRel} && git checkout HEAD -- ${cpRel}, ` +
+        `then pipeline resume ${state.nnn}-${state.slug}`,
+    );
+    restoreCommittedCheckpoint(repoDir, designDirRel);
+  }
   recordStageCommit(
     state,
     commitStage(repoDir, `${state.nnn}-${state.slug}`, 'escalate', 'docs', {
@@ -2605,8 +2922,14 @@ export async function finalizeEscalate(
   );
 }
 
-/** Human-facing explanation for `pipeline status`, from the gate log only. */
-export function renderStatus(state: PipelineState): string {
+/**
+ * Human-facing explanation for `pipeline status`, from the gate log only.
+ * `escalationMarkerPresent` (ADR-006 §3) makes the SPLIT RECORD visible: an
+ * `ESCALATION.md` marker next to a checkpoint that still says `running` means
+ * the last terminal save failed — the SQLite journal-existence posture, the
+ * marker is the terminal truth, the checkpoint keeps its last good save.
+ */
+export function statusLines(state: PipelineState, escalationMarkerPresent = false): string[] {
   const growth = proposalGrowthLine(state);
   const lines = [
     `run:     ${state.nnn}-${state.slug} (${state.status})`,
@@ -2626,5 +2949,17 @@ export function renderStatus(state: PipelineState): string {
       .slice(-6)
       .map((g) => `  ${g.proceed ? 'ok  ' : 'DENY'} ${g.gate} r${g.round}: ${printable(g.reason)}`),
   ];
-  return lines.join('\n');
+  if (escalationMarkerPresent && state.status === 'running') {
+    lines.push(
+      `note:    split record: ESCALATION.md marks this run escalated while the checkpoint still ` +
+        `says running — the last terminal checkpoint save failed. The committed checkpoint is the ` +
+        `recovery anchor: git checkout HEAD -- <design dir>/${STATE_FILE}, then resume (the resume ` +
+        `gate-logs and clears the marker).`,
+    );
+  }
+  return lines;
+}
+
+export function renderStatus(state: PipelineState, escalationMarkerPresent = false): string {
+  return statusLines(state, escalationMarkerPresent).join('\n');
 }

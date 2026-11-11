@@ -326,6 +326,64 @@ describe('stagePathAllowed', () => {
   });
 });
 
+describe('stagePathAllowed: runner-reserved checkpoint paths', () => {
+  // proves: Test strategy #1 — the reserved-name rule precedes the per-stage
+  // rules: the checkpoint, its saveState tmp shape, ESCALATION.md, and the
+  // run lock are denied to every stage class at any depth, and case-
+  // insensitively the way the moves validator already compares these names
+  // (ADR-006 §1). The lock joins the reserved set per security r1 #4: §1's
+  // trust posture leans on §4's single-flight premise, so a coder stage must
+  // not be able to delete or rewrite `.pipeline.lock`.
+  type StageArg = Parameters<typeof stagePathAllowed>[0];
+
+  const STAGE_CLASSES: StageArg[] = [
+    'research',
+    'proposal',
+    'design-review',
+    'doc-sync',
+    'editorial-review',
+    'test-authoring',
+    'test-update',
+    'implement',
+    'fix',
+    'code-review',
+  ];
+
+  const RESERVED_PATHS = [
+    '.pipeline.json',
+    'docs/designs/002-x/.pipeline.json',
+    'docs/designs/002-x/round/reviews/.pipeline.json',
+    '.pipeline.json.a1b2c3d4.tmp',
+    'docs/designs/002-x/.pipeline.json.a1b2c3d4.tmp',
+    'ESCALATION.md',
+    'docs/designs/002-x/ESCALATION.md',
+    '.PIPELINE.JSON',
+    'docs/designs/002-x/.Pipeline.Json.A1B2C3D4.TMP',
+    'docs/designs/002-x/Escalation.md',
+    '.pipeline.lock',
+    'docs/designs/002-x/.pipeline.lock',
+    'docs/designs/002-x/.PIPELINE.LOCK',
+  ];
+
+  for (const stage of STAGE_CLASSES) {
+    it(`denies every reserved checkpoint name to the ${stage} stage`, () => {
+      for (const path of RESERVED_PATHS) {
+        expect(stagePathAllowed(stage, path)).toBe(false);
+      }
+    });
+  }
+
+  // proves: Test strategy #1 — the fence matches whole `/`-separated
+  // segments: a neighboring docs path that merely carries a reserved name
+  // stays inside the stage's write set.
+  it('leaves neighboring docs paths allowed', () => {
+    expect(stagePathAllowed('research', 'docs/designs/002-x/.pipeline.json-notes.md')).toBe(true);
+    expect(stagePathAllowed('doc-sync', 'docs/designs/002-x/pipeline.json')).toBe(true);
+    expect(stagePathAllowed('research', 'docs/designs/002-x/ESCALATION-notes.md')).toBe(true);
+    expect(stagePathAllowed('implement', 'docs/designs/002-x/escalation-summary.md')).toBe(true);
+  });
+});
+
 describe('test tree mirrors src/ hierarchy', () => {
   // The baseline, named once as the amended Rollout 1 words it: the pre-move
   // test-only commit keeps the 26-file count and adds cases, so the

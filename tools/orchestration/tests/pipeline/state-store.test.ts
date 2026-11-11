@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -212,5 +212,92 @@ describe('checkpoint validation', () => {
       const loaded = await loadState(dir);
       expect(loaded?.slug).toBe(id.slug);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ADR-006 §2/§3: the cross-version contract's refusal path and the replaced-
+// path repair. A refused version names the supported version and the ADR's
+// two interim operator postures (restore the committed copy, or start a
+// fresh run) and touches nothing on disk; a directory at the checkpoint path
+// is reported as the repair it needs, not as a bare errno.
+// ---------------------------------------------------------------------------
+
+describe('cross-version refusal and path repair messages', () => {
+  async function tmpDir(): Promise<string> {
+    return mkdtemp(join(tmpdir(), 'bindforge-refuse-'));
+  }
+
+  async function refusalMessage(dir: string): Promise<string> {
+    try {
+      await loadState(dir);
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+    throw new Error('expected loadState to refuse the checkpoint');
+  }
+
+  // proves: Test strategy #4 — version 0, 2, and 99 all refuse; the message
+  // keeps today's stem, names the supported version and both operator
+  // postures, and the file on disk is byte-identical after the refusal —
+  // refusal never writes or deletes anything.
+  it('refuses versions 0, 2, and 99 naming the supported version and both recovery postures', async () => {
+    for (const version of [0, 2, 99]) {
+      const dir = await tmpDir();
+      const raw = JSON.stringify({ ...base, version });
+      await writeFile(join(dir, '.pipeline.json'), raw, 'utf8');
+
+      const message = await refusalMessage(dir);
+
+      expect(message).toMatch(/unsupported pipeline state version/);
+      expect(message).toContain('version 1');
+      expect(message).toContain('git checkout HEAD --');
+      expect(message).toMatch(/fresh run/i);
+
+      expect(await readFile(join(dir, '.pipeline.json'), 'utf8')).toBe(raw);
+      expect((await readdir(dir)).filter((f) => f.endsWith('.tmp'))).toEqual([]);
+    }
+  });
+
+  // proves: Test strategy #5 — a directory occupying the checkpoint path is
+  // loadState'd into the rm -r + git checkout HEAD -- repair instruction,
+  // not a bare errno (A5: the replacement is not repairable inside the
+  // write call).
+  it('names the rm -r plus git checkout repair for a directory at the checkpoint path', async () => {
+    const dir = await tmpDir();
+    await mkdir(join(dir, '.pipeline.json'));
+    await writeFile(join(dir, '.pipeline.json', 'planted.md'), 'x', 'utf8');
+
+    const message = await refusalMessage(dir);
+
+    expect(message).toContain('rm -r');
+    expect(message).toContain('git checkout HEAD --');
+  });
+
+  // proves: ADR-006 §2 / security r1 #5 (deviation 12) — the raw read is
+  // size-capped before any parse: the committed copy is the recovery anchor
+  // for pre-fence history that §Risks admits can carry model-authored bytes,
+  // so an oversized hostile checkpoint is refused with the same recovery
+  // postures instead of spending unbounded memory in JSON.parse — and the
+  // refusal stays read-only like every other one.
+  it('refuses an oversized checkpoint before parsing, naming the recovery postures', async () => {
+    const dir = await tmpDir();
+    const huge = {
+      ...base,
+      gateLog: [
+        { gate: 'x', round: 0, proceed: true, reason: 'a'.repeat(66 * 1024 * 1024), at: 0 },
+      ],
+    } as unknown as PipelineState;
+    const raw = JSON.stringify(huge);
+    await writeFile(join(dir, '.pipeline.json'), raw, 'utf8');
+
+    const message = await refusalMessage(dir);
+
+    expect(message).toMatch(/too large/i);
+    expect(message).toContain('git checkout HEAD --');
+    expect(message).toMatch(/fresh run/i);
+
+    expect(await readFile(join(dir, '.pipeline.json'), 'utf8')).toBe(raw);
+    expect((await readdir(dir)).filter((f) => f.endsWith('.tmp'))).toEqual([]);
   });
 });

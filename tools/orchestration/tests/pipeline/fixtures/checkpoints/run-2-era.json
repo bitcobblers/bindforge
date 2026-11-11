@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "slug": "x",
+  "nnn": "002",
+  "branch": "pipeline/002-x",
+  "source": {
+    "kind": "adr",
+    "path": "docs/adrs/002-x.md"
+  },
+  "status": "escalated",
+  "lastStage": "design-review",
+  "designRound": 1,
+  "codeRound": 0,
+  "designBudgetUsed": 1,
+  "codeBudgetUsed": 0,
+  "editorialDone": false,
+  "testsGreen": false,
+  "testsNeedUpdate": false,
+  "stageFailures": {
+    "design-review:security": 1
+  },
+  "forceNext": null,
+  "results": [
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_002_sec_failed",
+      "agent": "review/design-security",
+      "at": 1776000001000,
+      "transcript": "docs/designs/002-x/transcripts/design-review-security-r1c0.md",
+      "durationMs": 41000,
+      "nudges": 0,
+      "failure": "invalid reply: verdict missing"
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_002_correct",
+      "agent": "review/design-correctness",
+      "at": 1776000002000,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/002-x/transcripts/design-review-correctness-r1c0.md",
+      "durationMs": 33000,
+      "nudges": 0
+    }
+  ],
+  "gateLog": [
+    {
+      "gate": "sourceAdmissible",
+      "round": 0,
+      "proceed": true,
+      "reason": "ADR is proposed and complete",
+      "at": 1776000000000
+    },
+    {
+      "gate": "stageFailure",
+      "round": 1,
+      "proceed": false,
+      "reason": "design-review:security: invalid reply: verdict missing",
+      "at": 1776000001000
+    },
+    {
+      "gate": "escalate",
+      "round": 1,
+      "proceed": false,
+      "reason": "stage design-review:security failed twice (invalid reply: verdict missing) — nudge/reply rule: one retry, then escalate",
+      "at": 1776000001500
+    }
+  ],
+  "startedAt": 1776000000000,
+  "updatedAt": 1776000001500
+}

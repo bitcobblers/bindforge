@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   renameSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -13,6 +14,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { enforceOwnership, porcelainPaths } from '../../src/pipeline/runner.js';
+import { loadState, recordRunnerDelete, saveState } from '../../src/pipeline/state-store.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
 
 // ---------------------------------------------------------------------------
@@ -204,5 +206,201 @@ describe('enforceOwnership', () => {
     expect(report.reverted.sort()).toEqual(['tests/new.test.ts', 'tests/old.test.ts']);
     expect(readFileSync(join(dir, 'tests', 'old.test.ts'), 'utf8')).toContain("test('old'");
     expect(existsSync(join(dir, 'tests', 'new.test.ts'))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ADR-006 §1: the checkpoint is runner-reserved. The ownership sweep is
+// author-agnostic, so a stage write to `.pipeline.json`, to the `saveState`
+// tmp shape, or to a directory planted at the checkpoint path is a content
+// mismatch against what the runner last wrote — reverted before the stage's
+// `git add -A` can commit it. The runner's own save is the one match the
+// sweep skips, so boundary commits keep advancing the committed checkpoint.
+// ---------------------------------------------------------------------------
+
+/** Repo with a committed checkpoint under the design dir. */
+function tmpRepoWithCheckpoint(): { dir: string; base: string; checkpoint: string } {
+  // The sweep's `headBefore` is the checkpoint commit below, not the base
+  // commit `tmpRepo()` returns, so only `dir` carries forward here.
+  const { dir } = tmpRepo();
+  const checkpoint = join(dir, 'docs', 'designs', '002-x', '.pipeline.json');
+  writeFileSync(
+    checkpoint,
+    `${JSON.stringify({ ...state(), lastStage: 'proposal', updatedAt: 1 }, null, 2)}\n`,
+  );
+  gitAt(dir, ['add', '-A']);
+  gitAt(dir, ['commit', '-q', '-m', 'chore: commit the checkpoint']);
+  return { dir, base: gitAt(dir, ['rev-parse', 'HEAD']).trim(), checkpoint };
+}
+
+describe('enforceOwnership: runner-reserved checkpoint paths', () => {
+  // proves: Test strategy #2 — a stage that rewrites the checkpoint gets its
+  // bytes reverted, even though every stage may write `docs/**`.
+  it('reverts a stage-written checkpoint', () => {
+    const { dir, base, checkpoint } = tmpRepoWithCheckpoint();
+    const tampered = { ...state(), lastStage: 'doc-sync', slug: 'x' };
+    writeFileSync(checkpoint, `${JSON.stringify(tampered, null, 2)}\n`);
+
+    const report = enforceOwnership(dir, base, 'design-review', state());
+
+    expect(report.reverted).toContain('docs/designs/002-x/.pipeline.json');
+    const restored = JSON.parse(readFileSync(checkpoint, 'utf8')) as PipelineState;
+    expect(restored.lastStage).toBe('proposal');
+  });
+
+  // proves: Test strategy #2 — a planted writer-shaped tmp file matches
+  // nothing the runner wrote, so the sweep removes it and `git add -A` stays
+  // clean of stray checkpoint tmp files.
+  it('removes a planted saveState-shaped tmp file', () => {
+    const { dir, base } = tmpRepoWithCheckpoint();
+    const planted = join(dir, 'docs', 'designs', '002-x', '.pipeline.json.a1b2c3d4.tmp');
+    writeFileSync(planted, '{"slug":"x"}\n');
+
+    const report = enforceOwnership(dir, base, 'design-review', state());
+
+    expect(report.reverted).toContain('docs/designs/002-x/.pipeline.json.a1b2c3d4.tmp');
+    expect(existsSync(planted)).toBe(false);
+  });
+
+  // proves: Test strategy #2 — the directory replacement of the checkpoint
+  // path (the renameSync fixture pattern of this file, inverted) is reverted
+  // the same way: the planted directory goes, the committed file returns.
+  it('restores the checkpoint over a directory planted at its path', () => {
+    const { dir, base, checkpoint } = tmpRepoWithCheckpoint();
+    const planted = join(dir, 'docs', 'designs', '002-x', 'moved-proposal.md');
+    renameSync(join(dir, 'docs', 'designs', '002-x', '02-proposal.md'), planted);
+    rmSync(checkpoint);
+    mkdirSync(checkpoint);
+    writeFileSync(join(checkpoint, 'inside.md'), 'planted\n');
+
+    const report = enforceOwnership(dir, base, 'design-review', state());
+
+    expect(report.reverted).toContain('docs/designs/002-x/.pipeline.json');
+    expect(readFileSync(checkpoint, 'utf8')).toContain('"lastStage": "proposal"');
+    expect(existsSync(join(checkpoint, 'inside.md'))).toBe(false);
+  });
+
+  // proves: Test strategy #2 — the sweep skips what saveState last wrote, so
+  // a boundary whose only checkpoint change is the runner's own save commits
+  // that save rather than restoring the checkpoint to `headBefore`.
+  it('keeps the runner’s own checkpoint save instead of restoring headBefore', async () => {
+    const { dir, base, checkpoint } = tmpRepoWithCheckpoint();
+    const advanced = { ...state(), lastStage: 'design-review', updatedAt: 2 };
+    await saveState(join(dir, 'docs', 'designs', '002-x'), advanced);
+
+    const report = enforceOwnership(dir, base, 'design-review', advanced);
+
+    expect(report.reverted).not.toContain('docs/designs/002-x/.pipeline.json');
+    const saved = JSON.parse(readFileSync(checkpoint, 'utf8')) as PipelineState;
+    expect(saved.lastStage).toBe('design-review');
+  });
+
+  // proves: Test strategy #2 — the authorship skip compares content, not map
+  // presence: bytes the runner recorded and a stage then rewrote mismatch the
+  // record, so a stage edit made on top of the runner's own save is still
+  // reverted (testing r1 #3 — an implementation that skipped whenever the
+  // record merely existed would keep the rest of the suite green).
+  it('reverts a stage edit made on top of the runner’s own save', async () => {
+    const { dir, base, checkpoint } = tmpRepoWithCheckpoint();
+    const advanced = { ...state(), lastStage: 'design-review', updatedAt: 2 };
+    await saveState(join(dir, 'docs', 'designs', '002-x'), advanced);
+    writeFileSync(
+      checkpoint,
+      `${JSON.stringify({ ...advanced, lastStage: 'implement' }, null, 2)}\n`,
+    );
+
+    const report = enforceOwnership(dir, base, 'design-review', advanced);
+
+    expect(report.reverted).toContain('docs/designs/002-x/.pipeline.json');
+    const restored = JSON.parse(readFileSync(checkpoint, 'utf8')) as PipelineState;
+    expect(restored.lastStage).toBe('proposal'); // back to what headBefore holds
+  });
+
+  // proves: ADR-006 §1 (correctness r1 #1) — the authorship record survives
+  // the process boundary: `loadState` seeds it with the bytes it read, so the
+  // first sweep of a resumed run skips the run's own dirty checkpoint instead
+  // of reporting it as tampering. The bytes here never passed through this
+  // process's saveState: they are what the interrupted previous process left
+  // on disk, which is the ADR's central resume scenario.
+  it('skips the checkpoint bytes a fresh loadState just read', async () => {
+    const { dir, base, checkpoint } = tmpRepoWithCheckpoint();
+    writeFileSync(
+      checkpoint,
+      `${JSON.stringify({ ...state(), lastStage: 'design-review', updatedAt: 2 }, null, 2)}\n`,
+    );
+    await loadState(join(dir, 'docs', 'designs', '002-x')); // the resume's load
+
+    const report = enforceOwnership(dir, base, 'design-review', {
+      ...state(),
+      lastStage: 'design-review',
+      updatedAt: 2,
+    });
+
+    expect(report.reverted).not.toContain('docs/designs/002-x/.pipeline.json');
+    const kept = JSON.parse(readFileSync(checkpoint, 'utf8')) as PipelineState;
+    expect(kept.lastStage).toBe('design-review');
+  });
+
+  // proves: ADR-006 §1 (correctness r1 #1, stated bound) — the seed keeps the
+  // fence's teeth: a stage write that follows the load mismatches the seeded
+  // record and is still reverted.
+  it('still reverts a stage write that follows a fresh loadState', async () => {
+    const { dir, base, checkpoint } = tmpRepoWithCheckpoint();
+    await loadState(join(dir, 'docs', 'designs', '002-x'));
+    writeFileSync(
+      checkpoint,
+      `${JSON.stringify({ ...state(), lastStage: 'implement' }, null, 2)}\n`,
+    );
+
+    const report = enforceOwnership(dir, base, 'design-review', state());
+
+    expect(report.reverted).toContain('docs/designs/002-x/.pipeline.json');
+    const restored = JSON.parse(readFileSync(checkpoint, 'utf8')) as PipelineState;
+    expect(restored.lastStage).toBe('proposal');
+  });
+
+  // proves: ADR-006 §1 (correctness r1 #2) — a new run's checkpoint is
+  // untracked until its first commitStage; when a stage tampers with it, the
+  // sweep restores the bytes the runner recorded for it instead of deleting
+  // the run's only checkpoint copy because headBefore holds no blob.
+  it('restores recorded bytes over a tampered untracked checkpoint', async () => {
+    const { dir, base } = tmpRepo();
+    const designDir = join(dir, 'docs', 'designs', '002-x');
+    const checkpoint = join(designDir, '.pipeline.json');
+    const advanced = { ...state(), lastStage: 'proposal', updatedAt: 1 };
+    await saveState(designDir, advanced); // the entry save — nothing committed yet
+    const recorded = readFileSync(checkpoint, 'utf8');
+    writeFileSync(
+      checkpoint,
+      `${JSON.stringify({ ...advanced, lastStage: 'implement' }, null, 2)}\n`,
+    );
+
+    const report = enforceOwnership(dir, base, 'design-review', advanced);
+
+    expect(report.reverted).toContain('docs/designs/002-x/.pipeline.json');
+    // Not deleted: the run keeps its checkpoint, rewritten to the bytes the
+    // runner recorded — whatever headBefore holds.
+    expect(readFileSync(checkpoint, 'utf8')).toBe(recorded);
+  });
+
+  // proves: ADR-006 §1 (testing r1 #4) — resume deletes the escalation marker
+  // after gate-logging the split record; that delete is runner-authored, so a
+  // committed marker's deletion survives the next sweep instead of being
+  // resurrected from headBefore.
+  it('leaves a runner-deleted committed marker deleted instead of restoring it', () => {
+    const { dir } = tmpRepoWithCheckpoint();
+    const marker = join(dir, 'docs', 'designs', '002-x', 'ESCALATION.md');
+    writeFileSync(marker, '# pipeline escalated\n\ncheckpoint save failed: EISDIR\n', 'utf8');
+    gitAt(dir, ['add', '-A']);
+    gitAt(dir, ['commit', '-q', '-m', 'docs: 002-x escalated']);
+    const headBefore = gitAt(dir, ['rev-parse', 'HEAD']).trim();
+
+    rmSync(marker); // resume's marker delete, recognized through recordRunnerDelete
+    recordRunnerDelete(marker);
+
+    const report = enforceOwnership(dir, headBefore, 'design-review', state());
+
+    expect(report.reverted).not.toContain('docs/designs/002-x/ESCALATION.md');
+    expect(existsSync(marker)).toBe(false);
   });
 });
