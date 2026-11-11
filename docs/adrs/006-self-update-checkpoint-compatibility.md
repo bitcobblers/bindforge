@@ -5,9 +5,13 @@ date: 2026-11-09
 
 # ADR 006: Make the pipeline checkpoint resumable across a self-update
 
-Carved out of ADR-003, which no longer carries any of it. **Not scheduled to be
-run:** ADR-003 should land and be exercised once before this is worth designing,
-and nothing in fan-out depends on the property below.
+Carved out of ADR-003, which no longer carries any of it. **Precondition met
+10 Nov — ready to schedule:** ADR-003 landed in run 003 and its parallel lane
+was exercised once in later runs — 004, 005, and 007 launched review-pass
+seats concurrently (their checkpoints show same-millisecond seat-session IDs;
+`--max-parallel` is run-time config, not checkpoint state). Nothing in fan-out
+depends on the property below, and no 006 run exists yet, so this ADR stays
+`proposed` until one completes.
 
 ## Context
 
