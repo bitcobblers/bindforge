@@ -1,0 +1,7 @@
+# Legal TOML, outside the v1 grammar (`spec.md`): dotted keys are rejected, so
+# an entry cannot smuggle a nested path into a flat profile document.
+format = "profile"
+version = "v1"
+id = "dotted-key"
+derives = []
+author.name = "someone"

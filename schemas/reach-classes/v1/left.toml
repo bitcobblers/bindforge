@@ -1,0 +1,6 @@
+# Left-hand reach-class table, v1. The class ids are placeholders pending
+# ADR-009's taxonomy; the layout and the per-hand rule are this contract's.
+format = "reach-classes"
+version = "v1"
+hand = "left"
+classes = ["near", "mid", "extended"]

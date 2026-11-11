@@ -1,0 +1,6 @@
+# `middle` is not a hand: every implementer must reject this document with a
+# structured error naming what is wrong.
+format = "reach-classes"
+version = "v1"
+hand = "middle"
+classes = ["near"]

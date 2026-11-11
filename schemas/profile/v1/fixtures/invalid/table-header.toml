@@ -1,0 +1,10 @@
+# Legal TOML, outside the v1 grammar (`spec.md`): the grammar is line-oriented
+# `key = value` entries only, so a table header is rejected. Every implementer
+# refuses this document.
+format = "profile"
+version = "v1"
+id = "table-header"
+derives = []
+
+[extra]
+note = "table headers are not part of the v1 grammar"

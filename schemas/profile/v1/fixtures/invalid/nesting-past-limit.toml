@@ -1,0 +1,7 @@
+# Arrays nested 17 levels deep — one past MAX_NESTING_DEPTH (16), the budget
+# `schemas/README.md` states as a rejection every implementer must perform
+# before it builds any value. Regenerate this fixture if the budget moves.
+format = "profile"
+version = "v1"
+id = "nesting-past-limit"
+derives = [[[[[[[[[[[[[[[[["deep"]]]]]]]]]]]]]]]]]

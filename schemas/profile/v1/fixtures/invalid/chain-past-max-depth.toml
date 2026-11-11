@@ -1,0 +1,8 @@
+# 33 ancestor links — one past MAX_CHAIN_DEPTH (32 initially, ADR-009 may
+# tune the bound but not remove it; regenerate this fixture if the bound
+# moves). Every implementer must reject chain resolution for this document
+# (a reader's `ChainTooDeep` rejection).
+format = "profile"
+version = "v1"
+id = "past-max-depth"
+derives = ["ancestor-1", "ancestor-2", "ancestor-3", "ancestor-4", "ancestor-5", "ancestor-6", "ancestor-7", "ancestor-8", "ancestor-9", "ancestor-10", "ancestor-11", "ancestor-12", "ancestor-13", "ancestor-14", "ancestor-15", "ancestor-16", "ancestor-17", "ancestor-18", "ancestor-19", "ancestor-20", "ancestor-21", "ancestor-22", "ancestor-23", "ancestor-24", "ancestor-25", "ancestor-26", "ancestor-27", "ancestor-28", "ancestor-29", "ancestor-30", "ancestor-31", "ancestor-32", "ancestor-33"]

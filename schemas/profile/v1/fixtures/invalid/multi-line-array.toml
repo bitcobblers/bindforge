@@ -1,0 +1,8 @@
+# Legal TOML, outside the v1 grammar (`spec.md`): arrays must be written on
+# one line, so an entry whose array continues onto the next line is rejected.
+format = "profile"
+version = "v1"
+id = "multi-line-array"
+derives = [
+  "ancestor-1",
+]

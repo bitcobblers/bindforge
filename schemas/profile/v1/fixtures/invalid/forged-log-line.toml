@@ -1,0 +1,8 @@
+# A hostile `format` value: a `\n` escape and a timestamp-shaped tail. The
+# rejection this document produces is shown and logged by the CLI and the hub,
+# so it must stay one bounded line: an implementer may not echo the value's
+# newline into a log line, nor the whole string.
+format = "profile\n2026-11-11T03:17:00Z INFO hub: upload accepted id=fake"
+version = "v1"
+id = "forged-log-line"
+derives = []

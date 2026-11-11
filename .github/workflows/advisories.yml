@@ -1,0 +1,109 @@
+# The scheduled lockfile scan (design 008, "Gates"): the recurring look at
+# Cargo.lock. It runs weekly and on manual dispatch, never as a PR check, so a
+# live advisory database can never turn an unchanged PR red. The repo
+# maintainer triages what it reports within the week — the full report is
+# uploaded as a build artifact so the triage record outlives the runner — and
+# waivers live in the root deny.toml. A toolchain security advisory surfaced
+# here is a trigger to bump rust-toolchain.toml together with Cargo.toml
+# rust-version.
+#
+# The scan covers advisories, bans, licenses, and sources — every section the
+# root deny.toml configures, so no configured policy goes unrun.
+#
+# cargo-deny is deliberately not pinned in Cargo.lock (it is a tool, not a
+# workspace dependency); it is installed at a pinned version here. Its
+# crates.io/RustSec data is not every dependency's only advisory source
+# (A27) — frameworks with their own advisory lists (e.g. Tauri's repository
+# advisories) are checked against those lists when they enter the workspace.
+#
+# The scanner builds on its own toolchain, deliberately independent of the
+# product pin. rust-toolchain.toml pins 1.85.0, and rustup would apply that
+# pin here; cargo-deny 0.18.4+ declares an MSRV of 1.88.0, so building it
+# under the product pin fails and the scan would never run. A25's MSRV check
+# covers workspace dependencies; SCAN_TOOLCHAIN below is the same check for
+# the scanner itself, and it is what to bump when cargo-deny is upgraded.
+#
+# Where the pinned 0.20.2 writes its report — the tool fact two earlier
+# revisions got wrong, so it is stated here and at the scan step: with
+# `--format json` every record the tool produces (diagnostics, log records,
+# and the run summary) goes to *stderr*; the JSON stream is hard-wired to
+# stderr in the source, with its stdout variant commented out. Only SARIF is
+# written to stdout. The scan therefore runs `--format sarif` with a stdout
+# redirect, and the guard step proves by content that the captured file is a
+# SARIF run document. stdout carries nothing but that document, so "no SARIF
+# document in the file" means exactly "the scan did not run to completion".
+name: advisories
+
+on:
+  schedule:
+    - cron: "17 3 * * 1" # Mondays 03:17 UTC
+  workflow_dispatch:
+
+env:
+  # cargo-deny 0.20.2's crates.io `rust_version` (its MSRV). Kept separate
+  # from rust-toolchain.toml on purpose — see the header note.
+  SCAN_TOOLCHAIN: "1.88.0"
+  CARGO_DENY_VERSION: "0.20.2"
+
+jobs:
+  advisories:
+    runs-on: ubuntu-latest
+    # Building cargo-deny from source compiles hundreds of crates; a hung
+    # install means no scan report that week.
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      # actions/upload-artifact authenticates against the Actions artifact
+      # service; without this scope the report upload cannot run.
+      actions: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install cargo-deny (pinned, on the scanner toolchain)
+        run: |
+          rustup toolchain install "$SCAN_TOOLCHAIN" --profile minimal
+          RUSTUP_TOOLCHAIN="$SCAN_TOOLCHAIN" \
+            cargo install cargo-deny --version "$CARGO_DENY_VERSION" --locked
+      - name: Scan Cargo.lock (advisories, bans, licenses, sources)
+        # Findings are triage input, not a gate, so a non-zero exit from
+        # cargo-deny must not fail the job; the report still has to exist,
+        # and the next step proves it does — by content, not by size.
+        #
+        # Two facts about the pinned 0.20.2 this command line must respect:
+        # shared options (`--format`) are root-level arguments, so they sit
+        # before the subcommand — writing them after it is a clap parse error
+        # that exits before any check runs and leaves the redirect file empty;
+        # and with `--format json` every record (diagnostics, log records,
+        # summary) is written to stderr, so a stdout redirect of it captures
+        # nothing. SARIF is the format 0.20.2 writes to stdout, and it writes
+        # the document even when the scan found nothing. The whole
+        # `cargo deny check` runs here — advisories, bans, licenses, sources —
+        # so every policy the root deny.toml configures has a consumer.
+        run: |
+          RUSTUP_TOOLCHAIN="$SCAN_TOOLCHAIN" \
+            cargo deny --format sarif check > cargo-deny-report.json || true
+      - name: Fail if the scan produced no report
+        # A permanently-failing scheduled job is a dead control: it removes
+        # the repo's only recurring look at the lockfile while looking green
+        # to nobody in particular. This step makes that state loud — and the
+        # bar is a SARIF run document, not a non-empty file: a run that died
+        # loading deny.toml or the advisory database still emits an error
+        # line, and a parse-error exit leaves an empty file; neither is a
+        # report. The SARIF document always contains `"runs"` — even with
+        # zero findings — and stdout carries nothing else, so this marker is
+        # exactly "the checks ran".
+        run: |
+          if ! grep -q '"runs"' cargo-deny-report.json; then
+            echo "::error::cargo-deny produced no report; the scheduled lockfile scan did not run"
+            exit 1
+          fi
+          # Log preview only — the complete report is the artifact below.
+          head -c 4000 cargo-deny-report.json
+      - name: Upload the report (the week's triage record)
+        # The preview above truncates any real finding set and the file dies
+        # with the runner; "the maintainer triages what it reports within the
+        # week" needs the complete report to outlive the job.
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cargo-deny-report
+          path: cargo-deny-report.json
+          if-no-files-found: error

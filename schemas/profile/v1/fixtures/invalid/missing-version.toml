@@ -1,0 +1,5 @@
+# Declares no format version at all: every implementer rejects this with an
+# error naming the supported majors. It must never be defaulted to v1.
+format = "profile"
+id = "missing-version"
+derives = []

@@ -1,0 +1,5 @@
+# A minimal valid reach-classes table document.
+format = "reach-classes"
+version = "v1"
+hand = "right"
+classes = ["near"]

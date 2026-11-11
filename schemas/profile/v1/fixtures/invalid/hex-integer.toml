@@ -1,0 +1,7 @@
+# Legal TOML, outside the v1 grammar (`spec.md`): integers are decimal only, so
+# a `0x` prefixed integer is rejected rather than read as one.
+format = "profile"
+version = "v1"
+id = "hex-integer"
+derives = []
+revision = 0xFF

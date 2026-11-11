@@ -1,0 +1,7 @@
+# The profile derives from itself: its own id is its only ancestor. Every
+# implementer must reject chain resolution for this document (a reader's
+# `Cycle` rejection).
+format = "profile"
+version = "v1"
+id = "self-deriving"
+derives = ["self-deriving"]

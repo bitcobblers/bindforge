@@ -1,0 +1,10 @@
+# The entry set is closed: `spec.md` says "Any other entry is rejected", so a
+# document carrying an entry the grammar does not define must be refused, not
+# ignored. This one aliases a known entry (`derives_`): a reader that ignores
+# unknown entries reads it as *no ancestors at all* and silently turns a
+# derived profile into a standalone one.
+format = "profile"
+version = "v1"
+id = "unknown-entry"
+derives = []
+derives_ = ["ancestor-1"]

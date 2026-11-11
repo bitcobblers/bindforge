@@ -1,0 +1,10 @@
+# A valid profile whose id carries the escapes the grammar decodes: a quote, a
+# backslash, a tab, a backspace, and a form feed. Re-serializing it must yield
+# text the same reader accepts, so this fixture is what pins the serializer's
+# escape set — a writer that emits the raw control character instead of `\b`
+# or `\f` produces a document its own reader refuses. ADR-009 owns what an id
+# means; this contract pins only that a document round-trips.
+format = "profile"
+version = "v1"
+id = "quote\"backslash\\tab\tbackspace\band-formfeed\f"
+derives = ["escaped-parent", "escaped-grandparent"]

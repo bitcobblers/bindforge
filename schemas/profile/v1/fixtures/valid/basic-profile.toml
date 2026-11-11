@@ -1,0 +1,5 @@
+# A minimal valid profile: declares v1, no ancestors.
+format = "profile"
+version = "v1"
+id = "basic-profile"
+derives = []

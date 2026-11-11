@@ -1,0 +1,7 @@
+# Pins the rustup toolchain for this checkout (A11); rustup installs it
+# automatically. The channel equals [workspace.package] rust-version in
+# Cargo.toml and is bumped only when a reviewed dependency upgrade or a
+# published toolchain security advisory requires it (the scheduled
+# .github/workflows/advisories.yml run is that trigger).
+[toolchain]
+channel = "1.85.0"

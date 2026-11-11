@@ -1,0 +1,8 @@
+# `scope` is not part of the reach-classes/v1 grammar. Unknown entries are
+# refused rather than dropped, so no later component can decide what an entry
+# the contract never defined means.
+format = "reach-classes"
+version = "v1"
+hand = "left"
+classes = ["near"]
+scope = "global"

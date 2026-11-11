@@ -1,0 +1,10 @@
+[package]
+name = "bindforge-core"
+description = "Reference implementation of the schemas/ formats contract: model types, reach-table loader, chain resolution"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+# Depends on nothing: bindforge-core is the depends-on-nothing root of the
+# workspace dependency graph (Chosen design -> Workspace shape).

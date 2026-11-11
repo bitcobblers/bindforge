@@ -1,0 +1,7 @@
+# Legal TOML, outside the v1 grammar (`spec.md`): values are strings and
+# one-line arrays of strings only, and an integer literal must be a plain
+# decimal integer. A float anywhere in a document is rejected.
+format = "profile"
+version = 1.5
+id = "float-value"
+derives = []

@@ -1,0 +1,54 @@
+# The cargo equivalents of npm run check, plus the orchestration gate —
+# ADR-008 clause 4; design 008 "Gates". Two independent jobs per PR: a PR
+# that breaks only TypeScript fails `orchestration` while `rust` passes, and
+# vice versa (Test strategy #6). The cargo gate installs nothing beyond the
+# rustup-pinned toolchain (rust-toolchain.toml) and needs no Postgres or
+# DATABASE_URL (Test strategy #5).
+#
+# Third-party actions are pinned to commit SHAs; advisory scanning is a
+# separate scheduled workflow (.github/workflows/advisories.yml), never a
+# PR check.
+name: check
+
+on:
+  pull_request:
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    # A hung gate job holds a runner and yields no verdict; a PR is arbitrary
+    # code on that runner.
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      # rustup reads rust-toolchain.toml and installs the pinned toolchain
+      # (channel 1.85.0) automatically; nothing else is installed.
+      - name: Format check
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test --workspace --locked
+
+  orchestration:
+    runs-on: ubuntu-latest
+    # Same rule as the `rust` job: a hung gate job holds a runner and yields
+    # no verdict.
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          # The repo's Node floor: tools/orchestration's engines.node value
+          # (A28), the version the package already builds under.
+          node-version: "22.23.4"
+      - name: Install dependencies
+        run: npm ci
+        working-directory: tools/orchestration
+      - name: Check
+        run: npm run check
+        working-directory: tools/orchestration

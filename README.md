@@ -1,6 +1,29 @@
 # bindforge
 BindForge is an open framework for creating, sharing, and translating game input bindings.
 
+## Contributor prerequisites
+
+The product is Rust (ADR-008); the toolchain is pinned per checkout by
+`rust-toolchain.toml`, and rustup installs it automatically:
+
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+On Debian-family Linux, the desktop-era Tauri system dependencies (the cargo
+gate itself needs none of them):
+
+```sh
+sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file \
+  libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+```
+
+The gates: the cargo trio (`cargo fmt --all -- --check`,
+`cargo clippy --workspace --all-targets -- -D warnings`,
+`cargo test --workspace --locked`) and `npm ci && npm run check` in
+`tools/orchestration` (Node 22.23.4). Both run in CI
+([`.github/workflows/check.yml`](.github/workflows/check.yml)).
+
 ## Tools
 
 - [`tools/orchestration`](tools/orchestration) — CLI that drives a running
