@@ -24,11 +24,12 @@ the coder's assumptions.
 4. Unit tests: pure functions, temp dirs, stubbed clients — no network,
    no live server. Integration tests: real files end to end in a temp
    directory.
-5. Follow `repo-practices` conventions: vitest, `tests/**/*.test.ts`, the
-   package's existing style.
+5. Follow `repo-practices` conventions: vitest and `tests/**/*.test.ts`
+   for TypeScript packages; `cargo test -p <crate>` with tests under the
+   crate's `tests/` for Rust crates.
 6. Update rounds (after a fix changed behavior): change a test only when
    the proposal changed or a review finding was accepted and the caller
    says so — never to accommodate an implementation detail.
-7. Run `npm test` in the affected package before finishing and report the
-   result truthfully in your reply. Reply with the JSON verdict object
-   only.
+7. Run `npm test` in the affected package, or `cargo test -p <crate>` for a
+   Rust crate, before finishing and report the result truthfully in your
+   reply. Reply with the JSON verdict object only.
