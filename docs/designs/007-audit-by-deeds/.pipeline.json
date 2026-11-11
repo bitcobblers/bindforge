@@ -7,8 +7,8 @@
     "kind": "brief",
     "path": "docs/prompts/audit-by-deeds.md"
   },
-  "status": "running",
-  "lastStage": "code-review",
+  "status": "done",
+  "lastStage": "doc-sync",
   "designRound": 2,
   "codeRound": 1,
   "designBudgetUsed": 1,
@@ -40,7 +40,8 @@
     "5be92d3c0f24efda46df0d69426ef556305cd5e7",
     "1ce23f4dff33a4bbe52ed6e716afb3590749fcdd",
     "f0dd0e7af6697e196a22fe5d7a15bae8ef81b78c",
-    "15c594a1ee3c34962faa117b052cf11b30cd849b"
+    "15c594a1ee3c34962faa117b052cf11b30cd849b",
+    "aa3b0061a2b15884730723bacc05e5b60192c0ca"
   ],
   "forceNext": null,
   "results": [
@@ -1092,6 +1093,20 @@
       "transcript": "docs/designs/007-audit-by-deeds/transcripts/code-review-correctness-attempt2-r1c2.md",
       "durationMs": 316696,
       "nudges": 0
+    },
+    {
+      "stage": "doc-sync",
+      "round": 1,
+      "sessionID": "ses_e380f2ec6ffe45IAY2eB5HdCoo",
+      "agent": "ops/doc-sync",
+      "at": 1794355997837,
+      "reply": {
+        "drifted": true,
+        "commitMessage": "docs: record design 007 as-built drift and the test-update addendum"
+      },
+      "transcript": "docs/designs/007-audit-by-deeds/transcripts/doc-sync-r1.md",
+      "durationMs": 187197,
+      "nudges": 0
     }
   ],
   "gateLog": [
@@ -1220,10 +1235,17 @@
       "proceed": true,
       "reason": "all five seats approve the current revision stamp",
       "at": 1794355810611
+    },
+    {
+      "gate": "done",
+      "round": 0,
+      "proceed": true,
+      "reason": "pipeline complete",
+      "at": 1794355997879
     }
   ],
   "startedAt": 1794348961824,
-  "updatedAt": 1794355810611,
+  "updatedAt": 1794355997879,
   "baseRef": "7844c17171465dd779f8db6671801eb058bd2eb3",
   "designCycle": 3,
   "designStamp": "f4f64f9c7a62e1487a3ad86706965ae11544eb87",
