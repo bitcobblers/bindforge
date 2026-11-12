@@ -2559,7 +2559,22 @@ async function drive(
         await finalizeEscalate(opts.repoDir, state, printable(error.message), cfg);
         return;
       }
-      throw error;
+      // ADR-006 §3's posture, generalized from the checkpoint case: an
+      // unexpected throw ends the run WITH a record. Run 010's template render
+      // escaped at exactly this point — the lock released, the checkpoint kept
+      // saying `running`, and no `ESCALATION.md` was written: the split record
+      // §3 exists to prevent, reached from a direction §3 does not name. What
+      // reaches here is a harness defect, and the operator needs its message
+      // in the gate log with a resume path, not on a terminal that scrolled.
+      await finalizeEscalate(
+        opts.repoDir,
+        state,
+        `unhandled pipeline error after stage ` +
+          `${state.lastStage === '' ? '(none)' : state.lastStage}: ` +
+          printable(String(error instanceof Error ? (error as Error).message : error)),
+        cfg,
+      );
+      return;
     }
   }
 }

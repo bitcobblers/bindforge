@@ -16,6 +16,7 @@ import {
   statusLines,
 } from '../../src/pipeline/runner.js';
 import type { PipelineConfig } from '../../src/pipeline/stages.js';
+import { loadState } from '../../src/pipeline/state-store.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
 
 // --------------------------------------------------------------------------
@@ -353,6 +354,33 @@ describe('resume with a split record', () => {
     // The gate-log entry survives even though the marker is gone: the
     // marker was read before it was deleted.
     expect(existsSync(marker)).toBe(false);
+  });
+});
+
+describe('a runner error inside the drive loop', () => {
+  // proves: ADR-006 §3's posture for the failure the section does not name.
+  // Run 010's design review died on a template render over model-authored
+  // findings; the throw escaped `drive`, the lock released, the checkpoint kept
+  // saying `running`, and no ESCALATION.md was minted — the split record §3
+  // exists to prevent. An unhandled error has to terminate the run the way
+  // every other §3 failure does: gate-log entry, marker, terminal status.
+  it('escalates with a record instead of crashing with the checkpoint running', async () => {
+    const dir = tmpRepo(baseState({ lastStage: 'proposal', designRound: 0 }));
+    const promptsDir = mkdtempSync(join(tmpdir(), 'bindforge-unrenderable-template-'));
+    writeFileSync(join(promptsDir, 'design-review.md'), 'review {{designDir}} for {{noSuchVar}}\n');
+    const { client } = approveClient(dir);
+
+    const status = await resumePipeline(optionsFor(dir, { client, promptsDir }));
+    expect(status).toBe('escalated');
+
+    const saved = savedState(dir);
+    expect(saved.status).toBe('escalated');
+    expect(saved.gateLog.at(-1)?.gate).toBe('escalate');
+    expect(saved.gateLog.at(-1)?.reason).toMatch(/unhandled pipeline error/);
+    // The run is resumable from here: the checkpoint is the terminal record,
+    // and the marker names the stop.
+    expect(existsSync(join(dir, DESIGN_DIR, 'ESCALATION.md'))).toBe(true);
+    expect(await loadState(join(dir, DESIGN_DIR))).not.toBeNull();
   });
 });
 
