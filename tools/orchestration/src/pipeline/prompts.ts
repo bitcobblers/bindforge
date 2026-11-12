@@ -11,16 +11,26 @@ export interface TemplateVars {
   [key: string]: string | number;
 }
 
-/** Strict render: every placeholder must be filled, every fill must be used. */
+/**
+ * Strict render: every placeholder in the TEMPLATE must be filled.
+ *
+ * The check scans the template text, never the rendered result. Vars carry
+ * model-authored content — a review seat's own previous findings are injected
+ * as `{{prevFindings}}`, `{{scope}}` quotes git ranges, `{{reviewFiles}}`
+ * lists paths a model wrote — and content that quotes prompt syntax carries
+ * `{{...}}` bytes legitimately. Run 010 died on exactly that: its design
+ * specifies the light flow's plan template, a seat cited `{{planMaxLines}}`
+ * from it in a finding, and the post-substitution scan read the quotation as
+ * an unfilled placeholder and threw on the next seat's prompt.
+ */
 export function renderTemplate(text: string, vars: TemplateVars): string {
-  const rendered = text.replace(/\{\{(\w+)\}\}/g, (whole, key: string) =>
-    key in vars ? String(vars[key]) : whole,
-  );
-  const leftover = /\{\{(\w+)\}\}/.exec(rendered);
-  if (leftover) {
-    throw new Error(`unresolved template placeholder: {{${leftover[1]}}}`);
+  for (const match of text.matchAll(/\{\{(\w+)\}\}/g)) {
+    const key = match[1] as string;
+    if (!(key in vars)) {
+      throw new Error(`unresolved template placeholder: {{${key}}}`);
+    }
   }
-  return rendered.trim();
+  return text.replace(/\{\{(\w+)\}\}/g, (_whole, key: string) => String(vars[key])).trim();
 }
 
 export async function loadTemplate(promptsDir: string, name: string): Promise<string> {

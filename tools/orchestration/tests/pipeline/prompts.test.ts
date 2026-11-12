@@ -36,6 +36,25 @@ describe('renderTemplate', () => {
       /unresolved template placeholder: \{\{missing\}\}/,
     );
   });
+
+  it('renders substituted content that carries placeholder syntax', () => {
+    // Run 010: the design under review specifies a prompt template, so a
+    // seat's own findings — injected as `{{prevFindings}}` — quoted
+    // `{{planMaxLines}}`. Substituted content is data, never syntax.
+    const out = renderTemplate('your findings:\n{{prevFindings}}', {
+      prevFindings: 'line 259 interpolates {{planMaxLines}} from the registry',
+    });
+    expect(out).toBe('your findings:\nline 259 interpolates {{planMaxLines}} from the registry');
+  });
+
+  it('reports the first unfilled placeholder of the template itself', () => {
+    expect(() =>
+      renderTemplate('a {{reportPath}} for {{specialty}} at {{round}}', {
+        reportPath: 'reviews/design/security-r1c1.md',
+        round: 1,
+      }),
+    ).toThrow(/unresolved template placeholder: \{\{specialty\}\}/);
+  });
 });
 
 describe('transcripts', () => {
