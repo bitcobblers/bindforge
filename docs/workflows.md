@@ -182,8 +182,12 @@ Pipeline config defaults (set in `tools/orchestration/src/pipeline/stages.ts`):
   checked at every pass entry, so no pass sneaks past the cap
 - `maxParallelReviews: 1` — review-lane width per pass; the `--max-parallel`
   flag and `$OPENCODE_MAX_PARALLEL` override it (see the stages section)
-- `maxPassesPerRound: 6` — dissent/ratify passes inside one round; the
-  backstop against a seat that will not converge
+- `maxPassesPerRound: 8` — dissent/ratify passes inside one round; the
+  backstop against a seat that will not converge. It is the one budget
+  `--extend-budget` cannot buy — sessions and rounds extend, passes do not —
+  so a run stopped here is resumed by raising this default, not by buying
+  budget (run 010 stopped at 6 passes with all five seats reading `approve`,
+  four of them stale).
 - `maxRounds: 5` — backstop on the mutating revise/fix loop only; passes
   inside a round never spend a round
 - `stageTimeoutMs: 30 min` — wall-clock cap per stage attempt; stage turns

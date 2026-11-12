@@ -75,7 +75,20 @@ export const DEFAULT_MIN_NUDGE_INTERVAL_MS = 20_000;
 export const DEFAULT_CONFIG: PipelineConfig = {
   maxRounds: 5,
   maxReviews: { design: 40, code: 20 },
-  maxPassesPerRound: 6,
+  /**
+   * Dissent/ratify passes inside one round. Run 010 hit 6 and stopped with
+   * every seat reading `approve` — four stale approvals and one fresh one, so
+   * the funnel was one ratify pass from converging. The cap exists to stop a
+   * seat that will not move, and it fired on a panel that had moved.
+   *
+   * Note the gap this exposes: `--extend-budget` buys sessions and rounds, and
+   * `planPass` blocks at `cycle >= maxPassesPerRound` with no extension
+   * channel, so this number is the one budget an operator cannot buy at the
+   * stop it causes — the only remedy is editing this default. Extending the
+   * budget grammar to passes is a funnel change (ADR-002's accounting), not a
+   * constant, and deliberately not taken here.
+   */
+  maxPassesPerRound: 8,
   blockingSeverities: ['blocker', 'major'],
   pollIntervalMs: 2_000,
   stageTimeoutMs: 30 * 60_000,
