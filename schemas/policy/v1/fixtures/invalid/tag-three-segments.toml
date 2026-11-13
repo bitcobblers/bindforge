@@ -1,0 +1,7 @@
+# A third segment (`move.steer.left`) is not an id the action grammar builds, so
+# it is not a tag either: an id is exactly `<segment>.<segment>`. A reader that
+# accepted this would be matching against ids no registry can spell.
+format = "policy"
+version = "v1"
+id = "tag-three-segments"
+transforms = ["swap-polarity move.steer.left"]

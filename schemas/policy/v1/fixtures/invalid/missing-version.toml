@@ -1,0 +1,6 @@
+# Every document declares its major: a policy with no `version` entry is refused
+# as a version error naming the majors `policy` ships, never defaulted to `v1`
+# because that is the directory it happens to sit under.
+format = "policy"
+id = "missing-version"
+transforms = ["swap-mouse-buttons"]

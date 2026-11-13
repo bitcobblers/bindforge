@@ -1,0 +1,10 @@
+# The version gate is per-format: `policy` ships the majors its own directory
+# carries, and today that is `v1` alone. A document declaring `v2` is refused
+# naming `policy`'s majors — never read with v1 semantics, and never widened by
+# `profile/v2` or `reach-classes/v2` existing elsewhere in the tree. A new
+# transform kind rides a future `policy/v2`, which is what keeps this reader
+# closed.
+format = "policy"
+version = "v2"
+id = "major-not-shipped"
+transforms = ["swap-mouse-buttons"]

@@ -1,0 +1,8 @@
+# The shape the design's example ships: three rows, one per kind, in the order
+# the author means them to run. Array order is application order — a reader that
+# sorted the stack into a canonical order would change what the player gets, so
+# `serialize` preserves this order and the harness's round-trip compares it.
+format = "policy"
+version = "v1"
+id = "lefty-stack"
+transforms = ["relocate-cluster move.steer-* left right 2 keyboard:i keyboard:k", "swap-polarity move.strafe-*", "swap-mouse-buttons"]

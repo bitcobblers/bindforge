@@ -1,0 +1,7 @@
+# The bound is a decimal integer, not a free-form token: a letter is refused
+# naming the row and the value. A bound is compared against severity classes, so
+# an unparsable one answers nothing and must not be read as a missing bound.
+format = "policy"
+version = "v1"
+id = "relocate-bound-letter"
+transforms = ["relocate-cluster move.steer-* left right x keyboard:i"]

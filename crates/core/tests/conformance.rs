@@ -379,10 +379,10 @@ fn fixture_file_names_are_lowercase_ascii_dash_separated_and_case_unique() {
 /// strategy #6 —
 /// the scaffold ships `profile/v1` and `reach-classes/v1`, ADR-011 added
 /// `action-ids/v1`, ADR-012 adds `reach-classes/v2` and
-/// `keyboard-geometry/v1`, ADR-013 adds `manifests/v1`, and design 014 adds
-/// `profile/v2`; the same `schemas/*/v*/` walk picks up all of them with
-/// no harness change, which is also how `patch` and `policy` join when
-/// ADR-015 and its successors add them.
+/// `keyboard-geometry/v1`, ADR-013 adds `manifests/v1`, design 014 adds
+/// `profile/v2`, and design 015 adds `policy/v1`; the same `schemas/*/v*/` walk
+/// picks up all of them with
+/// no harness change, which is also how `patch` joins when its successors add it.
 ///
 /// proves: design 014's Test strategy #7 — the unchanged walk picks up
 /// `profile/v2`: every valid v2 fixture parses, passes the guards, and re-
@@ -391,6 +391,16 @@ fn fixture_file_names_are_lowercase_ascii_dash_separated_and_case_unique() {
 /// truncating message, and the zero-fixture rule and the case-unique fixture-
 /// name rule cover the new directory — all of which the loops above run over
 /// it the moment `schemas/profile/v2/` ships (A3, A16).
+///
+/// proves: design 015's Test strategy #9 — the unchanged walk picks up
+/// `policy/v1`, and this list is the only change the new directory costs: every
+/// valid policy fixture parses, passes the guards, and re-serializes to a
+/// semantically equal value (policies take the re-serialization path, with the
+/// `transforms` array order preserved), every invalid one — `forged-log-line.toml`
+/// among them — is refused with a single-line, control-free, truncating message,
+/// and the zero-fixture rule and the case-unique fixture-name rule cover the new
+/// directory (A8, A12). The *walk* above stays exactly as shipped, which is the
+/// claim: a new `schemas/*/v*/` directory is picked up with no harness change.
 #[test]
 fn the_walk_picks_up_every_version_directory_the_contract_tree_ships() {
     let found: Vec<String> = format_dirs()
@@ -406,6 +416,7 @@ fn the_walk_picks_up_every_version_directory_the_contract_tree_ships() {
         "keyboard-geometry/v1",
         "manifests/v1",
         "profile/v2",
+        "policy/v1",
     ] {
         assert!(
             found.iter().any(|dir| dir == expected),

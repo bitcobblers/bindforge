@@ -1,0 +1,7 @@
+# A fourth kind. The kind set is closed and compiled into the grammar: an open
+# name space would make an unresolved name somebody else's semantics — the
+# free-form-predicate risk one layer up. The refusal names the row.
+format = "policy"
+version = "v1"
+id = "transform-unknown-kind"
+transforms = ["resize-cluster move.steer-* left right 2 keyboard:i keyboard:k"]

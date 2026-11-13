@@ -1,0 +1,9 @@
+# The policy `id` rides the shared slug grammar `[a-z][a-z0-9-]*` — the same one
+# a geometry name, a manifest id, and a profile id ride — because the id is also
+# the file stem `load_policy` joins and the name a produced base carries. An
+# uppercase spelling is refused at the grammar, which is what keeps a policy
+# directory case-unique on a case-insensitive filesystem.
+format = "policy"
+version = "v1"
+id = "Unknown-Entry-Style"
+transforms = ["swap-mouse-buttons"]

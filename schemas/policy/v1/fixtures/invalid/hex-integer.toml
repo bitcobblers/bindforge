@@ -1,0 +1,11 @@
+# Legal TOML, outside the policy grammar (`spec.md`): integers are decimal only,
+# so a `0x` prefixed integer is rejected rather than read as one. The reader
+# refuses the value's shape while it reads the line, before any entry-name rule
+# runs: a lenient reader that reads `0xFF` as `255` has invented a number the
+# document never wrote, and every later rule that reads a decimal number — a row's
+# bound, a cap comparison — inherits the mistake.
+format = "policy"
+version = "v1"
+id = "hex-integer"
+transforms = ["swap-mouse-buttons"]
+revision = 0xFF

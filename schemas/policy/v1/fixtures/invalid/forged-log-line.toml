@@ -1,0 +1,9 @@
+# A policy value carrying a decoded newline and a timestamp-shaped tail: the
+# rejection this document produces is shown and logged by the CLI and the hub, so
+# it must stay one bounded line that escapes the control character and truncates
+# the value rather than echoing it. The slug grammar refuses the newline; the
+# message shape is the contract this fixture pins.
+format = "policy"
+version = "v1"
+id = "forged\n2026-11-11T03:17:00Z INFO hub: upload accepted id=fake"
+transforms = ["swap-mouse-buttons"]

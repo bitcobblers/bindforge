@@ -1,0 +1,10 @@
+# The entry set is closed: `spec.md` says any other entry is rejected, so a
+# document carrying an entry the policy grammar does not define must be refused,
+# not ignored. This one aliases the stack (`transforms_`): a reader that ignores
+# unknown entries reads it as a policy with *no transforms at all* — a document
+# that does nothing while looking as though it does something, under the very
+# format whose whole meaning is the stack.
+format = "policy"
+version = "v1"
+id = "unknown-entry"
+transforms_ = ["swap-mouse-buttons"]

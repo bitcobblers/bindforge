@@ -1,0 +1,9 @@
+# Legal TOML, outside the policy grammar (`spec.md`): dotted keys are rejected,
+# so an entry cannot smuggle a nested path into a flat policy document. A reader
+# that accepted `id.stem` would be reading a second, invisible `id` beside the one
+# `load_policy` compares against the file stem.
+format = "policy"
+version = "v1"
+id = "dotted-key"
+transforms = ["swap-mouse-buttons"]
+id.stem = "dotted-key"

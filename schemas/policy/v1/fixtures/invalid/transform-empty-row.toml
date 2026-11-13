@@ -1,0 +1,6 @@
+# A row that names no kind at all. Read as "nothing to do" it is the silent no-op
+# the ADR refuses, so an empty element is a refusal rather than a no-op row.
+format = "policy"
+version = "v1"
+id = "transform-empty-row"
+transforms = [""]

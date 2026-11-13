@@ -1,0 +1,9 @@
+# 17 targets — one past `MAX_RELOCATE_TARGETS` (16), the cap `schemas/README.md`
+# names beside the other budgets. The cap is what bounds the composite the spec
+# states (`MAX_POLICY_TRANSFORMS x MAX_RELOCATE_TARGETS` predicate moves), and
+# every id here is inside the closed keyboard vocabulary: the row's target count
+# is the fault, not its spelling. Regenerate this fixture if the cap moves.
+format = "policy"
+version = "v1"
+id = "relocate-target-past-cap"
+transforms = ["relocate-cluster move.steer-* left right 0 keyboard:a keyboard:b keyboard:c keyboard:d keyboard:e keyboard:f keyboard:g keyboard:h keyboard:i keyboard:j keyboard:k keyboard:l keyboard:m keyboard:n keyboard:o keyboard:p keyboard:q"]

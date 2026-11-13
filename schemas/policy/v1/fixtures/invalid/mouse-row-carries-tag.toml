@@ -1,0 +1,7 @@
+# `swap-mouse-buttons` takes no argument at all. The mouse pair is the closed
+# vocabulary's `mouse:left` and `mouse:right`, so a tag on the row would be a
+# second match language over inputs the grammar already names by member.
+format = "policy"
+version = "v1"
+id = "mouse-row-carries-tag"
+transforms = ["swap-mouse-buttons move.steer-*"]

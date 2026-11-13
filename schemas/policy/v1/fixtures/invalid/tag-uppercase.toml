@@ -1,0 +1,7 @@
+# An uppercase spelling is outside the tag grammar, which is id grammar: ids are
+# lowercase, so matching is byte-exact and case is never a second axis of
+# ambiguity between a pattern and a registry id.
+format = "policy"
+version = "v1"
+id = "tag-uppercase"
+transforms = ["swap-polarity Move.Steer-*"]

@@ -26,17 +26,34 @@
 //! `resolve`, `ResolvedBinding`, `fork`, `diff`, `merge`, `ProfileKind` — and
 //! `error.rs` the one `ChainLinkMissing` variant) — the same probe for the
 //! chain names, whose behavior `chain_ops.rs` pins (#1–#6).
+//!
+//! proves: design 015's Test strategy #10 + its Delta inventory (`document.rs`
+//! gains the `Policy`/`Transform`/`TagPattern` model, the `Document::Policy` arm,
+//! and the two budget constants; `policy.rs` adds `load_policy`; `lib.rs`
+//! re-exports them and says so in its public-surface doc) — the same probe for
+//! the policy names, whose behavior `policy.rs` pins (#1–#3). `error.rs` gains no
+//! variant, so nothing here asks for one (A9).
 
 mod common;
 
 use std::path::PathBuf;
 
 use bindforge_core::{
-    ActionRegistry, Chain, CoreError, DockedAction, Document, ExclusivityGroup, GradeBound, Hand,
-    InputGrade, InputId, InputNamespace, KeyboardGeometry, Manifest, ManifestAction,
-    PlacementCheck, Profile, ProfileKind, ReachClass, ReachTable, ReachTables, ResolvedBinding,
+    ActionId, ActionRegistry, Chain, CoreError, DockedAction, Document, ExclusivityGroup,
+    GradeBound, Hand, InputGrade, InputId, InputNamespace, KeyboardGeometry, Manifest,
+    ManifestAction, PlacementCheck, Policy, Profile, ProfileKind, ReachClass, ReachTable,
+    ReachTables, ResolvedBinding, TagPattern, Transform,
 };
 use common::{ScratchDir, schemas_root};
+
+/// A well-formed `policy` document: exactly the entries
+/// `schemas/policy/v1/spec.md` defines, in the shape its valid corpus fixtures
+/// ship — the document every policy name below is resolved through.
+const POLICY_TEXT: &str = r#"format = "policy"
+version = "v1"
+id = "probe-policy"
+transforms = ["relocate-cluster move.steer-* left right 2 keyboard:i keyboard:k", "swap-mouse-buttons"]
+"#;
 
 /// `InputGrade` is the parsed `keys` pair — input id plus class id — that a v2
 /// document's `keys` array carries (A11, r2: `InputGrade.class` typed). It reaches
@@ -373,5 +390,89 @@ set = ["move.steer-left keyboard:w"]
     assert!(
         matches!(missing, Err(CoreError::ChainLinkMissing { .. })),
         "a missing link is the named completeness refusal, got {missing:?}"
+    );
+}
+
+/// proves: design 015's Test strategy #10 + A13 — the two new budgets resolve at
+/// the crate root at the values the contract states, and they are the *per-
+/// structure* caps the design chose instead of a new aggregate: 64 mirrors
+/// `MAX_CONSTRAINT_GROUPS`, 16 mirrors `MAX_GROUP_MEMBERS`, so the composite
+/// `spec.md` states multiplies out of bounds that already exist (nine exported
+/// constants become eleven, and no aggregate cap joins them).
+#[test]
+fn the_adr_015_policy_budgets_resolve_at_the_crate_root() {
+    let budgets = [
+        bindforge_core::MAX_POLICY_TRANSFORMS,
+        bindforge_core::MAX_RELOCATE_TARGETS,
+    ];
+    assert_eq!(
+        budgets,
+        [64, 16],
+        "the policy budgets are the public names for the caps the contract states: {budgets:?}"
+    );
+    assert_eq!(
+        bindforge_core::MAX_POLICY_TRANSFORMS,
+        bindforge_core::MAX_CONSTRAINT_GROUPS,
+        "`MAX_POLICY_TRANSFORMS` mirrors the manifest group cap it stands beside"
+    );
+    assert_eq!(
+        bindforge_core::MAX_RELOCATE_TARGETS,
+        bindforge_core::MAX_GROUP_MEMBERS,
+        "`MAX_RELOCATE_TARGETS` mirrors the manifest member cap it stands beside"
+    );
+}
+
+/// proves: design 015's Test strategy #10 + its Delta inventory — every policy
+/// name resolves at the crate root and connects to the next one: model →
+/// matching → load. The behavior is `policy.rs`'s (#1–#3); this target only
+/// keeps the names honest, which is what `crates/transforms` — a consumer written
+/// in the same run — compiles against.
+#[test]
+fn the_adr_015_policy_names_resolve_at_the_crate_root() {
+    // `Policy`, `Transform`, `TagPattern`: the model, in type position, read out of
+    // a parsed document. Matching is grammar, and `matches` is the byte-exact
+    // prefixing the stack's match rule is built from (Options: Tags).
+    let policy: Policy = match bindforge_core::parse(POLICY_TEXT)
+        .expect("a policy document the entry table defines must parse")
+    {
+        Document::Policy(policy) => policy,
+        _ => panic!("a `format = \"policy\"` document must parse into the policy arm"),
+    };
+    assert_eq!(
+        policy.transforms.len(),
+        2,
+        "the model keeps the stack's array order — order is application order"
+    );
+    let tags: &TagPattern = match &policy.transforms[0] {
+        Transform::RelocateCluster { tags, .. } => tags,
+        _ => panic!("the probe stack's first row is a `relocate-cluster` row"),
+    };
+    assert!(
+        tags.matches(&ActionId::parse("move.steer-left").expect("a well-formed action id")),
+        "`TagPattern::matches` answers for the prefix form at the crate root"
+    );
+    assert!(
+        !tags.matches(&ActionId::parse("move.strafe-left").expect("a well-formed action id")),
+        "and it is byte-exact prefixing, not a general wildcard match (011's posture)"
+    );
+
+    // `load_policy` in call position, over a scratch directory carrying the file
+    // the location rule pins, and the slug-before-filesystem rule refusing a
+    // traversal name without opening anything (A15).
+    let scratch = ScratchDir::new("api-probe-policy");
+    scratch.write("v1/probe-policy.toml", POLICY_TEXT);
+    let loaded: Policy = bindforge_core::load_policy(&scratch.path().join("v1"), "probe-policy")
+        .expect("a policy document in its own major directory must load");
+    assert_eq!(
+        loaded.id, "probe-policy",
+        "the loaded model carries the document's own id"
+    );
+
+    let refused: Result<Policy, CoreError> =
+        bindforge_core::load_policy(&scratch.path().join("v1"), "../probe-policy");
+    assert!(
+        matches!(refused, Err(CoreError::InvalidValue { .. })),
+        "a policy id outside the slug grammar is refused before the filesystem is asked, and no \
+         new `CoreError` variant joins the refusal family (A9, A15)"
     );
 }

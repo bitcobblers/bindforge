@@ -1,0 +1,9 @@
+# The corpus's one `relocate-cluster` document: a prefix tag, both hands as the
+# row's own fields, a bound of 2 (two severity classes of slack on the v2
+# scale), and two keyboard targets in row order. Whether the cluster is
+# contiguous and the move legal is decided against the loaded grid and tables at
+# application; the document only has to be well-formed.
+format = "policy"
+version = "v1"
+id = "cluster-to-the-right-hand"
+transforms = ["relocate-cluster move.steer-* left right 2 keyboard:i keyboard:k"]

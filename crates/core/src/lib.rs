@@ -54,6 +54,18 @@
 //! `MAX_GENERATED_BY_OCTETS`, join the exported family beside `MAX_CHAIN_DEPTH`
 //! so a caller caps a patch before it allocates it.
 //!
+//! The policy documents of design 015 (ADR-015) are typed and parsed here —
+//! `Policy`, `Transform`, and `TagPattern`, loaded by `load_policy` with the
+//! slug-before-filesystem discipline `load_geometry` pins — while the stack that
+//! *applies* them is `crates/transforms`, the second workspace crate, which
+//! depends on this one and nothing else. The tag grammar, the closed three
+//! transform kinds, and the exact-or-prefix matching rule are contract, so they
+//! live here; the verdicts a stack reports (`NotApplicableReason`,
+//! `TransformReport`) live there. The two new budgets,
+//! `MAX_POLICY_TRANSFORMS = 64` and `MAX_RELOCATE_TARGETS = 16`, join the
+//! exported family beside the manifest's, mirroring `MAX_CONSTRAINT_GROUPS` and
+//! `MAX_GROUP_MEMBERS` rather than adding an aggregate cap.
+//!
 //! The public surface exercised by the conformance suites: `parse`,
 //! `parse_file`, `parse_reader`, `serialize`, `supported_majors`,
 //! `resolve_chain`, `MAX_CHAIN_DEPTH`, `MAX_DOCUMENT_BYTES`,
@@ -66,7 +78,9 @@
 //! `ManifestAction`, `ExclusivityGroup`, `DockedAction`, `load_manifest`, and
 //! the four manifest budget constants named above — and, from ADR-014, `Chain`,
 //! `load_chain`, `resolve`, `ResolvedBinding`, `fork`, `diff`, `merge`,
-//! `ProfileKind`, and the two chain budgets named above.
+//! `ProfileKind`, and the two chain budgets named above — and, from design 015,
+//! `Policy`, `Transform`, `TagPattern`, `load_policy`, and the two policy
+//! budgets named above.
 
 mod action;
 mod chain;
@@ -76,6 +90,7 @@ mod error;
 mod input;
 mod manifest;
 mod placement;
+mod policy;
 mod reach;
 mod toml;
 
@@ -84,6 +99,8 @@ pub use chain::{MAX_CHAIN_DEPTH, resolve_chain};
 pub use chain_ops::{Chain, ResolvedBinding, diff, fork, load_chain, merge, resolve};
 pub use document::{Document, GeometryKey, KeyboardGeometryTable};
 pub use document::{MAX_GENERATED_BY_OCTETS, MAX_PATCH_DELTA_ELEMENTS, supported_majors};
+pub use document::{MAX_POLICY_TRANSFORMS, MAX_RELOCATE_TARGETS};
+pub use document::{Policy, TagPattern, Transform};
 pub use document::{Profile, ProfileKind, ReachClassTable};
 pub use document::{parse, parse_file, parse_reader, serialize};
 pub use error::CoreError;
@@ -94,6 +111,7 @@ pub use manifest::{
 };
 pub use placement::{GradeBound, KeyboardGeometry, PlacementCheck};
 pub use placement::{geometry_matches_file_name, load_geometry, placement_is_legal};
+pub use policy::load_policy;
 pub use reach::{Hand, InputGrade, ReachClass, ReachTable, ReachTables};
 pub use reach::{hand_matches_file_name, load_reach_tables};
 pub use toml::{MAX_DOCUMENT_BYTES, MAX_NESTING_DEPTH};

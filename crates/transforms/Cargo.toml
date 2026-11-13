@@ -1,0 +1,13 @@
+[package]
+name = "bindforge-transforms"
+description = "ADR-015 transform stack: named, preconditioned transforms that produce profile/v2 bases, over bindforge-core's public surface"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+# The second workspace crate (ADR-008, design 015 A16): it depends on
+# `bindforge-core` and nothing else, and `crates/core` stays the
+# depends-on-nothing root of the dependency graph.
+[dependencies]
+bindforge-core = { workspace = true }

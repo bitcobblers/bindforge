@@ -1,0 +1,1122 @@
+{
+  "version": 1,
+  "slug": "transforms-as-preconditioned-policies",
+  "nnn": "015",
+  "branch": "pipeline/015-transforms-as-preconditioned-policies",
+  "source": {
+    "kind": "adr",
+    "path": "docs/adrs/015-transforms-as-preconditioned-policies.md"
+  },
+  "status": "done",
+  "lastStage": "doc-sync",
+  "designRound": 2,
+  "codeRound": 1,
+  "designBudgetUsed": 1,
+  "codeBudgetUsed": 3,
+  "editorialDone": false,
+  "testsGreen": true,
+  "testsNeedUpdate": false,
+  "stageFailures": {
+    "code-review:correctness": 1,
+    "doc-sync": 1
+  },
+  "stageCommits": [
+    "551dc69612d70fae7fdcd9517d7e51815cd72456",
+    "9e4f9365989c30088a3f051fd3189005cbd81950",
+    "9941dfe5a5e13d7dd2264f3cfd7b5b36340ed637",
+    "004bdbdda3e50a94dc9e31bb519e3bec7de449d7",
+    "b7b0452d77c52cdcd3b03c621967710a6fe98b54",
+    "65e7f43d4655c26c6a7ba739df94827d3a58962e",
+    "7b6b74b3e879ba89c372a3c938734fd9be16c0f9",
+    "26deb4c18190c8cafa4647cbbe6a05eba2a2e0c5",
+    "7080008873a9172db5edb6185bb168b569cb8e38",
+    "d80d4041c1858c621b62d12ff0ecac12fe86ff5e",
+    "f290e19420bd4daa8a69f55d866070204c2907da",
+    "9047e7c68f2cd82c2048f593d822a0998aa9b639",
+    "39d4fcb589fd14ce2c81ea01572c84dbd4b28d39",
+    "ad61cb348250edd267e9c324f9019b1192783a86",
+    "b15f7daea94654cec21b320a10f5c9ca571708da",
+    "e90525df3dff60570030813bcf2c1637dd5a9b0d",
+    "2761d6d8e1d67e7a048a73bc876769b610f7f873",
+    "22de1c1de016c8dd40f0dbeca0dd5d073e984490",
+    "fb6cef4a02ead1f90b4741921743249132777d4e"
+  ],
+  "forceNext": null,
+  "results": [
+    {
+      "stage": "research",
+      "round": 0,
+      "sessionID": "ses_e2a5e7ee3fferQ3RfkenpUa1lr",
+      "agent": "research/researcher",
+      "at": 1794585724297,
+      "reply": {
+        "summary": "Researched ADR-015 (transforms as named, preconditioned policies) and wrote docs/designs/015-transforms-as-preconditioned-policies/01-research.md. Verified the internal substrate the ADR stands on (AxisKind/registry, placement_is_legal's structured PlacementCheck, manifest constraint entries, chain_ops' shipped load/resolve/fork/diff/merge, and the contract tree's pre-announced `policy` format slot), and surveyed primary-source prior art under three lenses: XKB options/variants, DualSense Edge profiles, Xbox button mapping, PowerToys, SharpKeys, xremap/input-remapper, Steam Input, Terraform preconditions, CSS @supports, RFC 6902 test-op, SDL_GameControllerDB, HID usage tables/evdev, plus security classes for untrusted policy documents. Key gaps flagged for the designer: precondition vocabulary grammar, cluster/handedness not being data in core today, tag-glob semantics, transform output's representation in a chain, stack-order semantics, and report shape/budgets. Every claim carries an inline source (local path or verified URL).",
+        "commitMessage": "docs: add research artifact for ADR-015 transform policies"
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/research-r0.md",
+      "durationMs": 230464,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal",
+      "round": 0,
+      "sessionID": "ses_e2a5afa11fferONzXro03TNTmZ",
+      "agent": "design/designer",
+      "at": 1794586039707,
+      "reply": {
+        "commitMessage": "docs: add design proposal for ADR-015 preconditioned transform policies"
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/proposal-r0.md",
+      "durationMs": 315278,
+      "nudges": 0,
+      "docLines": 618,
+      "docLinesAdded": 618,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2a562a19ffepRH0IbnjvKcebO",
+      "agent": "review/design-correctness",
+      "at": 1794586219186,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → The stack / The match rule — \"the produced `set` list preserves the source base's element order in place\"; The stack → swap-mouse-buttons — \"finds the actions currently bound to `mouse:left` and `mouse:right`\"",
+            "problem": "The shipped layout model is action→input (chain_ops.rs:167 BTreeMap<ActionId, InputId>), and profile/v2 never refuses one input carrying two actions — only reach tables and geometry explicitly refuse repeated inputs (document.rs:1231,1276) — while duplicate set elements are legal data (profile/v2/spec.md:81 'Duplicates are data'). On a grammar-valid, hostile-authored source base (the design's own untrusted-input posture), 'the action currently bound to mouse:left', 'a target already bound to an action outside the match set', and 'element order in place' for a duplicated action id are each underdetermined — the one corner where the byte-identical-output and closed-reason-vocabulary contracts are not fully pinned.",
+            "fix": "One sentence in The stack: apply first collapses the base's `set` to resolve's own action→input map (last element wins), and a source base with more than one action bound to one input is an entry refusal reusing InvalidValue naming the input (the A9 'could not evaluate' channel); pin both with invalid-base tests in crates/transforms/tests/apply.rs."
+          },
+          {
+            "severity": "nit",
+            "location": "Assumption register A17 — \"ADR-004 binds a test tree to mirror `src/`: a module-named test file is that module's unit test\" (Basis: docs/adrs/004-mirror-src-hierarchy-in-tests.md:23-33)",
+            "problem": "The cited range is ADR-004's Context (the TS pipeline- prefix list), and ADR-004's title and Decision are scoped to 'the orchestration test tree'; the naming rule the row states is at lines 49-53 ('Naming rule going forward… New subsystems follow the same shape'). The claim is true as repo practice — core already ships module-mirrored Rust tests (tests/placement.rs, tests/manifest.rs, tests/chain_ops.rs) — but the cited lines do not contain it, so the verified row's basis citation is wrong.",
+            "fix": "Cite docs/adrs/004-mirror-src-hierarchy-in-tests.md:49-53 and add the shipped module-mirrored Rust test files (e.g. crates/core/tests/placement.rs) as the practice anchor."
+          },
+          {
+            "severity": "nit",
+            "location": "Assumption register A13 — \"the exported budget family is nine constants — … `MAX_CHAIN_DEPTH` 32, the four manifest caps, the two chain caps\"",
+            "problem": "The nine exported MAX_ constants are the two toml caps, the four manifest caps, MAX_CHAIN_DEPTH, and the two 014 profile caps (MAX_PATCH_DELTA_ELEMENTS and MAX_GENERATED_BY_OCTETS at document.rs:165,170); the enumeration double-counts MAX_CHAIN_DEPTH and labels the 014 profile caps 'chain caps', and the cited basis omits document.rs. The nine-count itself is confirmed by grep.",
+            "fix": "Replace 'the two chain caps' with 'the two `profile/v2` caps from 014 (`MAX_PATCH_DELTA_ELEMENTS`, `MAX_GENERATED_BY_OCTETS`)' and add crates/core/src/document.rs to the Basis."
+          }
+        ]
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/design-review-correctness-r1c0.md",
+      "durationMs": 179370,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2a536d41ffeJ1TO47BEw592wc",
+      "agent": "review/design-compatibility",
+      "at": 1794586285568,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Compatibility matrix (and the Risks row \"Policies are effectively ANSI-US-tested (A20)\")",
+            "problem": "The Risks mitigation asserts the ANSI-US geometry floor is \"stated in the Compatibility matrix\", but no matrix row states it: the eight rows cover Linux CI, Windows contributor, macOS contributor, toolchain floor, pre-015 core, existing formats, third-party reader, product artifacts. The row that comes closest (\"Existing formats, fixtures, loaders, `resolve` | yes (untouched)\") names keyboard-geometry only as byte-exact, i.e. not edited — not as single-geometry. This is checklist item 5 (non-QWERTY layouts) and it is load-bearing, not cosmetic: relocate-cluster's whole gate is grid-dependent (\"the source keys not connected by rook-adjacency (`|Δcol| + |Δrow| = 1`) in the loaded grid\" plus placement_is_legal(..., tables, geometry)), so 'a v1 policy is only validated against one grid' is a compatibility property of the layer. new.",
+            "fix": "Add one matrix row and let the existing Risks cross-reference point at it: `| Keyboard geometry | yes (`ansi-us` only) | relocate-cluster's contiguity and legality read the loaded grid; exactly one geometry ships (A20). ISO/JIS is new table files, not logic, and no policy may claim non-ANSI support until they land |`. No new mechanism — this states the A20 fact the `ISO/JIS grid tables` Deferred entry already carries."
+          },
+          {
+            "severity": "minor",
+            "location": "Deferred / out of scope and Compatibility matrix — keyboard reality",
+            "problem": "Of the four keyboard-reality sub-items in checklist item 5, three are handled (non-QWERTY via A20/Risks/ISO-JIS deferral; dead keys via the untouchable guard \"reads or writes an input appearing in `docked-actions`, `dead-keys`, or any `exclusive-groups` member\"; non-ASCII names via the slug grammar \"slug grammar, ≤ 63 octets (A15)\" and the `[a-z][a-z0-9-]*` tag prefix). IME/composition appears nowhere in the document — not in the matrix, Risks, or Deferred — so a reader cannot tell whether it was considered and dismissed or missed. new.",
+            "fix": "One clause on the new keyboard-geometry row (or one Deferred line): \"IME/composition — out of scope for v1: the closed `keyboard:` vocabulary names physical inputs (A19) and no text-entry input is modeled or matched; `load_policy`/`apply` never see a composed character.\""
+          },
+          {
+            "severity": "nit",
+            "location": "Compatibility matrix — \"Product artifacts (CLI, desktop, hub) | not applicable\"",
+            "problem": "The row justifies shipping no binary, but the matrix never names the OS input APIs checklist item 2 asks about (X11, Wayland, Windows Raw Input, macOS HID) for the layer that is shipped — the core/transforms library — so the \"no platform-specific input behaviour\" position is implied rather than stated. new.",
+            "fix": "Extend that row's note (or the \"Third-party reader, non-Rust\" row) with: \"v1 touches no OS input API: the contract is parsed documents in, parsed documents out.\""
+          }
+        ]
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/design-review-compatibility-r1c0.md",
+      "durationMs": 66346,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e2a5269f7ffex70ePXnIZXQWAs",
+      "agent": "review/design-security",
+      "at": 1794586371955,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → The output — a base in a chain — \"A consumer regenerates by writing `<policy-id>.toml` beside the chain and bumping pins as a review\" (with The stack refusal \"`policy.id == base.id` — a produced base cannot name its own input (a chain directory holds one file per id)\")",
+            "problem": "The id-collision refusal covers only the source base's id, but the document's own rule — a chain directory holds one file per id — means the same directory holds the personal patch. A policy id equal to any other link's id makes the prescribed regeneration write silently replace that file (potentially the player's patch), contradicting ADR-015's Decision clause that the personal patch \"sits above them in the chain and survives base regeneration untouched\". policy.id is document-controlled, so the hostile-corpus threat model (Risks row 1) reaches it.",
+            "fix": "Widen apply's refusal to any id present in the caller-supplied chain, or state beside this refusal that the regeneration write must collide-refuse against every id already in the chain and name that write-time rule as ADR-017's, so this document's regeneration recipe cannot destroy a patch file the ADR promises survives."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → The report — \"Every string a report carries is a grammar-checked id, so the bounded-echo posture holds without a `CoreError` in sight (A14)\" (vs. The contract: \"an inapplicable report naming the emptiness\")",
+            "problem": "The claim holds for ids (≤ 63 octets, A15), but the tag pattern grammar has no length bound (prefix is `[a-z][a-z0-9-]*`) and it is unstated whether an unmatched-tag report's `offender` is None or echoes the pattern. Not exploitable, but the bounded-echo posture is only verifiable if the bound is named.",
+            "fix": "One sentence in The report: either `offender` is None for tag-level outcomes, or tag echoes share the 63-octet id cap — whichever is intended."
+          }
+        ]
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/design-review-security-r1c0.md",
+      "durationMs": 86347,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2a511882ffeWwRPHyPyE2vdQN",
+      "agent": "review/design-performance",
+      "at": 1794586412152,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/design-review-performance-r1c0.md",
+      "durationMs": 40161,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e2a507b76ffe4EwnhuX6CRY988",
+      "agent": "review/design-complexity",
+      "at": 1794586472505,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/design-review-complexity-r1c0.md",
+      "durationMs": 60309,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e2a4f8f82ffeNvTJtAohuEk99O",
+      "agent": "design/designer",
+      "at": 1794586510784,
+      "reply": {
+        "changed": true,
+        "summary": "Major finding (compatibility matrix missing the geometry floor): added the one Keyboard geometry row the Risks row cites — relocate-cluster's contiguity/legality read the loaded grid, exactly one geometry ships (A20), no non-ANSI claim until ISO/JIS tables land — and collapsed the duplicate claims into it: the Risks mitigation no longer restates 'new table files, not logic' but cross-references the row, and the Deferred ISO/JIS entry was compressed to point at it. Minor finding (IME never addressed): resolved on that same row with the A19-grounded clause that apply/load_policy see only action ids and closed-vocabulary physical input ids, never a composed character — no new section. Nit (OS input APIs unnamed): extended the existing Product artifacts row's note in place; no new line. Revision log: the r0 placeholder entry was replaced in place by two section-anchored r1 entries. Net diff is +1 line: the reviewer-mandated matrix row is the only addition, offset by the compressed Deferred entry and the shortened Risks cell; the unchanged r0 line count and the deleted duplicate claims absorb the rest. FYI items (repeat-target fixture, ADR precondition wording) were left untouched as they are another seat's call.",
+        "commitMessage": "docs: add keyboard-geometry row to the ADR-015 compatibility matrix"
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/proposal-revise-r1.md",
+      "durationMs": 38185,
+      "nudges": 0,
+      "docLines": 619,
+      "docLinesAdded": 8,
+      "docLinesRemoved": 7
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2a4ef9faffeXux6c9p3i2NIAT",
+      "agent": "review/design-compatibility",
+      "at": 1794586537018,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/design-review-compatibility-r1c1.md",
+      "durationMs": 26132,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2a4e9384ffei3ORfMX78QgZ4H",
+      "agent": "review/design-correctness",
+      "at": 1794586613484,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Compatibility matrix → Keyboard geometry — \"ISO/JIS is new table files, not logic, and no policy may claim non-ANSI support until they land\"",
+            "problem": "The sentence (unchanged in substance from the r1 Deferred bullet, but now the place both the Risks mitigation and the Deferred bullet point at) drops the qualifier the shipped keyboard-geometry spec attaches to that same phrase — \"A geometry that places a key the reach tables do not grade is a vocabulary addition, and it rides the same closed member sets\" — which the proposal's own Deferred bullet already mirrors (\"widening the closed sets rides the `reach-classes` vocabulary major\", A19). An ISO/JIS grid placing members outside the 48-member ANSI-US-derived `keyboard:` set is therefore also a vocabulary major, so the row, read as the answer to the High-likelihood ANSI-US risk, understates the work and invites scheduling ISO/JIS as data-only.",
+            "fix": "Qualify the same clause with the mechanism the document already names: \"ISO/JIS is new table files, not logic, except where a grid places a member outside the closed `keyboard:` set, which rides the `reach-classes` vocabulary major (A19)\" — no new rule or section."
+          },
+          {
+            "severity": "nit",
+            "location": "Revision log — \"Compatibility matrix → Keyboard geometry (r1): added the row Risks cites\"",
+            "problem": "The r0 placeholder was replaced by only the two matrix entries, so the r1 findings the diff left untouched (this seat's collapse-rule/entry-refusal finding on The stack, and the A17 and A13 basis-citation nits) appear neither as changed text nor as a recorded rejection; a reader of the next round cannot distinguish \"deliberately rejected\" from \"missed\".",
+            "fix": "Append one line per unaddressed r1 finding with the author's reason (e.g. \"stack collapse rule: unchanged — pinned by invalid-base tests in crates/transforms/tests/apply.rs\"), leaving the two existing matrix entries as they are."
+          }
+        ]
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/design-review-correctness-r1c2.md",
+      "durationMs": 76373,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e2a4d690cffe4WEgUHz3Pee9qg",
+      "agent": "review/design-security",
+      "at": 1794586645659,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/design-review-security-r1c2.md",
+      "durationMs": 32148,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2a4ceb61ffe7KwKUZXmDCccBe",
+      "agent": "review/design-performance",
+      "at": 1794586665772,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/design-review-performance-r1c2.md",
+      "durationMs": 20085,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e2a4c9cd0ffeIO2KTqQ3oDXh2h",
+      "agent": "review/design-complexity",
+      "at": 1794586703987,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/design-review-complexity-r1c2.md",
+      "durationMs": 38190,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-final",
+      "round": 0,
+      "sessionID": "ses_e2a4c0750ffe13DfM1PEDSEOqs",
+      "agent": "design/editor",
+      "at": 1794586746283,
+      "reply": {
+        "ambiguities": [
+          "Test strategy #1: \"`grammar_closure.rs` refuses a policy document aliasing `transforms_`\" is ambiguous — what 'aliasing `transforms_`' tests is not determinable from the document; kept as written and flagged with an Editor notes line at the bottom for the author to clarify."
+        ],
+        "commitMessage": "docs: final language pass on the ADR-015 proposal"
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/proposal-final-r0.md",
+      "durationMs": 42211,
+      "nudges": 0,
+      "docLines": 621,
+      "docLinesAdded": 9,
+      "docLinesRemoved": 7
+    },
+    {
+      "stage": "editorial-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e2a4b6219ffekjVDrC1GxznGeJ",
+      "agent": "review/design-correctness",
+      "at": 1794586794591,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Revision log (trailing note) + Test strategy #1 — \"Editor notes: Test strategy — \\\"grammar_closure.rs refuses a policy document aliasing `transforms_`\\\" is ambiguous; author to clarify.\"",
+            "problem": "The diff appends an unresolved editor note, and the ambiguity it flags is real: Test strategy #1's sentence \"`grammar_closure.rs` refuses a policy document aliasing `transforms_`\" does not state which entry spelling is refused (`transforms_` as a near-miss of `transforms`, or an alias of `transforms_`), which refusal is expected, or whether the case is an inline case in `grammar_closure.rs` or a corpus fixture — yet the `fixtures/invalid/` list under \"The contract: `schemas/policy/v1/`\" contains no alias fixture, only `unknown-entry.toml`. The near-miss-entry guard that keeps the entry set closed is asserted but pinned to no named artefact, and the document now ends on an open author-to-clarify item.",
+            "fix": "Replace the Test strategy #1 sentence with the concrete assertion — \"a policy document carrying an entry named `transforms_` (a near-miss of `transforms`) refuses at parse as an unknown entry naming it, as an inline alias case in `grammar_closure.rs`, not a corpus fixture\" — and delete the `Editor notes:` line from the Revision log."
+          },
+          {
+            "severity": "nit",
+            "location": "Non-goals + Deferred / out of scope — \"both ride a future `policy/v2` (Options considered)\" and \"the version gate makes the old-reader refusal automatic (Options considered)\"",
+            "problem": "The revision sharpens the cross-reference to a real section heading, but only half of the cited \"both\" has a referent: Options considered does argue the fourth kind (\"Growing the set rides `policy/v2`: the version gate fails old readers closed\"), while and/or/not precondition composition is never considered there.",
+            "fix": "Cite the option by heading for the kind half (\"Options considered → Transform kinds\") and ground the composition half in the ADR alternative it closes (ADR-015, \"Conditions as free-form predicates\"), or drop the parenthetical for that half."
+          }
+        ]
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/editorial-review-correctness-r2.md",
+      "durationMs": 48203,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e2a4aa59dffe0UcfGZ1eRtSUMn",
+      "agent": "review/design-compatibility",
+      "at": 1794586824755,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/editorial-review-compatibility-r2.md",
+      "durationMs": 30139,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:security",
+      "round": 2,
+      "sessionID": "ses_e2a4a2fc3ffe5f9Td77SKsNUpB",
+      "agent": "review/design-security",
+      "at": 1794586848882,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/editorial-review-security-r2.md",
+      "durationMs": 24096,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:performance",
+      "round": 2,
+      "sessionID": "ses_e2a49d18bffeDm8mgkhlA2JuiB",
+      "agent": "review/design-performance",
+      "at": 1794586875011,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/editorial-review-performance-r2.md",
+      "durationMs": 26106,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:complexity",
+      "round": 2,
+      "sessionID": "ses_e2a496b7affeDtXFOYSFvrDaKG",
+      "agent": "review/design-complexity",
+      "at": 1794586903161,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/editorial-review-complexity-r2.md",
+      "durationMs": 28129,
+      "nudges": 0
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_e2a48fd3fffeyRmewq2ys4Pv5v",
+      "agent": "code/test-engineer",
+      "at": 1794587737039,
+      "reply": {
+        "testsAdded": 61,
+        "commitMessage": "test: add failing suites for ADR-015 policy grammar, load_policy, and the transform stack"
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/test-authoring-r0.md",
+      "durationMs": 833780,
+      "nudges": 0
+    },
+    {
+      "stage": "implement",
+      "round": 0,
+      "sessionID": "ses_e2a3c43eeffe91oSVsXisQJ0Ia",
+      "agent": "code/coder",
+      "at": 1794589069012,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "feat: add policy/v1 grammar, load_policy, and the transforms stack",
+        "moves": []
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/implement-r0.md",
+      "durationMs": 1331878,
+      "nudges": 1
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e2a27b842ffeTLmFe13fapv1z7",
+      "agent": "code/test-engineer",
+      "at": 1794589166237,
+      "reply": {
+        "commitMessage": "test: fix compile and fixture defects blocking the ADR-015 suites\n\nApply the four test-side defects the implement-r0 build notes pin (the\nround-1 fix round's testsNeedUpdate): the E0308 `contains` mismatch in\ncore/tests/policy.rs, the E0308 un-wrapped `Result` match arm and the\nout-of-vocabulary `gamepad:north` fixture (now `gamepad:dpad-up`, the\nclosed-set member) in transforms/tests/apply.rs, and the clippy\n`redundant_pattern_matching` hit in transforms/tests/zz_api_probe.rs.\nRefresh apply.rs's now-stale workspace-state header (the crate joined the\nworkspace). No assertion weakened or deleted; the design changed only in\nits compatibility matrix, which no test depends on. Shell access was\ndenied in this stage, so the cargo gate and prettier could not be run\nhere; the edits are rustfmt-shaped one-line fixes the coder verified\nagainst copies (policy 26 passed, apply 27 passed).",
+        "moves": []
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/test-update-r0.md",
+      "durationMs": 82622,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e2a264b40ffePD6diFyTGbzJMZ",
+      "agent": "code/coder",
+      "at": 1794589291896,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "docs: record the fix-round gate legs and the test-side lint defects for ADR-015",
+        "moves": []
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/fix-r0.md",
+      "durationMs": 114831,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e2a24607cffeMW4awhEAtTGnJY",
+      "agent": "code/test-engineer",
+      "at": 1794589375221,
+      "reply": {
+        "commitMessage": "test(core): clear the three clippy hits blocking the ADR-015 policy suite\n\nRound-1 test-update pass. Both rule-6 triggers are absent: the five round-0 code reviews\nthe prompt names do not exist (docs/designs/015-transforms-as-preconditioned-policies/\nreviews/ holds only design/, and .pipeline.json records codeRound 0 with no code-review\nstage entry or seats.code verdicts), so no accepted code-review finding exists to consume;\nand 02-proposal.md is byte-unchanged since proposal-final r0 (7b6b74b), which predates\ntest-authoring r0 (7080008), so Test strategy #1-#11 is the section the suite already\nencodes — the r1 revision log changes only two Compatibility-matrix rows, which no\nassertion reads. What the round changed is the gate: fix round r0 (9047e7c) answers\ntestsNeedUpdate with three test-side edits in crates/core/tests/policy.rs, and no edit\nunder src/ can clear them.\n\n- policy.rs:169 (clippy::manual_contains) — r0's suggested\n  `!names.iter().any(|entry| *entry == name.as_str())` is what trips the lint; clippy's own\n  spelling is the pin: `!names.contains(&name.as_str())` (`names: &[&str]`, so `contains`\n  wants `&&str`).\n- policy.rs:283 (clippy::needless_borrow) — `err` is already `&CoreError`:\n  `assert_message_shape(err)`.\n- policy.rs:453-457 (clippy::doc_lazy_continuation x3) — the `proves:` line now ends with\n  `+` and the next line opens with `A19 —`, which is this file's own convention at 341,\n  380, 466, 493 and 643; no wording changed.\n\nNo assertion, test name, fixture input or file was added, changed, weakened or deleted, and\nnothing moved — `moves` is empty. The editorial note on Test strategy #1 (\"grammar_closure.rs\nrefuses a policy document aliasing `transforms_`\") needed no follow-up: grammar_closure.rs:165-174\nand :494-513 already author it as the closed-entry-set rule the entry table states.\n\nGate, executed in this workspace: `cargo fmt --all -- --check` — no output;\n`cargo clippy --workspace --all-targets --locked -- -D warnings` — `Finished`, all five r0\nhits gone; `cargo test --workspace --locked` — 317 passed, 0 failed (core: policy 26,\nconformance 9, grammar_closure 15, version_gate 11, chain_ops 74, manifest 49,\nzz_api_probe 5; transforms: apply 27, zz_api_probe 2). NOT RUN: `npx prettier --check` and\n`npm run check` — both rejected outright by this stage's shell permissions. The only file I\ntouched is Rust outside prettier's parsers (no prettier config in the repo covers crates/),\nso its formatter leg is the green `cargo fmt --all -- --check` above.",
+        "moves": []
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/test-update-r0.md",
+      "durationMs": 72525,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2a231b09ffeJLld7FBtFmFj2e",
+      "agent": "codereview/code-correctness",
+      "at": 1794589584326,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/transforms/src/apply.rs:94-100 (offender field; spec at schemas/policy/v1/spec.md:208-211)",
+            "problem": "The proposal declares NotApplicable.offender as \"a grammar-checked id, never raw text\" and the spec.md shipped in this diff states a report carries \"an offender that is always a grammar-checked id — never raw document text\", but the implementation fills it with composed sentences (\"`keyboard:d` is bound to `combat.fire`, which the row never named\"), and the field's own doc comment still says \"the id, tag, or key the row tripped over\". A third-party implementer following spec.md produces a different report for the same fault; nothing in the gate pins report text.",
+            "fix": "Reconcile one side: amend spec.md's sentence (and the field doc comment) to say the offender names the grammar-checked id/tag/key at fault plus a bounded reason line, or put the checked id in `offender` and carry the explanation in a separate field, updating the proposal."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/transforms/src/apply.rs:276-309 (Layout::new, input_of, action_on, rebind)",
+            "problem": "profile/v2 makes repeated action ids in one link legal data and core's `resolve` resolves them last-wins (chain_ops.rs:167-170), but Layout reads and writes the FIRST element of a repeated action. For a base like set = [\"move.steer-left keyboard:a\", \"move.steer-left keyboard:b\"], a relocate rebinds the stale first element, leaves the effective binding untouched, and reports Applied — a row that did nothing while looking as though it did something.",
+            "fix": "Collapse the working layout by last-wins in Layout::new (keeping each element's position in the order-preserving output), or refuse at refuse_entry a base whose `set` binds one action twice, naming the action."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/transforms/src/apply.rs:500-510",
+            "problem": "The untouchable guard is specified over every action a row touches, but swap_polarity builds `moves` with filter_map over bound matched actions only, so guard_fault's docked_at(action) leg never sees a matched action the base leaves unbound. With `swap-polarity move.steer-*`, steer-left hard-docked and unbound, the row falls through the (Some, Some) test and reports Applied writing nothing instead of reserved-input (relocate cannot hit this because unbound-action fires first). No mangling, but the wrong one of the ten reasons.",
+            "fix": "Check guard.docked_at over every id in `matched` (a small loop before the filter_map), not only over the bound subset."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/transforms/src/apply.rs:665",
+            "problem": "produce() copies `seeded_from` from the source base. The proposal's output rules enumerate kind, id, derives, for, set and generated-by and never mention seeded_from, so a produced base asserts a seeding provenance its layout no longer has, with no stated reason for carrying it.",
+            "fix": "Either leave seeded_from: None in the produced base, or state the carry-forward in spec.md → The output (and the build notes) with the reason."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/transforms/src/apply.rs:232-238",
+            "problem": "The non-base entry refusal tests `!matches!(base.kind, Some(ProfileKind::Base))`, which also covers a profile/v1 document carrying no `kind`, but the message is the fixed string \"`patch` is not a base\".",
+            "fix": "Spell what the document actually carried (or `none`) in the message."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/transforms/src/apply.rs:104-105",
+            "problem": "The doc comment says \"A fourteenth reason is a policy/v2 question\"; the closed set is ten reasons (apply.rs:107-143, pinned by transforms/tests/zz_api_probe.rs:85-96), so the next reason is the eleventh.",
+            "fix": "Reword to \"an eleventh reason\"."
+          },
+          {
+            "severity": "nit",
+            "location": "schemas/policy/v1/fixtures/valid/exact-tag-policy.toml:1-6",
+            "problem": "The fixture comment reasons about `move.strafe-left` never matching `move.strafe-left-extra`, but the fixture's exact-tag rows are `swap-polarity move.steer-left` and `relocate-cluster move.strafe-right …`; the corpus comment is contract text for a third-party reader.",
+            "fix": "Name the ids actually on the rows."
+          }
+        ]
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/code-review-correctness-r1c0.md",
+      "durationMs": 198309,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2a201428ffeXKnm3hI56UgMTU",
+      "agent": "codereview/code-compatibility",
+      "at": 1794589693363,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/code-review-compatibility-r1c0.md",
+      "durationMs": 108993,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e2a1e6a27ffeWRWKYIIc0CkV4r",
+      "agent": "codereview/code-security",
+      "at": 1794589828460,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "crates/transforms/src/apply.rs:276-309, 436-449, 512-519, 552-553",
+            "problem": "`Layout` is built from an untrusted base's `set` with first-match semantics (`input_of`/`action_on` return the first matching element; `rebind` writes the first match), but profile/v2 determinism rule 3 and `chain_ops::resolve` are last-writer-wins, and the profile grammar permits duplicate elements (`parse_set` has no cross-element check; `set-twice-last-element.toml` pins it valid). A hostile-but-legal base can therefore (a) make a relocate row check contiguity/grades/predicates against dead first copies, report `Applied`, and leave the effective (last) bindings untouched — a silent defeat of the transform that passes every downstream validation; and (b) bypass the `occupied-target` guard by binding the target input twice (first holder inside the match set, a foreign action later), letting the row land a matched action on a key a never-named foreign action also holds — the displacement the guard and 'never mangles' exist to prevent. Same first-match semantics make swap_polarity/swap_mouse rewrite only the first copies on duplicated bindings.",
+            "fix": "Make `apply` see exactly one binding per action, matching `resolve`: cheapest is an entry refusal in `refuse_entry` for a base whose `set` names one action twice or binds one input twice (`CoreError::InvalidValue` naming the duplicate, no new variant per A9); alternatively fold `base.set` through rule 3 (last-wins) before `Layout::new`, deciding explicitly how dropped elements interact with the set-order-preservation clause. Either way, add hostile-base tests in crates/transforms/tests/apply.rs: duplicated-action base refusing (or folded so preconditions see the effective keys), and a duplicated-input target refusing with `occupied-target` naming the input."
+          }
+        ]
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/code-review-security-r1c0.md",
+      "durationMs": 135032,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2a1c5a87ffesGzH2B8nbS65ND",
+      "agent": "codereview/code-performance",
+      "at": 1794589894918,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/code-review-performance-r1c0.md",
+      "durationMs": 66420,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e2a1b56e1ffePUfdgLBYkOmn94",
+      "agent": "codereview/code-testing",
+      "at": 1794590044470,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/document.rs:1430-1433 (schemas/policy/v1/spec.md:89-90)",
+            "problem": "The parse-level \"no repeats\" rule for relocate-cluster targets is stated in the proposal and in the shipped spec.md and enforced in code, but has no test and no invalid fixture, breaking the corpus invariant \"every grammar refusal has its fixture\" (A22) that every other policy refusal honors.",
+            "fix": "Add fixtures/invalid/relocate-target-repeats.toml (a within-cap row repeating one input), cite it in spec.md's fixture index, and add it to INVALID_FIXTURE_NAMES in crates/core/tests/policy.rs; at minimum add an inline value_refusal case in policy.rs."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/transforms/src/apply.rs:495-496",
+            "problem": "Dead branch: the None arm of the axis_kind match (\"is not an id the loaded registry lists\") is unreachable — the match set is built from registry.ids(), and registry_from_entries gives every listed id one of the three kinds, so axis_kind answers Some for every matched id. Untestable dead branches are findings per the testing checklist.",
+            "fix": "Collapse the match to the Some spelling or replace the arm with a debug_assert!, keeping a single message path."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/transforms/src/apply.rs:508-510",
+            "problem": "The untouchable guard's swap-polarity path is reachable (the guard is unconditional over every row, spec.md:176-179) but has no test: guard cases exist for relocate (four shapes) and mouse (docked), none for polarity.",
+            "fix": "Add an apply.rs case — e.g. docked-actions = [\"move.steer-left keyboard:a\"] with swap-polarity move.steer-* — asserting reserved-input naming the offender and a byte-equal layout."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/transforms/src/apply.rs:724-727",
+            "problem": "The not-keyboard verdict is pinned only on the source arm; the target arm of first_not_keyboard — promised by Chosen design → The stack (\"any source or target input not keyboard:*\") — is untested, though mouse:/gamepad: targets parse cleanly as closed-vocabulary input ids.",
+            "fix": "Add a relocate-cluster row with mouse:left as a target, asserting not-keyboard naming mouse:left."
+          },
+          {
+            "severity": "minor",
+            "location": "checklist item 6 (cargo fmt / clippy -D warnings / cargo test --workspace --locked), whole change",
+            "problem": "Could not evaluate: the review environment rejected every shell invocation (Permission denied: shell), so the gate commands could not be run from this seat and no test-result tail can be pasted. Per the review rule an un-evaluable checklist item counts as a finding, not a pass.",
+            "fix": "Rely on the pipeline's independent runner leg (Test strategy #11, the merge PR's rust job) to post the green test result lines; no code change suggested — a hand check of test imports against the new public surfaces (lib.rs re-exports, GradeBound.0, PlacementCheck fields, TagPattern::spelling, Transform::kind) found no compile-level inconsistency."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/transforms/tests/apply.rs:499-523",
+            "problem": "Test strategy #5 promised \"a match that includes aim.camera → axis-kind naming the id\"; the case uses move.steer-right in a scratch registry's continuous-lateral array instead. The deviation is forced by the shipped tag grammar (prefix form needs a literal '-' in the second segment, exact form matches one id so match-count fires first), but no test touches the shipped continuous-lateral id and the none-kind spelling of the same message (apply.rs:491-494) is unexercised.",
+            "fix": "Record the reason in the test's docstring, and optionally add a scratch-registry case with two none-array ids under one prefix tag to pin the none spelling."
+          }
+        ]
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/code-review-testing-r1c0.md",
+      "durationMs": 149500,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e2a190e73ffegXmsiVCr3aW6OD",
+      "agent": "code/coder",
+      "at": 1794590322085,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "fix(transforms): close the duplicate-binding guard gap in the stack",
+        "moves": []
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/fix-r1.md",
+      "durationMs": 277499,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 1,
+      "sessionID": "ses_e2a14a7ebffeaexz193FAlRkJC",
+      "agent": "code/test-engineer",
+      "at": 1794590447948,
+      "reply": {
+        "moves": []
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/test-update-r1.md",
+      "durationMs": 114962,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e2a12bae0ffeb3rMK0USCcUTd4",
+      "agent": "codereview/code-security",
+      "at": 1794590533683,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/code-review-security-r1c1.md",
+      "durationMs": 74480,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2a119783ffeMZJRXOLMH1gnvU",
+      "agent": "codereview/code-correctness",
+      "at": 1794590719026,
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/code-review-correctness-r1c2.md",
+      "durationMs": 185233,
+      "nudges": 0,
+      "failure": "independence violation: read a review report: docs/designs/015-transforms-as-preconditioned-policies/reviews/code/*"
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2a0ec3c3ffepZk5Dov2J6xEDS",
+      "agent": "codereview/code-correctness",
+      "at": 1794590850192,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/transforms/src/apply.rs:103-109, 766-772 (offender field; contract at schemas/policy/v1/spec.md:216-222; proposal → The report)",
+            "problem": "Unchanged from round 1 (F2's fix did not touch it): spec.md still states a report carries \"an offender that is always a grammar-checked id — never raw document text\", but every fault() fills the field with a composed sentence (\"`keyboard:s` is bound to `combat.fire`, which the row never named\"), the field's doc comment still says \"The id, tag, or key the row tripped over\", and tests/common/mod.rs:346-355 now asserts that \"which sentence names it is not part of the contract\". A third-party implementer of policy/v1 produces a different report for the same fault, and nothing in the gate pins report text.",
+            "fix": "Reconcile one side: amend spec.md's sentence (and the field doc comment) to say the offender is the grammar-checked id/tag/key at fault plus a bounded reason line, or put the checked id in `offender` and carry the explanation in a separate field, updating the proposal."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/transforms/src/apply.rs:583-593, 595-600 (swap_polarity; guard_fault at 644-652; spec.md:183-186)",
+            "problem": "Unchanged from round 1: `moves` is still built by filter_map over bound matched ids only, so guard_fault's docked_at(action) leg never sees a matched id the base leaves unbound. With `swap-polarity move.steer-*`, a base binding only `move.steer-right keyboard:d`, and a manifest `docked-actions = [\"move.steer-left keyboard:m\"]`, the row falls through the (Some, Some) test and reports Applied writing nothing, where the unconditional guard promises reserved-input naming the docked input. Relocate cannot hit this because unbound-action fires first.",
+            "fix": "Check guard.docked_at over every id in `matched` (a small loop before the filter_map), not only over the bound subset."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/transforms/src/apply.rs:748 (produce; schemas/policy/v1/spec.md:226-230)",
+            "problem": "Partly addressed from round 1: the seeded_from carry-forward is now declared with a reason in 03-build-notes.md, but spec.md → The output still enumerates only kind, id, derives, for, set and generated-by. The output contract a non-Rust implementer follows therefore omits a field this implementation copies, so the produced documents differ.",
+            "fix": "State the carry-forward in spec.md → The output (with the reason the build notes give: a seeded base would otherwise lose that provenance through one application), or set seeded_from: None in the produced base."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/transforms/src/apply.rs:350-355, 614-638 (action_on / swap_mouse; spec.md:211-214)",
+            "problem": "Made contract-visible by this range's fix: c1 establishes that a base binding one input to several actions is legal and pinned, and the c1 probe case shows swap-mouse-buttons exchanging only the action action_on finds first while other holders on that button stay put. spec.md's clause (\"the actions currently bound to `mouse:left` and `mouse:right`\") does not say which holder the row moves, so a third-party implementer that exchanges every holder answers a different produced base for the same inputs.",
+            "fix": "Add one sentence to spec.md's swap-mouse-buttons clause: the row exchanges the action each button carries first in `set` order and leaves any other holder of that button untouched."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/transforms/src/apply.rs:243-249",
+            "problem": "Unchanged from round 1: the non-base entry refusal tests `!matches!(base.kind, Some(ProfileKind::Base))`, which also covers a document carrying no `kind`, but the message is the fixed string \"`patch` is not a base\".",
+            "fix": "Spell what the document actually carried (or `none`) in the message."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/transforms/src/apply.rs:113-114",
+            "problem": "Unchanged from round 1: the doc comment says \"A fourteenth reason is a `policy/v2` question\" while the closed set is ten reasons (enum at 116-152, pinned by tests/zz_api_probe.rs:85-96), so the next reason is the eleventh.",
+            "fix": "Reword to \"an eleventh reason\"."
+          },
+          {
+            "severity": "nit",
+            "location": "schemas/policy/v1/fixtures/valid/exact-tag-policy.toml:1-6",
+            "problem": "Unchanged from round 1: the fixture comment reasons about `move.strafe-left` never reaching `move.strafe-left-extra`, but the fixture's rows are `swap-polarity move.steer-left` and `relocate-cluster move.strafe-right … keyboard:i`; this comment is contract text for a third-party reader.",
+            "fix": "Name the ids actually on the rows."
+          }
+        ]
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/code-review-correctness-attempt2-r1c2.md",
+      "durationMs": 131128,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2a0cc363ffeCFxrSZKALI2mDR",
+      "agent": "codereview/code-compatibility",
+      "at": 1794590995382,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "schemas/policy/v1/spec.md:195-200 (code: crates/transforms/src/apply.rs:535-549, test: crates/transforms/tests/apply.rs:340)",
+            "problem": "The amended occupancy clause states that every action holding a target key is asked, but never says which holder the report names when a key has more than one holder outside the match set. Core answers with the first foreign holder in source-base `set` element order (`holders_of(target).find(|h| !matched.contains(*h))`), while spec.md:179-381 and apply.rs:29-31 declare the named offender part of the contract's determinism surface, and the Compatibility matrix's \"Third-party reader, non-Rust\" row makes spec.md the whole contract — so a conforming non-Rust implementer may name a different holder (e.g. the byte-order-smallest) and still claim to implement policy/v1. Before this diff the rule was a single `action_on` read, so the omission was harmless; the diff turns it into an unstated selection rule, and no test pins it: the new case needles only the target key (`assert_offender_names(offender, &[\"keyboard:s\"], ...)`) and its base has exactly one foreign holder.",
+            "fix": "State the selection rule in the `occupied-target` clause — e.g. \"the named holder is the first action, in the source base's `set` element order, that holds the target and sits outside the match set\" — mirror it in `foreign_holder`'s doc comment, and pin it with a case whose target is held by two foreign actions asserting the expected holder by name."
+          },
+          {
+            "severity": "nit",
+            "location": "schemas/policy/v1/spec.md:163-169 (code: crates/transforms/src/apply.rs:301-306, test: crates/transforms/tests/apply.rs:1133-1162)",
+            "problem": "\"The refusal names the duplicated action\" is ambiguous for a base that duplicates more than one action, a shape the new rule makes reachable. Core names the first duplicate in `set` element order (`duplicated_action` scans the unsorted element list), whereas crates/transforms/src/lib.rs:37-40 and apply.rs:29-31 attribute the crate's determinism to sorted containers. The new test duplicates exactly one action, so the multi-duplicate answer is unpinned and two conforming readers can name different ids.",
+            "fix": "Name the tie-break in the spec bullet (\"the first duplicated id in `set` element order\", or byte-order-smallest if that is intended), keep the code doc worded the same, and add one base duplicating two ids asserting which one the refusal names."
+          }
+        ]
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/code-review-compatibility-r1c2.md",
+      "durationMs": 145150,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2a0a8c31ffe7zBEEqcr8JXHPu",
+      "agent": "codereview/code-performance",
+      "at": 1794591086027,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/code-review-performance-r1c2.md",
+      "durationMs": 90594,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e2a092a1affeszOfI6rSdBdSnZ",
+      "agent": "codereview/code-testing",
+      "at": 1794591221019,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "crates/transforms/src/apply.rs:287-306; crates/transforms/tests/apply.rs:1133-1162",
+            "problem": "The new entry refusal's docstring makes a determinism claim — the refusal names the first action the base's set answers twice — but the pinning test carries exactly one duplicated action, so which of two differently-duplicated actions a report names is unpinned, against the suite's stated posture that which offender a report names is part of the determinism surface.",
+            "fix": "Extend a_base_binding_one_action_twice_refuses_naming_the_duplicated_action with a second duplicated action appearing later in the set array and assert the refusal message names the first duplicate in element order."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/transforms/src/apply.rs:347-355 (swap_mouse, apply.rs:614-638)",
+            "problem": "The fix's amended model explicitly documents first-answer action_on as intended swap-mouse-buttons semantics ('the action it exchanges is the one it found on the button') while the grammar admits a base binding one mouse button to two actions; no test pins that multi-holder mouse-button shape (what exchanges, which holder stays), so the newly-documented semantic is reachable but unpinned.",
+            "fix": "Add a swap-mouse-buttons case whose base binds a third action to mouse:left alongside the exchanged action, asserting the documented first-answer reading and that the unexchanged holder keeps its binding."
+          }
+        ]
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/code-review-testing-r1c2.md",
+      "durationMs": 134940,
+      "nudges": 0
+    },
+    {
+      "stage": "doc-sync",
+      "round": 1,
+      "sessionID": "ses_e2a071a8dffefvxkGU6gkWpF16",
+      "agent": "ops/doc-sync",
+      "at": 1794591346264,
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/doc-sync-r1.md",
+      "durationMs": 125122,
+      "nudges": 0,
+      "failure": "independence violation: glob accessed run records: docs/designs/015-transforms-as-preconditioned-policies/transcripts/*"
+    },
+    {
+      "stage": "doc-sync",
+      "round": 1,
+      "sessionID": "ses_e2a053199ffeWrIOpgMy9ziZq6",
+      "agent": "ops/doc-sync",
+      "at": 1794591467463,
+      "reply": {
+        "drifted": true,
+        "commitMessage": "docs: verify the 015 as-built note and finish its build notes"
+      },
+      "transcript": "docs/designs/015-transforms-as-preconditioned-policies/transcripts/doc-sync-attempt2-r1.md",
+      "durationMs": 121162,
+      "nudges": 0
+    }
+  ],
+  "gateLog": [
+    {
+      "gate": "sourceAdmissible",
+      "round": 0,
+      "proceed": true,
+      "reason": "ADR is proposed and complete",
+      "at": 1794585493750
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: compatibility",
+      "at": 1794586472563
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c2 pending: correctness, security, performance, complexity",
+      "at": 1794586537074
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794586704037
+    },
+    {
+      "gate": "editorial-review",
+      "round": 2,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1794586903226
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794589083566
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794589177009
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794589302644
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1794589385956
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: security",
+      "at": 1794590044545
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1794590332934
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1794590459150
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c2 pending: correctness, compatibility, performance, testing",
+      "at": 1794590533744
+    },
+    {
+      "gate": "stageFailure",
+      "round": 1,
+      "proceed": false,
+      "reason": "code-review:correctness: independence violation: read a review report: docs/designs/015-transforms-as-preconditioned-policies/reviews/code/*",
+      "at": 1794590719028
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794591221097
+    },
+    {
+      "gate": "stageFailure",
+      "round": 1,
+      "proceed": false,
+      "reason": "doc-sync: independence violation: glob accessed run records: docs/designs/015-transforms-as-preconditioned-policies/transcripts/*",
+      "at": 1794591346267
+    },
+    {
+      "gate": "done",
+      "round": 0,
+      "proceed": true,
+      "reason": "pipeline complete",
+      "at": 1794591467527
+    }
+  ],
+  "startedAt": 1794585493733,
+  "updatedAt": 1794591467527,
+  "flow": "full",
+  "baseRef": "1af12026893971772c5ac8384ceae348d63cd064",
+  "designCycle": 3,
+  "designStamp": "0dacb9675f15c96eeca2ddfc7d0e5f16fcc70498",
+  "seats": {
+    "design": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "0dacb9675f15c96eeca2ddfc7d0e5f16fcc70498",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Compatibility matrix → Keyboard geometry — \"ISO/JIS is new table files, not logic, and no policy may claim non-ANSI support until they land\"",
+            "problem": "The sentence (unchanged in substance from the r1 Deferred bullet, but now the place both the Risks mitigation and the Deferred bullet point at) drops the qualifier the shipped keyboard-geometry spec attaches to that same phrase — \"A geometry that places a key the reach tables do not grade is a vocabulary addition, and it rides the same closed member sets\" — which the proposal's own Deferred bullet already mirrors (\"widening the closed sets rides the `reach-classes` vocabulary major\", A19). An ISO/JIS grid placing members outside the 48-member ANSI-US-derived `keyboard:` set is therefore also a vocabulary major, so the row, read as the answer to the High-likelihood ANSI-US risk, understates the work and invites scheduling ISO/JIS as data-only.",
+            "fix": "Qualify the same clause with the mechanism the document already names: \"ISO/JIS is new table files, not logic, except where a grid places a member outside the closed `keyboard:` set, which rides the `reach-classes` vocabulary major (A19)\" — no new rule or section."
+          },
+          {
+            "severity": "nit",
+            "location": "Revision log — \"Compatibility matrix → Keyboard geometry (r1): added the row Risks cites\"",
+            "problem": "The r0 placeholder was replaced by only the two matrix entries, so the r1 findings the diff left untouched (this seat's collapse-rule/entry-refusal finding on The stack, and the A17 and A13 basis-citation nits) appear neither as changed text nor as a recorded rejection; a reader of the next round cannot distinguish \"deliberately rejected\" from \"missed\".",
+            "fix": "Append one line per unaddressed r1 finding with the author's reason (e.g. \"stack collapse rule: unchanged — pinned by invalid-base tests in crates/transforms/tests/apply.rs\"), leaving the two existing matrix entries as they are."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "0dacb9675f15c96eeca2ddfc7d0e5f16fcc70498",
+        "dissents": 1,
+        "findings": []
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "0dacb9675f15c96eeca2ddfc7d0e5f16fcc70498",
+        "dissents": 0,
+        "findings": []
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "0dacb9675f15c96eeca2ddfc7d0e5f16fcc70498",
+        "dissents": 0,
+        "findings": []
+      },
+      "complexity": {
+        "verdict": "approve",
+        "stamp": "0dacb9675f15c96eeca2ddfc7d0e5f16fcc70498",
+        "dissents": 0,
+        "findings": []
+      }
+    },
+    "code": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "e90525df3dff60570030813bcf2c1637dd5a9b0d",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/transforms/src/apply.rs:103-109, 766-772 (offender field; contract at schemas/policy/v1/spec.md:216-222; proposal → The report)",
+            "problem": "Unchanged from round 1 (F2's fix did not touch it): spec.md still states a report carries \"an offender that is always a grammar-checked id — never raw document text\", but every fault() fills the field with a composed sentence (\"`keyboard:s` is bound to `combat.fire`, which the row never named\"), the field's doc comment still says \"The id, tag, or key the row tripped over\", and tests/common/mod.rs:346-355 now asserts that \"which sentence names it is not part of the contract\". A third-party implementer of policy/v1 produces a different report for the same fault, and nothing in the gate pins report text.",
+            "fix": "Reconcile one side: amend spec.md's sentence (and the field doc comment) to say the offender is the grammar-checked id/tag/key at fault plus a bounded reason line, or put the checked id in `offender` and carry the explanation in a separate field, updating the proposal."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/transforms/src/apply.rs:583-593, 595-600 (swap_polarity; guard_fault at 644-652; spec.md:183-186)",
+            "problem": "Unchanged from round 1: `moves` is still built by filter_map over bound matched ids only, so guard_fault's docked_at(action) leg never sees a matched id the base leaves unbound. With `swap-polarity move.steer-*`, a base binding only `move.steer-right keyboard:d`, and a manifest `docked-actions = [\"move.steer-left keyboard:m\"]`, the row falls through the (Some, Some) test and reports Applied writing nothing, where the unconditional guard promises reserved-input naming the docked input. Relocate cannot hit this because unbound-action fires first.",
+            "fix": "Check guard.docked_at over every id in `matched` (a small loop before the filter_map), not only over the bound subset."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/transforms/src/apply.rs:748 (produce; schemas/policy/v1/spec.md:226-230)",
+            "problem": "Partly addressed from round 1: the seeded_from carry-forward is now declared with a reason in 03-build-notes.md, but spec.md → The output still enumerates only kind, id, derives, for, set and generated-by. The output contract a non-Rust implementer follows therefore omits a field this implementation copies, so the produced documents differ.",
+            "fix": "State the carry-forward in spec.md → The output (with the reason the build notes give: a seeded base would otherwise lose that provenance through one application), or set seeded_from: None in the produced base."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/transforms/src/apply.rs:350-355, 614-638 (action_on / swap_mouse; spec.md:211-214)",
+            "problem": "Made contract-visible by this range's fix: c1 establishes that a base binding one input to several actions is legal and pinned, and the c1 probe case shows swap-mouse-buttons exchanging only the action action_on finds first while other holders on that button stay put. spec.md's clause (\"the actions currently bound to `mouse:left` and `mouse:right`\") does not say which holder the row moves, so a third-party implementer that exchanges every holder answers a different produced base for the same inputs.",
+            "fix": "Add one sentence to spec.md's swap-mouse-buttons clause: the row exchanges the action each button carries first in `set` order and leaves any other holder of that button untouched."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/transforms/src/apply.rs:243-249",
+            "problem": "Unchanged from round 1: the non-base entry refusal tests `!matches!(base.kind, Some(ProfileKind::Base))`, which also covers a document carrying no `kind`, but the message is the fixed string \"`patch` is not a base\".",
+            "fix": "Spell what the document actually carried (or `none`) in the message."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/transforms/src/apply.rs:113-114",
+            "problem": "Unchanged from round 1: the doc comment says \"A fourteenth reason is a `policy/v2` question\" while the closed set is ten reasons (enum at 116-152, pinned by tests/zz_api_probe.rs:85-96), so the next reason is the eleventh.",
+            "fix": "Reword to \"an eleventh reason\"."
+          },
+          {
+            "severity": "nit",
+            "location": "schemas/policy/v1/fixtures/valid/exact-tag-policy.toml:1-6",
+            "problem": "Unchanged from round 1: the fixture comment reasons about `move.strafe-left` never reaching `move.strafe-left-extra`, but the fixture's rows are `swap-polarity move.steer-left` and `relocate-cluster move.strafe-right … keyboard:i`; this comment is contract text for a third-party reader.",
+            "fix": "Name the ids actually on the rows."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "e90525df3dff60570030813bcf2c1637dd5a9b0d",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "schemas/policy/v1/spec.md:195-200 (code: crates/transforms/src/apply.rs:535-549, test: crates/transforms/tests/apply.rs:340)",
+            "problem": "The amended occupancy clause states that every action holding a target key is asked, but never says which holder the report names when a key has more than one holder outside the match set. Core answers with the first foreign holder in source-base `set` element order (`holders_of(target).find(|h| !matched.contains(*h))`), while spec.md:179-381 and apply.rs:29-31 declare the named offender part of the contract's determinism surface, and the Compatibility matrix's \"Third-party reader, non-Rust\" row makes spec.md the whole contract — so a conforming non-Rust implementer may name a different holder (e.g. the byte-order-smallest) and still claim to implement policy/v1. Before this diff the rule was a single `action_on` read, so the omission was harmless; the diff turns it into an unstated selection rule, and no test pins it: the new case needles only the target key (`assert_offender_names(offender, &[\"keyboard:s\"], ...)`) and its base has exactly one foreign holder.",
+            "fix": "State the selection rule in the `occupied-target` clause — e.g. \"the named holder is the first action, in the source base's `set` element order, that holds the target and sits outside the match set\" — mirror it in `foreign_holder`'s doc comment, and pin it with a case whose target is held by two foreign actions asserting the expected holder by name."
+          },
+          {
+            "severity": "nit",
+            "location": "schemas/policy/v1/spec.md:163-169 (code: crates/transforms/src/apply.rs:301-306, test: crates/transforms/tests/apply.rs:1133-1162)",
+            "problem": "\"The refusal names the duplicated action\" is ambiguous for a base that duplicates more than one action, a shape the new rule makes reachable. Core names the first duplicate in `set` element order (`duplicated_action` scans the unsorted element list), whereas crates/transforms/src/lib.rs:37-40 and apply.rs:29-31 attribute the crate's determinism to sorted containers. The new test duplicates exactly one action, so the multi-duplicate answer is unpinned and two conforming readers can name different ids.",
+            "fix": "Name the tie-break in the spec bullet (\"the first duplicated id in `set` element order\", or byte-order-smallest if that is intended), keep the code doc worded the same, and add one base duplicating two ids asserting which one the refusal names."
+          }
+        ]
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "e90525df3dff60570030813bcf2c1637dd5a9b0d",
+        "dissents": 1,
+        "findings": []
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "e90525df3dff60570030813bcf2c1637dd5a9b0d",
+        "dissents": 0,
+        "findings": []
+      },
+      "testing": {
+        "verdict": "approve",
+        "stamp": "e90525df3dff60570030813bcf2c1637dd5a9b0d",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "crates/transforms/src/apply.rs:287-306; crates/transforms/tests/apply.rs:1133-1162",
+            "problem": "The new entry refusal's docstring makes a determinism claim — the refusal names the first action the base's set answers twice — but the pinning test carries exactly one duplicated action, so which of two differently-duplicated actions a report names is unpinned, against the suite's stated posture that which offender a report names is part of the determinism surface.",
+            "fix": "Extend a_base_binding_one_action_twice_refuses_naming_the_duplicated_action with a second duplicated action appearing later in the set array and assert the refusal message names the first duplicate in element order."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/transforms/src/apply.rs:347-355 (swap_mouse, apply.rs:614-638)",
+            "problem": "The fix's amended model explicitly documents first-answer action_on as intended swap-mouse-buttons semantics ('the action it exchanges is the one it found on the button') while the grammar admits a base binding one mouse button to two actions; no test pins that multi-holder mouse-button shape (what exchanges, which holder stays), so the newly-documented semantic is reachable but unpinned.",
+            "fix": "Add a swap-mouse-buttons case whose base binds a third action to mouse:left alongside the exchanged action, asserting the documented first-answer reading and that the unexchanged holder keeps its binding."
+          }
+        ]
+      }
+    }
+  },
+  "lastReviewPass": {
+    "phase": "code",
+    "round": 1,
+    "cycle": 2,
+    "seats": [
+      "correctness",
+      "compatibility",
+      "performance",
+      "testing"
+    ]
+  },
+  "reviseNoChange": false,
+  "codeCycle": 3,
+  "codeStamp": "e90525df3dff60570030813bcf2c1637dd5a9b0d"
+}

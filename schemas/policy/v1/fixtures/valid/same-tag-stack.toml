@@ -1,0 +1,9 @@
+# Two rows touching the one tag: a relocate that pairs `move.steer-*` with two
+# keys of the same hand, then a polarity flip over the same tag. Nothing in the
+# document says which row runs first — the order they are written in *is* the
+# order they apply in, and a row's checks see the layout the row above it
+# produced. That is the stack-order rule visible as data.
+format = "policy"
+version = "v1"
+id = "same-tag-stack"
+transforms = ["relocate-cluster move.steer-* left left 0 keyboard:s keyboard:d", "swap-polarity move.steer-*"]

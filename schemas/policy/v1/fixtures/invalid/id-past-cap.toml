@@ -1,0 +1,7 @@
+# 64 octets — one past the 63-octet slug cap every id that doubles as a file
+# name rides. The cap is what keeps a document name short enough to sit beside
+# its chain and to be echoed, truncated, in a refusal.
+format = "policy"
+version = "v1"
+id = "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+transforms = ["swap-mouse-buttons"]

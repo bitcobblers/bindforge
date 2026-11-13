@@ -1,0 +1,8 @@
+# The stack is `1..=MAX_POLICY_TRANSFORMS`, so an empty array is a refusal
+# distinct from a missing entry: a policy that names no transform is a document
+# whose meaning nobody agreed, and an application that answered "nothing to do"
+# would make a typo invisible.
+format = "policy"
+version = "v1"
+id = "transforms-empty"
+transforms = []

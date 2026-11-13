@@ -1,0 +1,11 @@
+# Legal TOML, outside the policy grammar (`spec.md`): arrays must be written on
+# one line, so an entry whose array continues onto the next line is rejected. The
+# order of the stack is the policy's semantics, so an implementation that reads a
+# continuation differently on a multi-line array changes what the player gets
+# rather than how the document is formatted.
+format = "policy"
+version = "v1"
+id = "multi-line-array"
+transforms = [
+  "swap-mouse-buttons",
+]

@@ -1,0 +1,66 @@
+diff --git a/tmp/bindforge-editorial-transforms-as-preconditioned-policies-r2.md b/home/mike/repos/bindforge/docs/designs/015-transforms-as-preconditioned-policies/02-proposal.md
+index 0dacb96..623ab81 100644
+--- a/tmp/bindforge-editorial-transforms-as-preconditioned-policies-r2.md
++++ b/home/mike/repos/bindforge/docs/designs/015-transforms-as-preconditioned-policies/02-proposal.md
+@@ -40,7 +40,7 @@ and 013's manifest constraints become load-bearing.
+   - `crates/transforms`, the second ADR-008 workspace crate: the stack —
+     sequential application, per-row verdict reports, the manifest-constraint
+     guard — over core's public surface (A16).
+-  - Precondition outcomes as **verdict data** on `PlacementCheck`'s channel,
++  - Precondition outcomes are **verdict data** on `PlacementCheck`'s channel,
+     never new `CoreError` variants; refusals reuse existing variants (A9).
+ - Non-goals:
+   - The seed policy collection (ADR-016); the CLI that authors or applies
+@@ -48,7 +48,7 @@ and 013's manifest constraints become load-bearing.
+     policy distribution and voting on the hub (ADR-018). This run ships no
+     policy data.
+   - Preconditions composed with and/or/not, and any fourth transform kind:
+-    both ride a future `policy/v2` (Options).
++    both ride a future `policy/v2` (Options considered).
+   - Deriving hands from data — 012 refused it, and this design restates the
+     refusal rather than reopening it (A4).
+   - Widening the closed input vocabulary (named keys, mouse geometry): that is
+@@ -98,7 +98,7 @@ parallel list is a second grammar over the same facts — each atom re-inherits
+ the closed-entry-set discipline and buys no reviewability the row lacks. Every
+ precondition the ADR exemplifies is one of the checks its three kinds already
+ run. Chosen: each kind carries a fixed, documented precondition set, each check
+-mapped one-to-one onto a named verdict (Chosen design → The stack); the
++mapped one-to-one to a named verdict (Chosen design → The stack); the
+ vocabulary stays fixed, loaded data stays the only input, and a row stays
+ reviewable as one line (A1, A23).
+ 
+@@ -126,8 +126,8 @@ load naming the link, while the patch file itself is untouched (A7, A10).
+ and dotted keys are outside every shipped grammar, each refusal fixture-pinned
+ (014 A19). Chosen: the shipped pair encoding (A22) — single-space-joined
+ fields, fixed field counts per kind except `relocate-cluster`'s trailing
+-target list — with wrong-field-count refusals and fixtures, exactly as
+-`set`/`swap`/manifest rows do today.
++target list — with wrong-field-count refusals and fixtures, as
++`set`/`swap`/manifest rows already do.
+ 
+ **Tags: exact ids plus one `-`-anchored prefix form, or general wildcards.**
+ Embedded `*`, `?`, or character classes invent a match language over a closed
+@@ -370,7 +370,7 @@ Per-kind checks, each landing a named verdict (Chosen design → The report):
+   final set's distinctness); finally `placement_is_legal(from, to, pairs,
+   GradeBound(bound), tables, geometry)` — an illegal verdict →
+   `placement-illegal` carrying that `PlacementCheck` as the evidence, exactly
+-  the answer-why a bool cannot give (A4). A `keyboard:*` id the grid does not
++  the answer a bool cannot give (A4). A `keyboard:*` id the grid does not
+   place or the tables do not grade propagates the predicate's `InvalidValue` —
+   a fact the contract lacks, not a base that does not fit (A4, A5).
+ - `swap-polarity` — match set empty → `unmatched-tags`; match count ≠ 2 →
+@@ -603,7 +603,7 @@ policy references no other document by path.
+   surface.
+ - A fourth transform kind, and precondition composition (and/or/not): ride a
+   future `policy/v2` — no follow-up yet; the version gate makes the old-reader
+-  refusal automatic (Options).
++  refusal automatic (Options considered).
+ - Named-key members (`tab`, `esc`, arrows, F-keys) and any mouse geometry:
+   widening the closed sets rides the `reach-classes` vocabulary major (012's
+   mechanism, A19).
+@@ -617,3 +617,5 @@ policy references no other document by path.
+ - Compatibility matrix → Keyboard geometry (r1): added the row Risks cites —
+   the ANSI-US-only floor (A20), with ISO/JIS and IME/composition out of scope.
+ - Compatibility matrix → Product artifacts (r1): v1 touches no OS input API.
++
++Editor notes: Test strategy — "grammar_closure.rs refuses a policy document aliasing `transforms_`" is ambiguous; author to clarify.

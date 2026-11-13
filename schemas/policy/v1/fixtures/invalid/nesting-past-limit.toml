@@ -1,0 +1,9 @@
+# Arrays nested 17 levels deep — one past `MAX_NESTING_DEPTH` (16), the budget
+# `schemas/README.md` states as a rejection every implementer must perform before
+# it builds any value. A `transforms` element is one string, so a nested array is
+# never legal here; the limit is what stops a hostile document costing the reader
+# stack before it is refused. Regenerate this fixture if the budget moves.
+format = "policy"
+version = "v1"
+id = "nesting-past-limit"
+transforms = [[[[[[[[[[[[[[[[["deep"]]]]]]]]]]]]]]]]]

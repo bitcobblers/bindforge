@@ -23,6 +23,13 @@
 //! Test strategy #3 and #7) grows only the *per-format* list, because the union
 //! already carries `v1` — that proposal's A2, and the reason the invariant the last
 //! case pins needs no change.
+//!
+//! Design 015 adds `schemas/policy/v1/` under exactly the same rule: `policy`'s
+//! majors are its own (`v1`, and nothing else until a `policy/v2` directory
+//! exists — Options considered: the closed kind set), a `policy` document
+//! declaring `v2` is refused naming *policy's* majors, and the crate-wide union is
+//! unchanged by the new directory, which is why the invariant case at the end of
+//! this file still needs no edit of its own (design 015's Test strategy #10, A11).
 
 mod common;
 
@@ -61,6 +68,16 @@ const GEOMETRY_DOC: &str = r#"format = "keyboard-geometry"
 version = "v1"
 geometry = "dvorak-us"
 keys = ["keyboard:a 0 2"]
+"#;
+
+/// A well-formed `policy` document: exactly the entries
+/// `schemas/policy/v1/spec.md` defines, in the shape its valid corpus fixtures
+/// ship, so the version line is the document's only fault (design 015's
+/// Test strategy #10).
+const POLICY_DOC: &str = r#"format = "policy"
+version = "v1"
+id = "lefty-stack"
+transforms = ["relocate-cluster move.steer-* left right 2 keyboard:i keyboard:k", "swap-mouse-buttons"]
 "#;
 
 /// The same document with a different `version` entry, so a case is about the
@@ -307,6 +324,65 @@ fn the_invalid_corpus_ships_a_manifest_fixture_for_a_major_the_format_does_not_s
     };
     let supported = format_majors("manifests");
     assert_version_rejection(err, "the manifests major-not-shipped fixture", &supported);
+}
+
+/// proves: design 015's Test strategy #10 + A11 — the gate is per-format for the
+/// policy format too: a `policy` document declaring `v2` names a major `policy`
+/// never shipped, so it is refused as the version gate's structured error naming
+/// *policy's* own majors. `profile` already ships a `v2` (design 014), and a gate
+/// reading one crate-wide list would read this document with a grammar that does
+/// not exist for it — the same fail-open arriving from the other side.
+#[test]
+fn rejects_a_policy_document_declaring_a_major_the_policy_format_does_not_ship() {
+    let document = declaring(POLICY_DOC, "v2");
+    let supported = format_majors("policy");
+
+    assert!(
+        supported.iter().any(|major| major == "v1"),
+        "the walk must find `policy/v1` in the contract tree to name its majors; the walk saw {:?}",
+        format_dirs()
+            .iter()
+            .map(|dir| format!("{}/{}", dir.format, dir.major))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        !supported.iter().any(|major| major == "v2"),
+        "this case needs `policy` to ship no `v2`; the tree carries {supported:?}"
+    );
+
+    let Err(err) = bindforge_core::parse(&document) else {
+        panic!("a `policy` document declaring `v2` must be refused, not parsed");
+    };
+    assert_version_rejection(err, "the policy v2 document", &supported);
+}
+
+/// proves: design 015's Test strategy #10 + A11 — `policy/v1` joins the tree
+/// without the crate-wide union moving at all: `policy`'s own majors are exactly
+/// `v1`, `supported_majors()` still answers the `v1`-and-`v2` union it answers
+/// today, and the majors-equality invariant stays green with no change to it —
+/// which is the whole point of the case below needing no edit for this format.
+#[test]
+fn the_policy_major_joining_the_tree_leaves_the_declared_union_unchanged() {
+    let policy_majors = format_majors("policy");
+    assert_eq!(
+        policy_majors,
+        vec!["v1".to_string()],
+        "`policy` ships exactly the major its directory carries, once `schemas/policy/v1/` exists \
+         (the corpus is what makes a major supported)"
+    );
+
+    let declared: BTreeSet<String> = bindforge_core::supported_majors().into_iter().collect();
+    let expected: BTreeSet<String> = ["v1".to_string(), "v2".to_string()].into_iter().collect();
+    assert_eq!(
+        declared, expected,
+        "A11: `supported_majors()` already unions to `v1` and `v2`, so adding `policy/v1` must \
+         change nothing it answers"
+    );
+    let present: BTreeSet<String> = format_dirs().into_iter().map(|dir| dir.major).collect();
+    assert_eq!(
+        declared, present,
+        "the majors-equality invariant holds with `policy/v1` in the tree, unchanged"
+    );
 }
 
 /// proves: Test strategy #2 — the majors `bindforge-core` declares equal the

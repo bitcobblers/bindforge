@@ -3,7 +3,8 @@
 //!
 //! proves: Chosen design → Formats contract + `schemas/profile/v1/spec.md`,
 //! `schemas/reach-classes/v1/spec.md`, `schemas/reach-classes/v2/spec.md`,
-//! `schemas/keyboard-geometry/v1/spec.md` and `schemas/manifests/v1/spec.md` —
+//! `schemas/keyboard-geometry/v1/spec.md`, `schemas/manifests/v1/spec.md` and
+//! `schemas/policy/v1/spec.md` —
 //! each format's entry set is closed, so
 //! an entry the grammar does not define is a typed refusal naming the entry, never
 //! an ignored key: an alias of a known entry (`derives_`) read as *that entry
@@ -151,6 +152,28 @@ for = "remnant-2@3"
 derives_ = ["ancestor-1"]
 "#;
 
+/// A `policy/v1` document using every entry `schemas/policy/v1/spec.md` defines:
+/// `format`, `version`, `id`, and the ordered `transforms` stack — the four the
+/// entry table lists, no more, with each row one space-joined transform (design
+/// 015's The contract, A22).
+const POLICY_USING_DEFINED_ENTRIES: &str = r#"format = "policy"
+version = "v1"
+id = "lefty-stack"
+transforms = ["relocate-cluster move.steer-* left right 2 keyboard:i keyboard:k", "swap-polarity move.strafe-*", "swap-mouse-buttons"]
+"#;
+
+/// A `policy/v1` document that aliases the defined `transforms` entry: a reader
+/// that ignores unknown entries reads it as a policy with no transforms at all —
+/// the one shape the grammar excludes, since the stack is
+/// `1..=MAX_POLICY_TRANSFORMS` and a policy whose opt-in stack silently empties
+/// is a policy that does nothing while looking like it does something (design
+/// 015's Test strategy #1).
+const POLICY_WITH_AN_ALIASED_ENTRY: &str = r#"format = "policy"
+version = "v1"
+id = "aliased-stack"
+transforms_ = ["swap-mouse-buttons"]
+"#;
+
 /// A `keyboard-geometry/v1` document whose `geometry` name breaks the slug
 /// grammar `[a-z][a-z0-9-]*` — the same grammar a manifest `id`, `codec` and
 /// preset id ride, defined once and renamed `is_slug_name` when the third entry
@@ -213,7 +236,9 @@ fn rejects_a_reach_classes_table_carrying_an_entry_outside_the_grammar() {
 /// the taxonomy, so an `emphasis` entry is a refusal naming the entry.
 /// `keyboard-geometry/v1` joins it the same way (ADR-012, design 012's Test
 /// strategy #7), and `manifests/v1` joins it the same way again (ADR-013, design
-/// 013's Test strategy #7).
+/// 013's Test strategy #7). `policy/v1` joins it the same way once more — design
+/// 015's Test strategy #1: the closed entry set is contract for the fourth
+/// untrusted document class exactly as it is for the other three (A8).
 /// `reach-classes/v2` is the one directory whose closed set this suite pins
 /// directly rather than through a fixture: the approved v2 corpus names its
 /// invalid fixtures and no `unknown-entry.toml` among them, and
@@ -228,6 +253,7 @@ fn the_invalid_corpus_ships_an_unknown_entry_fixture_for_every_format() {
         ("keyboard-geometry", "v1"),
         ("manifests", "v1"),
         ("profile", "v2"),
+        ("policy", "v1"),
     ] {
         let dir = version_dir(format, major);
         let path = dir
@@ -446,5 +472,53 @@ fn rejects_a_profile_v2_document_carrying_an_aliased_entry() {
         detail.contains("v2"),
         "the refusal names the version whose entry set it checked, not a hard-coded `v1`, got \
          `{detail}`"
+    );
+}
+
+/// proves: design 015's Test strategy #1 + its Delta inventory (the policy entry
+/// set) + Chosen design → The contract — closing the `policy/v1` set is not
+/// shrinking the grammar: a policy using exactly the four entries its entry table
+/// defines parses, `transforms` rows carrying the space-joined field encoding
+/// included (A22). The three transform kinds and the tag grammar are
+/// `policy.rs`'s to pin; this case is about the entry set.
+#[test]
+fn accepts_every_entry_the_policy_grammar_defines() {
+    if let Err(err) = bindforge_core::parse(POLICY_USING_DEFINED_ENTRIES) {
+        panic!(
+            "a policy using only the entries the `policy/v1` entry table defines must parse; it \
+             was refused: {err}"
+        );
+    }
+}
+
+/// proves: design 015's Test strategy #1 ("`grammar_closure.rs` refuses a policy
+/// document aliasing `transforms_`") + A1 — the alias case, authored as the
+/// closed-entry-set rule it is: `transforms_` is an entry the entry table never
+/// defines, so it is a typed refusal naming the entry and the version whose entry
+/// set was checked. The danger is the same one `derives_` carries for a profile: a
+/// reader that ignored the entry would read the document as a stack of **no
+/// transforms at all**, which is the one shape the grammar excludes — an opt-in
+/// stack that silently empties is a policy that does nothing while looking as
+/// though it does. It is not a rule about aliases in general, not about the
+/// `transforms` entry's own value, and not about a transform row: the row grammar
+/// is `policy.rs`'s.
+#[test]
+fn rejects_a_policy_document_carrying_an_aliased_entry() {
+    let err = bindforge_core::parse(POLICY_WITH_AN_ALIASED_ENTRY).expect_err(
+        "a policy carrying `transforms_` must be refused, not read as a policy with no stack",
+    );
+
+    let detail = err.to_string();
+    assert!(
+        detail.contains("transforms_"),
+        "the refusal must name the entry it refused, got `{detail}`"
+    );
+    assert!(
+        detail.contains("v1"),
+        "the refusal names the version whose entry set it checked, got `{detail}`"
+    );
+    assert!(
+        !detail.contains('\n') && !detail.contains('\r'),
+        "the refusal stays one bounded line: {detail:?}"
     );
 }

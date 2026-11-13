@@ -43,6 +43,18 @@
 //! guards, the position rules, the manifest joins) lives in `chain_ops`, the
 //! same split `manifest` uses; `profile/v1` stays exactly as shipped, entry
 //! set, `serialize` bytes, and fixtures included.
+//!
+//! Design 015 (ADR-015) adds `policy/v1`: the ordered stack of named,
+//! preconditioned transforms — `format`, `version`, the slug `id`, and the
+//! `transforms` rows of the closed three kinds — typed as `Policy`, `Transform`,
+//! and `TagPattern`, and parsed here because every rule the corpus can express
+//! refuses at `parse` alone. What needs loaded data in hand — which registry ids
+//! a tag matches, whether a move respects a declared bound, which manifest inputs
+//! are reserved — is the stack's, in `crates/transforms`, so the policy corpus
+//! stays single-document and registry-free like the manifest's. Matching *is*
+//! grammar, which is why `TagPattern::matches` lives here; the two new budgets,
+//! `MAX_POLICY_TRANSFORMS` and `MAX_RELOCATE_TARGETS`, join the exported family
+//! beside the manifest's.
 
 use std::collections::BTreeMap;
 use std::io::Read;
@@ -52,7 +64,7 @@ use crate::action::{ActionId, ActionRegistry, AxisKind, registry_from_entries};
 use crate::error::CoreError;
 use crate::input::{InputId, InputNamespace};
 use crate::manifest::{Manifest, manifest_from_entries};
-use crate::placement::is_slug_name;
+use crate::placement::{GradeBound, is_slug_name};
 use crate::reach::{Hand, InputGrade, ReachClass};
 use crate::toml::{self, Value};
 
@@ -68,6 +80,7 @@ const SUPPORTED_FORMATS: &[&str] = &[
     "action-ids",
     "keyboard-geometry",
     "manifests",
+    "policy",
     "profile",
     "reach-classes",
 ];
@@ -142,12 +155,29 @@ const MANIFEST_ENTRIES: &[&str] = &[
     "version",
 ];
 
+/// Every entry the `policy/v1` grammar defines, and the only ones it admits:
+/// the identity pair (`format`, `version`), the policy's slug id, and the
+/// ordered transform stack. The set is closed the same way as every other
+/// format's, and the refused alternative it exists to refuse is the alias
+/// `transforms_`: a reader that ignored it would read the document as a stack
+/// of *no transforms at all*, which is the one shape the grammar excludes — an
+/// opt-in stack that silently empties is a policy that does nothing while
+/// looking as though it does (design 015, A1, A8).
+const POLICY_V1_ENTRIES: &[&str] = &["format", "id", "transforms", "version"];
+
 /// The v2 taxonomy: the five class ids, once each, in **severity order**, worst
 /// last. The array order *is* the severity scale, so two hands cannot define
 /// two scales, and the rule is one rule per document — which is what lets a
 /// loader compare no files. Changing the scale changes what a bound means, so
 /// it rides a new major.
 const REACH_CLASSES_V2_TAXONOMY: [&str; 5] = ["home", "thumb", "stretch", "far", "off-reach"];
+
+/// The largest bound a `relocate-cluster` row may declare: one short of the v2
+/// taxonomy's class count, because that count *is* the severity scale and four
+/// ranks is the largest one-action degradation it can express (design 015,
+/// A24). The number is the taxonomy's, not a literal, so a scale that grows
+/// widens the bound with it — and a bound past the scale answers nothing.
+const MAX_GRADE_BOUND: u32 = REACH_CLASSES_V2_TAXONOMY.len() as u32 - 1;
 
 /// The geometry-name grammar `keyboard-geometry/v1/spec.md` states, echoed in
 /// the refusal so a document says which grammar it broke.
@@ -168,6 +198,20 @@ pub const MAX_PATCH_DELTA_ELEMENTS: usize = 256;
 /// bounds a refusal that has to name the label (A13); the label is provenance,
 /// so it is short and displayed, never a payload.
 pub const MAX_GENERATED_BY_OCTETS: usize = 128;
+
+/// Parse budget: the most transform rows one `policy/v1` stack may name. The
+/// cap mirrors `MAX_CONSTRAINT_GROUPS`, which bounds one manifest's whole
+/// constraint set, and it is what stops a hostile policy driving
+/// `MAX_RELOCATE_TARGETS` predicate moves per row past any bound (design 015,
+/// A13): the composite `schemas/policy/v1/spec.md` states multiplies out of
+/// caps that already exist, so no aggregate cap joins the family.
+pub const MAX_POLICY_TRANSFORMS: usize = 64;
+
+/// Parse budget: the most target inputs one `relocate-cluster` row may name.
+/// The cap mirrors `MAX_GROUP_MEMBERS`, the widest set of inputs one manifest
+/// constraint already relates, and it bounds the predicate's move list: one row
+/// evaluates at most this many `(source, target)` moves (design 015, A13).
+pub const MAX_RELOCATE_TARGETS: usize = 16;
 
 /// The octet bound a v2 profile `id`, each `derives` element, and each pin's
 /// manifest half share with the slug grammar — the DNS-label bound RFC 1035
@@ -197,7 +241,7 @@ pub fn supported_majors() -> Vec<String> {
 /// `UnknownFormat` refusal in `parse`, whatever its version line says.
 pub(crate) fn format_majors(format: &str) -> Option<&'static [&'static str]> {
     match format {
-        "action-ids" | "keyboard-geometry" | "manifests" => Some(&[MAJOR_V1]),
+        "action-ids" | "keyboard-geometry" | "manifests" | "policy" => Some(&[MAJOR_V1]),
         "profile" | "reach-classes" => Some(&[MAJOR_V1, MAJOR_V2]),
         _ => None,
     }
@@ -313,6 +357,134 @@ pub struct KeyboardGeometryTable {
     pub keys: Vec<GeometryKey>,
 }
 
+/// A `policy/v1` document: the ordered stack of named, preconditioned
+/// transforms ADR-015 defines. The model keeps the `transforms` array order,
+/// because **array order is application order** — a stack read in another
+/// order answers a different question, and the harness's re-parse comparison is
+/// equality on that order (design 015, Options: Stack order).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Policy {
+    pub version: String,
+    pub id: String,
+    pub transforms: Vec<Transform>,
+}
+
+/// One transform row, typed by its kind. The set is closed at exactly the
+/// ADR's three kinds: an open name space would make an unresolved name somebody
+/// else's semantics, so a fourth kind rides `policy/v2` and the version gate
+/// holds old readers closed (design 015, Options: Transform kinds). The
+/// preconditions are not a second list the author writes — each kind carries a
+/// fixed, documented set, and `crates/transforms` evaluates it and reports
+/// per-row verdicts.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Transform {
+    /// Moves one contiguous cluster of matched actions to a list of target
+    /// inputs as one translation. The hands are the row's declared inputs to
+    /// the placement predicate, never facts derived from the base (A4).
+    RelocateCluster {
+        tags: TagPattern,
+        from: Hand,
+        to: Hand,
+        bound: GradeBound,
+        targets: Vec<InputId>,
+    },
+    /// Exchanges the bindings of exactly two `discrete-lateral` actions — the
+    /// axis kind 011 recorded for exactly this rule (A2).
+    SwapPolarity { tags: TagPattern },
+    /// Exchanges the actions currently bound to `mouse:left` and `mouse:right`.
+    /// It carries no tag: the pair is the closed vocabulary's own two members
+    /// (A19), so a tag would be a second match language.
+    SwapMouseButtons,
+}
+
+impl Transform {
+    /// The contract spelling of this row's kind — the same string
+    /// `crates/transforms` puts on the row's `TransformReport`, and the
+    /// spelling `schemas/policy/v1/spec.md` states.
+    #[must_use]
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Transform::RelocateCluster { .. } => "relocate-cluster",
+            Transform::SwapPolarity { .. } => "swap-polarity",
+            Transform::SwapMouseButtons => "swap-mouse-buttons",
+        }
+    }
+
+    /// The whole row back in the grammar's one-line encoding: the kind, then
+    /// the typed fields in the contract's canonical spelling and field order.
+    /// `serialize` writes rows through this, and array order is preserved by
+    /// the caller, so re-parsing the output yields an equal stack (A12).
+    fn spelling(&self) -> String {
+        match self {
+            Transform::RelocateCluster {
+                tags,
+                from,
+                to,
+                bound,
+                targets,
+            } => {
+                let targets = targets
+                    .iter()
+                    .map(|input| input.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                format!(
+                    "relocate-cluster {} {} {} {} {targets}",
+                    tags.spelling(),
+                    from.name(),
+                    to.name(),
+                    bound.0
+                )
+            }
+            Transform::SwapPolarity { tags } => format!("swap-polarity {}", tags.spelling()),
+            Transform::SwapMouseButtons => "swap-mouse-buttons".to_string(),
+        }
+    }
+}
+
+/// The tag a transform row touches: an exact action id, or the one prefix form
+/// `schemas/policy/v1/spec.md` states — `<segment>.<prefix>-*`, which reaches
+/// every id whose second segment begins `<prefix>-`. Matching is grammar and it
+/// is byte-exact (011's posture): no case folding, no general wildcard, and no
+/// character class. Whether a pattern matches a *loaded* registry id is an
+/// application fact, answered by `crates/transforms`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TagPattern {
+    /// An exact action id: matches that id and nothing shaped like it.
+    Exact(ActionId),
+    /// `<segment>.<prefix>-*`, held with the `-` that closes the prefix: the
+    /// spelling is `{segment}.{prefix}*`, and matching asks whether an id's
+    /// second segment starts with `prefix`.
+    Prefix { segment: String, prefix: String },
+}
+
+impl TagPattern {
+    /// Whether this pattern names one action id, byte-exactly.
+    #[must_use]
+    pub fn matches(&self, id: &ActionId) -> bool {
+        match self {
+            TagPattern::Exact(exact) => exact == id,
+            TagPattern::Prefix { segment, prefix } => {
+                let Some((head, tail)) = id.as_str().split_once('.') else {
+                    return false;
+                };
+                head == segment && tail.starts_with(prefix.as_str())
+            }
+        }
+    }
+
+    /// The row spelling `serialize` writes the pattern back in — and the
+    /// spelling a `crates/transforms` verdict quotes, so a report names the tag
+    /// the author wrote rather than a Rust debug rendering of the pattern.
+    #[must_use]
+    pub fn spelling(&self) -> String {
+        match self {
+            TagPattern::Exact(id) => id.as_str().to_string(),
+            TagPattern::Prefix { segment, prefix } => format!("{segment}.{prefix}*"),
+        }
+    }
+}
+
 /// One contract document.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Document {
@@ -321,6 +493,7 @@ pub enum Document {
     ActionIds(ActionRegistry),
     KeyboardGeometry(KeyboardGeometryTable),
     Manifest(Manifest),
+    Policy(Policy),
 }
 
 impl Document {
@@ -393,6 +566,11 @@ pub fn parse(text: &str) -> Result<Document, CoreError> {
             reject_unknown_entry(&entries, "manifests", &version, MANIFEST_ENTRIES)?;
             let manifest = manifest_from_entries(&entries, version)?;
             Ok(Document::Manifest(manifest))
+        }
+        "policy" => {
+            reject_unknown_entry(&entries, "policy", &version, POLICY_V1_ENTRIES)?;
+            let policy = parse_policy(&entries, version)?;
+            Ok(Document::Policy(policy))
         }
         other => Err(CoreError::UnknownFormat {
             declared: other.to_string(),
@@ -616,7 +794,27 @@ pub fn serialize(document: &Document) -> String {
             }
             text
         }
+        Document::Policy(policy) => serialize_policy(policy),
     }
+}
+
+/// One `policy/v1` document back out as contract text: the three entries in
+/// the order the entry table defines them, and the stack as one one-line string
+/// array whose elements are re-spelled from each row's typed fields. Array
+/// order is application order, so it is preserved exactly and the harness's
+/// re-parse comparison is equality (A12).
+fn serialize_policy(policy: &Policy) -> String {
+    let rows = policy
+        .transforms
+        .iter()
+        .map(|row| quoted(&row.spelling()))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "format = \"policy\"\nversion = {}\nid = {}\ntransforms = [{rows}]\n",
+        quoted(&policy.version),
+        quoted(&policy.id)
+    )
 }
 
 /// One `profile/v2` link back out as contract text, in the fixed entry order
@@ -1122,6 +1320,220 @@ fn is_label_char(ch: char) -> bool {
                 | '\u{feff}'
                 | '\u{fff9}'..='\u{fffb}'
         )
+}
+
+/// The `policy/v1` arm: the slug id, then the ordered stack. Every rule here is
+/// one a single document answers on its own — a tag is grammar-checked, never
+/// registry-checked — which is what keeps the `policy/v1` corpus registry-free
+/// the way the manifest corpus is (design 015, A1): whether a tag matches a
+/// loaded id is an application fact `crates/transforms` answers.
+fn parse_policy(entries: &BTreeMap<String, Value>, version: String) -> Result<Policy, CoreError> {
+    let id = string_entry(entries, "id")?;
+    check_profile_slug("id", &id)?;
+    let transforms = parse_transforms(entries)?;
+    Ok(Policy {
+        version,
+        id,
+        transforms,
+    })
+}
+
+/// The `transforms` entry: required, non-empty, capped at
+/// `MAX_POLICY_TRANSFORMS`, each element one transform row. An absent entry is
+/// `MissingEntry` naming it; an empty array is refused, because a policy that
+/// names no transform is a document whose meaning nobody agreed (A1) — the
+/// alias fixture shows why an ignored entry is the worse failure.
+fn parse_transforms(entries: &BTreeMap<String, Value>) -> Result<Vec<Transform>, CoreError> {
+    let Some(value) = entries.get("transforms") else {
+        return Err(CoreError::MissingEntry {
+            key: "transforms".to_string(),
+        });
+    };
+    let raws = string_array("transforms", value)?;
+    let row_count_fault = |reason: String| CoreError::InvalidValue {
+        key: "transforms".to_string(),
+        message: reason,
+    };
+    if raws.is_empty() {
+        let reason = format!(
+            "a stack names 1 to {MAX_POLICY_TRANSFORMS} transform rows: an empty stack does \
+             nothing while looking as though it does"
+        );
+        return Err(row_count_fault(reason));
+    }
+    if raws.len() > MAX_POLICY_TRANSFORMS {
+        let reason = format!(
+            "more than {MAX_POLICY_TRANSFORMS} rows: the policy stack budget, which bounds the \
+             predicate work one application evaluates"
+        );
+        return Err(row_count_fault(reason));
+    }
+    raws.iter().map(|raw| parse_transform(raw)).collect()
+}
+
+/// The field shape of a `relocate-cluster` row, named in the refusal so a
+/// document says which grammar it broke.
+const RELOCATE_ROW_RULE: &str = "a `relocate-cluster` row is `relocate-cluster <tag> <from-hand> \
+                                 <to-hand> <bound> <target-input>` with 1 to \
+                                 MAX_RELOCATE_TARGETS target inputs";
+
+/// The field shape of a tag, same purpose.
+const TAG_RULE: &str = "a tag is an exact action id or `<segment>.<prefix>-*`: a well-formed id \
+                        segment, then `[a-z][a-z0-9-]*` closed by the `-` before the `*`";
+
+/// One transform row: the kind, then exactly the field count that kind defines.
+/// An unknown kind or a wrong count refuses naming the row — never a default
+/// for the field that was left out, and never a silent no-op row (A22): the
+/// fixed field counts are the shipped `set`/`swap`/manifest posture, and each
+/// fault has its fixture.
+fn parse_transform(raw: &str) -> Result<Transform, CoreError> {
+    let fault = |reason: String| delta_fault("transforms", raw, reason);
+    let fields: Vec<&str> = raw.split(' ').collect();
+    match fields[0] {
+        "relocate-cluster" => {
+            // kind + tag + hands + bound + at least one target, at most
+            // MAX_RELOCATE_TARGETS of them.
+            if fields.len() < 6 || fields.len() > 5 + MAX_RELOCATE_TARGETS {
+                return Err(fault(RELOCATE_ROW_RULE.to_string()));
+            }
+            let tags = parse_tag(fields[1], raw)?;
+            let from = match Hand::from_name(fields[2]) {
+                Some(hand) => hand,
+                None => {
+                    let reason = format!(
+                        "`{}` is not a hand: expected `left` or `right` — the hands are the row's \
+                         declared inputs to the placement predicate, never derived from the base",
+                        fields[2]
+                    );
+                    return Err(fault(reason));
+                }
+            };
+            let to = match Hand::from_name(fields[3]) {
+                Some(hand) => hand,
+                None => {
+                    let reason =
+                        format!("`{}` is not a hand: expected `left` or `right`", fields[3]);
+                    return Err(fault(reason));
+                }
+            };
+            let Some(bound) = parse_bound(fields[4]) else {
+                let reason = format!(
+                    "`{}` is not a bound: expected a decimal `0..={MAX_GRADE_BOUND}`",
+                    fields[4]
+                );
+                return Err(fault(reason));
+            };
+            let mut targets: Vec<InputId> = Vec::with_capacity(fields.len() - 5);
+            for field in &fields[5..] {
+                let parsed = InputId::parse(field);
+                let input = parsed.map_err(|err| name_the_element(err, "transforms", raw))?;
+                if targets.contains(&input) {
+                    let reason = format!("`{field}` is named twice by the target list");
+                    return Err(fault(reason));
+                }
+                targets.push(input);
+            }
+            Ok(Transform::RelocateCluster {
+                tags,
+                from,
+                to,
+                bound: GradeBound(bound),
+                targets,
+            })
+        }
+        "swap-polarity" => {
+            if fields.len() != 2 {
+                let reason = "a `swap-polarity` row is `swap-polarity <tag>`".to_string();
+                return Err(fault(reason));
+            }
+            let tags = parse_tag(fields[1], raw)?;
+            Ok(Transform::SwapPolarity { tags })
+        }
+        "swap-mouse-buttons" => {
+            if fields.len() != 1 {
+                let reason = "a `swap-mouse-buttons` row carries no argument: the pair it is \
+                              defined over is `mouse:left` and `mouse:right`"
+                    .to_string();
+                return Err(fault(reason));
+            }
+            Ok(Transform::SwapMouseButtons)
+        }
+        other => {
+            let reason = format!(
+                "`{other}` is not a transform kind: the kinds are `relocate-cluster`, \
+                 `swap-polarity`, and `swap-mouse-buttons`"
+            );
+            Err(fault(reason))
+        }
+    }
+}
+
+/// The tag a row touches, grammar-checked and nothing more: an exact action id,
+/// or the one prefix form. A star anywhere else, an uppercase spelling, an
+/// empty prefix, and a third segment each refuse here — a general wildcard
+/// would invent a match language over a closed id set (Options: Tags).
+fn parse_tag(text: &str, row: &str) -> Result<TagPattern, CoreError> {
+    let fault = |reason: String| delta_fault("transforms", row, reason);
+    let Some(body) = text.strip_suffix('*') else {
+        if text.contains('*') {
+            let reason = format!("`{text}` is not a tag: a `*` may only close the prefix form");
+            return Err(fault(reason));
+        }
+        let parsed = ActionId::parse(text);
+        let id = parsed.map_err(|err| name_the_element(err, "transforms", row))?;
+        return Ok(TagPattern::Exact(id));
+    };
+    let Some((segment, prefix)) = body.split_once('.') else {
+        let reason = format!("`{text}` is not a tag: {TAG_RULE}");
+        return Err(fault(reason));
+    };
+    if prefix.contains('.') || !is_tag_prefix(prefix) || !tag_segment_is_well_formed(segment) {
+        let reason = format!("`{text}` is not a tag: {TAG_RULE}");
+        return Err(fault(reason));
+    }
+    Ok(TagPattern::Prefix {
+        segment: segment.to_string(),
+        prefix: prefix.to_string(),
+    })
+}
+
+/// The prefix half of the tag grammar: `[a-z][a-z0-9-]*` within the same octet
+/// bound an id segment rides, and — because the form states the `-` before the
+/// `*` — closing with `-`. So `move.-*` refuses: its prefix is `-`, which is
+/// not `[a-z]`-initial.
+fn is_tag_prefix(prefix: &str) -> bool {
+    let bytes = prefix.as_bytes();
+    if bytes.is_empty() || bytes.len() > MAX_SLUG_OCTETS || !bytes[0].is_ascii_lowercase() {
+        return false;
+    }
+    bytes[1..]
+        .iter()
+        .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'-')
+        && bytes[bytes.len() - 1] == b'-'
+}
+
+/// Whether a tag's head segment is well formed. The action-id grammar is the
+/// one definition of a well-formed segment, so the head is checked through it,
+/// joined to a placeholder second segment: `action.rs` stays the only place
+/// that rule is written, and a head carrying a stray byte or a non-ASCII letter
+/// fails exactly where an id would.
+fn tag_segment_is_well_formed(segment: &str) -> bool {
+    ActionId::parse(&format!("{segment}.x")).is_ok()
+}
+
+/// The bound field: a plain decimal `0..=MAX_GRADE_BOUND`. The digits are
+/// checked byte by byte because `u32`'s parser accepts a leading `+`, and the
+/// grammar states a decimal digit string: a sign, a decimal point, or a word is
+/// the refusal, never a coercion (A24).
+fn parse_bound(text: &str) -> Option<u32> {
+    if text.is_empty() || !text.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    let value = text.parse::<u32>().ok()?;
+    if value > MAX_GRADE_BOUND {
+        return None;
+    }
+    Some(value)
 }
 
 fn parse_reach_classes(

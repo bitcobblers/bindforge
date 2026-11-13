@@ -1,0 +1,8 @@
+# A target is a closed-vocabulary input id, grammar-checked at parse through the
+# shipped `InputId` rule: `keyboard:tab` is outside the keyboard member set, so a
+# policy naming it refuses at the grammar rather than waiting for an application
+# that cannot grade or place it.
+format = "policy"
+version = "v1"
+id = "relocate-target-unknown-input"
+transforms = ["relocate-cluster move.steer-* left right 0 keyboard:tab"]

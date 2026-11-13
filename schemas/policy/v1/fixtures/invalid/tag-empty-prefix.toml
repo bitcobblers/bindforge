@@ -1,0 +1,8 @@
+# An empty prefix (`move.-*`) matches every id in the segment — the whole-segment
+# wildcard the grammar never admits — so it is refused at the shape rather than
+# read as a broad match. The prefix part is `[a-z][a-z0-9-]*`, which is
+# non-empty.
+format = "policy"
+version = "v1"
+id = "tag-empty-prefix"
+transforms = ["swap-polarity move.-*"]

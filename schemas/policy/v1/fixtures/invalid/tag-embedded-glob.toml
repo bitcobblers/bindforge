@@ -1,0 +1,8 @@
+# A tag is an exact action id or `<segment>.<prefix>-*`, and the shape is checked
+# at parse. A star anywhere but last is a refusal naming the tag: general
+# wildcards would invent a match language over a closed id set, and a pattern
+# whose middle is uncertain cannot be paired byte-order with a target list.
+format = "policy"
+version = "v1"
+id = "tag-embedded-glob"
+transforms = ["swap-polarity move.steer-*left"]

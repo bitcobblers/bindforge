@@ -1,0 +1,10 @@
+# Tags written as exact ids rather than prefixes: a `swap-polarity` over one
+# named action and a one-target relocate. An exact tag matches the id it spells
+# and is not a prefix, so `move.strafe-left` here never reaches
+# `move.strafe-left-extra`. A policy that names one action exactly is the other
+# half of the tag grammar, and it is the shape that survives registry growth
+# without widening its own intent.
+format = "policy"
+version = "v1"
+id = "exact-tag-policy"
+transforms = ["swap-polarity move.steer-left", "relocate-cluster move.strafe-right left right 4 keyboard:i"]

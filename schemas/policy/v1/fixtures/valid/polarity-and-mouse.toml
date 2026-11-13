@@ -1,0 +1,9 @@
+# The two rows that need no grid and no grades, in stack order: a polarity flip
+# over a tag, then the input-wise mouse exchange. A tag reaching two
+# discrete-lateral ids is all `swap-polarity` asks of the data, so this document
+# is valid for any base whose registry carries the tag — whether it applies is an
+# application fact.
+format = "policy"
+version = "v1"
+id = "polarity-and-mouse"
+transforms = ["swap-polarity move.steer-*", "swap-mouse-buttons"]

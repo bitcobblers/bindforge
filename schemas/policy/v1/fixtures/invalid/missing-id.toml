@@ -1,0 +1,6 @@
+# `id` is required, and it is load-bearing rather than decorative: it is the
+# file stem `load_policy` joins and the name the produced base carries in
+# `generated-by`. A policy with no name has nowhere to be read from.
+format = "policy"
+version = "v1"
+transforms = ["swap-mouse-buttons"]

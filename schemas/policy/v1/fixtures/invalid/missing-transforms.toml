@@ -1,0 +1,6 @@
+# `transforms` is required. A document with the other three entries and no stack
+# entry is refused naming the entry — it is not read as a policy that does
+# nothing, which is the silent no-op the ADR refuses.
+format = "policy"
+version = "v1"
+id = "missing-transforms"

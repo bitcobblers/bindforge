@@ -1,0 +1,10 @@
+# Legal TOML, outside the policy grammar (`spec.md`): the grammar is
+# line-oriented `key = value` entries only, so a table header is rejected. A
+# reader built on a standard TOML parser reads `[transforms]` as a table and the
+# whole stack vanishes from a document that looked like it had one.
+format = "policy"
+version = "v1"
+id = "table-header"
+
+[transforms]
+row = "swap-mouse-buttons"

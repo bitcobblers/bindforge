@@ -1,0 +1,8 @@
+# `5` is past the v2 taxonomy's five severity classes: four is the largest
+# possible one-action degradation, so a bound above it answers nothing and is a
+# refusal rather than a loose bound. Both ends of the scale — `0` and `4` —
+# parse, and a float is outside the grammar's value set anyway.
+format = "policy"
+version = "v1"
+id = "relocate-bound-past-scale"
+transforms = ["relocate-cluster move.steer-* left right 5 keyboard:i"]

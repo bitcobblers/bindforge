@@ -1,0 +1,8 @@
+# A `swap-polarity` row is exactly its kind and its tag: the third field is a
+# refusal naming the row, never an ignored extra. The fixed-field-count posture
+# is the one the `set`/`clear`/`swap` pair rows and the manifest rows already
+# pin — an ignored trailing field is a second, undocumented argument.
+format = "policy"
+version = "v1"
+id = "swap-polarity-extra-field"
+transforms = ["swap-polarity move.steer-* left"]

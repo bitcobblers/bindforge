@@ -1,0 +1,9 @@
+# Legal TOML, outside the policy grammar (`spec.md`): values are strings and
+# one-line arrays of strings only, and an integer literal must be a plain decimal
+# integer. A float anywhere is rejected — including a `version` that looks like a
+# newer major, which a lenient reader might round down to the one major `policy`
+# does ship.
+format = "policy"
+version = 1.5
+id = "float-value"
+transforms = ["swap-mouse-buttons"]

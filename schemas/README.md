@@ -2,7 +2,7 @@
 
 `schemas/` is the single home of BindForge's on-disk format contract: one
 directory per format (`action-ids`, `keyboard-geometry`, `manifests`,
-`profile`, `reach-classes`), and under it one directory per major version
+`policy`, `profile`, `reach-classes`), and under it one directory per major version
 (`v1`, `v2`, …). A format's later majors are how a format grows: the
 profile-chain vocabulary of the 012-015 series is `profile/v2`, not a sixth
 format.
@@ -24,7 +24,14 @@ rules. ADR-014 adds `profile/v2`: one link of a chain, with its `kind`, its
 files through `load_chain` — whose one-directory rule, pin equality, and
 manifest joins are load-time rules of the same shape. `profile/v1` and its
 fixtures stay exactly as shipped: the chain's vocabulary is a new major, not a
-widened one. The conformance harness's `schemas/*/v*/` walk picks every new
+widened one. ADR-015 adds `policy/v1`: an opt-in stack of transforms — the
+closed three row kinds, each one space-joined row in an ordered `transforms`
+array, with its tag, hands, grade bound, and closed-vocabulary target list —
+read from one file through `load_policy`, whose slug-before-filesystem and
+name↔location rules are load-time rules of the same shape. A policy references
+no other document by path: the base it applies to arrives from the caller, so
+applying a stack is a library call in `crates/transforms`, not a format load.
+The conformance harness's `schemas/*/v*/` walk picks every new
 directory up with no harness change.
 
 ## Versioning rule (canonical)
@@ -106,8 +113,18 @@ can reach a writer:
   `MAX_CHAIN_DEPTH` documents, so its total read cost is the product already
   stated by the two budgets, `MAX_CHAIN_DEPTH × MAX_DOCUMENT_BYTES` (32 MiB).
   `schemas/profile/v2/spec.md` states the composite the same way.
+- ADR-015 adds two budgets for a policy stack, named beside these:
+  `MAX_POLICY_TRANSFORMS = 64` bounds a `policy/v1` document's `transforms`
+  array, and `MAX_RELOCATE_TARGETS = 16` bounds one `relocate-cluster` row's
+  target list. ADR-015 adds no aggregate cap either: one application reads at
+  most one policy document plus the one base document the chain rules already
+  bounded, and evaluates at most `MAX_POLICY_TRANSFORMS × MAX_RELOCATE_TARGETS`
+  (64 × 16) predicate moves over the capped loaded tables, geometry, and
+  registry. `schemas/policy/v1/spec.md` states the composite the same way, and
+  because a policy references no other document by path, a per-document cap
+  cannot be defeated by document count.
 
-The reference implementation exports all nine constants as the public names
+The reference implementation exports all eleven constants as the public names
 for these limits, so an implementer never has to guess which number a
 rejection names.
 

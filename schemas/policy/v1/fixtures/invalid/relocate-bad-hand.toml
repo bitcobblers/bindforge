@@ -1,0 +1,8 @@
+# The hands are the shipped grammar, `left` or `right`, and they stay inputs the
+# row *declares*: a hand is never derived from the data, because a hand inferred
+# from where the keys sit is the predicate answering the author's question for
+# them. `both` is a refusal naming the row and the hand.
+format = "policy"
+version = "v1"
+id = "relocate-bad-hand"
+transforms = ["relocate-cluster move.steer-* both right 2 keyboard:i"]

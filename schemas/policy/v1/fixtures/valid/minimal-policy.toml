@@ -1,0 +1,8 @@
+# The smallest shape the grammar accepts: the four defined entries and a
+# one-row stack. `swap-mouse-buttons` is the only row that carries no argument
+# at all — the mouse pair is the closed input vocabulary's own `mouse:left` and
+# `mouse:right`, so a tag on the row would be a second match language.
+format = "policy"
+version = "v1"
+id = "minimal-policy"
+transforms = ["swap-mouse-buttons"]

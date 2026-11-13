@@ -1,0 +1,9 @@
+# A `relocate-cluster` row is its six fixed fields plus the targets: this one
+# stops after the two hands, so the bound and every target are missing. The
+# field count is checked, never padded with a default for the field the author
+# left out — a default hand or a default bound would be the predicate deciding
+# the row's meaning.
+format = "policy"
+version = "v1"
+id = "relocate-few-fields"
+transforms = ["relocate-cluster move.steer-* left right"]
