@@ -1,9 +1,18 @@
 ---
-status: proposed
+status: superseded
 date: 2026-11-11
+supersedes: —
+superseded-by: [009a, 009b, 009c, 009d, 009e]
 ---
 
 # ADR 009: Define the canonical profile, transform, and manifest model
+
+> **Superseded** 2026-11-12 by the 009 series — 009a (action taxonomy +
+> `crates/core` skeleton), 009b (input vocabulary + reach classes), 009c
+> (game manifests), 009d (profiles as chains), 009e (transforms as policies).
+> The single ADR bundled five independently-testable contracts into one
+> stage; the series splits the same decisions in dependency order.
+
 
 We will define BindForge's core vocabulary and file model as the public
 contract in `schemas/` — a semantic action taxonomy, a per-hand reach-class
