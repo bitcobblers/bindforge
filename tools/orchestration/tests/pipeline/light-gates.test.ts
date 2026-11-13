@@ -339,7 +339,8 @@ describe('the flow registry is the --stage gate', () => {
     const { client, sessionsCreated } = planStub(dir, designDir);
 
     const source = 'docs/prompts/re-plan.md';
-    const status = await runPipeline(entryOptions(dir, source, { client, forceStage: 'plan' }));
+    const options = entryOptions(dir, source, { client, forceStage: 'plan' });
+    const { status } = await runPipeline(options);
     expect(status).toBe('done');
 
     expect(sessionsCreated[0]).toBe('plan');
@@ -357,7 +358,7 @@ describe('the flow registry is the --stage gate', () => {
     const { client, sessionsCreated } = planStub(dir, DESIGN_DIR);
 
     const resume = resumePipeline(resumeOptions(dir, { client, forceStage: 'plan' }));
-    expect(await resume).toBe('done');
+    expect((await resume).status).toBe('done');
     expect(sessionsCreated[0]).toBe('plan');
   });
 

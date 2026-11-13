@@ -294,7 +294,7 @@ describe('light run end to end', () => {
     const dir = tmpRepo(lightState());
     const { client, sessionsCreated } = lightStub(dir, { rejects: {} });
 
-    const status = await resumePipeline(optionsFor(dir, { client }));
+    const { status } = await resumePipeline(optionsFor(dir, { client }));
     expect(status).toBe('done');
 
     expect(sessionsCreated).toEqual([
@@ -323,7 +323,7 @@ describe('light run end to end', () => {
     const dir = tmpRepo(lightState());
     const { client } = lightStub(dir, { rejects: {} });
 
-    expect(await resumePipeline(optionsFor(dir, { client }))).toBe('done');
+    expect((await resumePipeline(optionsFor(dir, { client }))).status).toBe('done');
 
     expect(existsSync(join(dir, DESIGN_DIR, '02-proposal.md'))).toBe(true);
     expect(existsSync(join(dir, DESIGN_DIR, '03-build-notes.md'))).toBe(true);
@@ -342,7 +342,7 @@ describe('light run end to end', () => {
     const dir = tmpRepo(lightState());
     const { client, sessionsCreated } = lightStub(dir, { rejects: {} });
 
-    expect(await resumePipeline(optionsFor(dir, { client }))).toBe('done');
+    expect((await resumePipeline(optionsFor(dir, { client }))).status).toBe('done');
 
     expect(existsSync(join(dir, DESIGN_DIR, '01-research.md'))).toBe(false);
     expect(existsSync(join(dir, DESIGN_DIR, 'reviews', 'design'))).toBe(false);
@@ -361,7 +361,7 @@ describe('light run end to end', () => {
     const dir = tmpRepo(lightState());
     const { client, sessionsCreated } = lightStub(dir, { rejects: {} });
 
-    expect(await resumePipeline(optionsFor(dir, { client }))).toBe('done');
+    expect((await resumePipeline(optionsFor(dir, { client }))).status).toBe('done');
 
     expect(sessionsCreated.length).toBeLessThanOrEqual(2 + LIGHT_SEATS.length * 3);
   });
@@ -378,7 +378,7 @@ describe('the 2-seat code funnel', () => {
       fixRewritesPlan: true,
     });
 
-    const status = await resumePipeline(optionsFor(dir, { client, cfg: BASE }));
+    const { status } = await resumePipeline(optionsFor(dir, { client, cfg: BASE }));
     expect(status).toBe('done');
 
     expect(sessionsCreated.filter((k) => k === 'code-review:testing')).toHaveLength(2);
@@ -405,7 +405,7 @@ describe('the 2-seat code funnel', () => {
       fixRewritesPlan: true,
     });
 
-    expect(await resumePipeline(optionsFor(dir, { client }))).toBe('done');
+    expect((await resumePipeline(optionsFor(dir, { client }))).status).toBe('done');
 
     const dissent = prompts.filter(
       (p) => p.key === 'code-review:testing' && p.text.includes('reviews/code/testing-r1c1.md'),
@@ -433,7 +433,7 @@ describe('the ownership line reaches the coder prompt', () => {
     const dir = tmpRepo(lightState());
     const { client, prompts } = lightStub(dir, { rejects: {} });
 
-    expect(await resumePipeline(optionsFor(dir, { client }))).toBe('done');
+    expect((await resumePipeline(optionsFor(dir, { client }))).status).toBe('done');
 
     const coderPrompts = prompts.filter((p) => p.key === 'implement');
     expect(coderPrompts.length).toBeGreaterThan(0);

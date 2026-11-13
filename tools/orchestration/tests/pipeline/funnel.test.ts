@@ -221,7 +221,7 @@ describe('funnel loop end to end', () => {
       reviseWrites: true,
     });
 
-    const status = await resumePipeline(optionsFor(dir, { client }));
+    const { status } = await resumePipeline(optionsFor(dir, { client }));
     expect(status).toBe('done');
 
     // One round, three passes: full panel c0, security alone at c1, the four
@@ -291,7 +291,7 @@ describe('funnel loop end to end', () => {
     git(['commit', '-q', '-m', 'docs: 002-x pipeline escalated']);
     expect(existsSync(join(designDir, 'ESCALATION.md'))).toBe(true);
 
-    const status = await resumePipeline(optionsFor(dir, { client }));
+    const { status } = await resumePipeline(optionsFor(dir, { client }));
     expect(status).toBe('done');
 
     // A run that escalated and recovered must not carry the stop's marker into
@@ -309,7 +309,7 @@ describe('funnel loop end to end', () => {
       reviseNoChange: true,
     });
 
-    const status = await resumePipeline(optionsFor(dir, { client }));
+    const { status } = await resumePipeline(optionsFor(dir, { client }));
     expect(status).toBe('escalated');
     // One full panel, one revise, then stop — no second dissent pass is spent.
     expect(sessionsCreated.filter((k) => k.startsWith('design-review:'))).toHaveLength(5);
@@ -326,7 +326,7 @@ describe('funnel loop end to end', () => {
       reviseWrites: true,
     });
 
-    const status = await resumePipeline(optionsFor(dir, { client, cfg }));
+    const { status } = await resumePipeline(optionsFor(dir, { client, cfg }));
     expect(status).toBe('escalated');
     // c0 spent 5 sessions; c1 (dissent: security alone) spent 1 more; entry to
     // c2 sees 6 >= 6 and stops. The funnel spends what dissent costs.
@@ -340,7 +340,7 @@ describe('funnel loop end to end', () => {
       rejects: { 'design-review:security': [0, 1, 2, 3, 4, 5] },
       reviseWrites: true,
     });
-    const status2 = await resumePipeline(
+    const { status: status2 } = await resumePipeline(
       optionsFor(dir2, { client: stub2.client, cfg, extendBudget: 1 }),
     );
     expect(status2).toBe('escalated');
@@ -373,7 +373,7 @@ describe('funnel loop end to end', () => {
       reviseWrites: true,
     });
 
-    const status = await resumePipeline(optionsFor(dir, { client, cfg }));
+    const { status } = await resumePipeline(optionsFor(dir, { client, cfg }));
     expect(status).toBe('escalated');
     // Three passes (c0, c1, c2), not an unbounded dissent cycle.
     expect(sessionsCreated.filter((k) => k.startsWith('design-review:'))).toHaveLength(15);
@@ -430,7 +430,7 @@ describe('funnel loop end to end', () => {
     );
     const { client, sessionsCreated } = stubClient(dir, { rejects: {}, reviseWrites: true });
 
-    const status = await resumePipeline(optionsFor(dir, { client }));
+    const { status } = await resumePipeline(optionsFor(dir, { client }));
     expect(status).toBe('done');
 
     // The dissenter is re-reviewed alone; the three never-seen seats and the
@@ -451,7 +451,7 @@ describe('funnel loop end to end', () => {
     const old = baseState();
     const dir = tmpRepo(old);
     const { client } = stubClient(dir, { rejects: {}, reviseWrites: true });
-    const status = await resumePipeline(optionsFor(dir, { client }));
+    const { status } = await resumePipeline(optionsFor(dir, { client }));
     expect(status).toBe('done');
     const saved = savedState(dir);
     expect(saved.version).toBe(1);
@@ -484,7 +484,7 @@ describe('the code phase converges on one stamp', () => {
       fixWrites: true,
     });
 
-    const status = await resumePipeline(optionsFor(dir, { client }));
+    const { status } = await resumePipeline(optionsFor(dir, { client }));
     expect(status).toBe('done');
 
     const codeSessions = sessionsCreated.filter((k) => k.startsWith('code-review:'));

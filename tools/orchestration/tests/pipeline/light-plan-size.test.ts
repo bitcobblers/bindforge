@@ -191,7 +191,7 @@ describe('the oversized-plan stop', () => {
     const dir = tmpRepo();
     const { client } = planStub(dir, 120);
 
-    const status = await resumePipeline(optionsFor(dir, { client }));
+    const { status } = await resumePipeline(optionsFor(dir, { client }));
     expect(status).toBe('escalated');
 
     const md = readFileSync(join(dir, DESIGN_DIR, 'ESCALATION.md'), 'utf8');
@@ -230,7 +230,7 @@ describe('the oversized-plan stop', () => {
     const dir = tmpRepo();
     const { client } = planStub(dir, 120);
 
-    expect(await resumePipeline(optionsFor(dir, { client }))).toBe('escalated');
+    expect((await resumePipeline(optionsFor(dir, { client }))).status).toBe('escalated');
 
     const saved = savedState(dir);
     const plan = saved.results.find((r) => r.stage === 'plan');
@@ -246,7 +246,7 @@ describe('the oversized-plan stop', () => {
     const dir = tmpRepo();
     const { client, sessionsCreated } = planStub(dir, 120);
 
-    expect(await resumePipeline(optionsFor(dir, { client }))).toBe('escalated');
+    expect((await resumePipeline(optionsFor(dir, { client }))).status).toBe('escalated');
     expect(sessionsCreated.filter((k) => k !== 'plan')).toEqual([]);
   });
 
@@ -257,7 +257,7 @@ describe('the oversized-plan stop', () => {
     const dir = tmpRepo();
     const { client } = planStub(dir, 120);
 
-    expect(await resumePipeline(optionsFor(dir, { client }))).toBe('escalated');
+    expect((await resumePipeline(optionsFor(dir, { client }))).status).toBe('escalated');
 
     const md = readFileSync(join(dir, DESIGN_DIR, 'ESCALATION.md'), 'utf8');
     expect(md).toContain(PROMOTION);
@@ -274,7 +274,7 @@ describe('the oversized-plan stop', () => {
     const dir = tmpRepo();
     const { client } = planStub(dir, 120);
 
-    expect(await resumePipeline(optionsFor(dir, { client }))).toBe('escalated');
+    expect((await resumePipeline(optionsFor(dir, { client }))).status).toBe('escalated');
 
     const md = readFileSync(join(dir, DESIGN_DIR, 'ESCALATION.md'), 'utf8');
     expect(md).toContain(PROMOTION);
@@ -290,7 +290,8 @@ describe('the oversized-plan stop', () => {
   it('refuses to build the refused plan when the run is resumed', async () => {
     const dir = tmpRepo();
     const first = planStub(dir, 120);
-    expect(await resumePipeline(optionsFor(dir, { client: first.client }))).toBe('escalated');
+    const firstRun = await resumePipeline(optionsFor(dir, { client: first.client }));
+    expect(firstRun.status).toBe('escalated');
 
     // The shape that made the bypass reachable: the stop records its stage.
     const saved = savedState(dir);
@@ -303,7 +304,8 @@ describe('the oversized-plan stop', () => {
     expect(reason).toMatch(/promot|flow: full|--force/);
 
     const second = planStub(dir, 120);
-    expect(await resumePipeline(optionsFor(dir, { client: second.client }))).toBe('escalated');
+    const secondRun = await resumePipeline(optionsFor(dir, { client: second.client }));
+    expect(secondRun.status).toBe('escalated');
     expect(second.sessionsCreated).not.toContain('implement');
     expect(existsSync(join(dir, DESIGN_DIR, '03-build-notes.md'))).toBe(false);
 
@@ -319,10 +321,11 @@ describe('the oversized-plan stop', () => {
   it('clears the stop when a re-plan lands under the cap', async () => {
     const dir = tmpRepo();
     const first = planStub(dir, 120);
-    expect(await resumePipeline(optionsFor(dir, { client: first.client }))).toBe('escalated');
+    const firstRun = await resumePipeline(optionsFor(dir, { client: first.client }));
+    expect(firstRun.status).toBe('escalated');
 
     const replan = planStub(dir, 60);
-    const status = await resumePipeline(
+    const { status } = await resumePipeline(
       optionsFor(dir, { client: replan.client, forceStage: 'plan' }),
     );
     expect(status).toBe('done');
@@ -337,7 +340,7 @@ describe('the oversized-plan stop', () => {
     const dir = tmpRepo();
     const { client, sessionsCreated } = planStub(dir, 80);
 
-    const status = await resumePipeline(optionsFor(dir, { client }));
+    const { status } = await resumePipeline(optionsFor(dir, { client }));
     expect(status).toBe('done');
     expect(sessionsCreated).toContain('implement');
     expect(sessionsCreated.filter((k) => k.startsWith('code-review:'))).toHaveLength(2);
@@ -353,7 +356,7 @@ describe('the oversized-plan stop', () => {
     const dir = tmpRepo();
     const { client, sessionsCreated } = planStub(dir, null);
 
-    expect(await resumePipeline(optionsFor(dir, { client }))).toBe('escalated');
+    expect((await resumePipeline(optionsFor(dir, { client }))).status).toBe('escalated');
     expect(sessionsCreated.filter((k) => k !== 'plan')).toEqual([]);
 
     const md = readFileSync(join(dir, DESIGN_DIR, 'ESCALATION.md'), 'utf8');
@@ -373,7 +376,7 @@ describe('the oversized-plan stop', () => {
     const dir = tmpRepo();
     const { client, sessionsCreated } = planStub(dir, 0);
 
-    expect(await resumePipeline(optionsFor(dir, { client }))).toBe('done');
+    expect((await resumePipeline(optionsFor(dir, { client }))).status).toBe('done');
     expect(sessionsCreated).toContain('implement');
     expect(existsSync(join(dir, DESIGN_DIR, 'ESCALATION.md'))).toBe(false);
   });

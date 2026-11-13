@@ -176,6 +176,23 @@ export interface GateEvidence {
   legs: GateLeg[];
 }
 
+/**
+ * ADR-020 (design 020 §1/§2) — the restart-boundary record: which stage's
+ * commit window net-changed the harness's executable surface, the surface paths
+ * it changed (writer-side posture: `printable` copies, bounded like
+ * `boundedGateEvidence`), and when the runner classified it. The pause is this
+ * record plus its gate-log entry, boundary commit and printed summary — never
+ * a status value and never a marker file beside the checkpoint.
+ */
+export interface RestartBoundary {
+  /** Registry name of the stage whose window opened the boundary. */
+  stage: string;
+  /** The surface paths the window's net diff changed, bounded and printable. */
+  paths: string[];
+  /** Wall clock of the classification. */
+  at: number;
+}
+
 /** Per-seat ledger for the funnel phases. Editorial has no seats. */
 export interface SeatBoard {
   design?: Record<string, SeatRecord>;
@@ -299,6 +316,21 @@ export interface PipelineState {
    * checkpoint carries it, and its absence is "no stop standing".
    */
   planStop?: string;
+  /**
+   * ADR-020 (design 020 §2): the restart boundary, sticky. A runner commit
+   * window whose NET diff changed the executable surface — a module the process
+   * imported at start, or a template it renders at stage time — is judged by
+   * code that is already stale for it, so the run stops as a clean pause and
+   * the *next process* carries it on. Recorded beside `planStop` (the same
+   * sticky companion-field shape, A10) rather than as a `RunStatus` member:
+   * widening the `status` enum is the retype ADR-006 §2 forbids, and a pre-020
+   * reader loads this checkpoint with the unknown key inert. `resume` is the
+   * restart: it gate-logs the boundary it crosses and clears this field, so
+   * every resume starts from "no boundary standing". Additive-optional: no
+   * earlier checkpoint carries it, and its absence is the same absence rule as
+   * `flow`, `planStop` and `gateEvidence`.
+   */
+  restartRequired?: RestartBoundary;
   status: RunStatus;
   /** Last completed stage ('' before the first stage). */
   lastStage: string;

@@ -195,7 +195,7 @@ async function runPassAt(maxParallelReviews: number): Promise<string> {
     cfg,
     client: dissentingStub(dir),
   };
-  const status = await resumePipeline(options);
+  const { status } = await resumePipeline(options);
   expect(status).toBe('escalated');
   return dir;
 }

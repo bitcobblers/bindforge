@@ -7,17 +7,61 @@ import yargs, { type Argv } from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
 import { DEFAULT_BASE_URL, createClient } from '../opencode-runner.js';
-import { type ServerConnection, renderStatus, resumePipeline, runPipeline } from './runner.js';
+import { printable } from './independence.js';
+import {
+  type PipelineRunResult,
+  type ServerConnection,
+  renderStatus,
+  resumePipeline,
+  runPipeline,
+} from './runner.js';
 import { DEFAULT_CONFIG } from './stages.js';
 import { loadState } from './state-store.js';
 import { ESCALATION_FILE } from './types.js';
 
 // ---------------------------------------------------------------------------
 // `pipeline` CLI: run / resume / status. Prompts are always files; the CLI
-// never carries prose. Exit codes: 0 done, 2 escalated, 1 error.
+// never carries prose. Exit codes (ADR-020 §3): 0 done, 3 paused at a restart
+// boundary (resume from this worktree to carry the run on), 2 escalated (read
+// ESCALATION.md), 1 error. `2` keeps its exact pre-020 meaning, so no existing
+// driver automates past an escalation by code collision.
 // ---------------------------------------------------------------------------
 
-const PROMPTS_DIR = join(fileURLToPath(new URL('../../prompts/', import.meta.url)));
+/**
+ * The stage-time prompt read root. Exported because it is part of the
+ * executable surface the restart boundary is judged by (design 020 §1): the
+ * honesty test pins that this root sits under `tools/orchestration/prompts/`,
+ * the other prefix the surface rule names.
+ */
+export const PROMPTS_DIR = join(fileURLToPath(new URL('../../prompts/', import.meta.url)));
+
+/**
+ * ADR-020 §3: the exit-code table, in one place — `done → 0`, a standing
+ * restart record `→ 3`, any other non-done status `→ 2`, a thrown error `→ 1`
+ * (the catch around `main`'s dispatch, so an invocation whose run never started
+ * answers the error integer on the same channel as the table's other rows).
+ * The order carries the two guarantees §3 makes:
+ * the record is checked after `done` so a finished run can never carry the
+ * pause's code, and an `escalated` result is answered before the record so an
+ * escalation always outranks a pause — a run with a committed `ESCALATION.md`
+ * must never exit 3, because the documented driver loop
+ * (`while [ $? -eq 3 ]; do pipeline resume …`) would resume past it.
+ * `finalizeEscalate` clears any standing record, so that arm is the belt
+ * against a record reaching the seam beside an escalation at all
+ * (code-review r1: security #1, compatibility #2).
+ */
+export function exitCodeFor(result: PipelineRunResult): number {
+  if (result.status === 'done') {
+    return 0;
+  }
+  if (result.status === 'escalated') {
+    return 2;
+  }
+  if (result.restartRequired !== undefined) {
+    return 3;
+  }
+  return 2;
+}
 
 function connectionOptions(cmd: Argv): Argv {
   return cmd
@@ -103,6 +147,23 @@ export function resolveMaxParallel(
 }
 
 export async function main(argv: string[] = process.argv): Promise<number> {
+  try {
+    return await dispatch(argv);
+  } catch (error: unknown) {
+    // ADR-020 §3, the table's last row: a thrown error is exit `1`, answered on
+    // the same channel as every other row so a driver never reads a stop posture
+    // it could loop on (`0`/`2`/`3`) for an invocation that never opened a run —
+    // no checkpoint, no git repo, an unreadable one, a bad knob. The message is
+    // the operator's reason for the integer; `printable` keeps a model- or
+    // path-authored byte off the terminal line, the posture every other
+    // operator-facing copy takes.
+    console.error(printable(error instanceof Error ? error.message : String(error)));
+    return 1;
+  }
+}
+
+/** The parse-and-dispatch half of `main`; every throw is the caller's exit 1. */
+async function dispatch(argv: string[]): Promise<number> {
   const args = await connectionOptions(
     yargs(hideBin(argv))
       .command(
@@ -199,7 +260,7 @@ export async function main(argv: string[] = process.argv): Promise<number> {
       return 0;
     }
     case 'run': {
-      const status = await runPipeline({
+      const result = await runPipeline({
         repoDir: repo,
         sourcePath: sourcePath(repo, String(args.source)),
         promptsDir: PROMPTS_DIR,
@@ -211,10 +272,10 @@ export async function main(argv: string[] = process.argv): Promise<number> {
         extendBudget: args.extendBudget as number | undefined,
         cfg: { ...DEFAULT_CONFIG, maxParallelReviews },
       });
-      return status === 'done' ? 0 : 2;
+      return exitCodeFor(result);
     }
     case 'resume': {
-      const status = await resumePipeline({
+      const result = await resumePipeline({
         repoDir: repo,
         slug: String(args.slug),
         promptsDir: PROMPTS_DIR,
@@ -224,7 +285,7 @@ export async function main(argv: string[] = process.argv): Promise<number> {
         extendBudget: args.extendBudget as number | undefined,
         cfg: { ...DEFAULT_CONFIG, maxParallelReviews },
       });
-      return status === 'done' ? 0 : 2;
+      return exitCodeFor(result);
     }
     default:
       return 1;

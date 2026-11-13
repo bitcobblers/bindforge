@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
@@ -299,5 +300,97 @@ describe('cross-version refusal and path repair messages', () => {
 
     expect(await readFile(join(dir, '.pipeline.json'), 'utf8')).toBe(raw);
     expect((await readdir(dir)).filter((f) => f.endsWith('.tmp'))).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ADR-020 §2 (design 020): `restartRequired` is the checkpoint's one additive-
+// optional companion field — `status` untouched, `version` still 1, the ADR-006
+// §2 grammar's sanctioned move. A checkpoint carrying the record writes and
+// reads back; a record with a key the current schema does not name still loads
+// (a later-era writer stays readable here, exactly as the pre-020 reader stays
+// reading here — A7); and no era fixture gains the key by defaulting, the same
+// absence rule as `flow`, `planStop` and `gateEvidence`.
+// ---------------------------------------------------------------------------
+
+interface RestartRecord {
+  stage: string;
+  paths: string[];
+  at: number;
+}
+type StateWithBoundary = PipelineState & { restartRequired?: RestartRecord };
+
+const CHECKPOINT_FIXTURES = fileURLToPath(new URL('./fixtures/checkpoints/', import.meta.url));
+
+describe('the restartRequired checkpoint record', () => {
+  // proves: Test strategy #2 — a checkpoint carrying restartRequired:
+  // { stage, paths, at } writes and reads back with the record intact and
+  // `status` untouched.
+  it('round-trips a checkpoint carrying the restartRequired record', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'bindforge-restart-record-'));
+    const withRecord = {
+      ...base,
+      restartRequired: {
+        stage: 'implement',
+        paths: ['tools/orchestration/prompts/implement.md'],
+        at: 1_700_000_000_000,
+      },
+    } as unknown as PipelineState;
+    await saveState(dir, withRecord);
+    const loaded = (await loadState(dir)) as StateWithBoundary | null;
+    expect(loaded).not.toBeNull();
+    expect(loaded?.status).toBe('running');
+    expect(loaded?.restartRequired).toEqual({
+      stage: 'implement',
+      paths: ['tools/orchestration/prompts/implement.md'],
+      at: 1_700_000_000_000,
+    });
+  });
+
+  // proves: Test strategy #2 (A7) — a record carrying a key this schema does
+  // not name still parses and loads, the unknown key inert to every consumer:
+  // the known fields read exactly, and nothing else about the checkpoint moves.
+  it('loads a record carrying an unrecognized sibling key with that key inert', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'bindforge-restart-record-'));
+    await writeFile(
+      join(dir, '.pipeline.json'),
+      JSON.stringify({
+        ...base,
+        restartRequired: {
+          stage: 'fix',
+          paths: ['tools/orchestration/src/pipeline/gates.ts'],
+          at: 2,
+          crossReferencedBy: 'a later era',
+        },
+      }),
+      'utf8',
+    );
+    const loaded = (await loadState(dir)) as StateWithBoundary | null;
+    expect(loaded).not.toBeNull();
+    expect(loaded?.slug).toBe('feat');
+    expect(loaded?.status).toBe('running');
+    expect(loaded?.restartRequired?.stage).toBe('fix');
+    expect(loaded?.restartRequired?.paths).toEqual(['tools/orchestration/src/pipeline/gates.ts']);
+    expect(loaded?.restartRequired?.at).toBe(2);
+  });
+
+  // proves: Test strategy #2 — the record defaults to absence, not to a
+  // default: every golden era fixture in fixtures/checkpoints/ loads with no
+  // restartRequired key materialised (the Rollout's "every existing checkpoint
+  // reads as no boundary standing").
+  it('loads every era fixture with no restartRequired key materialised', async () => {
+    const names = (await readdir(CHECKPOINT_FIXTURES)).filter((f) => f.endsWith('.json')).sort();
+    expect(names.length).toBeGreaterThan(0);
+    for (const name of names) {
+      const dir = await mkdtemp(join(tmpdir(), 'bindforge-restart-era-'));
+      const raw = await readFile(join(CHECKPOINT_FIXTURES, name), 'utf8');
+      const file = JSON.parse(raw) as StateWithBoundary;
+      expect(file.restartRequired, name).toBeUndefined();
+      await writeFile(join(dir, '.pipeline.json'), raw, 'utf8');
+      const loaded = (await loadState(dir)) as StateWithBoundary | null;
+      expect(loaded, name).not.toBeNull();
+      expect(loaded?.restartRequired, name).toBeUndefined();
+      expect(Object.keys(loaded ?? {}).includes('restartRequired'), name).toBe(false);
+    }
   });
 });

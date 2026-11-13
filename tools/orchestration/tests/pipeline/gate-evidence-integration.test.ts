@@ -279,7 +279,7 @@ describe('resuming a run without a gate record (ADR-016 Decision 2)', () => {
   it('runs a stage against a checkpoint that carries no gateEvidence', async () => {
     const dir = tmpGateRepo('green');
     const { client } = stageStub(dir);
-    const status = await resumePipeline(optionsFor(dir, client));
+    const { status } = await resumePipeline(optionsFor(dir, client));
 
     const saved = savedState(dir);
     // No pre-existing gateEvidence in the seeded checkpoint.

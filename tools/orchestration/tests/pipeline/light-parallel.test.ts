@@ -160,7 +160,7 @@ async function runAt(maxParallelReviews: number): Promise<{ dir: string; saved: 
     client,
   };
 
-  const status = await resumePipeline(options);
+  const { status } = await resumePipeline(options);
   expect(status).toBe('done');
   return {
     dir,

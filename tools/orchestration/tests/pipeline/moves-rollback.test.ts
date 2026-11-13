@@ -215,7 +215,7 @@ describe('a rollback rename that itself fails stops the run at the operator', ()
       return undefined;
     });
     fsFault.armed = true;
-    const status = await resumePipeline(options).finally(() => {
+    const { status } = await resumePipeline(options).finally(() => {
       fsFault.armed = false;
     });
     spy.mockRestore();
@@ -273,7 +273,7 @@ describe('an environmental apply failure keeps the fresh-session retry', () => {
 
     const undoBefore = fsFault.undoAttempts;
     const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const status = await resumePipeline(options);
+    const { status } = await resumePipeline(options);
     spy.mockRestore();
 
     expect(status).toBe('escalated');

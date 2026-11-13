@@ -261,7 +261,7 @@ describe('the own-report seat round trip (ADR-016 Decision 1)', () => {
     const dir = tmpRepo(baseState());
     const stub = seatStub({ sibling: false });
 
-    const status = await resumePipeline(optionsFor(dir, stub.client));
+    const { status } = await resumePipeline(optionsFor(dir, stub.client));
 
     // The fixture guard: the prompt must actually have handed the seat a
     // report path, and the deeds must have been staged against it.
@@ -289,7 +289,7 @@ describe('the own-report seat round trip (ADR-016 Decision 1)', () => {
     const dir = tmpRepo(baseState());
     const stub = seatStub({ sibling: true });
 
-    const status = await resumePipeline(optionsFor(dir, stub.client));
+    const { status } = await resumePipeline(optionsFor(dir, stub.client));
 
     const own = stub.ownReport();
     expect(own, 'the seat prompt names its reportPath').toBeDefined();

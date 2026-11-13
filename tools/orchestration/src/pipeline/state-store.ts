@@ -56,6 +56,23 @@ const GateEvidenceSchema = z.object({
 });
 
 /**
+ * ADR-020 (design 020 §2) — the restart-boundary record (`PipelineState.
+ * restartRequired`), optional-with-absence like every field added after run 1,
+ * and typed rather than coerced so the writer refuses a shape the loader would
+ * not read back. Size bounding is the writer's job (`boundedSurfacePaths` in
+ * `runner.ts`), exactly as `GateEvidenceSchema.legs` relies on
+ * `boundedGateEvidence`. A record carrying a key this schema does not name
+ * still parses and still round-trips: `loadState` returns the raw parse, so the
+ * unknown key stays inert to every consumer here and survives for the later-era
+ * reader that names it (the same posture A7 records for a pre-020 reader).
+ */
+const RestartBoundarySchema = z.object({
+  stage: z.string().min(1),
+  paths: z.array(z.string()),
+  at: z.number(),
+});
+
+/**
  * The cross-version resume contract (ADR-006 §2), stated as rule set:
  *
  * - GUARANTEED: any runner loads and resumes any `version: 1` checkpoint
@@ -94,6 +111,12 @@ const StateSchema = z.object({
   // and typed, not coerced: the writer refuses a shape the loader would not
   // read back, so the stop can only ever carry the string it names.
   planStop: z.string().optional(),
+  // ADR-020 (design 020 §2): the restart boundary, the record the pause is
+  // judged by and the resume clears. Optional like every field added after run
+  // 1 — every golden fixture in `tests/pipeline/fixtures/checkpoints/` loads
+  // with no `restartRequired` key materialised — and `status` and `version`
+  // stand untouched beside it.
+  restartRequired: RestartBoundarySchema.optional(),
   status: z.enum(['running', 'done', 'escalated']),
   lastStage: z.string(),
   designRound: z.number().int().min(0),

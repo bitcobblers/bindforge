@@ -534,6 +534,41 @@ export function nextNnn(existing: string[]): string {
   return String(next).padStart(3, '0');
 }
 
+// --- the executable surface (ADR-020, design 020 §1) ------------------------
+
+/**
+ * The two prefixes that make up the harness's executable surface: the sources
+ * the runner process imports at start, and the prompt templates it renders at
+ * stage time. Directory scope, not a static file list — a module or template
+ * created inside either prefix is surface the moment it exists, and every
+ * imported pipeline module falls under the first one for free.
+ *
+ * The agent permission files under `.opencode/agents/` are NOT surface in v1:
+ * their per-session re-read behaviour is unestablished, and ADR-020 leaves
+ * their membership undecided, so the rule that decides a pause names only what
+ * the runner demonstrably runs and renders.
+ */
+export const SURFACE_SRC_PREFIX = 'tools/orchestration/src/';
+export const SURFACE_PROMPTS_PREFIX = 'tools/orchestration/prompts/';
+export const EXECUTABLE_SURFACE_PREFIXES: readonly string[] = [
+  SURFACE_SRC_PREFIX,
+  SURFACE_PROMPTS_PREFIX,
+];
+
+/**
+ * ADR-020 §1: the rule the restart boundary is judged by — true when `path`
+ * lies under one of the two surface prefixes. Like `stagePathAllowed` it parses
+ * no path: paths reach it only as git plumbing output (repo-root-relative,
+ * POSIX separators, the real spelling — `moves.ts` Rule 1 rejects every other
+ * spelling as a usage error), so no normalization happens here and a prefix
+ * miss means the file is genuinely outside what this process executes.
+ */
+export function touchesExecutableSurface(path: string): boolean {
+  return EXECUTABLE_SURFACE_PREFIXES.some(
+    (prefix) => path === prefix.slice(0, -1) || path.startsWith(prefix),
+  );
+}
+
 // --- stage file ownership ----------------------------------------------------
 
 /** Test paths: owned by the test engineer; reverted out of coder diffs. */

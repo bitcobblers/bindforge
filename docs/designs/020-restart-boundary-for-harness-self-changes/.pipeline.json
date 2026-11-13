@@ -1,0 +1,1160 @@
+{
+  "version": 1,
+  "slug": "restart-boundary-for-harness-self-changes",
+  "nnn": "020",
+  "branch": "pipeline/020-restart-boundary-for-harness-self-changes",
+  "source": {
+    "kind": "adr",
+    "path": "docs/adrs/020-restart-boundary-for-harness-self-changes.md"
+  },
+  "status": "done",
+  "lastStage": "doc-sync",
+  "designRound": 2,
+  "codeRound": 1,
+  "designBudgetUsed": 1,
+  "codeBudgetUsed": 3,
+  "editorialDone": false,
+  "testsGreen": true,
+  "testsNeedUpdate": false,
+  "stageFailures": {
+    "test-authoring": 1
+  },
+  "stageCommits": [
+    "e0d1fcbb8220148b960ecd8a9f7e5788c35dc459",
+    "c7f5fff51d374c3f15da27a83f292cb23ed08095",
+    "384d168fd19c20c5ceebd8f80ec9e8cfbe632cc9",
+    "1c777ee87e5bd8e532497b297d8ed11b23a79b11",
+    "2c377d86e5a7e2e15fd73592a5db01dafc0975c3",
+    "fd3599d98ebd49b50d9718d4605d9a38f1c8c3b2",
+    "db7e023a814d5d5b76fa0645db0951495b7f61eb",
+    "507f6e54b677c3063d9dce3b7144eebe631e10c6",
+    "326e8a37afb2348bc771c2552fe8347124b1080a",
+    "893e7f2428400ff6f3d387473d4b0d3ef3df68f3",
+    "48c80bde34da123b8dd0306343c361617d5cb227",
+    "f9f0dbfdc3a7200389b21071c1adcf87f7c953c3",
+    "a82ae01f8d4f35a9da0b6e60d715fdfae3527200",
+    "de3204d7c4b83f83fb6c3e1a52b751308286dcc0",
+    "4fb1e18acba29fd87d2bc6e8152e70119a701744",
+    "2a2ece80201d04afaac056bf9470aac00ca21adc",
+    "94efe8a22fd1bba04f6a17ed005ecee3f563b293",
+    "450c02d67108eadb3912317416ca7ac58403e9cb",
+    "489bec552ebc2c0cd1b56add3d8b89df62570ae5"
+  ],
+  "forceNext": null,
+  "results": [
+    {
+      "stage": "research",
+      "round": 0,
+      "sessionID": "ses_e29853600ffeaXUaY0uPPLW2LB",
+      "agent": "research/researcher",
+      "at": 1794599933765,
+      "reply": {
+        "summary": "Wrote docs/designs/020-restart-boundary-for-harness-self-changes/01-research.md. Read the source ADR 020, its cited ADRs (006, 007, 008, 010, 016), the ADR index listing, and the harness code that defines the restart boundary's context: prompts.ts (loadTemplate, strict render, TEMPLATE_DEFAULTS, templateHash), runner.ts (stage/pass commit sites, ownership sweep with per-commit path lists, lock re-assertion, StopDriving, finalizeEscalate, status renderer, stage-entry template pinning), state-store.ts (ADR-006 checkpoint grammar and status enum), types.ts (RunStatus, reserved names), states.ts (planStop sticky-record precedent), cli.ts (exit codes 0/2/1), stages.ts, and docs/workflows.md — 8 files beyond the mandated set. Applied the prior-art and platform-notes lenses with verified primary sources (Node module cache docs, Erlang code loading, systemd ExecReload/notify-reload, Kubernetes rolling updates, nodemon, webpack HMR, sysexits(3)). Key research outputs: the detection hook likely reuses enforceOwnership's git diff-tree path lists; the new state collides with hard-coded running|done|escalated enums in types.ts and the checkpoint zod schema; the CLI currently maps every non-done status to exit 2; commit-site coverage must include review-pass and revert commits; the planStop sticky-field is a representation precedent. Open questions for the designer cover enum-vs-field choice, exit code, boundary count limit, agent-permission-file scope, and marker/checkpoint authority.",
+        "commitMessage": "docs: add research for ADR-020 restart boundary"
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/research-r0.md",
+      "durationMs": 199885,
+      "nudges": 0,
+      "docName": "01-research.md",
+      "docLines": 341,
+      "docLinesAdded": 341,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "proposal",
+      "round": 0,
+      "sessionID": "ses_e2982286bffe6Sx8Z4zCJwFxqr",
+      "agent": "design/designer",
+      "at": 1794600190398,
+      "reply": {
+        "commitMessage": "docs: add design proposal for ADR-020 restart boundary"
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/proposal-r0.md",
+      "durationMs": 256520,
+      "nudges": 0,
+      "docName": "02-proposal.md",
+      "docLines": 344,
+      "docLinesAdded": 344,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e297e3df5ffevLdIMqWK9K7TOg",
+      "agent": "review/design-correctness",
+      "at": 1794600315379,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design §1 (also the Options \"Per-commit hooks\" citation) — \"runs `git diff --name-only <headBefore>..HEAD`\"",
+            "problem": "git enables rename detection in `diff` by default, and `--name-only` prints only the destination path for a detected rename. A window that removes a surface file by renaming it out of the two prefixes (e.g. a template moved from tools/orchestration/prompts/ to docs/) can show only the non-surface destination and slip through the predicate; §1's directory-scope argument covers additions, not this removal shape. The failure mode is loud (stage-entry load throws), so it is not the silent-staleness class.",
+            "fix": "Specify `git diff --name-only --no-renames <headBefore>..HEAD` in §1, so renames appear as delete+add and both sides are filtered through the predicate; the Options section's citation of the same command inherits the fix."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design §2 — \"`restartRequired?: { stage: string; paths: string[]; at: number }`\"",
+            "problem": "ADR-020 Decision 2 requires the pause to stop \"with a `restart-required` marker naming the changed paths and the stage that will run next\", but every artifact the design names (the §2 record, the `restart-boundary` gate entry, the §3 status line \"the stage that opened the boundary\", the printed summary) names the completed stage, not the next stage. The next stage is derivable from `lastStage` plus the flow, but the design never says where the ADR's \"stage that will run next\" is carried.",
+            "fix": "Add one sentence in §2 stating that the next stage is carried by the checkpoint's `lastStage` + flow and surfaced by the status line's resume posture — or add the next stage to the printed summary's content list."
+          }
+        ]
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/design-review-correctness-r1c0.md",
+      "durationMs": 124858,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e297c55feffejSuy5LShSBpRTK",
+      "agent": "review/design-compatibility",
+      "at": 1794600428054,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Assumption register A7; Compatibility matrix row 'A pre-020 runner resumed onto a paused checkpoint'; Test strategy #2 — \"a payload with an unrecognized sibling key parses with it stripped (A7's posture)\"",
+            "problem": "`loadState` validates with `StateSchema.safeParse` but returns `parsed as PipelineState`, the raw document (state-store.ts:239–256), so unrecognized keys are not stripped from the loader's return and round-trip back through an older runner's `saveState`. The loadability promise the design leans on holds (validation accepts the key, version stays 1, old code never reads it), but 'stripped' states a mechanism the loader does not implement, and Test #2 as written asserts stripping of the loader's return, which fails against the current code.",
+            "fix": "Reword A7 and the matrix row to 'the loader's validation ignores the unknown key (it returns the raw parsed document, so the record harmlessly round-trips through older runners)', and change Test #2's clause to assert the load succeeds with the sibling key present and behaviorally inert (or assert stripping against `StateSchema.safeParse` output, not the loader's return)."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design §1 — \"runs `git diff --name-only <headBefore>..HEAD`, filters it through the predicate\"",
+            "problem": "The command form drops the pins every other name-list plumbing call uses (`status --porcelain=v1 -z` at runner.ts:268; `diff-tree -r --no-commit-id -z --name-only` at runner.ts:308), and it contradicts the predicate contract the design places it beside ('paths reach it only as git plumbing output — repo-root-relative, POSIX separators, the real spelling', gates.ts:554–557). Without `-z`, git's default core.quotepath emits non-ASCII paths quoted and octal-escaped, so the prefix match silently misses — the silent-miss class this design exists to end; with rename detection default-on, a rename crossing either prefix collapses to one shown line.",
+            "fix": "Name the canonical form in §1: `git diff --name-only -z --no-renames <headBefore>..HEAD`, split on NUL, feed each path to the predicate — the shape the ownership sweep already uses."
+          }
+        ]
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/design-review-compatibility-r1c0.md",
+      "durationMs": 112636,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e297a9ddbffetZlWhGmphoOgz3",
+      "agent": "review/design-security",
+      "at": 1794600546859,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design §1 — \"runs `git diff --name-only <headBefore>..HEAD`, filters it through the predicate\" (also Options considered: \"`git diff --name-only <window start>..HEAD` taken once in each finalize window\")",
+            "problem": "The canonical detection command omits the flags this repo established as mandatory for path lists: `porcelainPaths`/`nulPaths` (runner.ts:247-264) document that without `-z` paths are quoted/escaped and without `--no-renames` a rename collapses into one pseudo-path. Implemented as written, the prefix predicate silently misses a quoted non-ASCII path (default core.quotePath prints `\"...pr\\303\\266metheus.ts\"`) or a rename-out of the two prefixes, so the boundary fails open — the run drives on with the stale renderer, the exact run-016 class the design exists to close — and Test #7 does not catch it because the missed path is under a named prefix. Every range path is model-authorable (implement/fix own `tools/orchestration/**`, gates.ts:575-582), making crafted evasion in threat model.",
+            "fix": "Replace the call in §1 and Options with `git diff -z --no-renames --name-only <headBefore>..HEAD` parsed with the existing `nulPaths` helper — the same posture the sweep's `diff-tree -z --name-only` already uses (runner.ts:308)."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design §2/§3 — \"gate-logs a `restart-boundary` entry naming the stage and hit paths … mints a terminal … commit whose body names the changed paths … It prints the one-line summary §3 names\"",
+            "problem": "The design never states that the model-authorable path strings are sanitized or bounded where written. The established posture is writer-side: `gateLog` prints every reason through `printable` (runner.ts:2006-2023; independence.ts:434-445 names paths as attacker-chosen terminal-spoofing data), and checkpoint-cloned collections are writer-capped (`boundedFindings`, `boundedGateEvidence`; state-store.ts:43). The gate-log entry and the §3 status line inherit those printables, but the printed summary and the boundary-commit body name the paths raw, and `paths: string[]` is unbounded in the record — a crafted control byte in a path spoofs the operator's terminal and the `git log` the operator reads.",
+            "fix": "One §2 clause: the record, printed summary, and commit body take each path through `printable`, and the record follows the `boundedGateEvidence` posture (first N paths plus the count §3's status line already prints) — naming those two existing helpers, adding no new mechanism."
+          }
+        ]
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/design-review-security-r1c0.md",
+      "durationMs": 118755,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2978cdc8ffeE5m0Bl33oaSwaV",
+      "agent": "review/design-performance",
+      "at": 1794600597148,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design §2 — \"`restartRequired?: { stage: string; paths: string[]; at: number }`\"",
+            "problem": "The paths array is sized by the window's net diff, so a large surface-touching window (e.g. a mechanical refactor renaming many modules under tools/orchestration/src/) records every hit path in the checkpoint, the gate-log entry, and the boundary commit body. Bounded in practice (one live record, cleared at resume, capped by one window's commit), so it is not unbounded growth, but the stored/named list has no ceiling.",
+            "fix": "Cap the recorded and named path list at a fixed N with a total count alongside; the status line already needs only the count (\"how many harness files it changed\"), and §4's cross-reference use still works for the common small-window case."
+          }
+        ]
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/design-review-performance-r1c0.md",
+      "durationMs": 50250,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e2978094effe5T959YEBR4PVMX",
+      "agent": "review/design-complexity",
+      "at": 1794600818646,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design §1 — \"Detection is the window's **net** diff. `finalizeStage` and `finalizeReviewPass` (runner.ts:1848–1892, 1940–1961)\"",
+            "problem": "The second hook is unreachable under the design's own A3, which §1 restates: \"only `implement`/`fix` can commit under the two prefixes, so the boundary opens only after a coder window\". finalizeReviewPass runs only for pass-level review stages (runner.ts:2184–2187) and for the single-stage pre-commit refusal (runner.ts:1924), and the only preCommit in the tree is the plan stage's (runner.ts:2816) — all document stages, which stagePathAllowed confines to docs/** (gates.ts:588–589); on the refusal path commit:false means no commit is minted, so the headBefore..HEAD range is empty. So the hook can never fire, and Test strategy #3's \"a `finalizeStage` and a `finalizeReviewPass` window whose net diff touches a template or a src file set the record\" can only be satisfied by fabricating a state the ownership fence forbids.",
+            "fix": "Instrument finalizeStage alone and say so in §1 in the sentence that already concludes the coder-window rule; drop the review-pass half of Test #3. If the hook is kept deliberately as defence against a future ownership-matrix change, add one clause in §1 saying that, and mark the Test #3 review-pass case a rule-bypass fixture rather than a live window. Same red-on-drift property either way; saves one unreachable call site and one impossible test case."
+          },
+          {
+            "severity": "minor",
+            "location": "Test strategy #7 — \"walking the import graph from the pipeline entry points (`src/pipeline/cli.ts`, `src/cli.ts`, `src/opencode-runner.ts`)\"",
+            "problem": "The import-graph walk is the largest new mechanism in the design and tools/orchestration has no dependency providing one (devDeps: typescript, vitest, eslint, prettier, tsx), so it means hand-written specifier parsing plus an entry-root resolver — and it still misses any module none of the three roots imports. The rule it guards is directory-scoped, so the walk adds nothing over a flat check: every module under tools/orchestration/src/ is already surface by §1, so the only drift that matters is a module file living outside src/, or a prompt read root outside prompts/.",
+            "fix": "Replace the walk with a package-wide enumeration: every tracked .ts/.js under tools/orchestration/ that is not under tests/ must sit under src/, plus the PROMPTS_DIR assertion §7 already makes (cli.ts:20, the same spelling the provenance line uses at runner.ts:1344). About fifteen lines with the fs/git helpers the pipeline tests already use, no new dependency, identical \"new executable location turns the suite red\" property."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design §2 — \"mints a terminal `chore: <nnn>-<slug> restart boundary` commit\"",
+            "problem": "boundary is already a loaded term in the file this lands in: the lock records stage 'boundary' (runner.ts:606), and \"boundary commits\", \"the boundary re-assertion\" and \"at the next boundary\" all name the ADR-006 stage boundary (runner.ts:328, 571, 2376). Bare \"boundary\" in new comments, status text or identifiers will read as the wrong concept.",
+            "fix": "Add one clause in §2 (or the §1 heading): \"'restart boundary' is ADR-020's pause; the runner's existing 'boundary' is the ADR-006 stage boundary\", and keep every new identifier and label qualified — restartRequired, finalizeRestartBoundary, restart-boundary — never a bare boundary."
+          }
+        ]
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/design-review-complexity-r1c0.md",
+      "durationMs": 221455,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e2974a7daffeg0v3HH88RHQw5j",
+      "agent": "design/designer",
+      "at": 1794600911143,
+      "reply": {
+        "changed": true,
+        "summary": "Major (security finding 1): §1's canonical detection call is rewritten to `git diff -z --no-renames --name-only <headBefore>..HEAD` parsed through the existing `nulPaths` parser, and the Options paragraph's duplicated copy of the flagless command is deleted in favor of a §1 cross-reference, so the quoting/rename-collapse miss class cannot arise and the command has one canonical seat. Minor (finding 2): one clause in §2 puts the model-authorable paths through `printable` into the record, gate-log entry, commit body and summary and gives the record `boundedGateEvidence` bounding, naming only existing helpers. The FYI is also consumed at its correctness seat: A7 now states `loadState` returns the raw parse with the key inert (Test #2's 'parses with it stripped' pin and the two Risks/Compatibility copies follow, removing the drift). Revision log maintained in place: the Chosen design 1 entry is replaced to carry the corrected command, and one r2 Chosen design 2 entry indexes the path-posture decision. The diff is net +5 lines because the major's fix replaces a quoted command with its flagged form and adds a single writer-side hygiene clause plus its index entry; this was offset by deleting the duplicated Options command string and the §1 passage that restated Test #7.",
+        "commitMessage": "docs: fix restart-boundary path detection and writer-side path posture per security review r1"
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/proposal-revise-r1.md",
+      "durationMs": 92390,
+      "nudges": 0,
+      "docName": "02-proposal.md",
+      "docLines": 349,
+      "docLinesAdded": 23,
+      "docLinesRemoved": 18
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e29733e95ffevSI0n5gOWFVIoN",
+      "agent": "review/design-security",
+      "at": 1794601015845,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design §2 — \"the record keeps the `boundedGateEvidence` bounding (first N paths plus the count)\"",
+            "problem": "The bounding posture named in the new clause carries its elision note as an element of the bounded array: `boundedGateEvidence` pushes a synthetic leg `{ command: '(gate legs elided)', … }` (runner.ts:3066-3073) and `boundedFindings` a synthetic finding (runner.ts:3031-3038). Those arrays hold typed objects with a field to carry the label; `paths: string[]` has none, so read literally the clause puts a runner-authored pseudo-path into the same untagged array as the model-authorable untrusted path strings — and that array is exactly what the boundary-commit body and §4's cross-reference read as \"the changed paths\". The same sentence also leaves §3's status line (\"how many harness files it changed\") with no number to print once the array is truncated: the total survives only inside a display string.",
+            "fix": "Keep `paths` as paths only — first N printable-copied entries — and carry the pre-bound total as a number on the `restartRequired` object (a field inside a field this change is already adding, so ADR-006 §2 is untouched); the gate-log entry and §3's status line print the count from that number instead of from a pseudo-path entry."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design §2 — \"every copy of a path takes `printable` into the record, gate-log entry, commit body and summary\"",
+            "problem": "`printable` is `value.replace(/\\p{Cc}/gu, ' ')` (independence.ts:443-445): it neutralizes the C0/C1 controls, ESC sequences, newlines and BEL that r1 named, but leaves format characters (`\\p{Cf}` — the U+202A–U+202E directional isolates and overrides, zero-width joiners) untouched, and those are the other way a crafted model-authored filename reorders or hides characters on the operator's terminal and in the `git log` the operator reads for the boundary commit. This is the repo-wide posture rather than something this design introduces, so it should not be fixed here — but the design should not claim terminal-safety beyond what the helper gives.",
+            "fix": "No new mechanism: extend the same §2 sentence to say the path copies take printable's Cc-only coverage, with BiDi/format characters out of scope repo-wide, so any later hardening belongs to `printable` itself, not to this boundary."
+          }
+        ]
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/design-review-security-r1c1.md",
+      "durationMs": 104608,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2971a58cffeZAWZeNUxFlYLpu",
+      "agent": "review/design-correctness",
+      "at": 1794601094432,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design §3 (with §2) — \"`pipeline status` while the record stands gains one line … the stage that opened the boundary, how many harness files it changed, and the resume posture\"",
+            "problem": "re-raised (unchanged by this round, and not recorded as rejected in the Revision log): still short of ADR-020 Decision 2's marker \"naming the changed paths and the stage that will run next\". Every artifact the design names — the §2 record, the `restart-boundary` gate entry, the status line, the printed summary — names the stage that completed; the next stage is derivable from `lastStage` plus the flow, but the design never says where the ADR's \"stage that will run next\" is carried."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design §2 (new in r2) — \"the record keeps the `boundedGateEvidence` bounding (first N paths plus the count)\"",
+            "problem": "regression introduced by the closure: the count has nowhere to live. The record shape §2 declares is `restartRequired?: { stage, paths, at }`, so a record bounded to \"first N paths\" carries no total, and §3's status line (\"how many harness files it changed\") is rendered by a fresh process that can only read the checkpoint. The cited helper also does not fit the field: `boundedGateEvidence(evidence: GateEvidence, repoDir?)` bounds `evidence.legs` at `MAX_GATE_LEGS = 32` and encodes its elision count by pushing a synthetic entry into the kept array (runner.ts:3057–3075); the analogue for `paths: string[]` puts a non-path string into the record's path list, which then flows into the commit body and summary that the same sentence says carry \"every copy of a path\"."
+          }
+        ]
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/design-review-correctness-r1c2.md",
+      "durationMs": 78457,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e297072cfffeTJk3C0r2ah7o3A",
+      "agent": "review/design-compatibility",
+      "at": 1794601172902,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design 2 — \"the record keeps the `boundedGateEvidence` bounding (first N paths plus the count)\" alongside the declared field \"`restartRequired?: { stage: string; paths: string[]; at: number }`\", and Test strategy #3 — \"naming the stage and the hit paths\"",
+            "problem": "The bounding mechanism the revision cites bounds a different shape: `boundedGateEvidence` (runner.ts:3057–3075) slices `evidence.legs` at `MAX_GATE_LEGS` and carries the overflow count in an appended pseudo-leg (`'(gate legs elided)'`), as `boundedFindings` does for findings. `paths: string[]` has no member that can hold a count, so the sentence either re-types the field §2 declares in the same breath (the move A6 forbids) or leaves the count nowhere. Consequences in text this seat approved: §2's \"commit whose body names the changed paths\" and §3's \"how many harness files it changed\" read the record as complete, and Test #3's \"the hit paths\" becomes true only up to the cap once the record is bounded.",
+            "fix": "State where the bound lands. Smallest change: bound only the printed copies (gate-log entry, commit body, status line, summary) and keep the record's `paths` the full hit list the predicate produced, replacing \"the record keeps the `boundedGateEvidence` bounding (first N paths plus the count)\" with \"the printed copies keep the `boundedGateEvidence` bounding; the record keeps every hit path\". If bounding the record is wanted, add the count as a named member of the §2 field (or spell the elision entry exactly as `boundedFindings` does) and make Test #3 assert that bounded shape instead of \"the hit paths\"."
+          }
+        ]
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/design-review-compatibility-r1c2.md",
+      "durationMs": 78430,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e296f4048ffe3i6fLObHSA7F4n",
+      "agent": "review/design-performance",
+      "at": 1794601229211,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/design-review-performance-r1c2.md",
+      "durationMs": 56266,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e296e645affeDKtNmEKhh66DI5",
+      "agent": "review/design-complexity",
+      "at": 1794601313707,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design §1 — \"`finalizeStage` and `finalizeReviewPass` (runner.ts:1848–1892, 1940–1961) already receive the window's `headBefore` and mint its commit\"",
+            "problem": "[re-raised] The r2 edit rewrote this sentence (added `-z --no-renames`, named `nulPaths`) and left both hooks, so the r1 problem survives verbatim: finalizeReviewPass is called only at pass level (runner.ts:2184, 2187) and on the single-stage pre-commit refusal with commit:false (runner.ts:1924); the only preCommit in the tree is the plan stage's (runner.ts:2816); stagePathAllowed confines every non-implement/fix stage to docs/** (gates.ts:559–589). Under §1's own rule that only implement/fix can commit under the two prefixes, the second hook can never fire, and Test strategy #3's \"a `finalizeStage` and a `finalizeReviewPass` window whose net diff touches a template or a src file set the record\" is only satisfiable by fabricating a state the ownership fence forbids.",
+            "fix": "Instrument finalizeStage alone and say so in the sentence that already states the coder-window rule; drop the review-pass half of Test #3. If the hook is kept deliberately against a future ownership-matrix change, add one clause saying so and mark the Test #3 review-pass case a rule-bypass fixture rather than a live window. Same red-on-drift property either way; one unreachable call site and one impossible test case cheaper."
+          },
+          {
+            "severity": "minor",
+            "location": "Test strategy #7 — \"walking the import graph from the pipeline entry points (`src/pipeline/cli.ts`, `src/cli.ts`, `src/opencode-runner.ts`), every in-repo module reached is under `tools/orchestration/src/`\"",
+            "problem": "[re-raised] r2 deleted §1's description of this mechanism (\"The ADR's \\\"test that fails when a new executable path is added\\\" is Test strategy #7.\") but left the mechanism, which is still the largest new thing in the design and still has no provider: tools/orchestration/package.json devDeps are typescript, vitest, eslint, prettier, tsx and two plugins — nothing that resolves an import graph — so it means hand-written specifier parsing plus an entry-root resolver, and it still misses any module none of the three roots imports. The rule it guards is directory-scoped by §1, so the walk adds nothing over a flat check.",
+            "fix": "Replace the walk with a package-wide enumeration: every tracked .ts/.js under tools/orchestration/ that is not under tests/ must sit under src/, plus the PROMPTS_DIR root assertion the test already names (cli.ts:20). The readdirSync-based helpers the tests/pipeline/ suites already use cover it: no new dependency, ~15 lines instead of a resolver, identical red-on-drift property."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design §2 — \"the record keeps the `boundedGateEvidence` bounding (first N paths plus the count)\"",
+            "problem": "[new] The r2 clause imports a bound the design's own record shape cannot hold. boundedGateEvidence (runner.ts:3057) is typed GateEvidence -> GateEvidence, and its first-N-plus-count works only because an elided leg is a whole extra leg object with a command/tail to carry the count; restartRequired?: { stage, paths, at } has no slot for a count, and the only bound named in the tree is MAX_GATE_LEGS (gates.ts:310), a gate-leg cap, not a path cap. As written the implementer either adds a fourth checkpoint field for the count or drops it silently — and dropping it makes §3's status line, \"how many harness files it changed\", print the capped length rather than the number of changed files.",
+            "fix": "Bound where it renders, not what is recorded: keep paths whole and state that the gate-log line, commit body and summary are brief-bounded (brief, independence.ts:448, beside the printable the sentence already names), with paths.length as the count §3 prints. If the record itself is meant to be capped, name the constant and add total to the §2 shape so §3's count stays honest."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design §2 — \"mints a terminal `chore: <nnn>-<slug> restart boundary` commit\"",
+            "problem": "[re-raised] Unaddressed by r2 and not recorded as rejected in the Revision log. boundary is already loaded in this file's vocabulary: the lock records a stage named boundary (runner.ts:606), and \"boundary commits\", \"the boundary re-assertion\" and \"at the next boundary\" name the ADR-006 stage boundary (runner.ts:328, 571, 2376). §1's loop-top check and §2's \"gate-logs the boundary it is crossing\" lean on that second meaning in the same breath as ADR-020's pause.",
+            "fix": "One clause in §1's heading or §2 — \"'restart boundary' is ADR-020's pause; the runner's existing 'boundary' is the ADR-006 stage boundary\" — and keep every new identifier and label qualified (restartRequired, finalizeRestartBoundary, restart-boundary), never a bare boundary."
+          }
+        ]
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/design-review-complexity-r1c2.md",
+      "durationMs": 84458,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-final",
+      "round": 0,
+      "sessionID": "ses_e296d1a0affe8OgL5OHeKVDruQ",
+      "agent": "design/editor",
+      "at": 1794601374104,
+      "reply": {
+        "ambiguities": [
+          "Chosen design §2: \"The paths are model-authorable, so every copy of a path takes `printable` into the record, gate-log entry, commit body and summary\" — \"takes `printable` into\" is telegraphic; the assumed reading (each path copy passes through `printable` before entering those four places) matches revision-log entry r2 (\"`printable` copies\") and was not rewritten, so author may want to confirm the phrasing.",
+          "Chosen design §1: \"a standing record calls `finalizeRestartBoundary` (§2) and returns\" — metonymic (the drive loop returns, not the record); kept as-is, author may want to make the loop the explicit subject.",
+          "Chosen design §3: \"so no existing driver automates past an escalation by code collision\" — terse; kept verbatim because a plain-language rewrite risked shifting the technical claim about exit-code reuse."
+        ],
+        "commitMessage": "docs: apply final language pass to ADR-020 restart-boundary proposal"
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/proposal-final-r0.md",
+      "durationMs": 60284,
+      "nudges": 0,
+      "docName": "02-proposal.md",
+      "docLines": 349,
+      "docLinesAdded": 19,
+      "docLinesRemoved": 19
+    },
+    {
+      "stage": "editorial-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e296c2e28ffe56k7MKnMPLE2wb",
+      "agent": "review/design-correctness",
+      "at": 1794601487096,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/editorial-review-correctness-r2.md",
+      "durationMs": 112896,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e296a74ebffeznw874AlF4k2hj",
+      "agent": "review/design-compatibility",
+      "at": 1794601533346,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/editorial-review-compatibility-r2.md",
+      "durationMs": 46179,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:security",
+      "round": 2,
+      "sessionID": "ses_e2969c05affepGRAWPvaaAcmhH",
+      "agent": "review/design-security",
+      "at": 1794601599742,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/editorial-review-security-r2.md",
+      "durationMs": 66373,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:performance",
+      "round": 2,
+      "sessionID": "ses_e2968bcf2ffeL5a5T7tm3af3JG",
+      "agent": "review/design-performance",
+      "at": 1794601678286,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/editorial-review-performance-r2.md",
+      "durationMs": 78498,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:complexity",
+      "round": 2,
+      "sessionID": "ses_e29678a29ffeOpMUCKAqAqi0YQ",
+      "agent": "review/design-complexity",
+      "at": 1794601744698,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/editorial-review-complexity-r2.md",
+      "durationMs": 66374,
+      "nudges": 0
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_e2966867cffeHRwAR5sC95av9D",
+      "agent": "code/test-engineer",
+      "at": 1794602272533,
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/test-authoring-r0.md",
+      "durationMs": 527726,
+      "nudges": 0,
+      "failure": "independence violation: glob accessed run records: bindforge-runner-adr006-*/docs/designs/002-x/transcripts/*; read accessed run records: /tmp/bindforge-runner-adr006-6dcuPd/docs/designs/002-x/transcripts/implement-r0.md"
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_e295e78d2ffePGbHNPXWe1L8I1",
+      "agent": "code/test-engineer",
+      "at": 1794602377767,
+      "reply": {
+        "testsAdded": 28,
+        "commitMessage": "test: add restart boundary suite for ADR-020 self-change pause"
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/test-authoring-attempt2-r0.md",
+      "durationMs": 105184,
+      "nudges": 0
+    },
+    {
+      "stage": "implement",
+      "round": 0,
+      "sessionID": "ses_e295cdd94ffevKeoeKMXUxzvrl",
+      "agent": "code/coder",
+      "at": 1794603060545,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "feat: add restart boundary for harness self-changes (ADR-020)",
+        "moves": []
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/implement-r0.md",
+      "durationMs": 682676,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e2952397effe3Z7TCwXMtNipyt",
+      "agent": "code/test-engineer",
+      "at": 1794603753404,
+      "reply": {
+        "commitMessage": "test(orchestration): migrate the run/resume seam and fix the boundary fixtures",
+        "moves": []
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/test-update-r0.md",
+      "durationMs": 678134,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2947a369ffeqoTvkTtH1SET4m",
+      "agent": "codereview/code-correctness",
+      "at": 1794604051388,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3656 (finalizeEscalate; reachable from the CheckpointWriteFailure catch at runner.ts:3016-3028)",
+            "problem": "finalizeEscalate does not clear state.restartRequired. When a surface-touching coder window sets the record in finalizeStage (:1957) and the next checkpoint save (:3015) fails, the run escalates with the record still standing: the terminal checkpoint carries restartRequired alongside status 'escalated', ESCALATION.md is written, and exitCodeFor (cli.ts:43-52) returns 3 instead of 2. A `while [ $? -eq 3 ]; do resume; done` driver would then carry the escalated run on without the operator reading the marker — the code collision §3 says exit 2 exists to prevent.",
+            "fix": "Clear state.restartRequired = undefined at the top of finalizeEscalate, mirroring the pause's own save-failure arm (runner.ts:3592, Deviation 5): a pause that did not happen must not let its record ride into the escalation checkpoint or its exit code."
+          }
+        ]
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/code-review-correctness-r1c0.md",
+      "durationMs": 282326,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2943543effeCL5bfS7iHNDKb8",
+      "agent": "codereview/code-compatibility",
+      "at": 1794604180511,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "tools/orchestration/src/pipeline/cli.ts:43 (exitCodeFor); tools/orchestration/tests/pipeline/cli.test.ts",
+            "problem": "Decision 3's exit-code table — the driver-compatibility contract ('2 keeps its exact current meaning, so no existing driver automates past an escalation by code collision'; risk table: 'distinct codes pinned both ways... pinned by Test #6') — is asserted by no test. Test strategy #6 names the integers (done→0, record→3, escalated→2, error→1), but the shipped cli.test.ts pins only the widened seam's shape (status/restartRequired presence); exitCodeFor appears in no test, so a future swap of 3/2 leaves the suite green while every documented driver loop (docs/workflows.md `while [ $? -eq 3 ]`) silently automates past escalations.",
+            "fix": "Pin the integers, not just the fields: assert exitCodeFor({status:'done'})===0, a standing-record result===3, {status:'escalated'} without a record===2, and that the run/resume handlers return exitCodeFor's value (the thrown-error→1 leg is already pinned by the rejection test)."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3020 and :3036 (drive's finalizeEscalate exits) with runResult at :2287",
+            "problem": "The record set by finalizeStage/finalizeReviewPass (:1957/:~2032) can still be standing when drive's per-iteration checkpoint save fails or an unhandled throw escalates before the loop-top check: finalizeEscalate does not clear state.restartRequired, so runResult ships {status:'escalated', restartRequired} and exitCodeFor maps the standing record to 3 — a run with a committed ESCALATION.md exits 3, and the documented driver loop resumes it automatically, breaking the matrix's promise that 2 keeps its exact meaning in that corner (and the escalation checkpoint renders the boundary status line beside the escalation). finalizeRestartBoundary's own save-failure path already applies the correct posture ('the escalation is the terminal record from here', :3592-3600); the generic escalation exits do not.",
+            "fix": "Clear state.restartRequired in finalizeEscalate (runner.ts:3656) so the terminal escalation never carries a pause, and pin it with an escalate-after-surface-hit fixture asserting exit mapping 2 and no record in the committed checkpoint."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1861-1869 (boundedSurfacePaths), consumed at :3801 (restartBoundaryStatusLines), the gate reason and the printed summary",
+            "problem": "The elision sentence is appended into record.paths, so for windows with more than MAX_GATE_LEGS hit paths the printed 'changed N harness file(s)' uses the post-bounding length: a 40-path window prints 'changed 33 harness file(s)' and counts the elision sentence as a file. §2's wording is 'first N paths plus the count' (the shape mirrors boundedGateEvidence at :3182-3191, so this is wording fidelity, not drift).",
+            "fix": "Take the reported count from the pre-bounding total (paths.length before the slice) in the status line, gate reason, and summary — or store the total count on the record."
+          }
+        ]
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/code-review-compatibility-r1c0.md",
+      "durationMs": 129085,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e29415bd9fferWp1GX0u0fTttW",
+      "agent": "codereview/code-security",
+      "at": 1794604399925,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3656 (finalizeEscalate) with runner.ts:2287 (runResult) and tools/orchestration/src/pipeline/cli.ts:43 (exitCodeFor)",
+            "problem": "An escalation reached in the same drive iteration after finalizeStage/finalizeReviewPass set state.restartRequired (post-window save at runner.ts:3015 throwing CheckpointWriteFailure, an unexpected throw at runner.ts:3036, or a review pass escalating after finalizeReviewPass(commit:false) at runner.ts:2259) leaves the record set: finalizeEscalate never clears it, so the escalated checkpoint carries restartRequired and runResult yields {status:'escalated', restartRequired}. exitCodeFor then returns 3 — the pause code — for an escalated run, breaking design §3's guarantee that 2 keeps its exact 'read ESCALATION.md' meaning so no driver automates past an escalation by code collision; the workflows.md driver loop blindly resumes, and resume's restart-boundary-crossed entry (runner.ts:2479) logs and clears the stale record while the run drives on past an unaddressed escalation. finalizeRestartBoundary's own save-failure branch (runner.ts:3601-3607) already states this rule but only there; the escalated-with-record combination is unpinned by cli.test.ts.",
+            "fix": "Clear state.restartRequired at the top of finalizeEscalate (an escalation supersedes a pause, mirroring the boundary's own §3 route), map status==='escalated' to 2 in exitCodeFor before consulting the record, and pin it: a runner.test.ts case sabotaging the post-window save at runner.ts:3015 after a surface-touching window asserting the escalated checkpoint holds no restartRequired and ESCALATION.md stands, plus a cli.test.ts escalated+record -> 2 case."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:2477-2485",
+            "problem": "The restart-boundary-crossed gate entry interpolates boundary.stage and boundary.paths straight from the loaded checkpoint into the gate-log reason (committed into run history and printed) without printable, while the diff's other copies of the same loaded value sanitize: restartBoundaryStatusLines wraps record.stage in printable (runner.ts:3801-3810) and write-time records go through printable. The writer-side posture protects this process's writes only; a later-era or hand-edited checkpoint carrying control bytes in a path emits raw escape sequences through this reader-side copy.",
+            "fix": "Apply printable(boundary.stage) and boundary.paths.map(printable) at this render site (or sanitize the record once after loadState), matching the other copies of the same value."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1861-1869 (marker pushed into record.paths; rendered at 1884-1889, 3570-3580, status line 3801-3810, resume log 2483)",
+            "problem": "The elision line 'N further harness path(s) elided by the record cap' is appended to record.paths, so every renderer reporting '${record.paths.length} harness file(s)' overcounts by one when the cap hits (33 for 32 listed + marker). Design §2's posture is 'first N paths plus the count' — the count should come from the source length, not the marker-padded list.",
+            "fix": "Track the true total separately (e.g. count from paths.length before bounding) and render that as the file count, excluding the marker line."
+          }
+        ]
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/code-review-security-r1c0.md",
+      "durationMs": 219379,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e293e02b0ffeX07bzSuri9BYI2",
+      "agent": "codereview/code-performance",
+      "at": 1794604476460,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/gates.ts:566-569",
+            "problem": "touchesExecutableSurface evaluates prefix.slice(0, -1) on every call, allocating two fresh strings per candidate path although both exact-match spellings are compile-time constants. Not hot-path-critical — the predicate runs O(tens) of times per finalize window — but it is an avoidable per-call allocation on a rule evaluated for every window path.",
+            "fix": "Hoist the slash-stripped spellings to module constants beside SURFACE_SRC_PREFIX/SURFACE_PROMPTS_PREFIX (e.g. const SURFACE_SRC_EXACT = SURFACE_SRC_PREFIX.slice(0, -1)) and compare path against those constants instead of slicing inside the callback."
+          }
+        ]
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/code-review-performance-r1c0.md",
+      "durationMs": 76480,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e293cd7c6ffeTmmG7o7GeqmVlZ",
+      "agent": "codereview/code-testing",
+      "at": 1794604586419,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "tools/orchestration/tests/pipeline/cli.test.ts:225-273",
+            "problem": "Test strategy #6 / Decision 3: no test asserts the exit-code integers. The four tests cite the rows (`done→0`, record `→3`, escalated `→2`, thrown `→1`) but assert only the widened seam shape (status + restartRequired presence); `exitCodeFor` (src/pipeline/cli.ts:43) is called by no test, and the #10 integration driver-loop pin uses `restartRequired !== undefined` instead of exit 3. A regression swapping 3 and 2 — the exact pause-mistaken-for-escalation risk the proposal's risk register claims is 'pinned both ways by Test #6' — leaves the whole suite green.",
+            "fix": "Statically import `exitCodeFor` from `../../src/pipeline/cli.js` in cli.test.ts and assert the table: `exitCodeFor({status:'done'})===0`, `exitCodeFor({status:'running',restartRequired:record})===3`, `exitCodeFor({status:'escalated'})===2`; pin the thrown-error row by calling `main()` with an unreadable-checkpoint invocation and asserting it returns 1 (or pin its rejection handler directly)."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/runner.test.ts:1091-1137",
+            "problem": "The Test strategy #8 provenance pin is vacuous against the mechanism it names. The two `executeStage` calls run against an unchanged `implement.md`, so each re-loads identical text and the identical sha holds even if the stage-entry template pin is removed or the `templateText` argument is ignored — the test cannot catch the regression ('attempt 2 carries the identical sha — the entry pin is the record §4 relies on') it cites.",
+            "fix": "After the attempt-1 call, rewrite `implement.md` to different text, then run attempt 2 with the stage-entry-pinned `templateText` exactly as the drive loop does, and assert attempt 2's transcript sha still equals `templateHash(originalText)` — the text loaded at entry, not the text now on disk."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1862-1868",
+            "problem": "`boundedSurfacePaths` — the §2 writer-side posture for boundary paths (printable copies, bounded like `boundedGateEvidence`) — is never exercised: every fixture window touches one or two surface paths, so the `paths.length > MAX_GATE_LEGS` elision branch (the count line that flows into the checkpoint, gate log, commit body and status line) is untested, and no test asserts printable sanitization of a boundary path. The sibling boundedGateEvidence posture is pinned in its own suite; this copy has no equivalent pin (testing checklist item 7: unexercised branch).",
+            "fix": "Add a window-classification case whose implement stub writes MAX_GATE_LEGS+2 surface probe files and assert the saved record holds 32 real paths plus the elision line with the correct count; include one probe filename carrying a control byte and assert the record and gate-entry copies are printable-sanitized."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/pipeline/runner.test.ts:1083",
+            "problem": "`expect(lines[0]).toContain('2')` is trivially satisfied by the fixture's run id `002-x` in the resume command, so it pins nothing about the changed-file count in the status line.",
+            "fix": "Assert the count phrase, e.g. `expect(lines[0]).toContain('changed 2 harness file(s)')`."
+          }
+        ]
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/code-review-testing-r1c0.md",
+      "durationMs": 109918,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e293b29f9ffeVR7eBSejemggSb",
+      "agent": "code/coder",
+      "at": 1794604759595,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "fix(orchestration): let an escalation supersede the restart pause, sanitize the crossing entry, count the true surface total",
+        "moves": []
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/fix-r1.md",
+      "durationMs": 173055,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 1,
+      "sessionID": "ses_e293845f1ffe9ISWwS616YsXaI",
+      "agent": "code/test-engineer",
+      "at": 1794605177044,
+      "reply": {
+        "commitMessage": "test(orchestration): pin the boundary exit codes, escalation precedence, and record bounds",
+        "moves": []
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/test-update-r1.md",
+      "durationMs": 400985,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e2931ea4effejVvYz9J42UViSY",
+      "agent": "code/coder",
+      "at": 1794605575443,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "fix(orchestration): close three round-2 restart-boundary gate failures",
+        "moves": []
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/fix-r1.md",
+      "durationMs": 382750,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 1,
+      "sessionID": "ses_e292bd876ffeRUOQiWxTRIoYFm",
+      "agent": "code/test-engineer",
+      "at": 1794605950443,
+      "reply": {
+        "commitMessage": "test(orchestration): repair the restart-boundary printable pin and close the r1 review gaps\n\n- runner.test.ts (planted-record pin): the whole-block `hasControlChar(rendered)`\n  check was unsatisfiable because the join's own `\\n` is a control byte; assert\n  each rendered status line instead, and add the non-vacuity check that the raw\n  loaded stage never reaches the terminal (security r1 #2).\n- runner.test.ts (record-cap fixture): the gate entry, the status line and the\n  pause's printed driver summary are now pinned printable and render the window's\n  true file count, never the marker-padded array (testing r1 #3, security r1 #2/#3,\n  compatibility r1 #3).\n- runner.test.ts (escalate-after-window fixture): an escalated run's status output\n  carries no boundary line beside the escalation (compatibility r1 #2).\n\nNo other test changed: strategy #1-#11 and the accepted r1 findings (exit-code\nintegers, escalation precedence, seam widening, provenance pin, status count\nphrase) are already pinned in gates/state-store/cli/executable-surface/\nrestart-boundary-integration tests.\n\nGate: `npm run lint` clean; `npm run format` + `npm run format:check` -> \"All\nmatched files use Prettier code style!\"; vitest green -- \"Test Files 54 passed\n(54)\", \"Tests 607 passed | 2 skipped (609)\" (default `npm test` also ran fully\ngreen; under full 54-worker parallelism this run's box intermittently trips the\nsuite's pre-existing 5 s timeouts in load-heavy integration files --\nfunnel/light-budget/light-promotion/gate-evidence/checkpoint-integration -- which\npass in isolation and with `--maxWorkers=6`).",
+        "moves": []
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/test-update-r1.md",
+      "durationMs": 359943,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e29261bddffe2WnbSLt1jhbp7t",
+      "agent": "codereview/code-compatibility",
+      "at": 1794606146187,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/cli.ts:275, :288 (run/resume handlers' `return exitCodeFor(result)`); tools/orchestration/tests/pipeline/cli.test.ts:283-385",
+            "problem": "Residual of my r1 #1, now much smaller. Every row of §3's table is pinned at `exitCodeFor` and the driver loop turns on its integer, but the two lines that connect a run/resume result to the table are still pinned only by inspection: `main` builds its own client (`createClient(String(args.baseUrl))`), so no test can hand it the runner-test stub and drive a pause/escalation/done result through the CLI. Only the thrown row (→1) is pinned through the real entry point. A future edit returning a literal from those handlers would keep the suite green.",
+            "fix": "Make the seam injectable — an optional client factory (or runner pair) argument to `main`/`dispatch` — and extend the exit-code describe with `main(['node','pipeline','resume', slug])` against the existing `lightStub` fixture, asserting 3 for the pause, 2 for the red-gate run, 0 for the untouched run. If that seam stays shut this round, state in 03-build-notes.md that the mapping line is pinned by inspection while the integers are pinned at `exitCodeFor`."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3853 (finalizeEscalate's restoreCommittedCheckpoint, saveFailure branch) read against docs/workflows.md:240-243",
+            "problem": "The new docs sentence is absolute: \"a run that ends escalated exits 2 and its checkpoint carries no `restartRequired` record\". The in-memory clear at :3754 guarantees that for the result, the exit code and any checkpoint this process writes, but ADR-006 §3's recovery runs after it: when the escalated terminal save fails, `restoreCommittedCheckpoint` lands HEAD's committed copy back and `commitStage` (:3855) commits it — and for a run that crossed a boundary, HEAD's copy is the boundary commit's checkpoint, which does carry the record (Test strategy #4 pins that). The on-disk checkpoint beside ESCALATION.md then carries a standing pause, and `pipeline status` prints the split-record note (:3965-3971) beside the `restart boundary: … changed N harness file(s)` line, pointing the operator at the resume the escalation was meant to stop. Exit codes are unaffected (in-memory state → 2; the resume clears), so this is record/display honesty in a corner.",
+            "fix": "In the saveFailure branch, drop the stale pause from the recovered copy after `restoreCommittedCheckpoint` (strip `restartRequired` from the restored file, or re-save the cleared state once the path is healthy), or narrow the workflows.md sentence to name the ADR-006 §3 exception: a split record recovers the last committed checkpoint, which may still carry the record."
+          }
+        ]
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/code-review-compatibility-r1c1.md",
+      "durationMs": 179649,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e29235d61ffeyJzY6KExvVN2EL",
+      "agent": "codereview/code-security",
+      "at": 1794606277435,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/cli.ts:297-304",
+            "problem": "main's new catch (cli.ts:149-163) documents printable as \"the posture every other operator-facing copy takes\", but the isMain rejection handler still prints `error instanceof Error ? error.message : error` raw to stderr, so an error that escapes the catch itself (e.g. String(error) on an object with a throwing toString, or a failing console.error) reaches the operator's terminal unsanitized. Reachability is now marginal — main catches every dispatch throw — so this is the one copy left inconsistent with the posture the diff just stated, not an open hole.",
+            "fix": "Wrap that handler's message in printable (console.error(printable(error instanceof Error ? error.message : String(error)))) or drop the handler now that main is total; a one-line cli.test.ts pin asserting no control byte reaches console.error from a rejected dispatch would keep it honest."
+          }
+        ]
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/code-review-security-r1c1.md",
+      "durationMs": 131200,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e29215cb4ffepqNS8JV978h6nQ",
+      "agent": "codereview/code-testing",
+      "at": 1794606566944,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1911-1916",
+            "problem": "Unreachable arm in surfacePathCount (checklist item 7): SURFACE_ELISION_RE's captured group is `(\\d{1,9})`, so `hit[1]` is always digits and `Number(hit[1])` can never be NaN — the `Number.isNaN(elided) ? paths.length : …` fallback at :1916 is dead code no test can reach. It also masks a writer/reader asymmetry: elisionMarker (:1890) writes an unbounded-count integer while the reader regex matches only up to 9 digits, so a 10-digit elision (practically unreachable) would silently fall back to the padded length.",
+            "fix": "Widen SURFACE_ELISION_RE's group to `(\\d+)` and drop the NaN arm, or derive the count from a non-textual signal so writer and reader cannot drift."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3955-3961",
+            "problem": "The new statusLines dedup filter's crossed-side claim ('a boundary this run already crossed… its entries keep reading in this block (Test strategy #5)') is unpinned: the standing side is pinned by the cap test's one-/restart/-line assertion, but no test renders statusLines for a run whose boundary was crossed — the only crossed-entry assertion (runner.test.ts:1288) reads the checkpoint's gateLog, not the status output. A filter widened to drop restart entries unconditionally keeps the suite green while the recent-gates block loses the crossing record.",
+            "fix": "In the 'renders a planted record printable at the crossing and the status line' test (runner.test.ts:1270), after the crossing assert statusLines(saved, …) renders the `restart-boundary-crossed` entry in the recent-gates block."
+          }
+        ]
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/code-review-testing-r1c1.md",
+      "durationMs": 289465,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e291cf180ffeBeWMxOt4ZtNxLy",
+      "agent": "codereview/code-correctness",
+      "at": 1794606645639,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/code-review-correctness-r1c2.md",
+      "durationMs": 78544,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e291bbe65ffeMxFz4jH2ZMAJaT",
+      "agent": "codereview/code-performance",
+      "at": 1794606855918,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3959-3961",
+            "problem": "The new recent-gates filter re-tests the loop-invariant `state.restartRequired !== undefined` inside the callback and copies the whole `gateLog` before `slice(-6)`, so the common no-record path pays a full O(len(gateLog)) array copy that filters nothing. `gateLog` is the one checkpoint array the code never caps (state-store.ts:180-188 has no max; only the 8 MiB read ceiling at state-store.ts:201 bounds it from the read side) and it grows every round, resume and boundary. Impact is small — `statusLines` has a single one-shot caller (`cli.ts:259`), measured: the suite stays at 21.63s (`npx vitest run --maxWorkers=2`, 607 passed | 2 skipped) and the three touched test files run in 2.61s — so this is an avoidable allocation on an uncapped collection, not a hot-path cost.",
+            "fix": "Hoist the condition out of the callback and skip the copy when no record stands: `const standing = state.restartRequired !== undefined; const recent = standing ? state.gateLog.filter((g) => g.gate !== RESTART_BOUNDARY_GATE_NAME) : state.gateLog;` then `...recent.slice(-6).map(...)`. Same output, one comparison per render instead of per entry, no array copy on the no-record path."
+          }
+        ]
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/code-review-performance-r1c2.md",
+      "durationMs": 210224,
+      "nudges": 0
+    },
+    {
+      "stage": "doc-sync",
+      "round": 1,
+      "sessionID": "ses_e2918885affepeZDYIfznIQBxC",
+      "agent": "ops/doc-sync",
+      "at": 1794606965263,
+      "reply": {
+        "drifted": true,
+        "commitMessage": "docs: record the 020 restart-boundary as-built drift and finish the build notes"
+      },
+      "transcript": "docs/designs/020-restart-boundary-for-harness-self-changes/transcripts/doc-sync-r1.md",
+      "durationMs": 109113,
+      "nudges": 0
+    }
+  ],
+  "gateLog": [
+    {
+      "gate": "sourceAdmissible",
+      "round": 0,
+      "proceed": true,
+      "reason": "ADR is proposed and complete",
+      "at": 1794599733689
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: security",
+      "at": 1794600818712
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c2 pending: correctness, compatibility, performance, complexity",
+      "at": 1794601015910
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794601313774
+    },
+    {
+      "gate": "editorial-review",
+      "round": 2,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1794601744761
+    },
+    {
+      "gate": "stageFailure",
+      "round": 0,
+      "proceed": false,
+      "reason": "test-authoring: independence violation: glob accessed run records: bindforge-runner-adr006-*/docs/designs/002-x/transcripts/*; read accessed run records: /tmp/bindforge-runner-adr006-6dcuPd/docs/designs/002-x/transcripts/implement-r0.md",
+      "at": 1794602272536
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794603075160
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1794603768949
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: compatibility, security, testing",
+      "at": 1794604586490
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1794604775895
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794605192586
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794605590361
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1794605966312
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c2 pending: correctness, performance",
+      "at": 1794606567025
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794606856068
+    },
+    {
+      "gate": "done",
+      "round": 0,
+      "proceed": true,
+      "reason": "pipeline complete",
+      "at": 1794606965338
+    }
+  ],
+  "startedAt": 1794599733653,
+  "updatedAt": 1794606965338,
+  "flow": "full",
+  "baseRef": "0179375b8d037833c6b6c5150312d88af0162211",
+  "designCycle": 3,
+  "designStamp": "0b1355604ef1e9dec4bbabc9f7ddd54dd27be710",
+  "seats": {
+    "design": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "0b1355604ef1e9dec4bbabc9f7ddd54dd27be710",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design §3 (with §2) — \"`pipeline status` while the record stands gains one line … the stage that opened the boundary, how many harness files it changed, and the resume posture\"",
+            "problem": "re-raised (unchanged by this round, and not recorded as rejected in the Revision log): still short of ADR-020 Decision 2's marker \"naming the changed paths and the stage that will run next\". Every artifact the design names — the §2 record, the `restart-boundary` gate entry, the status line, the printed summary — names the stage that completed; the next stage is derivable from `lastStage` plus the flow, but the design never says where the ADR's \"stage that will run next\" is carried."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design §2 (new in r2) — \"the record keeps the `boundedGateEvidence` bounding (first N paths plus the count)\"",
+            "problem": "regression introduced by the closure: the count has nowhere to live. The record shape §2 declares is `restartRequired?: { stage, paths, at }`, so a record bounded to \"first N paths\" carries no total, and §3's status line (\"how many harness files it changed\") is rendered by a fresh process that can only read the checkpoint. The cited helper also does not fit the field: `boundedGateEvidence(evidence: GateEvidence, repoDir?)` bounds `evidence.legs` at `MAX_GATE_LEGS = 32` and encodes its elision count by pushing a synthetic entry into the kept array (runner.ts:3057–3075); the analogue for `paths: string[]` puts a non-path string into the record's path list, which then flows into the commit body and summary that the same sentence says carry \"every copy of a path\"."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "0b1355604ef1e9dec4bbabc9f7ddd54dd27be710",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design 2 — \"the record keeps the `boundedGateEvidence` bounding (first N paths plus the count)\" alongside the declared field \"`restartRequired?: { stage: string; paths: string[]; at: number }`\", and Test strategy #3 — \"naming the stage and the hit paths\"",
+            "problem": "The bounding mechanism the revision cites bounds a different shape: `boundedGateEvidence` (runner.ts:3057–3075) slices `evidence.legs` at `MAX_GATE_LEGS` and carries the overflow count in an appended pseudo-leg (`'(gate legs elided)'`), as `boundedFindings` does for findings. `paths: string[]` has no member that can hold a count, so the sentence either re-types the field §2 declares in the same breath (the move A6 forbids) or leaves the count nowhere. Consequences in text this seat approved: §2's \"commit whose body names the changed paths\" and §3's \"how many harness files it changed\" read the record as complete, and Test #3's \"the hit paths\" becomes true only up to the cap once the record is bounded.",
+            "fix": "State where the bound lands. Smallest change: bound only the printed copies (gate-log entry, commit body, status line, summary) and keep the record's `paths` the full hit list the predicate produced, replacing \"the record keeps the `boundedGateEvidence` bounding (first N paths plus the count)\" with \"the printed copies keep the `boundedGateEvidence` bounding; the record keeps every hit path\". If bounding the record is wanted, add the count as a named member of the §2 field (or spell the elision entry exactly as `boundedFindings` does) and make Test #3 assert that bounded shape instead of \"the hit paths\"."
+          }
+        ]
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "0b1355604ef1e9dec4bbabc9f7ddd54dd27be710",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design §2 — \"the record keeps the `boundedGateEvidence` bounding (first N paths plus the count)\"",
+            "problem": "The bounding posture named in the new clause carries its elision note as an element of the bounded array: `boundedGateEvidence` pushes a synthetic leg `{ command: '(gate legs elided)', … }` (runner.ts:3066-3073) and `boundedFindings` a synthetic finding (runner.ts:3031-3038). Those arrays hold typed objects with a field to carry the label; `paths: string[]` has none, so read literally the clause puts a runner-authored pseudo-path into the same untagged array as the model-authorable untrusted path strings — and that array is exactly what the boundary-commit body and §4's cross-reference read as \"the changed paths\". The same sentence also leaves §3's status line (\"how many harness files it changed\") with no number to print once the array is truncated: the total survives only inside a display string.",
+            "fix": "Keep `paths` as paths only — first N printable-copied entries — and carry the pre-bound total as a number on the `restartRequired` object (a field inside a field this change is already adding, so ADR-006 §2 is untouched); the gate-log entry and §3's status line print the count from that number instead of from a pseudo-path entry."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design §2 — \"every copy of a path takes `printable` into the record, gate-log entry, commit body and summary\"",
+            "problem": "`printable` is `value.replace(/\\p{Cc}/gu, ' ')` (independence.ts:443-445): it neutralizes the C0/C1 controls, ESC sequences, newlines and BEL that r1 named, but leaves format characters (`\\p{Cf}` — the U+202A–U+202E directional isolates and overrides, zero-width joiners) untouched, and those are the other way a crafted model-authored filename reorders or hides characters on the operator's terminal and in the `git log` the operator reads for the boundary commit. This is the repo-wide posture rather than something this design introduces, so it should not be fixed here — but the design should not claim terminal-safety beyond what the helper gives.",
+            "fix": "No new mechanism: extend the same §2 sentence to say the path copies take printable's Cc-only coverage, with BiDi/format characters out of scope repo-wide, so any later hardening belongs to `printable` itself, not to this boundary."
+          }
+        ]
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "0b1355604ef1e9dec4bbabc9f7ddd54dd27be710",
+        "dissents": 0,
+        "findings": []
+      },
+      "complexity": {
+        "verdict": "approve",
+        "stamp": "0b1355604ef1e9dec4bbabc9f7ddd54dd27be710",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design §1 — \"`finalizeStage` and `finalizeReviewPass` (runner.ts:1848–1892, 1940–1961) already receive the window's `headBefore` and mint its commit\"",
+            "problem": "[re-raised] The r2 edit rewrote this sentence (added `-z --no-renames`, named `nulPaths`) and left both hooks, so the r1 problem survives verbatim: finalizeReviewPass is called only at pass level (runner.ts:2184, 2187) and on the single-stage pre-commit refusal with commit:false (runner.ts:1924); the only preCommit in the tree is the plan stage's (runner.ts:2816); stagePathAllowed confines every non-implement/fix stage to docs/** (gates.ts:559–589). Under §1's own rule that only implement/fix can commit under the two prefixes, the second hook can never fire, and Test strategy #3's \"a `finalizeStage` and a `finalizeReviewPass` window whose net diff touches a template or a src file set the record\" is only satisfiable by fabricating a state the ownership fence forbids.",
+            "fix": "Instrument finalizeStage alone and say so in the sentence that already states the coder-window rule; drop the review-pass half of Test #3. If the hook is kept deliberately against a future ownership-matrix change, add one clause saying so and mark the Test #3 review-pass case a rule-bypass fixture rather than a live window. Same red-on-drift property either way; one unreachable call site and one impossible test case cheaper."
+          },
+          {
+            "severity": "minor",
+            "location": "Test strategy #7 — \"walking the import graph from the pipeline entry points (`src/pipeline/cli.ts`, `src/cli.ts`, `src/opencode-runner.ts`), every in-repo module reached is under `tools/orchestration/src/`\"",
+            "problem": "[re-raised] r2 deleted §1's description of this mechanism (\"The ADR's \\\"test that fails when a new executable path is added\\\" is Test strategy #7.\") but left the mechanism, which is still the largest new thing in the design and still has no provider: tools/orchestration/package.json devDeps are typescript, vitest, eslint, prettier, tsx and two plugins — nothing that resolves an import graph — so it means hand-written specifier parsing plus an entry-root resolver, and it still misses any module none of the three roots imports. The rule it guards is directory-scoped by §1, so the walk adds nothing over a flat check.",
+            "fix": "Replace the walk with a package-wide enumeration: every tracked .ts/.js under tools/orchestration/ that is not under tests/ must sit under src/, plus the PROMPTS_DIR root assertion the test already names (cli.ts:20). The readdirSync-based helpers the tests/pipeline/ suites already use cover it: no new dependency, ~15 lines instead of a resolver, identical red-on-drift property."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design §2 — \"the record keeps the `boundedGateEvidence` bounding (first N paths plus the count)\"",
+            "problem": "[new] The r2 clause imports a bound the design's own record shape cannot hold. boundedGateEvidence (runner.ts:3057) is typed GateEvidence -> GateEvidence, and its first-N-plus-count works only because an elided leg is a whole extra leg object with a command/tail to carry the count; restartRequired?: { stage, paths, at } has no slot for a count, and the only bound named in the tree is MAX_GATE_LEGS (gates.ts:310), a gate-leg cap, not a path cap. As written the implementer either adds a fourth checkpoint field for the count or drops it silently — and dropping it makes §3's status line, \"how many harness files it changed\", print the capped length rather than the number of changed files.",
+            "fix": "Bound where it renders, not what is recorded: keep paths whole and state that the gate-log line, commit body and summary are brief-bounded (brief, independence.ts:448, beside the printable the sentence already names), with paths.length as the count §3 prints. If the record itself is meant to be capped, name the constant and add total to the §2 shape so §3's count stays honest."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design §2 — \"mints a terminal `chore: <nnn>-<slug> restart boundary` commit\"",
+            "problem": "[re-raised] Unaddressed by r2 and not recorded as rejected in the Revision log. boundary is already loaded in this file's vocabulary: the lock records a stage named boundary (runner.ts:606), and \"boundary commits\", \"the boundary re-assertion\" and \"at the next boundary\" name the ADR-006 stage boundary (runner.ts:328, 571, 2376). §1's loop-top check and §2's \"gate-logs the boundary it is crossing\" lean on that second meaning in the same breath as ADR-020's pause.",
+            "fix": "One clause in §1's heading or §2 — \"'restart boundary' is ADR-020's pause; the runner's existing 'boundary' is the ADR-006 stage boundary\" — and keep every new identifier and label qualified (restartRequired, finalizeRestartBoundary, restart-boundary), never a bare boundary."
+          }
+        ]
+      }
+    },
+    "code": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "2a2ece80201d04afaac056bf9470aac00ca21adc",
+        "dissents": 0,
+        "findings": []
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "2a2ece80201d04afaac056bf9470aac00ca21adc",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/cli.ts:275, :288 (run/resume handlers' `return exitCodeFor(result)`); tools/orchestration/tests/pipeline/cli.test.ts:283-385",
+            "problem": "Residual of my r1 #1, now much smaller. Every row of §3's table is pinned at `exitCodeFor` and the driver loop turns on its integer, but the two lines that connect a run/resume result to the table are still pinned only by inspection: `main` builds its own client (`createClient(String(args.baseUrl))`), so no test can hand it the runner-test stub and drive a pause/escalation/done result through the CLI. Only the thrown row (→1) is pinned through the real entry point. A future edit returning a literal from those handlers would keep the suite green.",
+            "fix": "Make the seam injectable — an optional client factory (or runner pair) argument to `main`/`dispatch` — and extend the exit-code describe with `main(['node','pipeline','resume', slug])` against the existing `lightStub` fixture, asserting 3 for the pause, 2 for the red-gate run, 0 for the untouched run. If that seam stays shut this round, state in 03-build-notes.md that the mapping line is pinned by inspection while the integers are pinned at `exitCodeFor`."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3853 (finalizeEscalate's restoreCommittedCheckpoint, saveFailure branch) read against docs/workflows.md:240-243",
+            "problem": "The new docs sentence is absolute: \"a run that ends escalated exits 2 and its checkpoint carries no `restartRequired` record\". The in-memory clear at :3754 guarantees that for the result, the exit code and any checkpoint this process writes, but ADR-006 §3's recovery runs after it: when the escalated terminal save fails, `restoreCommittedCheckpoint` lands HEAD's committed copy back and `commitStage` (:3855) commits it — and for a run that crossed a boundary, HEAD's copy is the boundary commit's checkpoint, which does carry the record (Test strategy #4 pins that). The on-disk checkpoint beside ESCALATION.md then carries a standing pause, and `pipeline status` prints the split-record note (:3965-3971) beside the `restart boundary: … changed N harness file(s)` line, pointing the operator at the resume the escalation was meant to stop. Exit codes are unaffected (in-memory state → 2; the resume clears), so this is record/display honesty in a corner.",
+            "fix": "In the saveFailure branch, drop the stale pause from the recovered copy after `restoreCommittedCheckpoint` (strip `restartRequired` from the restored file, or re-save the cleared state once the path is healthy), or narrow the workflows.md sentence to name the ADR-006 §3 exception: a split record recovers the last committed checkpoint, which may still carry the record."
+          }
+        ]
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "2a2ece80201d04afaac056bf9470aac00ca21adc",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/cli.ts:297-304",
+            "problem": "main's new catch (cli.ts:149-163) documents printable as \"the posture every other operator-facing copy takes\", but the isMain rejection handler still prints `error instanceof Error ? error.message : error` raw to stderr, so an error that escapes the catch itself (e.g. String(error) on an object with a throwing toString, or a failing console.error) reaches the operator's terminal unsanitized. Reachability is now marginal — main catches every dispatch throw — so this is the one copy left inconsistent with the posture the diff just stated, not an open hole.",
+            "fix": "Wrap that handler's message in printable (console.error(printable(error instanceof Error ? error.message : String(error)))) or drop the handler now that main is total; a one-line cli.test.ts pin asserting no control byte reaches console.error from a rejected dispatch would keep it honest."
+          }
+        ]
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "2a2ece80201d04afaac056bf9470aac00ca21adc",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3959-3961",
+            "problem": "The new recent-gates filter re-tests the loop-invariant `state.restartRequired !== undefined` inside the callback and copies the whole `gateLog` before `slice(-6)`, so the common no-record path pays a full O(len(gateLog)) array copy that filters nothing. `gateLog` is the one checkpoint array the code never caps (state-store.ts:180-188 has no max; only the 8 MiB read ceiling at state-store.ts:201 bounds it from the read side) and it grows every round, resume and boundary. Impact is small — `statusLines` has a single one-shot caller (`cli.ts:259`), measured: the suite stays at 21.63s (`npx vitest run --maxWorkers=2`, 607 passed | 2 skipped) and the three touched test files run in 2.61s — so this is an avoidable allocation on an uncapped collection, not a hot-path cost.",
+            "fix": "Hoist the condition out of the callback and skip the copy when no record stands: `const standing = state.restartRequired !== undefined; const recent = standing ? state.gateLog.filter((g) => g.gate !== RESTART_BOUNDARY_GATE_NAME) : state.gateLog;` then `...recent.slice(-6).map(...)`. Same output, one comparison per render instead of per entry, no array copy on the no-record path."
+          }
+        ]
+      },
+      "testing": {
+        "verdict": "approve",
+        "stamp": "2a2ece80201d04afaac056bf9470aac00ca21adc",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1911-1916",
+            "problem": "Unreachable arm in surfacePathCount (checklist item 7): SURFACE_ELISION_RE's captured group is `(\\d{1,9})`, so `hit[1]` is always digits and `Number(hit[1])` can never be NaN — the `Number.isNaN(elided) ? paths.length : …` fallback at :1916 is dead code no test can reach. It also masks a writer/reader asymmetry: elisionMarker (:1890) writes an unbounded-count integer while the reader regex matches only up to 9 digits, so a 10-digit elision (practically unreachable) would silently fall back to the padded length.",
+            "fix": "Widen SURFACE_ELISION_RE's group to `(\\d+)` and drop the NaN arm, or derive the count from a non-textual signal so writer and reader cannot drift."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3955-3961",
+            "problem": "The new statusLines dedup filter's crossed-side claim ('a boundary this run already crossed… its entries keep reading in this block (Test strategy #5)') is unpinned: the standing side is pinned by the cap test's one-/restart/-line assertion, but no test renders statusLines for a run whose boundary was crossed — the only crossed-entry assertion (runner.test.ts:1288) reads the checkpoint's gateLog, not the status output. A filter widened to drop restart entries unconditionally keeps the suite green while the recent-gates block loses the crossing record.",
+            "fix": "In the 'renders a planted record printable at the crossing and the status line' test (runner.test.ts:1270), after the crossing assert statusLines(saved, …) renders the `restart-boundary-crossed` entry in the recent-gates block."
+          }
+        ]
+      }
+    }
+  },
+  "lastReviewPass": {
+    "phase": "code",
+    "round": 1,
+    "cycle": 2,
+    "seats": [
+      "correctness",
+      "performance"
+    ]
+  },
+  "reviseNoChange": false,
+  "gateEvidence": {
+    "at": 1794605966310,
+    "green": true,
+    "legs": [
+      {
+        "command": "npm run check",
+        "cwd": "tools/orchestration",
+        "exit": 0,
+        "tail": "npm notice run @bindforge/orchestration@1.0.0 check npm notice run npm run lint && npm run format:check && npm run test npm notice run @bindforge/orchestration@1.0.0 lint npm notice run eslint . npm notice run @bindforge/orchestration@1.0.0 format:check npm notice run prettier --check . Checking formatting... All matched files use Prettier code style! npm notice run @bindforge/orchestration@1.0.0 test npm notice run vitest run          dmesg(1) may have more information after failed mount system call.   Test Files  54 passed (54)       Tests  607 passed | 2 skipped (609)    Start at  16:39:14    Duration  10.90s (tests 79%, import 16%, transform 4%, worker 1%) [2 tail line(s) dropped by the record's citation rule]"
+      },
+      {
+        "command": "cargo fmt --all -- --check",
+        "cwd": ".",
+        "exit": 0,
+        "tail": ""
+      },
+      {
+        "command": "cargo clippy --workspace --all-targets -- -D warnings",
+        "cwd": ".",
+        "exit": 0,
+        "tail": "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.05s"
+      },
+      {
+        "command": "cargo test --workspace --locked",
+        "cwd": ".",
+        "exit": 0,
+        "tail": "[25045 characters elided by the gate tail cap]ntiguous_legal_move_pairing_by_the_match_rule ... ok test relocate_cluster_with_a_bound_violating_move_reports_placement_illegal_with_the_check ... ok test relocate_cluster_with_a_match_count_that_is_not_the_target_count_reports_match_count ... ok test swap_mouse_buttons_exchanges_the_bound_actions_and_lands_as_set_elements ... ok test relocate_cluster_with_a_tag_matching_no_registry_id_reports_unmatched_tags ... ok test relocate_cluster_with_an_unbound_matched_action_reports_it_by_name ... ok test relocate_cluster_with_disconnected_source_keys_reports_not_contiguous ... ok test swap_mouse_buttons_with_an_unbound_mouse_input_reports_it_by_name ... ok test swap_polarity_exchanges_a_bound_discrete_lateral_pair ... ok test swap_polarity_applied_twice_is_the_identity ... ok test swap_polarity_including_a_continuous_lateral_id_reports_axis_kind_naming_it ... ok test swap_polarity_leaves_an_unbound_side_unbound ... ok test swap_mouse_buttons_on_a_docked_mouse_input_reports_reserved_input ... ok test swap_polarity_with_a_match_that_is_not_two_ids_reports_match_count ... ok test the_produced_base_is_an_ordinary_profile_v2_base_document ... ok test relocate_cluster_touching_reserved_manifest_data_reports_reserved_input ... ok  test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s       Running tests/zz_api_probe.rs (target/debug/deps/zz_api_probe-4459fd1d9832c5c4)  running 2 tests test the_not_applicable_reason_vocabulary_answers_the_contract_spellings ... ok test the_adr_015_names_resolve_at_the_crate_root ... ok  test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests bindforge_core  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests bindforge_transforms  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      }
+    ]
+  },
+  "codeCycle": 3,
+  "codeStamp": "2a2ece80201d04afaac056bf9470aac00ca21adc"
+}

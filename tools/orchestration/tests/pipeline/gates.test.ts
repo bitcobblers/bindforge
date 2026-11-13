@@ -731,3 +731,51 @@ describe('stagePathAllowed: the flow parameter (the security spine)', () => {
 // The plan line cap is `planOutgrewFlow`, above, run by the runner on the size
 // meter's own count and driven end to end by `light-plan-size.test.ts`: the
 // source gate judges a source document's shape only, in both flows.
+
+// ---------------------------------------------------------------------------
+// ADR-020 §1 (design 020): `touchesExecutableSurface` in `gates.ts`, beside
+// `stagePathAllowed`, is the executable-surface rule the restart boundary is
+// judged by: directory scope, not a static file list — a module or template
+// created inside either prefix is surface the moment it exists. The import is
+// dynamic on purpose: the rule does not exist yet, and a named static import
+// would take the whole gates suite down with it; the first test below is the
+// pin that turns the missing rule red on its own.
+// ---------------------------------------------------------------------------
+
+const gatesModule = (await import('../../src/pipeline/gates.js')) as {
+  touchesExecutableSurface?: (path: string) => boolean;
+};
+
+describe('touchesExecutableSurface', () => {
+  const surfaceRule = (path: string): boolean => {
+    if (gatesModule.touchesExecutableSurface === undefined) {
+      throw new Error('gates.js exports no touchesExecutableSurface yet');
+    }
+    return gatesModule.touchesExecutableSurface(path);
+  };
+
+  // proves: Test strategy #1 — the two §1 prefixes are surface, directory-
+  // scoped: every pipeline module (an existing one and one invented inside
+  // the directory) and every stage-time template count.
+  it('is true for everything under tools/orchestration src and prompts', () => {
+    expect(surfaceRule('tools/orchestration/src/pipeline/runner.ts')).toBe(true);
+    expect(surfaceRule('tools/orchestration/src/pipeline/flows.ts')).toBe(true);
+    expect(surfaceRule('tools/orchestration/prompts/implement.md')).toBe(true);
+    // Directory scope, not a file list: a module that does not exist yet is
+    // surface the moment it exists (§1).
+    expect(surfaceRule('tools/orchestration/src/pipeline/not-yet-written.ts')).toBe(true);
+    expect(surfaceRule('tools/orchestration/prompts/a-new-template.md')).toBe(true);
+  });
+
+  // proves: Test strategy #1 — everything outside the two prefixes is not
+  // surface: product docs and crates, the package's own tests, package
+  // metadata, and the agent permission files ADR-020 keeps out of the v1
+  // surface (Deferred).
+  it('is false outside the two surface prefixes', () => {
+    expect(surfaceRule('docs/designs/020-restart-boundary/02-proposal.md')).toBe(false);
+    expect(surfaceRule('crates/core/src/lib.rs')).toBe(false);
+    expect(surfaceRule('tools/orchestration/tests/pipeline/gates.test.ts')).toBe(false);
+    expect(surfaceRule('tools/orchestration/package.json')).toBe(false);
+    expect(surfaceRule('.opencode/agents/coder.md')).toBe(false);
+  });
+});

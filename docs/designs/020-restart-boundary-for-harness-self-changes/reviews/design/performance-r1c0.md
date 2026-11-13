@@ -1,0 +1,18 @@
+# performance review r1
+
+verdict: approve
+
+## Findings
+- [nit][new] Chosen design §2 — "`restartRequired?: { stage: string; paths: string[]; at: number }`" — the `paths` array is sized by the window's net diff and so grows with whatever one window commits: a mechanical refactor window renaming hundreds of modules under `tools/orchestration/src/` records every hit path in the checkpoint, the `restart-boundary` gate-log entry, and the boundary commit body ("whose body names the changed paths"). It is bounded in practice — one live record, cleared at each resume entry, capped by a single window's commit, not a cross-product growth class — so it does not block. Fix: cap the recorded/named list at a fixed N with a total count alongside (status output already needs only the count — "how many harness files it changed"), leaving §4's cross-reference use intact for the common small-window case.
+
+## Checklist pass notes
+1. Latency budget on the event path: the drive-loop addition is a standing-field check before `decideNext` (O(1), no IO); the only new synchronous IO is one `git diff --name-only <headBefore>..HEAD` per finalize window. Verified in code that the runner already runs `rev-list` + per-commit `diff-tree --name-only` per window in `enforceOwnership` (runner.ts:302–308), so the marginal cost of the range diff is negligible against minutes-long stage windows. No per-event cost introduced.
+2. Structure costs: no nested unbounded iteration; range diff is O(window size). The import-graph walk is a test-time check (Test #7), not runtime.
+3. Memory growth: the only new stored structure is the single companion record (see nit); cleared by every resume, no cache/table growth.
+4. Startup cost: one extra process start per boundary (lock create, checkpoint read, branch ensure, A12). The minutes half of A12's comparison is verified in code — `DEFAULT_CONFIG.stageTimeoutMs = 30 * 60_000` with the light flow's 12 (stages.ts:118–126); the "seconds" half is self-declared unverified. The added zod field's parse cost at boot is negligible.
+5. Caching/invalidation: the invalidation primitive is the fresh process, and A1's staleness premise is verified (`loadTemplate` reads disk at stage entry, prompts.ts:81–83; `PROMPTS_DIR` resolves relative to the CLI module, cli.ts:20). Record clearing at resume entry, including forced `--stage` resume, keeps the invalidation signal single-use — no stale-record re-fire. Template-only windows legitimately open a boundary: the live renderer can lack a new variable even when the template re-reads fine (run-016 class), consistent with ADR-020 Decision 1.
+6. Baseline quote: the design's expected numbers (one process start of seconds vs minutes-long windows) match ADR-020's own consequence line ("one more process start, which is seconds — far less than the escalation it replaces", ADR:116–117) and the verified stage timeouts; the unverified half is explicitly flagged as unverified in A12, so there is no gap-without-explanation. Note: 01-research.md was not in this seat's named inputs, so the research baseline was evaluated through the proposal's own research citations and the ADR.
+
+## FYI (no severity)
+- "Consecutive self-change windows cost a boundary round trip each / Common" is the right row to watch: uncapped boundaries per run are deferred consistently with ADR-020's "Not decided here", so it is not re-opened here; the thrash stays bounded by the run's round budgets (maxRounds 5).
+- The exit-code widening (`done→0`, `restartRequired→3`, other→2, error→1) matches the current mapping verified in cli.ts:17 and adds one distinct code; no perf dimension, compatibility seat's ground.

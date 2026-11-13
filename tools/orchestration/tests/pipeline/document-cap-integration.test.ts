@@ -176,7 +176,7 @@ describe('the oversized research document (ADR-016 Decision 4)', () => {
     const dir = tmpRepo();
     const { client } = researchStub(dir, CAP + 100);
 
-    const status = await runPipeline(optionsFor(dir, client));
+    const { status } = await runPipeline(optionsFor(dir, client));
 
     const rel = designDirRel(dir);
     expect(status, 'an over-cap research stage must not finish').toBe('escalated');

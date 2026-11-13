@@ -246,7 +246,9 @@ describe('child deeds fail the parent attempt end to end', () => {
     const dir = tmpRepo(baseState());
     const stub = deedsStub();
 
-    const status = await resumePipeline(optionsFor(dir, stub.client, { forceStage: 'implement' }));
+    const { status } = await resumePipeline(
+      optionsFor(dir, stub.client, { forceStage: 'implement' }),
+    );
 
     expect(status).toBe('escalated');
 
@@ -293,7 +295,9 @@ describe('child deeds fail the parent attempt end to end', () => {
     const dir = tmpRepo(baseState());
     const stub = deedsStub({ listOnly: true });
 
-    const status = await resumePipeline(optionsFor(dir, stub.client, { forceStage: 'implement' }));
+    const { status } = await resumePipeline(
+      optionsFor(dir, stub.client, { forceStage: 'implement' }),
+    );
 
     expect(status).toBe('escalated');
     const attempts = stub.creates.filter((c) => c.key === 'implement');
@@ -445,7 +449,7 @@ describe('review-pass seat retry carries the failure reason', () => {
     const dir = tmpRepo(baseState());
     const stub = seatStub();
 
-    const status = await resumePipeline(
+    const { status } = await resumePipeline(
       optionsFor(dir, stub.client, { cfg: { ...FAST, maxParallelReviews: 1 } }),
     );
 

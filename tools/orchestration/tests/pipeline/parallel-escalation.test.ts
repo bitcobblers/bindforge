@@ -225,7 +225,7 @@ describe('seat failing twice inside a fanned-out pass', () => {
       slowMs: { 'design-review:correctness': 5 },
     });
 
-    const status = await resumePipeline(optionsFor(dir, stub.client, 1));
+    const { status } = await resumePipeline(optionsFor(dir, stub.client, 1));
 
     expect(status).toBe('escalated');
     // The invalid-reply retry reuses the seat's own session…
@@ -268,7 +268,7 @@ describe('seat failing twice inside a fanned-out pass', () => {
       slowMs: { 'design-review:correctness': 5, 'design-review:compatibility': 600 },
     });
 
-    const status = await resumePipeline(optionsFor(dir, stub.client, 2));
+    const { status } = await resumePipeline(optionsFor(dir, stub.client, 2));
 
     expect(status).toBe('escalated');
     // correctness: one session, retried in place inside its own permit while the

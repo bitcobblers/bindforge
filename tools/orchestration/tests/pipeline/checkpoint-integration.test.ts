@@ -217,7 +217,7 @@ describe('cross-era checkpoint resumes on current code', () => {
     const dir = tmpRepo(checkpoint);
     const { client, created } = approveClient(dir);
 
-    const status = await resumePipeline(optionsFor(dir, { client }));
+    const { status } = await resumePipeline(optionsFor(dir, { client }));
     expect(status).toBe('done');
 
     // §2's promise is that driving continues *after* the checkpoint's
@@ -255,7 +255,7 @@ describe('interrupted between a stage commit and the next save', () => {
     );
     const { client, created } = approveClient(dir);
 
-    const status = await resumePipeline(optionsFor(dir, { client }));
+    const { status } = await resumePipeline(optionsFor(dir, { client }));
     expect(status).toBe('done');
 
     // The checkpoint stopped inside the design-review loop, so resume's first
@@ -294,7 +294,7 @@ describe('checkpoint path replaced by a directory mid-run', () => {
       },
     });
 
-    const status = await resumePipeline(optionsFor(dir, { client: sabotaged.client }));
+    const { status } = await resumePipeline(optionsFor(dir, { client: sabotaged.client }));
     // Escalated, not a crash: the caller gets the terminal status, and the
     // run's terminal record exists even though the checkpoint could not be
     // written.
@@ -337,7 +337,7 @@ describe('checkpoint path replaced by a directory mid-run', () => {
     execFileSync('git', ['checkout', lastGood, '--', cpRel], { cwd: dir });
 
     const clean = approveClient(dir);
-    const resumed = await resumePipeline(optionsFor(dir, { client: clean.client }));
+    const { status: resumed } = await resumePipeline(optionsFor(dir, { client: clean.client }));
     expect(resumed).toBe('done');
 
     // testing r1 #4: the marker was committed by the escalation commit, and

@@ -1,0 +1,120 @@
+diff --git a/tmp/bindforge-editorial-restart-boundary-for-harness-self-changes-r2.md b/home/mike/repos/bindforge/docs/designs/020-restart-boundary-for-harness-self-changes/02-proposal.md
+index 0b13556..4daf427 100644
+--- a/tmp/bindforge-editorial-restart-boundary-for-harness-self-changes-r2.md
++++ b/home/mike/repos/bindforge/docs/designs/020-restart-boundary-for-harness-self-changes/02-proposal.md
+@@ -35,12 +35,12 @@ kept: one additive-optional field, `version` still 1. Research input:
+     without the surface rule turns the suite red.
+ - Non-goals (each prevents scope creep at code review):
+   - The runner restarting itself, a boundary count per run, and
+-    `.opencode/agents/**` surface membership — each left undecided by ADR 020
++    `.opencode/agents/**` surface membership — each left undecided by ADR-020
+     ("Not decided here"); see Deferred.
+-  - Hot-reloading the runner's own modules — rejected by ADR 020; the
++  - Hot-reloading the runner's own modules — rejected by ADR-020; the
+     checkpoint plus `resume` is the restart primitive.
+   - Loosening strict render's defaults, or forbidding self-change runs from
+-    adding prompt variables — both rejected by ADR 020, not revisited.
++    adding prompt variables — both rejected by ADR-020, not revisited.
+   - A checkpoint schema version bump or migration ladder — the ADR-006 §2
+     grammar stands untouched (A6); this change adds one optional field.
+   - Multi-run concurrency or per-run worktrees — ADR-003's territory.
+@@ -81,14 +81,14 @@ plumbing for a fact the checkpoint already carries. The checkpoint record is
+ the only marker; the ADR's "marker" is its record, printed summary, and
+ commit, not a new file.
+ 
+-**Per-commit hooks at all three commit sites.** Rejected in favor of one
++**Per-commit hooks at all three commit sites.** Rejected in favour of one
+ net-diff check per window: the three sites (A2) would drift as the harness
+ grows, while §1's net-diff listing, taken once in each finalize window,
+ already sees the stage/pass commit and the ownership-revert commits
+ together, and nets a reverted attempt's changes out (A4).
+ 
+ **The runner relaunches itself instead of exiting.** Considered, not rejected
+-on merit, deferred: ADR 020 leaves it undecided, and v1's pause-and-exit
++on merit, deferred: ADR-020 leaves it undecided, and v1's pause-and-exit
+ matches the watch-and-restart posture the research found dominant (driver
+ relaunches; systemd/Kubernetes replace whole processes rather than mutating
+ one) and needs nothing the lock and checkpoint do not already give (A9).
+@@ -127,7 +127,7 @@ before driving (§2).
+ Which stages can open a boundary at all follows from the ownership matrix
+ (A3): only `implement`/`fix` can commit under the two prefixes, so the
+ boundary opens only after a coder window, and ordinary product runs — which
+-touch no `tools/orchestration` path — never see one, as ADR 020 requires.
++touch no `tools/orchestration` path — never see one, as ADR-020 requires.
+ 
+ The ADR's "test that fails when a new executable path is added" is Test
+ strategy #7.
+@@ -163,7 +163,7 @@ can resume immediately.
+ 
+ Resume is the restart. The boundary commit is on the run's branch and
+ templates resolve from the runner's own module path, so any fresh process
+-started from the run's worktree has imported and renders the changed tree
++started from the run's worktree already imports and renders the changed tree
+ (A1). `resumePipeline` — before it drives — gate-logs the boundary it is
+ crossing and clears the record, mirroring the split-record posture resume
+ already uses (runner.ts:2345–2378); because it clears at entry, a forced
+@@ -184,12 +184,12 @@ the new renderer — run 016's `{{gateEvidence}}` class goes green.
+   driver automates past an escalation by code collision; the research's
+   FreeBSD `sysexits` note is why the code stays this simple and the record,
+   not the integer, is the durable contract.
+-- The pause's own summary: the line `finalizeRestartBoundary` prints names
++- The pause's own summary: the line that `finalizeRestartBoundary` prints names
+   the stage, the changed paths, and the repair command
+   (`pipeline resume <slug>`) — the "summary a driver logs".
+-- `pipeline status` while the record stands gains one line, built the way
+-  `planStopStatusLines` builds its stop line (runner.ts:3580–3589): the
+-  stage that opened the boundary, how many harness files it changed, and the
++- Status output: while the record stands, `pipeline status` gains one line,
++  built the way `planStopStatusLines` builds its stop line (runner.ts:3580–3589):
++  the stage that opened the boundary, how many harness files it changed, and the
+   resume posture. The `restart-boundary` gate-log entry keeps the existing
+   recent-gates block honest without further mechanism.
+ 
+@@ -212,7 +212,7 @@ cross-reference boundaries, the §2 record already names the stage and paths.
+ | A driver misreads exit 3 (treats a pause as an escalation, or ignores the difference) | Low — one new code, pinned by Test #6 and the driver-loop pin #10 | Low — resuming is the right next step for a pause, and the record says so in the run's own checkpoint | Distinct codes pinned both ways (pause→3, escalation→2); the checkpoint record, not the integer, is the contract (research prior art: sysexits' regret) |
+ | A `resume` launched from a different, older checkout imports pre-change code and drives on, the record inert to it (A7) | Low — needs a second checkout at an old revision | Medium — that run re-stales; that is today's status quo, not a regression this change worsens | The printed summary names the run's worktree as the place to relaunch; the boundary commit makes the pause visible in history after the fact |
+ | The surface rule drifts as the harness grows (a new importable location appears outside the two prefixes) | Medium over the harness's lifetime | Medium — a self-change there would restart nothing, reproducing the run-016 class | The ADR demands exactly this guard: Test #7 fails the suite on any import location or read root the rule does not name |
+-| Consecutive self-change windows cost a boundary round trip each | Common for self-change runs, zero for product runs (A3) | Low — one process start of seconds against minutes-long stage windows (A12) | Every boundary is gate-logged, so thrashing is visible in the record; a per-run cap is Deferred (ADR 020's "too large for a single pass") |
++| Consecutive self-change windows cost a boundary round trip each | Common for self-change runs, zero for product runs (A3) | Low — one process start of seconds against minutes-long stage windows (A12) | Every boundary is gate-logged, so thrashing is visible in the record; a per-run cap is Deferred (ADR-020's "too large for a single pass") |
+ | A pause mid-review-round is mistaken for a pass failure by an operator reading the transcript | Low — the pause follows a green pass commit and the status line names it | Low | The boundary entry, commit and status line all state "not a failure"; Test #4 pins that no failure accounting moves |
+ 
+ ## Compatibility matrix
+@@ -304,25 +304,25 @@ are recorded as such in the matrix.
+ 3. `docs/workflows.md` gains the operator section: the exit-code table
+    (0/3/2/1), how a paused run reads in `pipeline status`, and the
+    resume-is-the-restart posture — drivers relaunch from the run's worktree.
+-4. Acceptance: ADR 020 flips `proposed → accepted` when its own run 020
++4. Acceptance: ADR-020 flips `proposed → accepted` when its own run 020
+    completes, exactly as ADR-006's did; the design is then exercised by the
+    first later self-change run that adds a prompt variable (the ADR-016
+    class) and goes green across its boundary.
+ 
+ ## Deferred / out of scope
+ 
+-- The runner restarting itself instead of pausing for the driver — ADR 020's
++- The runner restarting itself instead of pausing for the driver — ADR-020's
+   "Not decided here"; v1's rule is pause-and-exit only.
+ - Whether the agent permission files under `.opencode/agents/` belong to the
+-  surface — ADR 020's "Not decided here" (their per-session re-read behavior
++  surface — ADR-020's "Not decided here" (their per-session re-read behaviour
+   is unestablished, A13; a flow-config module under `src/**` is surface only
+   incidentally, by §1's rule).
+ - How many boundaries one run may cross before the run is too large for a
+-  single pass — ADR 020's "Not decided here"; v1 counts them only in the
++  single pass — ADR-020's "Not decided here"; v1 counts them only in the
+   gate log.
+ - Defaulting unknown template variables at the render boundary, and forbidding
+-  self-change runs from adding prompt variables — both rejected by ADR 020.
+-- Hot-reloading the runner's own modules — rejected by ADR 020 on mechanism.
++  self-change runs from adding prompt variables — both rejected by ADR-020.
++- Hot-reloading the runner's own modules — rejected by ADR-020 on mechanism.
+ - The lock-ID nonce / stale-lock race — already deferred by ADR-006;
+   unchanged here.
+ - Windows and macOS verification of the lock and git posture — no follow-up
+@@ -345,5 +345,5 @@ are recorded as such in the matrix.
+   record; the existing per-attempt `template @ sha` line stands, pinned by
+   Test #8.
+ - r1 Deferred (research OQ4/OQ5/OQ6): boundary cap, runner self-restart, and
+-  `.opencode/agents/**` surface membership deferred to ADR 020's
++  `.opencode/agents/**` surface membership deferred to ADR-020's
+   "Not decided here".

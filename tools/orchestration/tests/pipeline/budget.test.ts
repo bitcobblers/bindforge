@@ -184,7 +184,7 @@ describe('review budget at round entry', () => {
     const { options } = tmpRepo(state);
     const { client, calls } = requestCountingClient();
 
-    const status = await resumePipeline({ ...options({}), client });
+    const { status } = await resumePipeline({ ...options({}), client });
 
     expect(status).toBe('escalated');
     expect(calls).toEqual([]);
@@ -196,7 +196,7 @@ describe('review budget at round entry', () => {
     const { dir, options } = tmpRepo(state);
     const { client, calls } = requestCountingClient();
 
-    const status = await resumePipeline({ ...options({ extendBudget: 1 }), client });
+    const { status } = await resumePipeline({ ...options({ extendBudget: 1 }), client });
 
     // One revise stage plus the five reviewers of the granted round 6.
     expect(calls.filter((c) => c.startsWith('create:'))).toHaveLength(6);
@@ -220,7 +220,10 @@ describe('review budget at round entry', () => {
     const { dir, options } = tmpRepo(exhaustedState());
     const { client, calls } = requestCountingClient();
 
-    const status = await resumePipeline({ ...options({ forceStage: 'design-review' }), client });
+    const { status } = await resumePipeline({
+      ...options({ forceStage: 'design-review' }),
+      client,
+    });
 
     expect(status).toBe('escalated');
     // No review sessions were spent: the cap is checked before the round.
@@ -234,7 +237,7 @@ describe('review budget at round entry', () => {
     const { dir, options } = tmpRepo(exhaustedState());
     const { client, calls } = requestCountingClient();
 
-    const status = await resumePipeline({
+    const { status } = await resumePipeline({
       ...options({ forceStage: 'design-review', extendBudget: 1 }),
       client,
     });
@@ -329,7 +332,7 @@ describe('a rejected moves list is one budget event', () => {
     // attempt as `stage-timeout` before the nudge budget can produce the
     // `invalid-reply: moves` failure this test is about.
     const cfg: PipelineConfig = { ...FAST, minNudgeIntervalMs: 0 };
-    const status = await resumePipeline({ ...options({ forceStage: 'fix', cfg }), client });
+    const { status } = await resumePipeline({ ...options({ forceStage: 'fix', cfg }), client });
 
     const saved = JSON.parse(
       readFileSync(join(dir, 'docs', 'designs', '002-x', '.pipeline.json'), 'utf8'),

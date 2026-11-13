@@ -42,6 +42,7 @@ import {
   planOutgrewFlow,
   sourceAdmissible,
   stagePathAllowed,
+  touchesExecutableSurface,
 } from './gates.js';
 import {
   type IdentityPin,
@@ -126,6 +127,7 @@ import {
   PROPOSAL_DOC,
   type PipelineState,
   RESEARCH_DOC,
+  RestartBoundary,
   STATE_FILE,
   type StageResult,
   namesReservedSegment,
@@ -1244,6 +1246,16 @@ interface StageHandle {
   /** Set on a fresh-session attempt 2: why attempt 1 failed (log excerpt). */
   failureNote?: string;
   /**
+   * ADR-020 §4 (Test strategy #8): the prompt template text pinned at stage
+   * entry, carried on the handle so every attempt of the stage renders — and
+   * hashes — the same bytes even when a self-change window rewrites the file on
+   * disk under it. The transcript's `template <file> @ <sha>` line is the record
+   * each stage's reply is judged by, so attempt 2 must name attempt 1's sha;
+   * re-reading the template per attempt is run 010 r8's escalation and the
+   * run 016 staleness class ADR-020 exists for.
+   */
+  templateText?: string;
+  /**
    * The stage-ok/pre-commit gate: runs after the inference phase, before this
    * stage's commit window, over the outcome the size meter just measured. A
    * returned reason stops the run — the window never opens, so nothing is
@@ -1340,7 +1352,12 @@ async function executeInference(
   let templateFile: string | null = null;
   let sha: string | undefined;
   if (template) {
-    const text = templateText ?? (await loadTemplate(opts.promptsDir, template));
+    // The stage-entry pin wins over a re-read: `templateText` is what the
+    // caller preloaded, `handle.templateText` is the same text carried on the
+    // handle (the single-stage path), and only a stage whose caller hands down
+    // nothing reads the file at attempt time (ADR-020 §4, run 010 r8).
+    const text =
+      templateText ?? handle.templateText ?? (await loadTemplate(opts.promptsDir, template));
     templateFile = `tools/orchestration/prompts/${template}`;
     sha = templateHash(text);
     prompt = renderTemplate(text, handle.vars);
@@ -1832,6 +1849,108 @@ function recordAttemptFailure(
 }
 
 /**
+ * ADR-020 §1 — the executable-surface hits inside ONE runner commit window.
+ * The window's NET diff (`headBefore..HEAD`, taken after the window's own
+ * commit) is what the rule judges, and that single check covers all three
+ * runner commit sites: the stage/pass commit is the window's net effect, and
+ * the revert commits `enforceOwnership` mints cancel their cause inside the
+ * same range — so a stage that only *tried* to change the harness outside its
+ * ownership and was swept leaves no hit (A3, A4). One net-diff check per window
+ * also cannot drift as the harness grows the way three per-commit hooks would.
+ */
+function surfacePathsInWindow(repoDir: string, headBefore: string): string[] {
+  return nulPaths(
+    git(repoDir, ['diff', '-z', '--no-renames', '--name-only', `${headBefore}..HEAD`]),
+  )
+    .filter((path) => touchesExecutableSurface(path))
+    .sort();
+}
+
+/**
+ * The record's path list, bounded the way `boundedGateEvidence` bounds a gate
+ * record — the checkpoint carrying it is cloned into every later save and
+ * rendered into the boundary commit, the gate log, `pipeline status` and the
+ * printed summary. Every path is model-authorable, so each copy goes through
+ * `printable` before it can reach any of those.
+ *
+ * The cap's marker line rides *in* the list, exactly like the elision leg of a
+ * bounded gate record, so it is a count line and never a file: every renderer
+ * that says "N harness file(s)" takes N from `surfacePathCount`, not from the
+ * padded array's length (code-review r1: compatibility #3, security #3).
+ */
+function boundedSurfacePaths(paths: readonly string[]): string[] {
+  const kept = paths.slice(0, MAX_GATE_LEGS).map((path) => printable(path));
+  if (paths.length > MAX_GATE_LEGS) {
+    kept.push(elisionMarker(paths.length - MAX_GATE_LEGS));
+  }
+  return kept;
+}
+
+/** The one text `boundedSurfacePaths` appends when the cap bites. */
+function elisionMarker(elided: number): string {
+  return `${String(elided)} further harness path(s) elided by the record cap`;
+}
+
+/** Exact shape of that marker, so only text this file writes reads as a count. */
+const SURFACE_ELISION_RE = /^(\d{1,9}) further harness path\(s\) elided by the record cap$/;
+
+/**
+ * The record's true file count, for every "N harness file(s)" line: the status
+ * line, the pause summary, the `restart-boundary` gate entry and the crossing
+ * entry the resume logs. Once the cap bites the marker sits inside
+ * `record.paths`, so `paths.length` would report one file too many (and one of
+ * them a sentence). The count is only read from a marker standing at the cap
+ * position of a capped list — a planted path that merely ends like one is still
+ * just a path.
+ */
+function surfacePathCount(record: RestartBoundary): number {
+  const { paths } = record;
+  if (paths.length !== MAX_GATE_LEGS + 1) {
+    return paths.length;
+  }
+  const hit = SURFACE_ELISION_RE.exec(paths[MAX_GATE_LEGS] ?? '');
+  if (hit === null) {
+    return paths.length;
+  }
+  const elided = Number(hit[1]);
+  return Number.isNaN(elided) ? paths.length : MAX_GATE_LEGS + elided;
+}
+
+/**
+ * The gate-log names the boundary writes: the pause entry `finalizeRestartBoundary`
+ * records and the crossing entry `resumePipeline` records. Named in one place so
+ * the writers and the `statusLines` recent-gates block agree on which entries the
+ * standing boundary line already renders — an entry renamed at one site only must
+ * not silently start duplicating (or vanishing from) `pipeline status`.
+ */
+const RESTART_BOUNDARY_GATE_NAME = 'restart-boundary';
+const RESTART_BOUNDARY_CROSSED_GATE_NAME = `${RESTART_BOUNDARY_GATE_NAME}-crossed`;
+
+/**
+ * Record the boundary this window opened: the pause is decided here, at the
+ * window that net-changed the surface, and acted on at the top of the drive
+ * loop (§2). A window never opens a second record while one stands — the loop
+ * stops the run at the first — and the stage that opened it is the one named,
+ * because that is the window the next process must be judged in.
+ */
+function recordRestartBoundary(state: PipelineState, stageName: string, paths: string[]): void {
+  if (paths.length === 0) {
+    return;
+  }
+  const record: RestartBoundary = {
+    stage: printable(stageName),
+    paths: boundedSurfacePaths(paths),
+    at: Date.now(),
+  };
+  state.restartRequired = record;
+  console.warn(
+    `restart boundary: stage ${record.stage} changed ` +
+      `${String(paths.length)} harness file(s) this process runs or renders: ` +
+      `${record.paths.join(', ')} — the run pauses so a fresh process imports them`,
+  );
+}
+
+/**
  * One stage's window: the declared moves, then the sweep and commit. Skipped
  * when the stage failed.
  *
@@ -1888,6 +2007,12 @@ function finalizeStage(
       outcome.reply,
     ),
   );
+  // ADR-020 §1: the window just closed is the unit of detection — its net diff
+  // is what this process's own code was judged by, and if it moved the harness,
+  // the code still running is stale for it. The record is set here and acted on
+  // at the top of the drive loop, so no further stage window opens in this
+  // process.
+  recordRestartBoundary(state, stageName, surfacePathsInWindow(repoDir, headBefore));
   return outcome;
 }
 
@@ -1958,6 +2083,11 @@ function finalizeReviewPass(
       undefined,
     ),
   );
+  // ADR-020 §1: the pass window is judged by the same net-diff rule as a
+  // single stage's, so a commit landing inside it — including an operator
+  // commit the sweep reports and leaves alone — is inside its range and opens
+  // the boundary naming this pass's stage.
+  recordRestartBoundary(state, stageName, surfacePathsInWindow(repoDir, headBefore));
 }
 
 /**
@@ -2199,7 +2329,26 @@ async function runReviewPass(args: ReviewPassArgs): Promise<string | null> {
 
 class StopDriving extends Error {}
 
-export async function runPipeline(opts: RunOptions): Promise<PipelineState['status']> {
+/**
+ * ADR-020 §3 — the widened run/resume result. The status stays the whole
+ * terminal fact it always was, and the standing restart record rides beside it
+ * so the CLI can map a pause to its own exit code without reading the
+ * checkpoint a second time. `2` keeps its exact current meaning ("read
+ * `ESCALATION.md`") because a pause never enters the status enum: the record,
+ * not the integer, is the durable contract.
+ */
+export interface PipelineRunResult {
+  status: PipelineState['status'];
+  restartRequired?: RestartBoundary;
+}
+
+function runResult(state: PipelineState): PipelineRunResult {
+  return state.restartRequired === undefined
+    ? { status: state.status }
+    : { status: state.status, restartRequired: state.restartRequired };
+}
+
+export async function runPipeline(opts: RunOptions): Promise<PipelineRunResult> {
   const sourceAbs = resolve(opts.repoDir, opts.sourcePath);
 
   // ADR-010: the flow is read once, pre-lock, from the source document's
@@ -2282,7 +2431,7 @@ export async function runPipeline(opts: RunOptions): Promise<PipelineState['stat
       // an unwritable checkpoint is an escalation with a record, not a crash.
       if (error instanceof CheckpointWriteFailure) {
         await finalizeEscalate(opts.repoDir, state, printable(error.message), cfg);
-        return state.status;
+        return runResult(state);
       }
       throw error;
     }
@@ -2290,16 +2439,16 @@ export async function runPipeline(opts: RunOptions): Promise<PipelineState['stat
     gateLog(state, 'sourceAdmissible', 0, verdict);
     if (!verdict.proceed) {
       await finalizeEscalate(opts.repoDir, state, `source not admissible: ${verdict.reason}`, cfg);
-      return state.status;
+      return runResult(state);
     }
     await drive(opts, state, cfg);
-    return state.status;
+    return runResult(state);
   } finally {
     releaseLock(opts.repoDir);
   }
 }
 
-export async function resumePipeline(opts: ResumeOptions): Promise<PipelineState['status']> {
+export async function resumePipeline(opts: ResumeOptions): Promise<PipelineRunResult> {
   const designDirRel = join('docs', 'designs', opts.slug);
   const state = await loadState(join(opts.repoDir, designDirRel));
   if (!state) {
@@ -2376,6 +2525,31 @@ export async function resumePipeline(opts: ResumeOptions): Promise<PipelineState
       // removal is not restored from `headBefore` at the next boundary.
       recordRunnerDelete(markerAbs);
     }
+    // ADR-020 §2: `resume` IS the restart. This process already imported and
+    // renders the committed tree, so the boundary the previous process stopped
+    // at is crossed here — gate-logged first, exactly as the split-record
+    // posture above records the gap it repairs, then cleared before driving.
+    // Clearing at entry is what lets a forced resume (`--stage`) land on the
+    // forced stage instead of straight back at the loop-top boundary check, and
+    // it is why `states.ts` needs no transition for the pause.
+    const boundary = state.restartRequired;
+    if (boundary !== undefined) {
+      // The record's values are `printable` only if this code wrote them; a
+      // checkpoint can also come from a later-era runner or an operator's edit,
+      // so this render re-applies the writer-side posture to the loaded copy,
+      // exactly as `restartBoundaryStatusLines` does (code-review r1, security
+      // #2). The count is the record's true total, not the capped list's length.
+      const crossedStage = printable(boundary.stage);
+      const crossedPaths = boundary.paths.map((path) => printable(path));
+      gateLog(state, RESTART_BOUNDARY_CROSSED_GATE_NAME, 0, {
+        proceed: true,
+        reason:
+          `crossed the restart boundary stage ${crossedStage} opened on ` +
+          `${String(surfacePathCount(boundary))} harness file(s): ${crossedPaths.join(', ')} — ` +
+          'this process imported the committed tree, so the record is cleared and the run drives on',
+      });
+      state.restartRequired = undefined;
+    }
     if (!state.baseRef) {
       // Backfill for checkpoints written before baseRef existed: fork point
       // of the pipeline branch, falling back to the main repo default.
@@ -2387,7 +2561,7 @@ export async function resumePipeline(opts: ResumeOptions): Promise<PipelineState
     }
     ensureBranch(opts.repoDir, state.branch);
     await drive(opts, state, cfg);
-    return state.status;
+    return runResult(state);
   } finally {
     releaseLock(opts.repoDir);
   }
@@ -2438,6 +2612,15 @@ async function drive(
   let proposalSnapshot: string | null = null;
 
   for (;;) {
+    // ADR-020 §1: a standing boundary refuses to open another window. The check
+    // sits ahead of `decideNext` so the pause is not a state-graph edge and no
+    // stage after the surface-touching one runs in this process — the next
+    // stage's session is spent by the resumed one, on the committed tree.
+    if (state.restartRequired !== undefined) {
+      await finalizeRestartBoundary(opts.repoDir, state, cfg);
+      return;
+    }
+
     const next = decideNext(state, cfg);
     state.forceNext = null;
 
@@ -2475,12 +2658,19 @@ async function drive(
         await finalizeEscalate(opts.repoDir, state, o.stopped, cfg);
         throw new StopDriving();
       };
+      // The pin rides on the handle, not just on this call: attempt 2's handle
+      // carries the same text, so both attempts render and hash the same bytes
+      // and the transcript's `template @ sha` provenance names one template for
+      // the stage — the record ADR-020 §4 judges a stage across a boundary by.
       let out = await executeStage(
         opts as RunOptions,
         state,
-        { ...handle, attempt: 1 },
+        {
+          ...handle,
+          attempt: 1,
+          templateText: entryTemplateText,
+        },
         cfg,
-        entryTemplateText,
       );
       await stopOnGate(out);
       if (!out.ok) {
@@ -2518,6 +2708,10 @@ async function drive(
           {
             ...handle,
             attempt: 2,
+            // The entry pin again (see attempt 1): the retry renders and hashes
+            // the text the stage was given, not whatever the previous attempt
+            // or a self-change window left on disk.
+            templateText: entryTemplateText,
             ...(resumable
               ? {
                   resume: {
@@ -2528,7 +2722,6 @@ async function drive(
               : { failureNote: brief(printable(out.failure ?? 'no reply')) }),
           },
           cfg,
-          entryTemplateText,
         );
         await stopOnGate(out);
         if (!out.ok) {
@@ -3425,6 +3618,96 @@ async function finalizeDone(
 }
 
 /**
+ * ADR-020 §2 — the terminal pause, in the done path's shape and with nothing
+ * else that distinguishes it from a normal stage end: one `restart-boundary`
+ * gate entry naming the stage and the changed paths, one checkpoint save under
+ * the ADR-006 §3 terminal-save guard, one `chore: <nnn>-<slug> restart
+ * boundary` commit that lands the record in the COMMITTED checkpoint (the
+ * save-before-commit posture, so the worktree is not left dirty), and one
+ * printed summary naming the repair. No `ESCALATION.md`, no `stageFailures`
+ * increment, no round, session or budget charge: the pause reads the commit
+ * AFTER the stage completed green, and the next stage's charge lands once, in
+ * the resumed process.
+ *
+ * The one thing that must not happen is a pause that cannot be recorded
+ * masquerading as a clean stop, so a failed terminal save takes the §3 route:
+ * restore the committed copy and escalate.
+ */
+export async function finalizeRestartBoundary(
+  repoDir: string,
+  state: PipelineState,
+  cfg: PipelineConfig,
+): Promise<void> {
+  const record = state.restartRequired;
+  if (record === undefined) {
+    return;
+  }
+  const runId = `${state.nnn}-${state.slug}`;
+  const designDirRel = designDirOf(state);
+  const designDir = join(repoDir, designDirRel);
+  // Loaded or local, the copies of the record that reach a log, a commit or a
+  // terminal go through `printable`, and the count is the record's true total
+  // rather than the bounded list's length (code-review r1: security #2, #3).
+  const stageName = printable(record.stage);
+  const surfacePaths = record.paths.map((path) => printable(path));
+  const pathList = surfacePaths.join(', ');
+  const changedCount = String(surfacePathCount(record));
+  gateLog(state, RESTART_BOUNDARY_GATE_NAME, 0, {
+    proceed: true,
+    reason:
+      `stage ${stageName} changed ${changedCount} harness file(s) this runner ` +
+      `executes or renders: ${pathList} — not a failure: the run pauses here so a fresh process ` +
+      `imports and renders the committed tree (pipeline resume ${runId})`,
+  });
+  try {
+    await checkpoint(designDir, state);
+  } catch (error) {
+    if (!(error instanceof CheckpointWriteFailure)) {
+      throw error;
+    }
+    // The pause did not happen: the record is not in the run's record, so it
+    // must not reach the checkpoint the escalation goes on to write either.
+    // Dropping it here is what "restores the committed copy" means on the state
+    // side — the committed copy carries no boundary, and the escalation is the
+    // terminal record from here.
+    state.restartRequired = undefined;
+    restoreCommittedCheckpoint(repoDir, designDirRel);
+    await finalizeEscalate(
+      repoDir,
+      state,
+      `restart boundary could not be recorded: ${printable(error.message)}`,
+      cfg,
+    );
+    return;
+  }
+  // The boundary commit: the record is run history, and the worktree is left
+  // clean. The paths go in the body, exactly as the ownership revert commit
+  // states them, so a later reader can see what the pause was for.
+  stageAll(repoDir);
+  if (!gitOk(repoDir, ['diff', '--cached', '--quiet'])) {
+    git(repoDir, [
+      'commit',
+      '-m',
+      `chore: ${runId} restart boundary`,
+      '-m',
+      `stage ${stageName} changed the harness this process runs or renders; the run pauses ` +
+        `so the next process starts from this commit — not a failure, and nothing was charged ` +
+        `for it. changed harness files: ${pathList}`,
+    ]);
+    recordStageCommit(state, git(repoDir, ['rev-parse', 'HEAD']).trim());
+  }
+  // Decision 3's "summary a driver logs": the stage, the changed paths, and the
+  // repair — the pause is the routine next step, and the wording says so.
+  console.log(
+    `\npipeline PAUSED at a restart boundary (after stage ${stageName}): ` +
+      `${changedCount} harness file(s) this process runs or renders changed:\n` +
+      surfacePaths.map((path) => `  - ${path}`).join('\n') +
+      `\n  not a failure — no attempt, round, session or budget was charged for it.` +
+      `\n  restart from this worktree to carry the run on: pipeline resume ${runId}`,
+  );
+}
+
+/**
  * In-process equivalent of the printed repair, run after a failed terminal
  * save: when HEAD holds a file at the checkpoint path, clear the replacement
  * and land the committed copy back. Without it the escalation commit's
@@ -3457,6 +3740,18 @@ export async function finalizeEscalate(
   reason: string,
   cfg: PipelineConfig,
 ): Promise<void> {
+  // ADR-020 §3: an escalation is the terminal record, so it supersedes a pause.
+  // A window's finalize sets `restartRequired` at window end and the drive loop
+  // only converts it at the next loop top, so an escalation reached inside the
+  // same iteration — the post-window `checkpoint` that throws, an unexpected
+  // throw, a review pass that escalated after its `commit: false` sweep saw an
+  // operator's surface commit — would otherwise carry the pause into the
+  // escalated checkpoint, the widened result and the exit code: 3, the pause's
+  // code, beside a committed `ESCALATION.md`, and the documented driver loop
+  // (`while [ $? -eq 3 ]`) would resume straight past the escalation
+  // (code-review r1: security #1, compatibility #2). `finalizeRestartBoundary`'s
+  // own failed-save branch already states this rule; it holds at every site.
+  state.restartRequired = undefined;
   // The reason usually quotes failure text the model or the server chose (a
   // seat failure, an independence violation naming a path). It lands in the
   // gate log, on the operator's terminal, and in ESCALATION.md: keep it on
@@ -3589,6 +3884,27 @@ function planStopStatusLines(state: PipelineState, repair: RepairStep[]): string
 }
 
 /**
+ * ADR-020 §3: the `restart boundary:` status line, and only while the record
+ * stands — the same predicate-rendered shape as `planStopStatusLines`, because
+ * a pause is the run's standing condition, not a past event. It names the stage
+ * that opened it, how many harness files it changed, and the resume posture
+ * that is the whole repair; the record is cleared by `resume`, so a run that
+ * already crossed its boundary prints no line about one.
+ */
+function restartBoundaryStatusLines(state: PipelineState): string[] {
+  const record = state.restartRequired;
+  if (record === undefined) {
+    return [];
+  }
+  return [
+    `restart boundary: stage ${printable(record.stage)} changed ` +
+      `${String(surfacePathCount(record))} harness file(s) this runner executes or renders — not a ` +
+      `failure, nothing was charged for it; resume from this worktree and the fresh process ` +
+      `carries the run on: pipeline resume ${state.nnn}-${state.slug}`,
+  ];
+}
+
+/**
  * Human-facing explanation for `pipeline status`, from the gate log only.
  * `escalationMarkerPresent` (ADR-006 §3) makes the SPLIT RECORD visible: an
  * `ESCALATION.md` marker next to a checkpoint that still says `running` means
@@ -3624,11 +3940,25 @@ export function statusLines(state: PipelineState, escalationMarkerPresent = fals
     // it is the one state line rendered from a predicate: see
     // `planStopStatusLines` for why the record, not the stage, decides it.
     ...planStopStatusLines(state, repair),
+    // A standing restart boundary is the same kind of standing condition (ADR-020
+    // §3): one line, rendered from the record, naming the resume posture as the
+    // repair. `restartBoundaryStatusLines` explains why the record decides it.
+    ...restartBoundaryStatusLines(state),
     ...(hasSeats(state, 'design') ? [seatSummary(state, 'design', cfg)] : []),
     ...(hasSeats(state, 'code') ? [seatSummary(state, 'code', cfg)] : []),
     ...(growth === null ? [] : [growth]),
     'recent gates:',
     ...state.gateLog
+      // While a boundary record stands, the pause is already the standing line
+      // above — the same record rendered once (`docs/workflows.md`: status
+      // "carries one line"). The pause entry is that record's own twin in the
+      // log, so printing it here would state the same standing fact twice and
+      // read as two boundaries. The entry stays in the checkpoint's gate log,
+      // and a boundary this run already crossed has no standing line, so its
+      // entries keep reading in this block (Test strategy #5).
+      .filter(
+        (g) => !(state.restartRequired !== undefined && g.gate === RESTART_BOUNDARY_GATE_NAME),
+      )
       .slice(-6)
       .map((g) => `  ${g.proceed ? 'ok  ' : 'DENY'} ${g.gate} r${g.round}: ${printable(g.reason)}`),
   ];

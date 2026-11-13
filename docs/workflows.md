@@ -211,6 +211,55 @@ ownership violation, and the runner re-asserts it at every stage boundary —
 if another live process has taken it, the run refuses to continue rather
 than work beside a second writer.
 
+## When a run pauses at a restart boundary (ADR-020)
+
+A self-change run edits the harness itself. After each runner-minted stage
+window the runner diffs the window's net change against the harness's
+**executable surface** — what that process executes or renders, the
+`tools/orchestration/src/` modules it imported at start and the
+`tools/orchestration/prompts/` templates it renders at stage time. Only an
+`implement` or `fix` window can touch either, so ordinary product runs never
+see a boundary. When a window does move the surface, the run **pauses**
+instead of opening the next stage window against code that is now stale. The
+pause is not a failure: no attempt, round, session or budget is charged, no
+`ESCALATION.md` is written, and the checkpoint carries a `restartRequired`
+record naming the stage and the changed files. The pause is run history:
+a `restart-boundary` gate-log entry and a terminal
+`chore: <nnn>-<slug> restart boundary` commit whose body names the files.
+
+The `run` and `resume` commands exit with:
+
+| Exit | Meaning                                                |
+| ---- | ------------------------------------------------------ |
+| 0    | done                                                   |
+| 3    | paused at a restart boundary — the record stands       |
+| 2    | escalated — read `ESCALATION.md`                       |
+| 1    | error                                                  |
+
+`2` keeps its exact pre-020 meaning, so no existing driver mistakes a pause
+for an escalation. An escalation always outranks a pause: a run that ends
+escalated exits 2 and its checkpoint carries no `restartRequired` record, even
+when a stage window had just opened a boundary in the same process. While the
+record stands, `pipeline status` carries one line:
+
+```text
+restart boundary: stage implement changed 2 harness file(s) this runner executes or renders — not a failure, nothing was charged for it; resume from this worktree and the fresh process carries the run on: pipeline resume 020-example
+```
+
+Resume **is** the restart: relaunch `pipeline resume <slug>` from the run's
+worktree, where the fresh process has already imported and renders the
+committed tree. The resume gate-logs the boundary it crosses, clears the
+record, and carries the run on — the next stage renders the changed template
+with the current code. The driver-loop posture for self-change runs:
+
+```sh
+pipeline run docs/adrs/020-example.md
+while [ $? -eq 3 ]; do pipeline resume 020-example; done
+```
+
+v1 counts boundaries only in the gate log; a per-run cap is deferred
+(ADR-020, "Not decided here").
+
 ## Self-update checkpoint recovery
 
 A stage that writes anywhere inside another design's `docs/designs/<id>/`

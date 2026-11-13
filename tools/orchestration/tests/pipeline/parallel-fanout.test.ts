@@ -223,7 +223,7 @@ describe('review-pass fan-out at cfg.maxParallelReviews', () => {
   for (const n of [1, 2, 3, 5]) {
     it(`fans out the design pass at N = ${n}`, async () => {
       const { dir, stub, cfg } = dissentFixture(n);
-      const status = await resumePipeline(optionsFor(dir, { client: stub.client, cfg }));
+      const { status } = await resumePipeline(optionsFor(dir, { client: stub.client, cfg }));
       expect(status).toBe('escalated');
       // At N = 5 every seat of the panel is in flight at once; at every N the
       // in-flight count never climbs past N (maxInFlight is the peak over the
@@ -243,7 +243,9 @@ describe('review-pass fan-out at cfg.maxParallelReviews', () => {
       staggeredPrompts: false,
     });
 
-    const status = await resumePipeline(optionsFor(dir, { client: stub.client, cfg: cfgFor(5) }));
+    const { status } = await resumePipeline(
+      optionsFor(dir, { client: stub.client, cfg: cfgFor(5) }),
+    );
     expect(status).toBe('done');
 
     // c0: the full panel in handed order. c1: the security seat alone.
@@ -265,7 +267,7 @@ describe('review-pass fan-out at cfg.maxParallelReviews', () => {
   it('creates design seat sessions in handed order at N = 2', async () => {
     const { dir, stub, cfg } = dissentFixture(2);
 
-    const status = await resumePipeline(optionsFor(dir, { client: stub.client, cfg }));
+    const { status } = await resumePipeline(optionsFor(dir, { client: stub.client, cfg }));
     expect(status).toBe('escalated');
 
     // The fan-out really ran two-at-a-time (not accidentally serial)…

@@ -254,7 +254,7 @@ describe("promotion: --force on a light run's identity (A19, A26)", () => {
   it('completes as a full run and keeps the light plan in the branch history', async () => {
     const dir = tmpRepo({ flow: 'light' });
     const light = stageStub(dir);
-    expect(await runPipeline(entryOptions(dir, { client: light.client }))).toBe('done');
+    expect((await runPipeline(entryOptions(dir, { client: light.client }))).status).toBe('done');
     expect(light.sessionsCreated.filter((k) => k.startsWith('code-review:'))).toEqual(
       LIGHT_SEATS.map((seat) => `code-review:${seat}`),
     );
@@ -266,7 +266,8 @@ describe("promotion: --force on a light run's identity (A19, A26)", () => {
     // The operator promotes: one frontmatter edit, then the `--force` re-entry.
     writeSource(dir, 'full');
     const full = stageStub(dir);
-    expect(await runPipeline(entryOptions(dir, { client: full.client, force: true }))).toBe('done');
+    const fullRun = await runPipeline(entryOptions(dir, { client: full.client, force: true }));
+    expect(fullRun.status).toBe('done');
 
     const saved = savedState(dir);
     expect(saved.flow).toBe('full');
@@ -297,7 +298,7 @@ describe("promotion: --force on a light run's identity (A19, A26)", () => {
   it('refuses the promoted entry without --force, naming the checkpoint', async () => {
     const dir = tmpRepo({ flow: 'light' });
     const light = stageStub(dir);
-    expect(await runPipeline(entryOptions(dir, { client: light.client }))).toBe('done');
+    expect((await runPipeline(entryOptions(dir, { client: light.client }))).status).toBe('done');
 
     writeSource(dir, 'full');
     const { client, calls } = countingClient();
@@ -322,7 +323,7 @@ describe("promotion: --force on a light run's identity (A19, A26)", () => {
     writeSource(dir, 'full');
     const { client, sessionsCreated } = stageStub(dir);
 
-    expect(await resumePipeline(optionsFor(dir, { client }))).toBe('done');
+    expect((await resumePipeline(optionsFor(dir, { client }))).status).toBe('done');
     expect(savedState(dir).flow).toBe('light');
     expect(sessionsCreated.filter((k) => k.startsWith('design-review:'))).toEqual([]);
     expect(sessionsCreated.filter((k) => k.startsWith('code-review:'))).toEqual(

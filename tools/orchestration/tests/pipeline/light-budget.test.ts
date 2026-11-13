@@ -220,7 +220,7 @@ describe('the light review budget, bound in a run', () => {
     const dir = tmpRepo(lightState());
     const { client, sessionsCreated } = dissentStub(dir, LIGHT_SEATS);
 
-    const status = await resumePipeline(optionsFor(dir, { client }));
+    const { status } = await resumePipeline(optionsFor(dir, { client }));
     expect(status).toBe('escalated');
     expect(codeSessions(sessionsCreated)).toHaveLength(6);
 
@@ -248,7 +248,7 @@ describe('the light review budget, bound in a run', () => {
     const dir = tmpRepo(lightState());
     const { client } = dissentStub(dir, LIGHT_SEATS);
 
-    expect(await resumePipeline(optionsFor(dir, { client }))).toBe('escalated');
+    expect((await resumePipeline(optionsFor(dir, { client }))).status).toBe('escalated');
     expect(marker(dir)).not.toContain('review session budget exhausted');
   });
 
@@ -258,7 +258,7 @@ describe('the light review budget, bound in a run', () => {
     const dir = tmpRepo(lightState());
     const { client, sessionsCreated } = dissentStub(dir, ['testing']);
 
-    const status = await resumePipeline(optionsFor(dir, { client }));
+    const { status } = await resumePipeline(optionsFor(dir, { client }));
     expect(status).toBe('escalated');
     expect(codeSessions(sessionsCreated)).toHaveLength(4);
 
@@ -280,11 +280,12 @@ describe('the light review budget, bound in a run', () => {
   it('escalates a forced code-review resume on the session budget at 6/6', async () => {
     const dir = tmpRepo(lightState());
     const first = dissentStub(dir, LIGHT_SEATS);
-    expect(await resumePipeline(optionsFor(dir, { client: first.client }))).toBe('escalated');
+    const firstRun = await resumePipeline(optionsFor(dir, { client: first.client }));
+    expect(firstRun.status).toBe('escalated');
     expect(codeSessions(first.sessionsCreated)).toHaveLength(6);
 
     const second = dissentStub(dir, LIGHT_SEATS);
-    const status = await resumePipeline(
+    const { status } = await resumePipeline(
       optionsFor(dir, { client: second.client, forceStage: 'code-review' }),
     );
     expect(status).toBe('escalated');
@@ -307,7 +308,7 @@ describe('the light review budget, bound in a run', () => {
     const dir = tmpRepo(lightState(), false);
     const { client, sessionsCreated } = dissentStub(dir, LIGHT_SEATS);
 
-    const status = await resumePipeline(optionsFor(dir, { client }));
+    const { status } = await resumePipeline(optionsFor(dir, { client }));
     expect(status).toBe('escalated');
 
     // The loop terminates: plan, implement, and exactly two `fix` sessions.
@@ -333,7 +334,7 @@ describe('the light review budget, bound in a run', () => {
     const dir = tmpRepo(lightState());
     const { client, sessionsCreated } = dissentStub(dir, LIGHT_SEATS);
 
-    const status = await resumePipeline(optionsFor(dir, { client, extendBudget: 1 }));
+    const { status } = await resumePipeline(optionsFor(dir, { client, extendBudget: 1 }));
     expect(status).toBe('escalated');
     expect(codeSessions(sessionsCreated)).toHaveLength(6);
 
@@ -356,11 +357,12 @@ describe('the light review budget, bound in a run', () => {
   it('spends one grant per over-cap pass and stops on the spent fix budget', async () => {
     const dir = tmpRepo(lightState());
     const first = dissentStub(dir, LIGHT_SEATS);
-    expect(await resumePipeline(optionsFor(dir, { client: first.client }))).toBe('escalated');
+    const firstRun = await resumePipeline(optionsFor(dir, { client: first.client }));
+    expect(firstRun.status).toBe('escalated');
     expect(codeSessions(first.sessionsCreated)).toHaveLength(6);
 
     const second = dissentStub(dir, LIGHT_SEATS);
-    const status = await resumePipeline(
+    const { status } = await resumePipeline(
       optionsFor(dir, { client: second.client, forceStage: 'code-review', extendBudget: 1 }),
     );
     expect(status).toBe('escalated');
@@ -392,11 +394,12 @@ describe('the light review budget, bound in a run', () => {
   it('prints a grant count that decreases and leaves the surplus unspent', async () => {
     const dir = tmpRepo(lightState());
     const first = dissentStub(dir, LIGHT_SEATS);
-    expect(await resumePipeline(optionsFor(dir, { client: first.client }))).toBe('escalated');
+    const firstRun = await resumePipeline(optionsFor(dir, { client: first.client }));
+    expect(firstRun.status).toBe('escalated');
     expect(codeSessions(first.sessionsCreated)).toHaveLength(6);
 
     const second = dissentStub(dir, LIGHT_SEATS);
-    const status = await resumePipeline(
+    const { status } = await resumePipeline(
       optionsFor(dir, { client: second.client, forceStage: 'code-review', extendBudget: 2 }),
     );
     expect(status).toBe('escalated');
@@ -431,7 +434,7 @@ describe('the effective config on a light resume', () => {
     const { client, sessionsCreated } = dissentStub(dir, LIGHT_SEATS);
     const cliCfg = cliConfig();
 
-    const status = await resumePipeline(optionsFor(dir, { client, cfg: cliCfg }));
+    const { status } = await resumePipeline(optionsFor(dir, { client, cfg: cliCfg }));
     expect(status).toBe('escalated');
 
     const launched = codeSessions(sessionsCreated);
