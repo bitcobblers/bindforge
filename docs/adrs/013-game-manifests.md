@@ -88,5 +88,5 @@ a re-validation matrix of profiles-per-manifest-version; a third format joins
 the conformance corpus and the `supported_majors` list.
 
 Not decided here: codec family implementations and config-path discovery
-(ADR-017); which preset sets ship as seeds (ADR-016); how a manifest is
+(ADR-017); which preset sets ship as seeds (ADR-019); how a manifest is
 authored or reviewed by a human.

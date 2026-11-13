@@ -183,5 +183,5 @@ TOML file formats plus schema validation double the validation surface vs.
 a JSON-only design.
 
 Not decided here: codec implementations and config path discovery (ADR-017),
-which policies ship as the seed preset set (ADR-016), the hub service and
+which policies ship as the seed preset set (ADR-019), the hub service and
 voting (ADR-018), and where a user's personal policy document lives.

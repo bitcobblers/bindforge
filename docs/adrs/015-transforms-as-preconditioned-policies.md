@@ -90,7 +90,7 @@ recorded now has teeth.
 Costs: every transform is a named, preconditioned, tested unit — preconditions
 are real logic, not a flag; the policy format joins the conformance corpus and
 `supported_majors`; the seed preset set is a curated collection to maintain
-(ADR-016).
+(ADR-019).
 
-Not decided here: which policies ship as the seed preset set (ADR-016); the CLI
+Not decided here: which policies ship as the seed preset set (ADR-019); the CLI
 to author and apply policies (ADR-017); the hub and voting (ADR-018).
