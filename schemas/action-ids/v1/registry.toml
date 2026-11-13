@@ -1,0 +1,7 @@
+# The action taxonomy, v1. This file is the only id list: bindforge-core loads
+# it, it is not repeated in Rust. Adding an id means a PR to this file.
+format = "action-ids"
+version = "v1"
+discrete-lateral = ["move.steer-left", "move.steer-right", "move.strafe-left", "move.strafe-right"]
+continuous-lateral = ["aim.camera"]
+none = ["move.forward", "move.backward", "move.jump", "move.sprint", "aim.sights", "aim.cycle-target", "combat.melee", "combat.fire", "combat.reload", "combat.dodge", "combat.block", "combat.skill-1", "combat.skill-2", "combat.skill-3", "interact.primary", "interact.secondary", "interact.pickup", "item.slot-1", "item.slot-2", "item.slot-3", "item.slot-4", "item.slot-5", "item.slot-6", "item.heal", "item.cycle", "ui.map", "ui.inventory", "ui.menu", "ui.journal", "ui.chat", "ui.scoreboard", "system.pause", "system.settings", "system.respawn", "system.screenshot"]

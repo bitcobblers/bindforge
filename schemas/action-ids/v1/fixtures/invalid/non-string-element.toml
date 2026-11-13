@@ -1,0 +1,8 @@
+# An axis array is an array of strings. The bare `7` in `none` is a TOML
+# integer, not an id, so the document is refused: an unquoted element would
+# otherwise read as an id no writer intended.
+format = "action-ids"
+version = "v1"
+discrete-lateral = []
+continuous-lateral = []
+none = ["move.forward", 7]

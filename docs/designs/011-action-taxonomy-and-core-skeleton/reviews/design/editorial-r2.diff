@@ -1,0 +1,73 @@
+diff --git a/tmp/bindforge-editorial-action-taxonomy-and-core-skeleton-r2.md b/home/mike/repos/bindforge/docs/designs/011-action-taxonomy-and-core-skeleton/02-proposal.md
+index f23e3e4..b29cba0 100644
+--- a/tmp/bindforge-editorial-action-taxonomy-and-core-skeleton-r2.md
++++ b/home/mike/repos/bindforge/docs/designs/011-action-taxonomy-and-core-skeleton/02-proposal.md
+@@ -9,7 +9,7 @@ a conformance harness, `data/manifests/` and `data/profiles/` as placeholders.
+ **Two:** the action taxonomy — dotted lowercase ids in one shared namespace,
+ one orthogonal axis-kind attribute, and explicitly *no* placement semantics —
+ which every later contract references: ADR-012 declares `depends-on: [011]`,
+-ADR-013 maps game-native action names onto these ids, ADR-014 profiles speak
++ADR-013 maps game-native action names onto these ids, ADR-014's profiles speak
+ them, and ADR-015 may flip polarity only for `discrete-lateral` ones (A4).
+ 
+ This stage does not start from an empty tree. The ADR-008 design run already
+@@ -30,10 +30,10 @@ questions 1-8) are each answered in Chosen design or listed in Deferred.
+   - `schemas/action-ids/v1/`: the id grammar, the shipped id registry as data,
+     and valid+invalid fixtures the existing harness walk picks up with **no
+     harness change**.
+-  - `crates/core`: typed `ActionId`, `AxisKind`, `ActionRegistry` and a loader,
++  - `crates/core`: typed `ActionId`, `AxisKind`, `ActionRegistry`, and a loader,
+     std-only, no new dependency.
+   - The initial ~40-id set enumerated, not implied — for a third-person
+-    shooter / ARPG with Remnant 2 as first exercise (A15).
++    shooter / ARPG with Remnant 2 as the first exercise (A15).
+   - One written rule for axis-kind classification, and one for id extension and
+     withdrawal, both in the contract tree where a third-party reader sees them.
+   - `data/manifests/` and `data/profiles/` created with READMEs; the stale
+@@ -68,7 +68,7 @@ questions 1-8) are each answered in Chosen design or listed in Deferred.
+ ## Options considered
+ 
+ **Where the id set lives: `schemas/` data loaded by `crates/core`, a Rust
+-literal inside `crates/core`, or a build-script generated table.** A Rust
++literal inside `crates/core`, or a build-script-generated table.** A Rust
+ literal makes the crate a second copy of the registry with a drift test between
+ them, and it contradicts the precedent the repo already set for a taxonomy-ish
+ table — the reach classes live in `schemas/`, "not in Rust literals"
+@@ -221,9 +221,9 @@ reuses an existing `CoreError` variant — `InvalidValue` for a malformed id, a
+ duplicate, an out-of-set entry, or a version that disagrees with its directory,
+ `MissingEntry` for an absent axis array — so no new variant enters the error
+ contract and every rejection keeps the single-line, truncating, path-free
+-message the contract already promises, an offending id echoed escaped to
+-printable characters (`schemas/README.md:67-72`). `lib.rs` re-exports the four
+-new names and its public-surface list gains them.
++message the contract already promises, with an offending id echoed,
++escaped to printable characters (`schemas/README.md:67-72`). `lib.rs`
++re-exports the four new names and its public-surface list gains them.
+ 
+ ### Axis kind
+ 
+@@ -261,11 +261,11 @@ paragraph saying what lands there and which ADR populates it (013 and 014), that
+ nothing reads them yet, that whatever is dropped there arrived from elsewhere
+ and is untrusted input once 013/014 read it, and pointing at the stability rule
+ in `schemas/action-ids/v1/spec.md` rather than restating it. `schemas/README.md`
+-gains `action-ids` to its format list and replaces the "arrive with ADR-009"
++adds `action-ids` to its format list and replaces the "arrive with ADR-009"
+ lineage with the 012-015 series; the `ADR-009` references in the module docs of
+-`crates/core/src/lib.rs`, `document.rs`, and `chain.rs` that describe future
+-model ownership are retargeted to the same series. Docs only — no behaviour, no
+-fixture, no gate change.
++`crates/core/src/lib.rs`, `document.rs`, and `chain.rs` — the ones that
++describe future model ownership — are retargeted to the same series. Docs
++only — no behaviour, no fixture, no gate change.
+ 
+ ## Risks
+ 
+@@ -295,7 +295,7 @@ fixture, no gate change.
+ 
+ 1. Unit (`crates/core/tests/action.rs`, module-named per ADR-004/A8) — id
+    grammar, one case per rule: accept `move.strafe-left`, `item.slot-6`,
+-   `aim.cycle-target` and a 63-octet segment; reject an uppercase segment, a
++   `aim.cycle-target`, and a 63-octet segment; reject an uppercase segment, a
+    non-ASCII letter in a segment, a leading digit, a leading or trailing hyphen,
+    an underscore, an empty segment (`move..steer`), a single-segment id, a
+    three-segment id, a 64-octet segment, and the empty string.

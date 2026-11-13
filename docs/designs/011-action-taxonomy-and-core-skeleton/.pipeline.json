@@ -1,0 +1,1029 @@
+{
+  "version": 1,
+  "slug": "action-taxonomy-and-core-skeleton",
+  "nnn": "011",
+  "branch": "pipeline/011-action-taxonomy-and-core-skeleton",
+  "source": {
+    "kind": "adr",
+    "path": "docs/adrs/011-action-taxonomy-and-core-skeleton.md"
+  },
+  "status": "done",
+  "lastStage": "doc-sync",
+  "designRound": 2,
+  "codeRound": 1,
+  "designBudgetUsed": 1,
+  "codeBudgetUsed": 4,
+  "editorialDone": false,
+  "testsGreen": true,
+  "testsNeedUpdate": false,
+  "stageFailures": {},
+  "stageCommits": [
+    "1220b0e5bf4835cfa2eb24d7364d1ebb8e0d9f63",
+    "b2626ea6be060c155d744f5a970a141674117feb",
+    "0257cc86ad9204434769c7862fbda1ea92e08e53",
+    "8a74fc4c57b2fafc2ad33063e84bb089025302f9",
+    "26459a314d53f5f763851c2c6419f64358c54ac6",
+    "c7ba2192e3fba4c20473cdea1f6df70249bad802",
+    "25c70b2ca404feb67ba7dff550e5ec3c26f4987c",
+    "4227c457ba8e04de0816902fe4c108ac9aa585a8",
+    "29e4dc351d756d718b3085d38c5d693ffe8871eb",
+    "95a17d3fb5d137ac7cc74c2f80f271c7a6709996",
+    "2dfec2a054b7b60165f3c0ce53636c8d618fc7c9",
+    "66aa490173aea2187c55bd64884dcdd8cb30cee5",
+    "a964239396d6e75d846b4b436c8a63f6492c9162",
+    "be5ec982a497d3835003938ebe858c3d511fb85a",
+    "2b20f3c8ab3c963ece6a8b08f6aaa7432b5ad1cc",
+    "e8bf4f486df520c0692188b7c68e3efc7797756b",
+    "760f00bd4ab8ead2ad41c0878ccdfc46c760224d"
+  ],
+  "forceNext": null,
+  "results": [
+    {
+      "stage": "research",
+      "round": 0,
+      "sessionID": "ses_e2d064e66ffe3QhZ9gRGRtc7RJ",
+      "agent": "research/researcher",
+      "at": 1794541207541,
+      "reply": {
+        "summary": "Researched ADR-011 (action taxonomy + crates/core skeleton) and wrote docs/designs/011-action-taxonomy-and-core-skeleton/01-research.md. Applied three lenses — prior art (Steam Input IGA files, Unity Input System actions/GUIDs, SDL GameControllerDB, evdev key-code registry, libretro remap layering, XAG 107), standards/conformance (JSON Schema Test Suite and toml-test golden-fixture harnesses, RFC 1035 label grammar, semver deprecation vocabulary, HID/evdev lineage), and platform notes (cargo workspace globs + virtual-manifest resolver, edition 2024 ⇒ Rust 1.85, rust-toolchain.toml pinning, CI gates). Every claim carries a source URL. Key findings for the designer: 'actions not inputs' identity layers are industry-proven; published id sets are one-way doors needing written extension/deprecation discipline; and the branch already contains crates/core and schemas/ scaffolding that contradicts the ADR's greenfield framing — flagged as the top risk with open questions on the ~40-id list, id grammar, and harness portability.",
+        "commitMessage": "docs: add research for action taxonomy and core skeleton"
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/research-r0.md",
+      "durationMs": 265780,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal",
+      "round": 0,
+      "sessionID": "ses_e2d023fc6ffeJckUmyfpLpw6HJ",
+      "agent": "design/designer",
+      "at": 1794541431821,
+      "reply": {
+        "commitMessage": "docs: propose the action taxonomy and the crates/core spine (ADR-011)"
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/proposal-r0.md",
+      "durationMs": 224186,
+      "nudges": 0,
+      "docLines": 382,
+      "docLinesAdded": 382,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2cfed3a3ffeDIaHHQEsZEJQEq",
+      "agent": "review/design-correctness",
+      "at": 1794541609283,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Test strategy #3 — \"a document with exactly the four defined entries parses\"",
+            "problem": "The format defines five entries: the spec entry table lists format, version, and the three axis arrays (all required), and the registry.toml shown in Chosen design carries exactly those five keys; the same test says a \"fourth axis array\" is an unknown entry, implying three defined arrays plus format and version. As written, a document with only four of the five required entries would have to parse, contradicting the entry table and the missing-axis-arrays fixture.",
+            "fix": "Change \"four\" to \"five defined entries\"."
+          },
+          {
+            "severity": "minor",
+            "location": "Delta inventory — \"Unchanged: `conformance.rs`, `common/mod.rs`, `chain.rs`, `reach.rs`, …\"",
+            "problem": "Contradicts Placeholders and lineage / Rollout 5, which edit \"the `ADR-009` references in the module docs of `crates/core/src/lib.rs`, `document.rs`, and `chain.rs`\" (chain.rs:3 and :16 hold such references). chain.rs is an edited file listed as unchanged.",
+            "fix": "Move chain.rs into the Edited list annotated \"(module docs only)\", or split the Unchanged list into unchanged files and docs-only edits."
+          },
+          {
+            "severity": "minor",
+            "location": "Goals / Non-goals — \"the stale ADR-009 lineage in the contract docs retargeted to the 011-015 series\"",
+            "problem": "The delta inventory and Rollout 5 retarget only schemas/README.md plus the lib.rs/document.rs/chain.rs module docs, but stale ADR-009 ownership lineage also sits in schemas/reach-classes/v1/spec.md (\"owned by ADR-009 … pending ADR-009\"), schemas/profile/v1/spec.md, and crates/core/src/reach.rs (\"ADR-009 owns the taxonomy the ids name\"), so the Risks row \"Stale ADR-009 lineage misleads the next contributor\" under-covers its own mitigation.",
+            "fix": "Add those three files' lineage sentences to the Rollout 5 retarget list (doc-only, no deferred substance touched), or scope the Goal to the files actually edited."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design — fixtures/invalid list, \"missing-axis-arrays.toml\"",
+            "problem": "The proposal commits to toml-test's rule (\"one fault each, file named after the fault (A6)\"), but the plural name implies one document missing several required axis arrays — multiple faults in one fixture.",
+            "fix": "Make the fixture omit exactly one required axis array and name it missing-axis-array.toml; the all-arrays-absent case is already covered by unit Test strategy #3."
+          }
+        ]
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/design-review-correctness-r1c0.md",
+      "durationMs": 177352,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2cfc1eadffeZ8JIJ4478VabKN",
+      "agent": "review/design-compatibility",
+      "at": 1794541663565,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Compatibility matrix — row \"| Steam Deck / SteamOS | unknown | Inherits design 008's position; this stage adds no platform-specific work |\"",
+            "problem": "The compatibility checklist requires every matrix row to carry a status and counts `unknown` as a finding. This row points at design 008's position without recording what that position is, so the matrix leaves the platform undecided; the adjacent macOS row shows the closing pattern, restating the inherited status (\"no (v1) | Design 008's matrix\").",
+            "fix": "Give the row an explicit status: `no (v1)` with the note \"inherits design 008's matrix\" (or `yes` if 008's CI in fact covers SteamOS), so the row states a decision rather than a pointer."
+          },
+          {
+            "severity": "minor",
+            "location": "Compatibility matrix × Test strategy — row \"| Third-party reader, non-Rust | yes (fixtures) / no (harness) |\"",
+            "problem": "The matrix claims a support leg (\"yes (fixtures)\": the corpora are consumable by non-Rust readers) that no Test strategy entry exercises, and the external runner that would prove it is Deferred with no follow-up; the checklist wants a named leg for every claimed support.",
+            "fix": "Restate the status as the deferral rather than a claim: `no (v1) — corpora language-neutral, runner contract deferred`. Do not add a test leg here; a non-Rust leg cannot exist until the deferred runner contract does."
+          },
+          {
+            "severity": "minor",
+            "location": "Stability — \"Widening the *grammar* later (a third segment, say) is an additive change: a v1 reader refuses the id outright rather than misreading it, which is the same posture as an unregistered id.\"",
+            "problem": "The posture claim is false for this contract as specified: an id violating the v1 grammar makes the whole registry document invalid (`third-segment.toml` is listed under fixtures/invalid, and Test strategy #6 requires every loaded id to be grammar-valid), whereas an unregistered id leaves the document loading with `axis_kind` → `None`. Widening the grammar inside `action-ids/v1/` therefore breaks every v1 loader of that file — a breaking change, not an additive one.",
+            "fix": "Replace the sentence: grammar widening for ids actually in the registry rides a major directory (`action-ids/v2`), where the existing version gate (Test strategy #4) refuses cleanly naming the supported majors; refuse-don't-misread is the posture only for consumers validating other formats' ids (ADR-013), not for loading a widened v1 registry."
+          },
+          {
+            "severity": "minor",
+            "location": "The contract: `schemas/action-ids/v1/` (fixtures/invalid list) × Test strategy #1 — \"Comparison is byte-exact: no case folding, no canonicalization\"",
+            "problem": "The keyboard-reality checklist item names non-ASCII binding names, but the enumerated invalid fixtures pin only uppercase, digit, hyphen, underscore, segment-shape and arity faults — no non-ASCII id — and Test strategy #1's reject list likewise omits one, so a third-party reader building from the golden corpora has no fixture pinning the non-ASCII rejection.",
+            "fix": "Add `non-ascii-id.toml` (a segment containing a non-ASCII letter) to fixtures/invalid and to Test strategy #1's reject list."
+          }
+        ]
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/design-review-compatibility-r1c0.md",
+      "durationMs": 54238,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e2cfb4aaeffe5nA82OpS6folxA",
+      "agent": "review/design-security",
+      "at": 1794541725859,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design — The model: `crates/core/src/action.rs` (with Stability): \"`load_action_registry(dir: &Path) -> Result<ActionRegistry, CoreError>`\"",
+            "problem": "[new] No data source in the document is classified (security checklist 1). The registry entry point takes a caller-chosen `dir`, and the same section adds \"an `action-ids` arm in `parse`\" plus an entry in `SUPPORTED_FORMATS` — the shared parse path the proposal itself ties to \"the guard ADR-008's design decided for the hub's upload path\". Nothing states which `action-ids` document is authoritative, so a document arriving over the untrusted path is indistinguishable from the shipped registry, and `contains()`/`axis_kind()` — the attribute the ADR makes load-bearing (\"Only `discrete-lateral` actions may have polarity flipped by a transform (015)\") — could be answered from counterparty-chosen ids, re-grading arbitrary actions into the flip-eligible set and undermining the stability promise in Stability. A17's \"nothing acts on the attribute\" bounds today's damage but leaves the boundary unrecorded, so ADR-015 inherits it by accident.",
+            "fix": "Add one clause to spec.md's Extension and withdrawal rule and to `load_action_registry`'s doc: the registry bindforge-core answers from is the versioned directory shipped with the crate (the app-pinned path); an `action-ids` document that arrives from elsewhere is parsed as data only — it is never passed to `load_action_registry` and never consulted for `axis_kind`. That replaces the current silence on source authority rather than adding a mechanism."
+          },
+          {
+            "severity": "minor",
+            "location": "Test strategy 4 (with The model, `load_action_registry`): \"an `action-ids` document declaring no version, or `v99`, is refused with the error naming the supported majors\"",
+            "problem": "[new] The loader is specified as \"`parse_file(dir.join(\"registry.toml\"))` and the variant check\", which checks the declared major is supported but never compares it to the version segment of the directory it was loaded from — and `conformance.rs`'s `schemas/*/v*/` walk derives format and major from the path. A document declaring a later-supported major sitting in `action-ids/v1/` parses under v1 rules, so spec and corpus drift with no refusal (checklist 7, fail closed).",
+            "fix": "State in the spec's entry table, and add as a case in Test strategy 4, that a declared `version` unequal to the version segment of the directory being loaded is an `InvalidValue` refusal."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design — Placeholders and lineage: \"one paragraph saying what lands there and which ADR populates it (013 and 014), that nothing reads them yet\"",
+            "problem": "[new] The README content spec covers the directories that will hold shared binding files from elsewhere, the one artifact class this checklist treats as untrusted, yet never says so; the classification appears nowhere in the proposal.",
+            "fix": "Add one sentence to the README spec: anything dropped into `data/profiles/` or `data/manifests/` is a file from elsewhere and is untrusted input once 013/014 read it — a classification, not a restatement of the stability rule the README already declines to repeat."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design — The contract: `schemas/action-ids/v1/`, spec.md entry table: \"`discrete-lateral` / `continuous-lateral` / `none` (arrays of strings, all required, may be empty)\"",
+            "problem": "[new] The entry table bounds element type but not array length, so for an `action-ids` document reaching the parser from outside the repo the only cap on id count is the parse budget; uniqueness (\"an id appears once across the three arrays\") and document-order construction then cost whatever that budget permits, and the budget's magnitude is never stated for this format.",
+            "fix": "Either state an explicit max id count in the entry table refused with `InvalidValue`, or state plainly that the existing parse budget is the bound for this format too — either replaces the implicit-only limit."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design — The model: \"every rejection keeps the single-line, truncating, path-free message the contract already promises\"",
+            "problem": "[new] The spec also requires refusals that name the offender (\"a repeat is a rejection naming the id and the array\"). For a malformed id the offending bytes are by construction outside the grammar charset and may carry terminal control sequences; \"single-line\" bounds newlines, not escapes, so an echoed hostile id can inject into a log or terminal line.",
+            "fix": "One clause on the error rule: an offending id is echoed escaped to printable characters, so the naming requirement cannot inject control sequences into a single-line message."
+          }
+        ]
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/design-review-security-r1c0.md",
+      "durationMs": 62267,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2cfa5758ffe5nEJsmBnL6NG4y",
+      "agent": "review/design-performance",
+      "at": 1794541764037,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design — \"The model: `crates/core/src/action.rs`\" — \"`ActionRegistry` — `version` plus the ids in document order, with `ids()`, `contains(&ActionId)`, and `axis_kind(&ActionId) -> Option<AxisKind>`\"",
+            "problem": "The lookup cost model for contains/axis_kind is unstated, and \"the ids in document order\" reads as a flat Vec, which would make every lookup a linear scan once ADR-013's translation resolves each binding's id. At 40 ids the scan is negligible and the growth discipline keeps n small, so nothing is gated; it is only that the contract sentence makes document order an accidental property of the lookup storage.",
+            "fix": "One clause in the model section: ids() yields document order, the lookup representation behind contains/axis_kind is the implementation's choice — no new mechanism added."
+          }
+        ]
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/design-review-performance-r1c0.md",
+      "durationMs": 38137,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e2cf9c237ffe6kssidE6zOrhI5",
+      "agent": "review/design-complexity",
+      "at": 1794541796174,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design → \"The model: `crates/core/src/action.rs`\" — \"`contains(&ActionId)`, and `axis_kind(&ActionId) -> Option<AxisKind>`\"",
+            "problem": "The registry shape makes membership and axis kind one fact (\"the arrays *are* the id set, so there is no id without an axis kind\"), so `contains` is a second public API surface that only re-expresses `axis_kind(id).is_some()`; the test strategy (items 2 and 6) consumes `ids()`/`axis_kind` and never needs `contains`. It is the only API knob in the design with no distinct consumer.",
+            "fix": "Drop `ActionRegistry::contains` and let callers use `axis_kind(id).is_some()`, or state the consumer that needs membership without a kind."
+          }
+        ]
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/design-review-complexity-r1c0.md",
+      "durationMs": 32112,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e2cf9446fffeNZPE3YuPuowkNI",
+      "agent": "design/designer",
+      "at": 1794541975855,
+      "reply": {
+        "changed": true,
+        "summary": "Round 1 consumed all nine open findings by deletion or narrowing, not accretion, and the file is exactly 382 lines as before (net zero). Compatibility major: the Steam Deck / SteamOS row now states the inherited `no (v1)` status instead of pointing at 008. Compatibility minors: the unexercised `yes (fixtures)` non-Rust leg is deleted so the row states the Deferred runner contract; the false \"grammar widening is additive\" posture is deleted from Stability and the Risks row, replaced by widening rides `action-ids/v2` where the version gate refuses it; `non-ascii-id.toml` plus a Test strategy #1 reject case pin the byte-exact ASCII grammar. Security major (authority): one canonical clause in spec.md's Extension and withdrawal rule plus a cross-reference on `load_action_registry` classifies the source — only the `registry.toml` shipped in the crate's versioned directory is the registry, documents from elsewhere are data, never loaded and never consulted for `axis_kind`; the `data/` README spec records the same classification. Security minor: a declared `version` that differs from the loading directory's version segment is an `InvalidValue` refusal, stated in the entry table, the loader, and Test strategy #4. Security nits: array length is bounded by the shared parse budget in the entry table, and an offending id is echoed escaped to printable characters. Offsetting the additions, the Non-goals bullets that duplicated Deferred line by line, the Rollout steps that restated the Delta inventory (steps renumbered, Risks cross-reference updated), the Options withdrawal restatement of Stability, and the Context restatement of A3 were consolidated away.",
+        "commitMessage": "docs: resolve r1 design review findings on the action taxonomy proposal"
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/proposal-revise-r1.md",
+      "durationMs": 179583,
+      "nudges": 0,
+      "docLines": 382,
+      "docLinesAdded": 66,
+      "docLinesRemoved": 66
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2cf68683ffe5yRnD5k92Ew23j",
+      "agent": "review/design-compatibility",
+      "at": 1794542016165,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/design-review-compatibility-r1c1.md",
+      "durationMs": 40205,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e2cf5e94fffexuh3AsfwuLRpwc",
+      "agent": "review/design-security",
+      "at": 1794542074445,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design — The contract, `spec.md` entry table: \"`version` (string, required, equal to the version segment of the directory holding the file)\"",
+            "problem": "[new] The r1 version/directory equality is closed in substance but placed in the wrong rule set: the entry table is where the constraints the shared `parse` path enforces live (\"Any other entry is rejected\"), yet `parse` has no directory — only `load_action_registry` holds `dir`. Read literally, the rule invalidates the corpus that exists to demonstrate it, since `schemas/action-ids/v1/fixtures/valid/basic-registry.toml` is held by `fixtures/valid/`, which has no version segment; and a third-party reader of the document alone — the reader the section is written for — cannot evaluate the rule at all.",
+            "fix": "In the entry table keep `version` (string, required); state the equality where the loader is described, as a loader rule: the loader refuses a document whose declared version differs from the version segment of the directory it loads it from. Test strategy #4's new case then reads as a `load_action_registry` case and fixtures keep one fault per file."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design — spec.md \"Extension and withdrawal\" × The model: \"never loaded as the registry, never consulted for `axis_kind`\" beside \"`Document::ActionIds(ActionRegistry)` variant\"",
+            "problem": "[new] Residual of the r1 closure. The source is now classified, but the model still routes every `action-ids` document, from wherever it arrived, through the `action-ids` arm in `parse`, which returns the same public `ActionRegistry` with `axis_kind()`, re-exported from `lib.rs`. Nothing in the design distinguishes the registry value built by the corpus round-trip from untrusted bytes from the one `load_action_registry` returns, so \"never consulted for `axis_kind`\" is consumer discipline, not a boundary — and ADR-015 is exactly where the ADR makes that attribute load-bearing. A17 bounds today's damage.",
+            "fix": "One clause in The model: the `parse` arm yields the registry only as parsed data for the corpus round-trip, and the registry consumers read `axis_kind` from is the value `load_action_registry` returns. This names which value the spec's rule attaches to rather than adding a mechanism."
+          }
+        ]
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/design-review-security-r1c1.md",
+      "durationMs": 58249,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2cf50569ffeNCtBv9ggDaEwXf",
+      "agent": "review/design-correctness",
+      "at": 1794542177066,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design — The contract, entry table — \"`version` (string, required, equal to the version segment of the directory holding the file)\"",
+            "problem": "The new constraint is written as a per-document entry rule, but fixtures are `action-ids` documents held in `schemas/action-ids/v1/fixtures/{valid,invalid}/`, whose holding directories carry no version segment; the check itself exists only in `load_action_registry` (\"the declared `version` equals `dir`'s version segment\") and the unchanged harness parses fixtures without it. A third-party conformance reader applying the entry table literally to each fixture must either reject every valid fixture or invent the unstated rule \"match the nearest ancestor directory named `v<N>`\", and a version-mismatch fixture becomes unexpressible — the same rule appears under two shapes in spec.md (document constraint) and The model (loader-side check).",
+            "fix": "Scope the entry-table parenthetical to the registry document and name the check site: \"`version` (string, required; `load_action_registry` refuses a `registry.toml` whose `version` differs from the version segment of the versioned directory holding it; fixtures declare `v1` and are gated by the version rule, not by their directory)\" — replacing the document-level constraint with a registry-load constraint."
+          }
+        ]
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/design-review-correctness-r1c2.md",
+      "durationMs": 102520,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2cf374ccffezZjDY7IogXkuTQ",
+      "agent": "review/design-performance",
+      "at": 1794542215250,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/design-review-performance-r1c2.md",
+      "durationMs": 38154,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e2cf2dfabffelRk8AUt0sqLxQF",
+      "agent": "review/design-complexity",
+      "at": 1794542253416,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design → \"The model: `crates/core/src/action.rs`\" — \"`contains(&ActionId)`, and `axis_kind(&ActionId) -> Option<AxisKind>`\"",
+            "problem": "re-raised: the r1 revisions left this line untouched, so the r1 finding still stands. The registry shape states that membership and axis kind are one fact (\"the arrays *are* the id set, so there is no id without an axis kind\"), and the test strategy (#2 and #6) consumes only `ids()`/`axis_kind`; the newly added source-classification text (spec.md Extension and withdrawal, `load_action_registry`) did not create a consumer for `contains`. It remains the only public API knob in the design with no distinct consumer. Not a regression: nothing the revisions changed makes it worse, and it does not gate.",
+            "fix": "Drop `ActionRegistry::contains` and let callers use `axis_kind(id).is_some()`, or state the consumer that needs membership without a kind."
+          }
+        ]
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/design-review-complexity-r1c2.md",
+      "durationMs": 38146,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-final",
+      "round": 0,
+      "sessionID": "ses_e2cf24a4bffecmN0KEu7ewIb3A",
+      "agent": "design/editor",
+      "at": 1794542329876,
+      "reply": {
+        "ambiguities": [],
+        "commitMessage": "docs: final language pass on the ADR-011 proposal"
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/proposal-final-r0.md",
+      "durationMs": 76355,
+      "nudges": 0,
+      "docLines": 382,
+      "docLinesAdded": 12,
+      "docLinesRemoved": 12
+    },
+    {
+      "stage": "editorial-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e2cf11fa5ffeuddSF7537o1Pdl",
+      "agent": "review/design-correctness",
+      "at": 1794542406385,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design > The model (`crates/core/src/action.rs`), error-rule paragraph (editorial-r2.diff hunk @@ -221,9 +221,9 @@) — \"with an offending id echoed, escaped to printable characters\"",
+            "problem": "The comma inserted by the editorial pass splits one predicate into two, so `escaped to printable characters` can be read as a property of the rejection message rather than of the echoed id — weaker than the r1 closure recorded in the Revision log (\"an offending id is echoed escaped to printable characters\"). No rule or contract text changes meaning, so this is wording only.",
+            "fix": "Replace \"echoed, escaped to printable characters\" with \"echoed after escaping to printable characters\" (or restore \"echoed escaped to printable characters\"); same single guarantee, no new mechanism."
+          }
+        ]
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/editorial-review-correctness-r2.md",
+      "durationMs": 76413,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e2ceff4f6ffeACDa047TurpSCs",
+      "agent": "review/design-compatibility",
+      "at": 1794542434545,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/editorial-review-compatibility-r2.md",
+      "durationMs": 28104,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:security",
+      "round": 2,
+      "sessionID": "ses_e2cef870cffegURWMv0r6UgBEz",
+      "agent": "review/design-security",
+      "at": 1794542450671,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/editorial-review-security-r2.md",
+      "durationMs": 16076,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:performance",
+      "round": 2,
+      "sessionID": "ses_e2cef480effeYHzYIViDCkjroz",
+      "agent": "review/design-performance",
+      "at": 1794542470825,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/editorial-review-performance-r2.md",
+      "durationMs": 20129,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:complexity",
+      "round": 2,
+      "sessionID": "ses_e2ceef953ffeOz3cIEi6G2HPZ1",
+      "agent": "review/design-complexity",
+      "at": 1794542494943,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/editorial-review-complexity-r2.md",
+      "durationMs": 24092,
+      "nudges": 0
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_e2cee9ad8ffeHE3CoZzqp9lG4N",
+      "agent": "code/test-engineer",
+      "at": 1794542840056,
+      "reply": {
+        "testsAdded": 30,
+        "commitMessage": "test: add action-ids taxonomy suites to bindforge-core"
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/test-authoring-r0.md",
+      "durationMs": 345017,
+      "nudges": 0
+    },
+    {
+      "stage": "implement",
+      "round": 0,
+      "sessionID": "ses_e2ce956bcffe03j1v5B0uljVU4",
+      "agent": "code/coder",
+      "at": 1794543313112,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "feat(core): ship the action taxonomy contract and typed registry",
+        "moves": []
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/implement-r0.md",
+      "durationMs": 472954,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e2ce1f71fffegLiCOCy41kBMR2",
+      "agent": "code/coder",
+      "at": 1794543651138,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "fix(core): rewrite the nested parse arms to the rustfmt-stable shape the cargo gate expects",
+        "moves": []
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/fix-r0.md",
+      "durationMs": 327742,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e2cdcce68ffeXYpO7WobGHyCjY",
+      "agent": "code/coder",
+      "at": 1794543989285,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "fix(core): break the 61-column id parse chain and record the red gate legs",
+        "moves": []
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/fix-r0.md",
+      "durationMs": 327791,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e2cd7a56bffeP1TCjvJtZyzsSd",
+      "agent": "code/test-engineer",
+      "at": 1794544347125,
+      "reply": {
+        "commitMessage": "test(core): clear the action suite's lifetime and formatter blockers",
+        "moves": []
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/test-update-r0.md",
+      "durationMs": 347446,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e2cd22ea3ffe3334jTAp1kSHrw",
+      "agent": "code/coder",
+      "at": 1794545117937,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "docs: record the eight rustfmt sites the action suites still carry",
+        "moves": []
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/fix-r0.md",
+      "durationMs": 760177,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e2cc66bcaffebz0Di6OzChJu8G",
+      "agent": "code/test-engineer",
+      "at": 1794545904667,
+      "reply": {
+        "commitMessage": "test(core): make the two action suites rustfmt-clean for the gate's fmt leg",
+        "moves": []
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/test-update-r0.md",
+      "durationMs": 776129,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2cba655bffeQimof79B4r3hMI",
+      "agent": "codereview/code-correctness",
+      "at": 1794546160089,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/action.rs:26-29, crates/core/tests/action_ids.rs:32-33",
+            "problem": "Suite headers still state the tests were written 'while crates/core/src/action.rs does not exist yet, so they fail until the design is implemented'; at HEAD the implementation has shipped and the sentence is stale.",
+            "fix": "Reword to past tense or delete the sentence in a docs-only test edit; no assertion changes."
+          },
+          {
+            "severity": "nit",
+            "location": "docs/designs/011-action-taxonomy-and-core-skeleton/03-build-notes.md:84-90",
+            "problem": "Deviation 7's list of files still carrying ADR-009 references omits crates/core/tests/conformance.rs:318-321, whose doc comment still says the walk picks up 'patch, manifest and policy when ADR-009 adds them'. Leaving the file unchanged is correct per the delta inventory; the notes' list is just incomplete.",
+            "fix": "Add conformance.rs's header comment to the retained-ADR-009 list in the build notes."
+          }
+        ]
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/code-review-correctness-r1c0.md",
+      "durationMs": 243445,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2cb6ae0fffeRblc65cYKp5Z6y",
+      "agent": "codereview/code-compatibility",
+      "at": 1794546321612,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/action.rs:221 (with schemas/action-ids/v1/spec.md:14-19 and 02-proposal.md:287)",
+            "problem": "The registry's file name is resolved by the filesystem: `dir.join(\"registry.toml\")` never inspects the name it opened, so on a case-insensitive filesystem — the platform the Compatibility matrix calls `yes` — a version directory holding `Registry.toml` loads as the registry while the same tree is refused with an `Io` error on the Linux CI runner. The directory half of the same identity check is byte-exact (`is_major_dir` at action.rs:289 refuses `V1` on every platform), so name matching is asymmetric inside one function, and spec.md never states which rule a third-party reader implements. No fixture or test pins either behaviour.",
+            "fix": "Pick one rule and state it: either add a byte-exact-name sentence to spec.md's \"Registry data\" and compare `file_name()` in the loader, or state that file lookup follows the filesystem's case rules and the shipped tree uses lowercase names, and mirror that in the matrix's Windows note."
+          },
+          {
+            "severity": "minor",
+            "location": "02-proposal.md:328-331 (Test strategy #7) and 02-proposal.md:287 (Compatibility matrix, Windows row)",
+            "problem": "Checklist item 7 is unevaluable rather than a pass. A16 (02-proposal.md:65) records that no stage of this run has invoked a toolchain, so the two new targets and the new corpus have never executed anywhere; the diff rightly declines a fake test-file leg (crates/core/tests/action_ids.rs:20-26), and nothing in the change runs the Windows pass or names who runs it and when. The matrix's \"Windows 10/11 contributor: yes\" therefore rests on inspection only, and no `test result:` line exists for `action` or `action_ids` yet.",
+            "fix": "Post the CI job's `test result:` lines for the `action` and `action_ids` targets into this run's build notes, and give the Windows leg an owner and a date; if it cannot be scheduled in this stage, mark the Windows row's evidence as inspection-only in the matrix note."
+          },
+          {
+            "severity": "nit",
+            "location": "schemas/action-ids/v1/spec.md:21-35 with crates/core/tests/grammar_closure.rs:131-152",
+            "problem": "The new spec tells this format's readers that table headers, dotted keys, multi-line arrays, floats and hex integers are legal TOML that the grammar excludes and rejects, but none of the 14 invalid fixtures carries one of those cases, and the suite that pins them walks `profile/v1/fixtures/invalid/` only. Fixtures are the conformance currency for the language-neutral corpus, so an implementer reading only `action-ids/v1/` gets the claim with no leg to check it against.",
+            "fix": "Point the excluded-construct walk at every `schemas/*/v*/fixtures/invalid/` (or add the five cases to `action-ids/v1/`), or add one sentence to spec.md naming `schemas/profile/v1/fixtures/invalid/` as where the shared-construct cases live."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/action.rs:229-232",
+            "problem": "`dir.file_name().and_then(|name| name.to_str()).unwrap_or_default()` turns a final path component that is not valid UTF-8 (ordinary on Linux, reachable on Windows for a name with an unpaired surrogate) into `\"\"`, and the refusal then says \"a registry directory is named for a major, like `v1`\" — it misnames the fault, pointing the operator at the file's contents instead of at their own path.",
+            "fix": "Keep the `OsStr` and compare bytes for the expected major, or separate the two cases so an undecodable directory name gets a message saying the directory name is not usable text."
+          }
+        ]
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/code-review-compatibility-r1c0.md",
+      "durationMs": 161472,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e2cb43728ffeNDtyOPd0T28k1J",
+      "agent": "codereview/code-security",
+      "at": 1794546438577,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "schemas/action-ids/v1/fixtures/invalid/ (missing case); rule at schemas/action-ids/v1/spec.md:116-117 and crates/core/src/action.rs:109-131, action.rs:194-206",
+            "problem": "The diff adds the contract's largest new echo site of untrusted text — the offending id, attacker-controlled up to the parse budget — but no invalid fixture exercises it. Every action-ids invalid fixture carries a short id with no control character, so the harness legs every implementer runs (conformance.rs:223-245: one line, no control character) pass for a reader that echoes a multi-kibibyte id verbatim and never truncates. The escape/truncate rule for ids exists only in this format's spec prose and in Rust tests a third-party reader does not run (tests/action.rs:453-491), whereas profile/v1 already pins the same rule with fixtures/invalid/forged-log-line.toml.",
+            "fix": "Add one one-fault invalid fixture for action-ids/v1 modelled on profile/v1's forged-log-line.toml: a `none` entry holding one id of several hundred characters containing a `\\u0007` and a `\\n` escape, so the corpus's one-line/no-control-character legs bind the escaping for ids; extend the bound leg (conformance.rs's truncation test) with a length assertion driven by that fixture, and register the file in INVALID_FIXTURES (tests/action_ids.rs:113-128) and in 02-proposal.md's corpus list."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/action.rs:212-247 (load_action_registry), crates/core/src/lib.rs:37, schemas/action-ids/v1/spec.md:14-19, 02-proposal.md:192-196",
+            "problem": "The contract rule that a registry.toml from anywhere else is data and 'only the copy shipped in this versioned directory is ever consulted for axis_kind' is enforced nowhere. load_action_registry checks internal consistency only (format arm, directory named v<digits>, declared version equals the directory name), and it is public API. The directories the diff's own READMEs declare untrusted (data/manifests/README.md:9-13, data/profiles/README.md:9-13) could be passed as `dir` and yield an attacker-chosen taxonomy, including the discrete-lateral set ADR-015 will act on; no test in the diff would fail, since tests/action.rs:138-145 and tests/action_ids.rs:541-606 deliberately load from scratch directories, i.e. from 'elsewhere'.",
+            "fix": "Make the classification mechanical: give consumers a path-free entry point that resolves the shipped tree (e.g. load_shipped_action_registry()) and keep the path-taking loader crate-internal/test-only, or, if the Deferred 'how an installed artifact locates schemas/ data' question forces the path-taking loader to stay public, state the caller obligation in spec.md ('a caller may pass only the directory the artifact ships with it') and record in 03-build-notes.md an open item binding ADR-013/014 to prove the registry source is the installed copy, not a synced or uploaded tree."
+          },
+          {
+            "severity": "nit",
+            "location": "schemas/README.md:68-73; new echo sites at crates/core/src/action.rs:249-257, action.rs:201-205, action.rs:239-245",
+            "problem": "The canonical rejection-message contract enumerates the quoted document parts as 'a declared format, a declared version, an entry name'. The diff adds an id value as a fourth quoted part — the only one whose length the writer controls up to 1 MiB — and a reader implementing the README's list literally would treat it as outside the escape-and-truncate duty. The obligation for ids appears only in the format-local spec (action-ids/v1/spec.md:116-117), which is the arrangement this contract tree otherwise rejects ('a narrowing that only lives in one implementation is not a contract', schemas/README.md:39-40).",
+            "fix": "Extend schemas/README.md:68-71 with one clause naming an id value among the quoted parts, so the escape-and-truncate obligation is stated once, canonically, for every part of a document a rejection may quote."
+          }
+        ]
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/code-review-security-r1c0.md",
+      "durationMs": 116925,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2cb26e31ffeS4GnidijzefXmq",
+      "agent": "codereview/code-performance",
+      "at": 1794546486946,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "crates/core/src/document.rs:axis_array (called from the Document::ActionIds arm of serialize)",
+            "problem": "serialize builds each of the three axis arrays by calling registry.ids() once per kind; ids() (crates/core/src/action.rs) does entries.keys().cloned().collect(), so each call allocates a fresh Vec and clones every id String. Over one serialize that is three full-id-set Vec allocations + clones and three BTreeMap axis_kind filter passes where a single pass over the entries partitioned by AxisKind would do. Bounded at the shipped ~40 ids and on the conformance round-trip path, not a hot or event path, so it is avoidable allocation but not a gate.",
+            "fix": "Build the three arrays in a single iteration over the registry's entries, grouping ids by AxisKind (or pass a pre-partitioned view) and emit each kind.name() array once, eliminating the per-kind ids() clone. No behavior change; the harness round-trip still holds."
+          }
+        ]
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/code-review-performance-r1c0.md",
+      "durationMs": 48312,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e2cb1b14effe9StEcK0BtwWUwm",
+      "agent": "codereview/code-testing",
+      "at": 1794547071099,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": ".github/workflows/check.yml:29-33 (gate leg; report-wide)",
+            "problem": "Testing checklist item 6 is not evaluable in this seat: shell access was denied, so `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace --locked` were never run and the report carries no `test result:` tail. Per the skill, a checklist item I could not evaluate is a finding, not a pass. Nothing in the static review (import/usage audit against `-D warnings`, fixture-name audit against common::is_fixture_name and the case-unique rule, hand-trace of every new expectation against src/) suggests a red gate, but nothing here proves green either — and the proposal's own Risk row rates 'the new suite never runs locally' High likelihood.",
+            "fix": "Post the merge PR's `rust` job `test result:` lines for crates/core/tests/action.rs and crates/core/tests/action_ids.rs (plus the fmt and clippy legs) into the outstanding evidence checklist at docs/designs/008-rust-for-the-product/03-build-notes.md as Rollout 5 states, and run Test strategy #7's Windows contributor leg once, before merge."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/action.rs:229-238 (is_major_dir false arm of load_action_registry)",
+            "problem": "The refusal for a directory that is not named as a major is a branch no test reaches. Every load_action_registry call in the new suite passes `v1` or `v2` (crates/core/tests/action.rs:140, :533; crates/core/tests/action_ids.rs:131, :536, :560, :592), so a caller pointing the loader at `latest/`, at the format directory itself, or at a path whose file_name() is empty (`unwrap_or_default()` -> \"\") is guarded by code the gate can never see fail. Checklist 7 counts an untested dead branch as a finding.",
+            "fix": "Add one case to crates/core/tests/action.rs: write registry.toml into a scratch directory named `latest`, assert load_action_registry returns CoreError::InvalidValue naming the major-directory rule, one line, no local path — or drop the branch and let the declared-version comparison carry the check."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/tests/action.rs:26-29 and crates/core/tests/action_ids.rs:32-33",
+            "problem": "Both new suite headers still state that the tests are 'written from the proposal while crates/core/src/action.rs does not exist yet, so they fail until the design is implemented' / 'before the format ships, so they fail until it does'. In this commit src/action.rs, document.rs's action-ids arm and the whole action-ids corpus are present, so the claim is false about the tree a reader is standing in, contradicts the proves: map, and gives a future fixer an excuse to wave away a red run. It is the same class of stale statement the proposal itself treats as a risk ('Stale ADR-009 lineage misleads the next contributor').",
+            "fix": "Rewrite both sentences to say the suite was written from the proposal and is kept green against the shipped src/action.rs, with no assertion permitted to be weakened to make a change pass."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/tests/action.rs:376-385 (refuses_a_non_string_element_in_an_axis_array)",
+            "problem": "The test asserts only that parse returns some error, with no variant and no named entry. Test strategy #3 groups the non-string element with the duplicate case as a refusal 'naming the id', and schemas/action-ids/v1/spec.md:40-42 types each array as 'array of strings'; as written, a reader that refused `7` for an unrelated reason (Malformed, a budget error, UnknownFormat) passes. Every neighbouring refuses_a_* test in the same file pins the variant, so this is an outlier rather than deliberate looseness.",
+            "fix": "Assert matches!(err, CoreError::InvalidValue { .. }) and that the rendered message names the array (`none`), mirroring refuses_a_duplicate_id_within_one_axis_array_naming_the_id at :387."
+          },
+          {
+            "severity": "nit",
+            "location": "data/manifests/README.md, data/profiles/README.md (new) vs proposal Rollout 3 + A11",
+            "problem": "The tree facts this stage promises — both data/ placeholders present in the commit, and the new version directory carrying spec.md and registry.toml alongside its corpora — are pinned for fixtures only (crates/core/tests/action_ids.rs:161-193). git tracks no empty directory, so the placeholder guarantee rests on prose, while the repo pins comparable tree facts in tests elsewhere (crates/core/tests/gate_contract.rs:517).",
+            "fix": "Extend the tests/action_ids.rs:161 assertion with spec.md and registry.toml presence, and add one repo_root()-relative assertion that data/manifests/README.md and data/profiles/README.md exist."
+          }
+        ]
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/code-review-testing-r1c0.md",
+      "durationMs": 584116,
+      "nudges": 0
+    },
+    {
+      "stage": "doc-sync",
+      "round": 1,
+      "sessionID": "ses_e2ca8c737ffeYWwMm48b09deyo",
+      "agent": "ops/doc-sync",
+      "at": 1794547392175,
+      "reply": {
+        "drifted": true,
+        "commitMessage": "docs: record the 011 as-built drift and finish its build notes"
+      },
+      "transcript": "docs/designs/011-action-taxonomy-and-core-skeleton/transcripts/doc-sync-r1.md",
+      "durationMs": 320967,
+      "nudges": 0
+    }
+  ],
+  "gateLog": [
+    {
+      "gate": "sourceAdmissible",
+      "round": 0,
+      "proceed": true,
+      "reason": "ADR is proposed and complete",
+      "at": 1794540941694
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: compatibility, security",
+      "at": 1794541796231
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c2 pending: correctness, performance, complexity",
+      "at": 1794542074508
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794542253477
+    },
+    {
+      "gate": "editorial-review",
+      "round": 2,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1794542495009
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794543323353
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794543661455
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794543999627
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794544357708
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794545128490
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1794545916552
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794547071170
+    },
+    {
+      "gate": "done",
+      "round": 0,
+      "proceed": true,
+      "reason": "pipeline complete",
+      "at": 1794547392232
+    }
+  ],
+  "startedAt": 1794540941678,
+  "updatedAt": 1794547392232,
+  "flow": "full",
+  "baseRef": "4aeb57c2188fbdfc1ca68d99080e4d2f3950d945",
+  "designCycle": 3,
+  "designStamp": "f23e3e46775472749f40dcd6952c48fec3982eca",
+  "seats": {
+    "design": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "f23e3e46775472749f40dcd6952c48fec3982eca",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design — The contract, entry table — \"`version` (string, required, equal to the version segment of the directory holding the file)\"",
+            "problem": "The new constraint is written as a per-document entry rule, but fixtures are `action-ids` documents held in `schemas/action-ids/v1/fixtures/{valid,invalid}/`, whose holding directories carry no version segment; the check itself exists only in `load_action_registry` (\"the declared `version` equals `dir`'s version segment\") and the unchanged harness parses fixtures without it. A third-party conformance reader applying the entry table literally to each fixture must either reject every valid fixture or invent the unstated rule \"match the nearest ancestor directory named `v<N>`\", and a version-mismatch fixture becomes unexpressible — the same rule appears under two shapes in spec.md (document constraint) and The model (loader-side check).",
+            "fix": "Scope the entry-table parenthetical to the registry document and name the check site: \"`version` (string, required; `load_action_registry` refuses a `registry.toml` whose `version` differs from the version segment of the versioned directory holding it; fixtures declare `v1` and are gated by the version rule, not by their directory)\" — replacing the document-level constraint with a registry-load constraint."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "f23e3e46775472749f40dcd6952c48fec3982eca",
+        "dissents": 1,
+        "findings": []
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "f23e3e46775472749f40dcd6952c48fec3982eca",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design — The contract, `spec.md` entry table: \"`version` (string, required, equal to the version segment of the directory holding the file)\"",
+            "problem": "[new] The r1 version/directory equality is closed in substance but placed in the wrong rule set: the entry table is where the constraints the shared `parse` path enforces live (\"Any other entry is rejected\"), yet `parse` has no directory — only `load_action_registry` holds `dir`. Read literally, the rule invalidates the corpus that exists to demonstrate it, since `schemas/action-ids/v1/fixtures/valid/basic-registry.toml` is held by `fixtures/valid/`, which has no version segment; and a third-party reader of the document alone — the reader the section is written for — cannot evaluate the rule at all.",
+            "fix": "In the entry table keep `version` (string, required); state the equality where the loader is described, as a loader rule: the loader refuses a document whose declared version differs from the version segment of the directory it loads it from. Test strategy #4's new case then reads as a `load_action_registry` case and fixtures keep one fault per file."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design — spec.md \"Extension and withdrawal\" × The model: \"never loaded as the registry, never consulted for `axis_kind`\" beside \"`Document::ActionIds(ActionRegistry)` variant\"",
+            "problem": "[new] Residual of the r1 closure. The source is now classified, but the model still routes every `action-ids` document, from wherever it arrived, through the `action-ids` arm in `parse`, which returns the same public `ActionRegistry` with `axis_kind()`, re-exported from `lib.rs`. Nothing in the design distinguishes the registry value built by the corpus round-trip from untrusted bytes from the one `load_action_registry` returns, so \"never consulted for `axis_kind`\" is consumer discipline, not a boundary — and ADR-015 is exactly where the ADR makes that attribute load-bearing. A17 bounds today's damage.",
+            "fix": "One clause in The model: the `parse` arm yields the registry only as parsed data for the corpus round-trip, and the registry consumers read `axis_kind` from is the value `load_action_registry` returns. This names which value the spec's rule attaches to rather than adding a mechanism."
+          }
+        ]
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "f23e3e46775472749f40dcd6952c48fec3982eca",
+        "dissents": 0,
+        "findings": []
+      },
+      "complexity": {
+        "verdict": "approve",
+        "stamp": "f23e3e46775472749f40dcd6952c48fec3982eca",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design → \"The model: `crates/core/src/action.rs`\" — \"`contains(&ActionId)`, and `axis_kind(&ActionId) -> Option<AxisKind>`\"",
+            "problem": "re-raised: the r1 revisions left this line untouched, so the r1 finding still stands. The registry shape states that membership and axis kind are one fact (\"the arrays *are* the id set, so there is no id without an axis kind\"), and the test strategy (#2 and #6) consumes only `ids()`/`axis_kind`; the newly added source-classification text (spec.md Extension and withdrawal, `load_action_registry`) did not create a consumer for `contains`. It remains the only public API knob in the design with no distinct consumer. Not a regression: nothing the revisions changed makes it worse, and it does not gate.",
+            "fix": "Drop `ActionRegistry::contains` and let callers use `axis_kind(id).is_some()`, or state the consumer that needs membership without a kind."
+          }
+        ]
+      }
+    },
+    "code": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "2b20f3c8ab3c963ece6a8b08f6aaa7432b5ad1cc",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/action.rs:26-29, crates/core/tests/action_ids.rs:32-33",
+            "problem": "Suite headers still state the tests were written 'while crates/core/src/action.rs does not exist yet, so they fail until the design is implemented'; at HEAD the implementation has shipped and the sentence is stale.",
+            "fix": "Reword to past tense or delete the sentence in a docs-only test edit; no assertion changes."
+          },
+          {
+            "severity": "nit",
+            "location": "docs/designs/011-action-taxonomy-and-core-skeleton/03-build-notes.md:84-90",
+            "problem": "Deviation 7's list of files still carrying ADR-009 references omits crates/core/tests/conformance.rs:318-321, whose doc comment still says the walk picks up 'patch, manifest and policy when ADR-009 adds them'. Leaving the file unchanged is correct per the delta inventory; the notes' list is just incomplete.",
+            "fix": "Add conformance.rs's header comment to the retained-ADR-009 list in the build notes."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "2b20f3c8ab3c963ece6a8b08f6aaa7432b5ad1cc",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/action.rs:221 (with schemas/action-ids/v1/spec.md:14-19 and 02-proposal.md:287)",
+            "problem": "The registry's file name is resolved by the filesystem: `dir.join(\"registry.toml\")` never inspects the name it opened, so on a case-insensitive filesystem — the platform the Compatibility matrix calls `yes` — a version directory holding `Registry.toml` loads as the registry while the same tree is refused with an `Io` error on the Linux CI runner. The directory half of the same identity check is byte-exact (`is_major_dir` at action.rs:289 refuses `V1` on every platform), so name matching is asymmetric inside one function, and spec.md never states which rule a third-party reader implements. No fixture or test pins either behaviour.",
+            "fix": "Pick one rule and state it: either add a byte-exact-name sentence to spec.md's \"Registry data\" and compare `file_name()` in the loader, or state that file lookup follows the filesystem's case rules and the shipped tree uses lowercase names, and mirror that in the matrix's Windows note."
+          },
+          {
+            "severity": "minor",
+            "location": "02-proposal.md:328-331 (Test strategy #7) and 02-proposal.md:287 (Compatibility matrix, Windows row)",
+            "problem": "Checklist item 7 is unevaluable rather than a pass. A16 (02-proposal.md:65) records that no stage of this run has invoked a toolchain, so the two new targets and the new corpus have never executed anywhere; the diff rightly declines a fake test-file leg (crates/core/tests/action_ids.rs:20-26), and nothing in the change runs the Windows pass or names who runs it and when. The matrix's \"Windows 10/11 contributor: yes\" therefore rests on inspection only, and no `test result:` line exists for `action` or `action_ids` yet.",
+            "fix": "Post the CI job's `test result:` lines for the `action` and `action_ids` targets into this run's build notes, and give the Windows leg an owner and a date; if it cannot be scheduled in this stage, mark the Windows row's evidence as inspection-only in the matrix note."
+          },
+          {
+            "severity": "nit",
+            "location": "schemas/action-ids/v1/spec.md:21-35 with crates/core/tests/grammar_closure.rs:131-152",
+            "problem": "The new spec tells this format's readers that table headers, dotted keys, multi-line arrays, floats and hex integers are legal TOML that the grammar excludes and rejects, but none of the 14 invalid fixtures carries one of those cases, and the suite that pins them walks `profile/v1/fixtures/invalid/` only. Fixtures are the conformance currency for the language-neutral corpus, so an implementer reading only `action-ids/v1/` gets the claim with no leg to check it against.",
+            "fix": "Point the excluded-construct walk at every `schemas/*/v*/fixtures/invalid/` (or add the five cases to `action-ids/v1/`), or add one sentence to spec.md naming `schemas/profile/v1/fixtures/invalid/` as where the shared-construct cases live."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/action.rs:229-232",
+            "problem": "`dir.file_name().and_then(|name| name.to_str()).unwrap_or_default()` turns a final path component that is not valid UTF-8 (ordinary on Linux, reachable on Windows for a name with an unpaired surrogate) into `\"\"`, and the refusal then says \"a registry directory is named for a major, like `v1`\" — it misnames the fault, pointing the operator at the file's contents instead of at their own path.",
+            "fix": "Keep the `OsStr` and compare bytes for the expected major, or separate the two cases so an undecodable directory name gets a message saying the directory name is not usable text."
+          }
+        ]
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "2b20f3c8ab3c963ece6a8b08f6aaa7432b5ad1cc",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "schemas/action-ids/v1/fixtures/invalid/ (missing case); rule at schemas/action-ids/v1/spec.md:116-117 and crates/core/src/action.rs:109-131, action.rs:194-206",
+            "problem": "The diff adds the contract's largest new echo site of untrusted text — the offending id, attacker-controlled up to the parse budget — but no invalid fixture exercises it. Every action-ids invalid fixture carries a short id with no control character, so the harness legs every implementer runs (conformance.rs:223-245: one line, no control character) pass for a reader that echoes a multi-kibibyte id verbatim and never truncates. The escape/truncate rule for ids exists only in this format's spec prose and in Rust tests a third-party reader does not run (tests/action.rs:453-491), whereas profile/v1 already pins the same rule with fixtures/invalid/forged-log-line.toml.",
+            "fix": "Add one one-fault invalid fixture for action-ids/v1 modelled on profile/v1's forged-log-line.toml: a `none` entry holding one id of several hundred characters containing a `\\u0007` and a `\\n` escape, so the corpus's one-line/no-control-character legs bind the escaping for ids; extend the bound leg (conformance.rs's truncation test) with a length assertion driven by that fixture, and register the file in INVALID_FIXTURES (tests/action_ids.rs:113-128) and in 02-proposal.md's corpus list."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/action.rs:212-247 (load_action_registry), crates/core/src/lib.rs:37, schemas/action-ids/v1/spec.md:14-19, 02-proposal.md:192-196",
+            "problem": "The contract rule that a registry.toml from anywhere else is data and 'only the copy shipped in this versioned directory is ever consulted for axis_kind' is enforced nowhere. load_action_registry checks internal consistency only (format arm, directory named v<digits>, declared version equals the directory name), and it is public API. The directories the diff's own READMEs declare untrusted (data/manifests/README.md:9-13, data/profiles/README.md:9-13) could be passed as `dir` and yield an attacker-chosen taxonomy, including the discrete-lateral set ADR-015 will act on; no test in the diff would fail, since tests/action.rs:138-145 and tests/action_ids.rs:541-606 deliberately load from scratch directories, i.e. from 'elsewhere'.",
+            "fix": "Make the classification mechanical: give consumers a path-free entry point that resolves the shipped tree (e.g. load_shipped_action_registry()) and keep the path-taking loader crate-internal/test-only, or, if the Deferred 'how an installed artifact locates schemas/ data' question forces the path-taking loader to stay public, state the caller obligation in spec.md ('a caller may pass only the directory the artifact ships with it') and record in 03-build-notes.md an open item binding ADR-013/014 to prove the registry source is the installed copy, not a synced or uploaded tree."
+          },
+          {
+            "severity": "nit",
+            "location": "schemas/README.md:68-73; new echo sites at crates/core/src/action.rs:249-257, action.rs:201-205, action.rs:239-245",
+            "problem": "The canonical rejection-message contract enumerates the quoted document parts as 'a declared format, a declared version, an entry name'. The diff adds an id value as a fourth quoted part — the only one whose length the writer controls up to 1 MiB — and a reader implementing the README's list literally would treat it as outside the escape-and-truncate duty. The obligation for ids appears only in the format-local spec (action-ids/v1/spec.md:116-117), which is the arrangement this contract tree otherwise rejects ('a narrowing that only lives in one implementation is not a contract', schemas/README.md:39-40).",
+            "fix": "Extend schemas/README.md:68-71 with one clause naming an id value among the quoted parts, so the escape-and-truncate obligation is stated once, canonically, for every part of a document a rejection may quote."
+          }
+        ]
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "2b20f3c8ab3c963ece6a8b08f6aaa7432b5ad1cc",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "crates/core/src/document.rs:axis_array (called from the Document::ActionIds arm of serialize)",
+            "problem": "serialize builds each of the three axis arrays by calling registry.ids() once per kind; ids() (crates/core/src/action.rs) does entries.keys().cloned().collect(), so each call allocates a fresh Vec and clones every id String. Over one serialize that is three full-id-set Vec allocations + clones and three BTreeMap axis_kind filter passes where a single pass over the entries partitioned by AxisKind would do. Bounded at the shipped ~40 ids and on the conformance round-trip path, not a hot or event path, so it is avoidable allocation but not a gate.",
+            "fix": "Build the three arrays in a single iteration over the registry's entries, grouping ids by AxisKind (or pass a pre-partitioned view) and emit each kind.name() array once, eliminating the per-kind ids() clone. No behavior change; the harness round-trip still holds."
+          }
+        ]
+      },
+      "testing": {
+        "verdict": "approve",
+        "stamp": "2b20f3c8ab3c963ece6a8b08f6aaa7432b5ad1cc",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": ".github/workflows/check.yml:29-33 (gate leg; report-wide)",
+            "problem": "Testing checklist item 6 is not evaluable in this seat: shell access was denied, so `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace --locked` were never run and the report carries no `test result:` tail. Per the skill, a checklist item I could not evaluate is a finding, not a pass. Nothing in the static review (import/usage audit against `-D warnings`, fixture-name audit against common::is_fixture_name and the case-unique rule, hand-trace of every new expectation against src/) suggests a red gate, but nothing here proves green either — and the proposal's own Risk row rates 'the new suite never runs locally' High likelihood.",
+            "fix": "Post the merge PR's `rust` job `test result:` lines for crates/core/tests/action.rs and crates/core/tests/action_ids.rs (plus the fmt and clippy legs) into the outstanding evidence checklist at docs/designs/008-rust-for-the-product/03-build-notes.md as Rollout 5 states, and run Test strategy #7's Windows contributor leg once, before merge."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/action.rs:229-238 (is_major_dir false arm of load_action_registry)",
+            "problem": "The refusal for a directory that is not named as a major is a branch no test reaches. Every load_action_registry call in the new suite passes `v1` or `v2` (crates/core/tests/action.rs:140, :533; crates/core/tests/action_ids.rs:131, :536, :560, :592), so a caller pointing the loader at `latest/`, at the format directory itself, or at a path whose file_name() is empty (`unwrap_or_default()` -> \"\") is guarded by code the gate can never see fail. Checklist 7 counts an untested dead branch as a finding.",
+            "fix": "Add one case to crates/core/tests/action.rs: write registry.toml into a scratch directory named `latest`, assert load_action_registry returns CoreError::InvalidValue naming the major-directory rule, one line, no local path — or drop the branch and let the declared-version comparison carry the check."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/tests/action.rs:26-29 and crates/core/tests/action_ids.rs:32-33",
+            "problem": "Both new suite headers still state that the tests are 'written from the proposal while crates/core/src/action.rs does not exist yet, so they fail until the design is implemented' / 'before the format ships, so they fail until it does'. In this commit src/action.rs, document.rs's action-ids arm and the whole action-ids corpus are present, so the claim is false about the tree a reader is standing in, contradicts the proves: map, and gives a future fixer an excuse to wave away a red run. It is the same class of stale statement the proposal itself treats as a risk ('Stale ADR-009 lineage misleads the next contributor').",
+            "fix": "Rewrite both sentences to say the suite was written from the proposal and is kept green against the shipped src/action.rs, with no assertion permitted to be weakened to make a change pass."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/tests/action.rs:376-385 (refuses_a_non_string_element_in_an_axis_array)",
+            "problem": "The test asserts only that parse returns some error, with no variant and no named entry. Test strategy #3 groups the non-string element with the duplicate case as a refusal 'naming the id', and schemas/action-ids/v1/spec.md:40-42 types each array as 'array of strings'; as written, a reader that refused `7` for an unrelated reason (Malformed, a budget error, UnknownFormat) passes. Every neighbouring refuses_a_* test in the same file pins the variant, so this is an outlier rather than deliberate looseness.",
+            "fix": "Assert matches!(err, CoreError::InvalidValue { .. }) and that the rendered message names the array (`none`), mirroring refuses_a_duplicate_id_within_one_axis_array_naming_the_id at :387."
+          },
+          {
+            "severity": "nit",
+            "location": "data/manifests/README.md, data/profiles/README.md (new) vs proposal Rollout 3 + A11",
+            "problem": "The tree facts this stage promises — both data/ placeholders present in the commit, and the new version directory carrying spec.md and registry.toml alongside its corpora — are pinned for fixtures only (crates/core/tests/action_ids.rs:161-193). git tracks no empty directory, so the placeholder guarantee rests on prose, while the repo pins comparable tree facts in tests elsewhere (crates/core/tests/gate_contract.rs:517).",
+            "fix": "Extend the tests/action_ids.rs:161 assertion with spec.md and registry.toml presence, and add one repo_root()-relative assertion that data/manifests/README.md and data/profiles/README.md exist."
+          }
+        ]
+      }
+    }
+  },
+  "lastReviewPass": {
+    "phase": "code",
+    "round": 1,
+    "cycle": 0,
+    "seats": [
+      "correctness",
+      "compatibility",
+      "security",
+      "performance",
+      "testing"
+    ]
+  },
+  "reviseNoChange": false,
+  "codeCycle": 1,
+  "codeStamp": "2b20f3c8ab3c963ece6a8b08f6aaa7432b5ad1cc"
+}

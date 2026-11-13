@@ -1,0 +1,8 @@
+# The grammar asks for exactly two segments, so `steer-left` is a malformed id
+# rather than a valid unprefixed one. There is no unprefixed id in this
+# namespace and no third mechanism to decide what one would mean.
+format = "action-ids"
+version = "v1"
+discrete-lateral = []
+continuous-lateral = []
+none = ["steer-left"]

@@ -16,14 +16,16 @@
 //! misspelled or aliased `derives_` reads as *no ancestors at all*, quietly
 //! turning a derived profile into a standalone one.
 //!
-//! The scaffold ships the `profile/v1` and `reach-classes/v1` documents; the
-//! patch, manifest, and policy formats arrive with ADR-009 and the same
-//! harness walk picks them up with no harness change.
+//! The scaffold ships the `profile/v1` and `reach-classes/v1` documents, and
+//! ADR-011 adds `action-ids/v1`; the manifest and profile-chain formats arrive
+//! with the 012-015 series and the same harness walk picks them up with no
+//! harness change.
 
 use std::collections::BTreeMap;
 use std::io::Read;
 use std::path::Path;
 
+use crate::action::{ActionRegistry, AxisKind, registry_from_entries};
 use crate::error::CoreError;
 use crate::reach::{Hand, ReachClass};
 use crate::toml::{self, Value};
@@ -33,7 +35,7 @@ use crate::toml::{self, Value};
 const MAJOR_V1: &str = "v1";
 
 /// The format names this crate parses.
-const SUPPORTED_FORMATS: &[&str] = &["profile", "reach-classes"];
+const SUPPORTED_FORMATS: &[&str] = &["action-ids", "profile", "reach-classes"];
 
 /// Every entry the `profile/v1` grammar defines, and the only ones it admits.
 const PROFILE_ENTRIES: &[&str] = &["derives", "format", "id", "version"];
@@ -42,13 +44,26 @@ const PROFILE_ENTRIES: &[&str] = &["derives", "format", "id", "version"];
 /// admits.
 const REACH_CLASSES_ENTRIES: &[&str] = &["classes", "format", "hand", "version"];
 
+/// Every entry the `action-ids/v1` grammar defines, and the only ones it
+/// admits. The three axis arrays are the entry set's load-bearing part: they
+/// are the id set, so an entry naming a fourth axis kind, or an `emphasis`,
+/// is refused rather than ignored (ADR-011: emphasis is *not* in the
+/// taxonomy).
+const ACTION_IDS_ENTRIES: &[&str] = &[
+    "continuous-lateral",
+    "discrete-lateral",
+    "format",
+    "none",
+    "version",
+];
+
 /// The majors `bindforge-core` declares supported.
 pub fn supported_majors() -> Vec<String> {
     vec![MAJOR_V1.to_string()]
 }
 
 /// A `profile/v1` document. This design carries the identity and the
-/// inline ancestor chain the guards read (`id`, `derives`); ADR-009 owns
+/// inline ancestor chain the guards read (`id`, `derives`); ADR-014 owns
 /// profile content beyond that.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Profile {
@@ -70,6 +85,7 @@ pub struct ReachClassTable {
 pub enum Document {
     Profile(Profile),
     ReachClasses(ReachClassTable),
+    ActionIds(ActionRegistry),
 }
 
 impl Document {
@@ -78,7 +94,7 @@ impl Document {
     pub fn profile(&self) -> Option<&Profile> {
         match self {
             Document::Profile(profile) => Some(profile),
-            Document::ReachClasses(_) => None,
+            Document::ReachClasses(_) | Document::ActionIds(_) => None,
         }
     }
 }
@@ -119,9 +135,13 @@ pub fn parse(text: &str) -> Result<Document, CoreError> {
         }
         "reach-classes" => {
             reject_unknown_entry(&entries, "reach-classes", REACH_CLASSES_ENTRIES)?;
-            Ok(Document::ReachClasses(parse_reach_classes(
-                &entries, version,
-            )?))
+            let table = parse_reach_classes(&entries, version)?;
+            Ok(Document::ReachClasses(table))
+        }
+        "action-ids" => {
+            reject_unknown_entry(&entries, "action-ids", ACTION_IDS_ENTRIES)?;
+            let registry = registry_from_entries(&entries, version)?;
+            Ok(Document::ActionIds(registry))
         }
         other => Err(CoreError::UnknownFormat {
             declared: other.to_string(),
@@ -199,7 +219,39 @@ pub fn serialize(document: &Document) -> String {
                 quoted(table.hand.name())
             )
         }
+        Document::ActionIds(registry) => {
+            let discrete = axis_array(registry, AxisKind::DiscreteLateral);
+            let continuous = axis_array(registry, AxisKind::ContinuousLateral);
+            let none = axis_array(registry, AxisKind::None);
+            let lines = [
+                "format = \"action-ids\"".to_string(),
+                format!("version = {}", quoted(&registry.version)),
+                format!("discrete-lateral = [{discrete}]"),
+                format!("continuous-lateral = [{continuous}]"),
+                format!("none = [{none}]"),
+            ];
+            let mut text = String::new();
+            for line in lines {
+                text.push_str(&line);
+                text.push('\n');
+            }
+            text
+        }
     }
+}
+
+/// The ids one axis array lists, quoted into the grammar's one-line array
+/// form, in the registry's id order. `serialize` writes the three arrays in
+/// the order the entry table defines them, so re-parsing its output yields the
+/// same registry — the round-trip the harness asserts for this format.
+fn axis_array(registry: &ActionRegistry, kind: AxisKind) -> String {
+    registry
+        .ids()
+        .iter()
+        .filter(|id| registry.axis_kind(id) == Some(kind))
+        .map(|id| quoted(id.as_str()))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn parse_profile(entries: &BTreeMap<String, Value>, version: String) -> Result<Profile, CoreError> {
@@ -281,7 +333,7 @@ fn string_value(key: &str, value: &Value) -> Result<String, CoreError> {
     }
 }
 
-fn string_array(key: &str, value: &Value) -> Result<Vec<String>, CoreError> {
+pub(crate) fn string_array(key: &str, value: &Value) -> Result<Vec<String>, CoreError> {
     match value {
         Value::Array(items) => items
             .iter()

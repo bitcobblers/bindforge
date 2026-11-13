@@ -1,0 +1,8 @@
+# An id is exactly two non-empty segments. `move..steer` carries an empty
+# middle one, so it is refused; the empty segment is not read as "no namespace"
+# and not read as a continuation of the first.
+format = "action-ids"
+version = "v1"
+discrete-lateral = []
+continuous-lateral = []
+none = ["move..steer"]

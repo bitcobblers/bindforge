@@ -1,0 +1,8 @@
+# The id grammar is ASCII and byte-exact. `möve.forward` looks like
+# `move.forward` to a reader that normalizes, which is the confusion this rule
+# exists to prevent: a non-ASCII letter is a refusal, never a fold.
+format = "action-ids"
+version = "v1"
+discrete-lateral = []
+continuous-lateral = []
+none = ["möve.forward"]

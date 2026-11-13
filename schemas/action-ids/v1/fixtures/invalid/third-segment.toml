@@ -1,0 +1,8 @@
+# Exactly two segments: `move.steer.left` adds a third, so the id grammar
+# refuses it. Widening the segment count is a grammar change, and a grammar
+# change rides a new major directory (`action-ids/v2`), not this one.
+format = "action-ids"
+version = "v1"
+discrete-lateral = []
+continuous-lateral = []
+none = ["move.steer.left"]

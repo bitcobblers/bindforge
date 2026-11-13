@@ -1,0 +1,8 @@
+# A small `action-ids` registry using exactly the five entries the entry table
+# defines: `format`, `version`, and the three axis arrays. Every array is one
+# line, because a multi-line array is outside the v1 grammar.
+format = "action-ids"
+version = "v1"
+discrete-lateral = ["move.steer-left", "move.steer-right", "move.strafe-left", "move.strafe-right"]
+continuous-lateral = ["aim.camera"]
+none = ["move.forward", "combat.fire", "interact.primary", "item.slot-1", "ui.map"]

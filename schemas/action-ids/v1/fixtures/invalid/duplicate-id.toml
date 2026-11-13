@@ -1,0 +1,9 @@
+# One id appears once across the three arrays. `move.steer-left` sits in both
+# `discrete-lateral` and `continuous-lateral`, so the document grades it two
+# ways; the refusal names the id. The three arrays are one id set, and a
+# doubled array would quietly widen what ADR-015 may flip.
+format = "action-ids"
+version = "v1"
+discrete-lateral = ["move.steer-left"]
+continuous-lateral = ["move.steer-left"]
+none = ["move.forward"]

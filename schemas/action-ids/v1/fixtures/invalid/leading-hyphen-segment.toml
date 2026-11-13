@@ -1,0 +1,8 @@
+# A segment opens with a letter, not a hyphen. `move.-left` is refused: the
+# grammar allows `-` only between letters and digits, which is what keeps one
+# hyphen from becoming a second, unnamed kind of separator.
+format = "action-ids"
+version = "v1"
+discrete-lateral = []
+continuous-lateral = []
+none = ["move.-left"]

@@ -1,0 +1,8 @@
+# A segment holds `a-z`, `0-9`, and `-` only. `move.strafe_left` uses an
+# underscore, which is what keeps one id from having two spellings in the wild
+# depending on which separator a writer reached for.
+format = "action-ids"
+version = "v1"
+discrete-lateral = []
+continuous-lateral = []
+none = ["move.strafe_left"]

@@ -1,0 +1,7 @@
+# A segment opens with an ASCII lowercase letter. `move.1step` opens its second
+# segment with a digit, so it is refused; the echo names the id as written.
+format = "action-ids"
+version = "v1"
+discrete-lateral = []
+continuous-lateral = []
+none = ["move.1step"]

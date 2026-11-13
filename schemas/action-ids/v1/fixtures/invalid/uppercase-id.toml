@@ -1,0 +1,8 @@
+# An uppercase segment is a rejection, never a canonicalization. `Move.Forward`
+# is refused rather than folded to `move.forward`, because case folding lets two
+# spellings name one action — the churn ADR-011 forbids. Comparison is exact.
+format = "action-ids"
+version = "v1"
+discrete-lateral = []
+continuous-lateral = []
+none = ["Move.Forward"]

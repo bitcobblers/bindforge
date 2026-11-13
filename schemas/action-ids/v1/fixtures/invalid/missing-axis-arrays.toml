@@ -1,0 +1,8 @@
+# All three axis arrays are required. This document carries no
+# `continuous-lateral` array, so it is refused as a missing entry naming that
+# array, not read as an empty one: defaulting an array open drops the ids of
+# that kind without saying so.
+format = "action-ids"
+version = "v1"
+discrete-lateral = ["move.steer-left"]
+none = ["move.forward"]

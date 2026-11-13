@@ -1,0 +1,8 @@
+# The three axis arrays are all required, and all three may be empty: an empty
+# array says this registry ships no id of that kind, which is a valid registry,
+# not a missing one.
+format = "action-ids"
+version = "v1"
+discrete-lateral = []
+continuous-lateral = []
+none = []

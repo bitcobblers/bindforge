@@ -46,7 +46,7 @@ Resolving a profile's chain is iterative and refuses adversarial shapes:
 
 - a chain that derives from itself (its id appears in its own chain, or an
   ancestor repeats) is rejected as `Cycle`;
-- a chain longer than `MAX_CHAIN_DEPTH` links (32 initially; ADR-009 may
+- a chain longer than `MAX_CHAIN_DEPTH` links (32 initially; ADR-014 may
   tune, not remove, the bound) is rejected as `ChainTooDeep`.
 
 Both boundary cases ship as invalid fixtures so every implementer rejects

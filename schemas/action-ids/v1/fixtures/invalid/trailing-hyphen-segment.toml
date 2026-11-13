@@ -1,0 +1,8 @@
+# A segment closes with a letter or a digit, not a hyphen. `move.left-` is
+# refused even though every character in it is allowed elsewhere, so a
+# trailing hyphen cannot sneak in as a name that mirrors badly.
+format = "action-ids"
+version = "v1"
+discrete-lateral = []
+continuous-lateral = []
+none = ["move.left-"]

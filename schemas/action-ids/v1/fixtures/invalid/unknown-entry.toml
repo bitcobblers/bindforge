@@ -1,0 +1,11 @@
+# The entry set is closed. `emphasis` is not an entry the grammar defines, and
+# ADR-011 says emphasis is *not* in the taxonomy at all: where a game places an
+# action is a game fact the manifest (ADR-013) records. A reader that ignored
+# this entry would invent a fourth axis the contract has no meaning for, so the
+# refusal names the entry.
+format = "action-ids"
+version = "v1"
+discrete-lateral = ["move.steer-left"]
+continuous-lateral = ["aim.camera"]
+none = ["combat.melee"]
+emphasis = ["combat.melee"]

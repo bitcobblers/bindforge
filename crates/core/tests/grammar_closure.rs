@@ -97,10 +97,12 @@ fn rejects_a_reach_classes_table_carrying_an_entry_outside_the_grammar() {
 
 /// proves: Formats contract (closed entry set) — the corpus carries the case for
 /// every shipped format, which is what pins the closed set for third-party
-/// readers instead of only for `bindforge-core`.
+/// readers instead of only for `bindforge-core`. `action-ids` joins the list with
+/// its own `emphasis` fixture (Test strategy #5): ADR-011 says emphasis is not in
+/// the taxonomy, so an `emphasis` entry is a refusal naming the entry.
 #[test]
 fn the_invalid_corpus_ships_an_unknown_entry_fixture_for_every_format() {
-    for format in ["profile", "reach-classes"] {
+    for format in ["profile", "reach-classes", "action-ids"] {
         let dir = version_dir(format, "v1");
         let path = dir
             .path

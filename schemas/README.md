@@ -1,16 +1,17 @@
 # BindForge formats contract
 
 `schemas/` is the single home of BindForge's on-disk format contract: one
-directory per format (`profile`, `patch`, `manifest`, `policy`,
-`reach-classes`), and under it one directory per major version (`v1`, `v2`,
-…). Every product component — the CLI, the desktop app, the hub — validates
-documents with these rules, and third-party readers can conform to them
-without reading Rust.
+directory per format (`action-ids`, `profile`, `reach-classes`, and later the
+manifest and profile-chain formats of the 012-015 series), and under it one
+directory per major version (`v1`, `v2`, …). Every product component — the
+CLI, the desktop app, the hub — validates documents with these rules, and
+third-party readers can conform to them without reading Rust.
 
-The scaffold of this contract tree (ADR-008 design 008) ships `profile/v1`
-and `reach-classes/v1`; `patch/v1`, `manifest/v1`, and `policy/v1` arrive
-with ADR-009, and the conformance harness's `schemas/*/v*/` walk picks them
-up with no harness change.
+The scaffold of this contract tree (ADR-008 design 008) ships `profile/v1` and
+`reach-classes/v1`; ADR-011 adds `action-ids/v1`, the id set the rest of the
+011-015 series speaks through. The manifest and profile-chain formats arrive
+with the 012-015 series, and the conformance harness's `schemas/*/v*/` walk
+picks them up with no harness change.
 
 ## Versioning rule (canonical)
 
@@ -59,7 +60,7 @@ can reach a writer:
   (`MAX_NESTING_DEPTH`).
 - A chain deriving from itself is rejected (`Cycle`); a chain longer than
   `MAX_CHAIN_DEPTH = 32` links is rejected (`ChainTooDeep`) instead of
-  recursed into. 32 is an initial value ADR-009 may tune but not remove.
+  recursed into. 32 is an initial value ADR-014 may tune but not remove.
 
 The three constants are the reference implementation's public names for these
 limits, so an implementer never has to guess which number a rejection names.

@@ -1,0 +1,8 @@
+# A segment may close with a digit: the slot and skill ids this taxonomy ships
+# are `item.slot-<n>` and `combat.skill-<n>`, letter-first and digit-last, which
+# the grammar admits. Nothing here is a number — the array holds strings.
+format = "action-ids"
+version = "v1"
+discrete-lateral = []
+continuous-lateral = []
+none = ["item.slot-1", "item.slot-6", "combat.skill-1", "combat.skill-3", "move.sprint"]

@@ -1,6 +1,6 @@
 //! Chain resolution — the one piece of chain semantics this design decides
 //! (Chosen design -> Adversarial guard). All other chain semantics are
-//! ADR-009's.
+//! ADR-014's.
 //!
 //! `resolve_chain` is the guard that lets the hub validate uploads with the
 //! same compiled types the CLI and desktop use: it walks the chain
@@ -13,7 +13,7 @@ use crate::document::Profile;
 use crate::error::CoreError;
 
 /// Maximum number of ancestor links a profile's chain may hold. 32 is the
-/// initial value ADR-009 may tune but may not remove; the boundary tests and
+/// initial value ADR-014 may tune but may not remove; the boundary tests and
 /// the fixture corpus are written against this constant, never the literal.
 pub const MAX_CHAIN_DEPTH: usize = 32;
 
