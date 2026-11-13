@@ -1,0 +1,10 @@
+# A base has empty `derives`: a link labelled `base` that names an ancestor
+# contradicts its own label, and the chain position rule would have nothing to
+# terminate on. The contradiction is refused per document, naming the ancestor.
+format = "profile"
+version = "v2"
+id = "base-derives-nonempty"
+derives = ["game-base"]
+kind = "base"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]

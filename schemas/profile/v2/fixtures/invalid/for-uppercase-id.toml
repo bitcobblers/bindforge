@@ -1,0 +1,11 @@
+# The id half of the pin rides the slug grammar `[a-z][a-z0-9-]*`. A manifest id
+# is a directory name and a lookup key, so a pin that capitalizes it names a
+# referent the contract can never resolve — on a case-insensitive contributor
+# filesystem it would name two.
+format = "profile"
+version = "v2"
+id = "for-uppercase-id"
+derives = ["game-base"]
+kind = "patch"
+for = "Remnant-2@3"
+set = ["move.steer-left keyboard:d"]

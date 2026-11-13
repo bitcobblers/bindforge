@@ -1,0 +1,10 @@
+# `seeded-from` rides the slug grammar: a preset id is a manifest lookup, so a
+# malformed one is a provenance claim that can never resolve — refused at parse,
+# naming the value, before the load-time join is ever asked about it.
+format = "profile"
+version = "v2"
+id = "seeded-from-uppercase"
+kind = "base"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]
+seeded-from = "Default"

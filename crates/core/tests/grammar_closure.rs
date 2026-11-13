@@ -121,6 +121,36 @@ actions = ["move.steer-left Turn left"]
 axis-kinds = ["move.steer-left none"]
 "#;
 
+/// A `profile/v2` document using every entry `schemas/profile/v2/spec.md`
+/// defines: v1's four unchanged in meaning plus `kind`, the `for` pin, the
+/// three delta lists, and the two provenance labels — the eleven the entry
+/// table lists, no more (design 014, A1).
+const PROFILE_V2_USING_DEFINED_ENTRIES: &str = r#"format = "profile"
+version = "v2"
+id = "defined-entries-v2"
+derives = ["game-base"]
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]
+clear = ["aim.camera"]
+swap = ["move.steer-left combat.fire"]
+seeded-from = "default"
+generated-by = "human"
+"#;
+
+/// A `profile/v2` document that aliases a known entry: a reader that ignores
+/// unknown entries reads it as a profile with no ancestors at all, under the
+/// very version whose chain machinery the entry would steer (design 014's Test
+/// strategy #8).
+const PROFILE_V2_WITH_AN_ALIASED_ENTRY: &str = r#"format = "profile"
+version = "v2"
+id = "aliased-chain-v2"
+derives = ["game-base"]
+kind = "patch"
+for = "remnant-2@3"
+derives_ = ["ancestor-1"]
+"#;
+
 /// A `keyboard-geometry/v1` document whose `geometry` name breaks the slug
 /// grammar `[a-z][a-z0-9-]*` — the same grammar a manifest `id`, `codec` and
 /// preset id ride, defined once and renamed `is_slug_name` when the third entry
@@ -197,6 +227,7 @@ fn the_invalid_corpus_ships_an_unknown_entry_fixture_for_every_format() {
         ("action-ids", "v1"),
         ("keyboard-geometry", "v1"),
         ("manifests", "v1"),
+        ("profile", "v2"),
     ] {
         let dir = version_dir(format, major);
         let path = dir
@@ -376,5 +407,44 @@ fn rejects_a_keyboard_geometry_name_outside_the_slug_grammar() {
     assert!(
         !detail.contains('\n') && !detail.contains('\r'),
         "the refusal stays one bounded line: {detail:?}"
+    );
+}
+
+/// proves: design 014's Test strategy #8 + The contract (closed entry set) —
+/// closing the v2 set is not shrinking the grammar: a profile using exactly
+/// the eleven entries the v2 entry table defines parses, the v1 four
+/// unchanged in meaning (A1, A15).
+#[test]
+fn accepts_every_entry_the_profile_v2_grammar_defines() {
+    if let Err(err) = bindforge_core::parse(PROFILE_V2_USING_DEFINED_ENTRIES) {
+        panic!(
+            "a profile using only the entries the v2 entry table defines must parse; it was \
+             refused: {err}"
+        );
+    }
+}
+
+/// proves: design 014's Test strategy #8 — the closed entry set is per-
+/// version, and v2 is closed the same way v1 is: a `profile/v2` document
+/// aliasing `derives_` is refused naming the entry and the version whose entry
+/// set was checked — an ignored alias would read as *no ancestors at all*
+/// under the very version whose whole contract is the chain (A4: the entry-set
+/// arm keyed on the declared version is the shipped `reach-classes` mechanism).
+#[test]
+fn rejects_a_profile_v2_document_carrying_an_aliased_entry() {
+    let err = bindforge_core::parse(PROFILE_V2_WITH_AN_ALIASED_ENTRY).expect_err(
+        "a v2 profile carrying `derives_` must be refused, not read as a chain-shaping entry \
+         outside the grammar",
+    );
+
+    let detail = err.to_string();
+    assert!(
+        detail.contains("derives_"),
+        "the refusal must name the entry it refused, got `{detail}`"
+    );
+    assert!(
+        detail.contains("v2"),
+        "the refusal names the version whose entry set it checked, not a hard-coded `v1`, got \
+         `{detail}`"
     );
 }

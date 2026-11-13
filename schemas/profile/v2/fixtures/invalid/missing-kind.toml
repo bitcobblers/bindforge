@@ -1,0 +1,9 @@
+# `kind` is required, and never inferred from `derives` or from chain position:
+# it is the label the parse-level shape rules and the load-level position rule
+# are both checked against, so guessing it is the drift the entry table refuses.
+format = "profile"
+version = "v2"
+id = "missing-kind"
+derives = ["game-base"]
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]

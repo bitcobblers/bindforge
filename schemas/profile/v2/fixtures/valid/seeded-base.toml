@@ -1,0 +1,13 @@
+# A base whose layout is its `set` list over the all-unbound baseline, carrying
+# both provenance labels. `seeded-from` names a preset of the pinned manifest
+# and `generated-by` names what wrote the document; neither is ever consumed as
+# trust (ADR-014 Decision Four). The join that checks the preset exists is a
+# load-level rule `spec.md` states and `chain_ops` pins.
+format = "profile"
+version = "v2"
+id = "remnant-2-default"
+kind = "base"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d", "move.steer-right keyboard:a", "combat.fire mouse:left"]
+seeded-from = "default"
+generated-by = "human"

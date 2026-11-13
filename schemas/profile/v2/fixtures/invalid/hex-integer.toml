@@ -1,0 +1,13 @@
+# Legal TOML, outside the v2 grammar (`spec.md`): integers are decimal only, so
+# a `0x` prefixed integer is rejected rather than read as one — the same rule
+# `profile/v1` pins, in a document that also carries the v2 link vocabulary. A
+# lenient reader that reads `0xFF` as `255` has invented a number the document
+# never wrote, and every later rule that reads a decimal number inherits the
+# mistake.
+format = "profile"
+version = "v2"
+id = "hex-integer"
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]
+revision = 0xFF

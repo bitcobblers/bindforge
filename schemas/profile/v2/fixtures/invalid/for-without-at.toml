@@ -1,0 +1,10 @@
+# The pin splits at its one `@`: `"<manifest-id>@<revision>"`, exactly design
+# 013's canonical identity. A pin with no `@` names no revision, so it can never
+# equal the identity a manifest answers with, and load refuses naming the link.
+format = "profile"
+version = "v2"
+id = "for-without-at"
+derives = ["game-base"]
+kind = "patch"
+for = "remnant-2"
+set = ["move.steer-left keyboard:d"]

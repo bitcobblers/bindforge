@@ -2,8 +2,10 @@
 
 `schemas/` is the single home of BindForge's on-disk format contract: one
 directory per format (`action-ids`, `keyboard-geometry`, `manifests`,
-`profile`, `reach-classes`, and later the profile-chain format of the 012-015
-series), and under it one directory per major version (`v1`, `v2`, …).
+`profile`, `reach-classes`), and under it one directory per major version
+(`v1`, `v2`, …). A format's later majors are how a format grows: the
+profile-chain vocabulary of the 012-015 series is `profile/v2`, not a sixth
+format.
 Every product component — the CLI, the desktop app, the hub — validates
 documents with these rules, and third-party readers can conform to them
 without reading Rust.
@@ -17,9 +19,13 @@ placement predicate checks its shape rule against. ADR-013 adds
 `manifests/v1`, the game manifest — game id and data revision, codec family
 id, action table, constraints, and preset ids — read from `data/manifests/`
 through `load_manifest`, whose registry join and location rule are load-time
-rules. The profile-chain format arrives with the rest of the 012-015 series,
-and the conformance harness's `schemas/*/v*/` walk picks every new directory
-up with no harness change.
+rules. ADR-014 adds `profile/v2`: one link of a chain, with its `kind`, its
+`for` pin, its three delta lists, and its two provenance labels, read across
+files through `load_chain` — whose one-directory rule, pin equality, and
+manifest joins are load-time rules of the same shape. `profile/v1` and its
+fixtures stay exactly as shipped: the chain's vocabulary is a new major, not a
+widened one. The conformance harness's `schemas/*/v*/` walk picks every new
+directory up with no harness change.
 
 ## Versioning rule (canonical)
 
@@ -31,11 +37,11 @@ up with no harness change.
 - The majors a document may declare are those of **its own format**: a format
   ships a major only when a `schemas/<format>/vN/` directory carries it, and a
   document declaring a major its format does not ship is refused naming that
-  format's majors. `reach-classes` is the only format with two majors today, so
-  its `v2` never widens what a `profile`, `action-ids`, or `keyboard-geometry`
-  reader accepts. A reader that gates on one global list instead reads a
-  future-major document with the grammar of the major it happens to have —
-  the misreading this rule exists to prevent.
+  format's majors. `reach-classes` and `profile` each have two majors today, so
+  their `v2` never widens what an `action-ids`, `keyboard-geometry`, or
+  `manifests` reader accepts. A reader that gates on one global list instead
+  reads a future-major document with the grammar of the major it happens to
+  have — the misreading this rule exists to prevent.
 - Minor bumps are additive only.
 - A file's presence in `vN/fixtures/valid/` is the definition of
   "supported", and the majors `bindforge-core` declares must equal the
@@ -91,8 +97,17 @@ can reach a writer:
   `MAX_NATIVE_NAME_OCTETS = 128` one game-native action name. Each cap sits
   well above the baselines it was surveyed for, and the shared 1 MiB /
   16-deep budgets still bind first.
+- ADR-014 adds two budgets for a profile chain's delta data, named beside
+  these: `MAX_PATCH_DELTA_ELEMENTS = 256` bounds each of a `profile/v2`
+  link's `set`, `clear`, and `swap` lists — mirroring the `MAX_MANIFEST_ROWS`
+  cap that bounds one game's whole action table — and
+  `MAX_GENERATED_BY_OCTETS = 128` one `generated-by` provenance label.
+  ADR-014 adds no aggregate chain cap: one chain resolution opens at most
+  `MAX_CHAIN_DEPTH` documents, so its total read cost is the product already
+  stated by the two budgets, `MAX_CHAIN_DEPTH × MAX_DOCUMENT_BYTES` (32 MiB).
+  `schemas/profile/v2/spec.md` states the composite the same way.
 
-The reference implementation exports all seven constants as the public names
+The reference implementation exports all nine constants as the public names
 for these limits, so an implementer never has to guess which number a
 rejection names.
 

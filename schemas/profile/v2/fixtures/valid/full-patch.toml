@@ -1,0 +1,14 @@
+# Every entry the v2 entry table defines, in one document: the eleven the closed
+# set admits, no more. An implementer must also re-serialize this to a
+# semantically equal document, each delta array in its document order.
+format = "profile"
+version = "v2"
+id = "full-chain-link"
+derives = ["remnant-2-default"]
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:w"]
+clear = ["aim.zoom"]
+swap = ["move.steer-left aim.camera"]
+seeded-from = "southpaw"
+generated-by = "bindforge-cli 0.1"

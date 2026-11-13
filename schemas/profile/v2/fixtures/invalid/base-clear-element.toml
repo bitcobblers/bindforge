@@ -1,0 +1,10 @@
+# A base has no `clear` elements: there is nothing below it whose binding could
+# be dropped, so a `clear` on a base is a claim with nothing to act on. A base's
+# layout is its `set` list over the all-unbound baseline, and that is all.
+format = "profile"
+version = "v2"
+id = "base-clear-element"
+kind = "base"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]
+clear = ["aim.zoom"]

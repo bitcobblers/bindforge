@@ -1,0 +1,13 @@
+# Legal TOML, outside the v2 grammar (`spec.md`): arrays must be written on
+# one line, so an entry whose array continues onto the next line is rejected.
+# The order of a v2 delta array is the patch's semantics, so an implementation
+# that reads the continuation differently on a multi-line array changes the
+# meaning of the link rather than its formatting.
+format = "profile"
+version = "v2"
+id = "multi-line-array"
+kind = "patch"
+for = "remnant-2@3"
+set = [
+  "move.steer-left keyboard:d",
+]

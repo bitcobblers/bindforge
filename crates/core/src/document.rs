@@ -14,8 +14,8 @@
 //! format does not carry is refused naming that format's majors. A crate-wide
 //! list alone would fail open the moment any format grows a second major —
 //! ADR-012 adds `reach-classes/v2`, and without the per-format half a document
-//! declaring `format = "profile", version = "v2"` would be read with the
-//! `profile/v1` grammar, which is exactly the misreading the gate exists to
+//! declaring `format = "manifests", version = "v2"` would be read with the
+//! `manifests/v1` grammar, which is exactly the misreading the gate exists to
 //! prevent. The crate-wide list still binds first, so a major no format ships
 //! is refused naming every major the crate declares.
 //!
@@ -36,14 +36,19 @@
 //! `placement` checks its shape rule against — and ADR-013 adds `manifests/v1`
 //! — the game facts of `manifest`, whose two cross-file rules (the registry
 //! join and the location rule) live in `manifest::load_manifest`, not here.
-//! The profile-chain format arrives with the rest of the 012-015 series and
-//! the same harness walk picks it up with no harness change.
+//! Design 014 (ADR-014) adds `profile/v2`: the link vocabulary of the chain —
+//! `kind`, the `for` pin, the `set`/`clear`/`swap` delta lists, and the two
+//! provenance labels — all of it *parse*-level, so the corpus stays
+//! single-document. What needs other documents in hand (the resolved-chain
+//! guards, the position rules, the manifest joins) lives in `chain_ops`, the
+//! same split `manifest` uses; `profile/v1` stays exactly as shipped, entry
+//! set, `serialize` bytes, and fixtures included.
 
 use std::collections::BTreeMap;
 use std::io::Read;
 use std::path::Path;
 
-use crate::action::{ActionRegistry, AxisKind, registry_from_entries};
+use crate::action::{ActionId, ActionRegistry, AxisKind, registry_from_entries};
 use crate::error::CoreError;
 use crate::input::{InputId, InputNamespace};
 use crate::manifest::{Manifest, manifest_from_entries};
@@ -54,7 +59,9 @@ use crate::toml::{self, Value};
 /// The major versions of the contract this crate implements. Must stay equal
 /// to the majors present under `schemas/*/v*/` (Test strategy #2).
 const MAJOR_V1: &str = "v1";
-const MAJOR_V2: &str = "v2";
+/// `pub(crate)` because `chain_ops` builds chain documents as well as reads
+/// them, and every chain link is written in this major.
+pub(crate) const MAJOR_V2: &str = "v2";
 
 /// The format names this crate parses.
 const SUPPORTED_FORMATS: &[&str] = &[
@@ -66,7 +73,27 @@ const SUPPORTED_FORMATS: &[&str] = &[
 ];
 
 /// Every entry the `profile/v1` grammar defines, and the only ones it admits.
-const PROFILE_ENTRIES: &[&str] = &["derives", "format", "id", "version"];
+const PROFILE_V1_ENTRIES: &[&str] = &["derives", "format", "id", "version"];
+
+/// Every entry the `profile/v2` grammar defines: v1's four unchanged in meaning
+/// (`format`, `version`, `id`, `derives`, A1) plus the link vocabulary the
+/// chain is written in — `kind`, the `for` pin, the three delta lists, and the
+/// two provenance labels. The set is closed the same way every other format's
+/// is: `fixtures/invalid/unknown-entry.toml` pins the refusal, and the retired
+/// `based-on` is refused rather than read as `derives` under another name.
+const PROFILE_V2_ENTRIES: &[&str] = &[
+    "clear",
+    "derives",
+    "format",
+    "for",
+    "generated-by",
+    "id",
+    "kind",
+    "seeded-from",
+    "set",
+    "swap",
+    "version",
+];
 
 /// Every entry the `reach-classes/v1` grammar defines, and the only ones it
 /// admits. This set stays closed forever: `keys` is what `v2` adds, and
@@ -131,6 +158,27 @@ const GEOMETRY_NAME_RULE: &str = "expected `[a-z][a-z0-9-]*`";
 /// is a grammar refusal rather than a coordinate that wraps into a legal one.
 const MAX_GEOMETRY_COORDINATE: u32 = 999;
 
+/// Parse budget: the most elements one `profile/v2` `set`, `clear`, or `swap`
+/// list may hold. The cap mirrors `MAX_MANIFEST_ROWS`, which bounds one game's
+/// whole action table, so one patch can retouch every row of the manifest it
+/// is pinned to and no more (design 014, A17).
+pub const MAX_PATCH_DELTA_ELEMENTS: usize = 256;
+
+/// Parse budget: the longest `generated-by` label, in octets. The cap is what
+/// bounds a refusal that has to name the label (A13); the label is provenance,
+/// so it is short and displayed, never a payload.
+pub const MAX_GENERATED_BY_OCTETS: usize = 128;
+
+/// The octet bound a v2 profile `id`, each `derives` element, and each pin's
+/// manifest half share with the slug grammar — the DNS-label bound RFC 1035
+/// §2.3.1 publishes, the same one the action-id and manifest grammars borrow,
+/// so no unbounded string rides a displayed refusal.
+const MAX_SLUG_OCTETS: usize = 63;
+
+/// The slug grammar those ids ride, named in the refusal so a document says
+/// which grammar it broke — the same spelling `placement::is_slug_name` checks.
+const SLUG_RULE: &str = "expected `[a-z][a-z0-9-]*`";
+
 /// The majors `bindforge-core` declares supported: the union over the formats,
 /// and exactly the majors present under `schemas/*/v*/`. A major outside this
 /// list is refused naming the whole union; a major inside it is still refused
@@ -141,16 +189,16 @@ pub fn supported_majors() -> Vec<String> {
 }
 
 /// The majors one format ships, which is what the version gate actually checks.
-/// `reach-classes` is the only format with a second major so far, and the list
-/// is where a future `manifest`/`patch`/`policy` major gets declared when its
-/// directory is added: a format's majors widen only with its own directory
-/// under `schemas/`, never because another format grew one. `None` says the
-/// format is not one this crate parses — that is the `UnknownFormat` refusal in
-/// `parse`, whatever its version line says.
-fn format_majors(format: &str) -> Option<&'static [&'static str]> {
+/// `reach-classes` grew a second major in ADR-012 and `profile` grew one in
+/// design 014; the list is where a future `manifest`/`patch`/`policy` major
+/// gets declared when its directory is added: a format's majors widen only with
+/// its own directory under `schemas/`, never because another format grew one.
+/// `None` says the format is not one this crate parses — that is the
+/// `UnknownFormat` refusal in `parse`, whatever its version line says.
+pub(crate) fn format_majors(format: &str) -> Option<&'static [&'static str]> {
     match format {
-        "action-ids" | "keyboard-geometry" | "manifests" | "profile" => Some(&[MAJOR_V1]),
-        "reach-classes" => Some(&[MAJOR_V1, MAJOR_V2]),
+        "action-ids" | "keyboard-geometry" | "manifests" => Some(&[MAJOR_V1]),
+        "profile" | "reach-classes" => Some(&[MAJOR_V1, MAJOR_V2]),
         _ => None,
     }
 }
@@ -172,14 +220,67 @@ fn check_format_major(format: &str, version: &str) -> Result<(), CoreError> {
     })
 }
 
-/// A `profile/v1` document. This design carries the identity and the
-/// inline ancestor chain the guards read (`id`, `derives`); ADR-014 owns
-/// profile content beyond that.
+/// What one `profile/v2` link is: a base stands alone at the bottom of a
+/// chain, a patch modifies the one link below it. The label is required at v2
+/// — never inferred from position — because it is the label the contract names,
+/// and it is checked against `derives` at parse and against chain position at
+/// load (design 014, Options: what `kind` means).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProfileKind {
+    Base,
+    Patch,
+}
+
+impl ProfileKind {
+    /// The contract spelling of this kind: the value of a link's `kind` entry.
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            ProfileKind::Base => "base",
+            ProfileKind::Patch => "patch",
+        }
+    }
+
+    /// The kind one of those spellings names, or `None` when it names neither —
+    /// the closed pair `spec.md` states. A third label is a refusal, never a
+    /// kind whose position gets guessed.
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<ProfileKind> {
+        match name {
+            "base" => Some(ProfileKind::Base),
+            "patch" => Some(ProfileKind::Patch),
+            _ => None,
+        }
+    }
+}
+
+/// A profile document. A `v1` document carries the identity and the inline
+/// ancestor chain the shipped guards read (`id`, `derives`) and nothing else —
+/// its v2 fields sit at their defaults and its `serialize` output stays
+/// byte-exact (A15). A `v2` document is one link of a chain: the `kind` label,
+/// the `for` pin naming the manifest the link applies to, the delta lists that
+/// write the layout, and the two provenance labels nothing consumes as trust.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Profile {
     pub version: String,
     pub id: String,
     pub derives: Vec<String>,
+    /// `v2`: required, so always `Some`; `v1`: `None`.
+    pub kind: Option<ProfileKind>,
+    /// `v2`: `"<manifest-id>@<revision>"`, grammar-checked at parse and joined
+    /// to the manifest at load; `v1`: empty.
+    pub for_manifest: String,
+    /// Each element binds that action to that input, replacing any binding.
+    pub set: Vec<(ActionId, InputId)>,
+    /// Each action's binding is dropped.
+    pub clear: Vec<ActionId>,
+    /// Each pair of actions exchanges its current binding.
+    pub swap: Vec<(ActionId, ActionId)>,
+    /// Provenance: the preset the chain's base was seeded from. Validated
+    /// referentially at load, consumed by nothing.
+    pub seeded_from: Option<String>,
+    /// Provenance: what produced this document. Never consumed as trust.
+    pub generated_by: Option<String>,
 }
 
 /// A `reach-classes` table document: one hand's class list, and the grade that
@@ -268,7 +369,8 @@ pub fn parse(text: &str) -> Result<Document, CoreError> {
 
     match format.as_str() {
         "profile" => {
-            reject_unknown_entry(&entries, "profile", &version, PROFILE_ENTRIES)?;
+            let defined = profile_entries(&version);
+            reject_unknown_entry(&entries, "profile", &version, defined)?;
             Ok(Document::Profile(parse_profile(&entries, version)?))
         }
         "reach-classes" => {
@@ -318,6 +420,18 @@ pub fn parse_reader(source: impl Read) -> Result<Document, CoreError> {
     parse(&text)
 }
 
+/// Which closed entry set a `profile` document is held to: `v2` admits the link
+/// vocabulary, `v1` never does, and the declared version is what picks — the
+/// same version-keyed mechanism `reach_classes_entries` ships (A4). The
+/// per-format version gate has already refused anything outside `profile`'s two
+/// majors, so one of these two sets always applies.
+fn profile_entries(version: &str) -> &'static [&'static str] {
+    if version == MAJOR_V2 {
+        return PROFILE_V2_ENTRIES;
+    }
+    PROFILE_V1_ENTRIES
+}
+
 /// Which closed entry set a `reach-classes` document is held to: `v2` admits
 /// `keys`, `v1` never does, and the declared version is what picks. The
 /// per-format version gate has already refused anything outside this format's
@@ -354,21 +468,31 @@ fn reject_unknown_entry(
 }
 
 /// Write a document back out as contract text. Re-parsing the output yields
-/// a semantically equal document — the round-trip half of Test strategy #1.
+/// a semantically equal document — the round-trip half of Test strategy #1 —
+/// for any model this crate produced by parsing one; `serialize_profile_link`
+/// states the one precondition a hand-built `profile/v2` model has to meet.
 pub fn serialize(document: &Document) -> String {
     match document {
         Document::Profile(profile) => {
-            let derives = profile
-                .derives
-                .iter()
-                .map(|ancestor| quoted(ancestor))
-                .collect::<Vec<_>>()
-                .join(", ");
-            format!(
-                "format = \"profile\"\nversion = {}\nid = {}\nderives = [{derives}]\n",
-                quoted(&profile.version),
-                quoted(&profile.id)
-            )
+            // The writer follows the grammar, not the model: the declared
+            // version alone decides which entries exist. A v1 document keeps
+            // its shipped bytes (A15), and a hand-built v1 model carrying v2
+            // fields in it never prints a document the v1 reader refuses — the
+            // same shape `reach-classes` grades decide on.
+            if profile.version == MAJOR_V1 {
+                let derives = profile
+                    .derives
+                    .iter()
+                    .map(|ancestor| quoted(ancestor))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                return format!(
+                    "format = \"profile\"\nversion = {}\nid = {}\nderives = [{derives}]\n",
+                    quoted(&profile.version),
+                    quoted(&profile.id)
+                );
+            }
+            serialize_profile_link(profile)
         }
         Document::ReachClasses(table) => {
             let classes = table
@@ -495,6 +619,87 @@ pub fn serialize(document: &Document) -> String {
     }
 }
 
+/// One `profile/v2` link back out as contract text, in the fixed entry order
+/// the entry table defines: `format, version, id, derives, kind, for, set,
+/// clear, swap` then the two optional provenance labels. Every delta array is
+/// written for every v2 document — an absent one round-trips as `[]`, the 013
+/// precedent — and each array keeps its **document order**, because delta order
+/// is data and the harness's re-parse comparison is equality (A3).
+///
+/// `kind` and `for` are written for every v2 document, unconditionally: this
+/// writer branches on the declared `version` alone, never on which fields happen
+/// to be filled in. So a v2 model is required to carry a `kind`; one hand-built
+/// without it writes `kind = ""`, which the reader refuses naming the entry —
+/// never a document that quietly lacks a required entry and re-parses as a
+/// different shape. Every model this crate produces (a parse, a `fork`, `diff`,
+/// or `merge` output) carries one.
+fn serialize_profile_link(profile: &Profile) -> String {
+    let derives = profile
+        .derives
+        .iter()
+        .map(|ancestor| quoted(ancestor))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let kind = profile.kind.map_or("", ProfileKind::name);
+    let mut lines = vec![
+        "format = \"profile\"".to_string(),
+        format!("version = {}", quoted(&profile.version)),
+        format!("id = {}", quoted(&profile.id)),
+        format!("derives = [{derives}]"),
+        format!("kind = {}", quoted(kind)),
+        format!("for = {}", quoted(&profile.for_manifest)),
+    ];
+    let set = profile
+        .set
+        .iter()
+        .map(|(action, input)| quoted(&set_pair(action, input)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let clear = profile
+        .clear
+        .iter()
+        .map(|action| quoted(action.as_str()))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let swap = profile
+        .swap
+        .iter()
+        .map(|(first, second)| quoted(&swap_pair(first, second)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    lines.extend([
+        format!("set = [{set}]"),
+        format!("clear = [{clear}]"),
+        format!("swap = [{swap}]"),
+    ]);
+    // An absent provenance label stays absent: writing one would invent a claim
+    // about what produced the document.
+    if let Some(seeded_from) = &profile.seeded_from {
+        lines.push(format!("seeded-from = {}", quoted(seeded_from)));
+    }
+    if let Some(generated_by) = &profile.generated_by {
+        lines.push(format!("generated-by = {}", quoted(generated_by)));
+    }
+    let mut text = String::new();
+    for line in lines {
+        text.push_str(&line);
+        text.push('\n');
+    }
+    text
+}
+
+/// One `set` element back into the grammar's pair encoding: the action id and
+/// the input id, one space between. Neither half ever carries a space, which is
+/// what makes the reader's one split point the same point the writer joins at.
+fn set_pair(action: &ActionId, input: &InputId) -> String {
+    format!("{} {}", action.as_str(), input.as_str())
+}
+
+/// One `swap` element back into the same pair encoding, both halves action ids.
+fn swap_pair(first: &ActionId, second: &ActionId) -> String {
+    format!("{} {}", first.as_str(), second.as_str())
+}
+
 /// One graded input back into the grammar's pair encoding: the id and the
 /// class id, one space between. `quoted` escapes `\`, so the backslash glyph
 /// round-trips through the reader's closed escape table.
@@ -547,6 +752,9 @@ fn axis_array(registry: &ActionRegistry, kind: AxisKind) -> String {
 }
 
 fn parse_profile(entries: &BTreeMap<String, Value>, version: String) -> Result<Profile, CoreError> {
+    if version == MAJOR_V2 {
+        return parse_profile_link(entries, version);
+    }
     let id = string_entry(entries, "id")?;
     if id.is_empty() {
         return Err(CoreError::InvalidValue {
@@ -558,11 +766,362 @@ fn parse_profile(entries: &BTreeMap<String, Value>, version: String) -> Result<P
         None => Vec::new(),
         Some(value) => string_array("derives", value)?,
     };
+    // A v1 document carries nothing beyond the identity and the inline ancestor
+    // list: the v2 fields sit at their defaults, and `serialize` never writes a
+    // v2 entry into a v1 document (A15).
     Ok(Profile {
         version,
         id,
         derives,
+        kind: None,
+        for_manifest: String::new(),
+        set: Vec::new(),
+        clear: Vec::new(),
+        swap: Vec::new(),
+        seeded_from: None,
+        generated_by: None,
     })
+}
+
+/// One `profile/v2` link: the `kind` label, the `for` pin, the three delta
+/// lists split into typed ids, and the two provenance labels. Every rule here
+/// is one a single document can answer on its own — which is what keeps the
+/// `profile/v2` corpus single-document (A16) and leaves only the chain-level
+/// rules (position, the joins, the resolved-chain guards) to `chain_ops`.
+fn parse_profile_link(
+    entries: &BTreeMap<String, Value>,
+    version: String,
+) -> Result<Profile, CoreError> {
+    let id = string_entry(entries, "id")?;
+    check_profile_slug("id", &id)?;
+
+    let kind = parse_profile_kind(entries)?;
+
+    let for_manifest = string_entry(entries, "for")?;
+    check_pin(&for_manifest)?;
+
+    let derives = match entries.get("derives") {
+        None => Vec::new(),
+        Some(value) => string_array("derives", value)?,
+    };
+    // Every element is a chain lookup key and a file name, so the slug grammar
+    // runs before any path is ever built from it: `..` and `a/b` refuse here,
+    // as `placement::is_slug_name` already refuses them for a geometry name.
+    for element in &derives {
+        check_profile_slug("derives", element)?;
+    }
+
+    let set = parse_set(entries)?;
+    let clear = parse_clear(entries)?;
+    let swap = parse_swap(entries)?;
+    check_link_shape(kind, &derives, &set, &clear, &swap)?;
+
+    let seeded_from = match entries.get("seeded-from") {
+        None => None,
+        Some(value) => {
+            let preset = string_value("seeded-from", value)?;
+            check_profile_slug("seeded-from", &preset)?;
+            Some(preset)
+        }
+    };
+    let generated_by = match entries.get("generated-by") {
+        None => None,
+        Some(value) => {
+            let label = string_value("generated-by", value)?;
+            check_generated_by(&label)?;
+            Some(label)
+        }
+    };
+
+    Ok(Profile {
+        version,
+        id,
+        derives,
+        kind: Some(kind),
+        for_manifest,
+        set,
+        clear,
+        swap,
+        seeded_from,
+        generated_by,
+    })
+}
+
+/// The `kind` entry: required, and one of the closed pair. Absent is
+/// `MissingEntry` naming the entry — never a kind guessed from `derives`, which
+/// is the label the position rules at load are checked against.
+fn parse_profile_kind(entries: &BTreeMap<String, Value>) -> Result<ProfileKind, CoreError> {
+    let name = string_entry(entries, "kind")?;
+    match ProfileKind::from_name(&name) {
+        Some(kind) => Ok(kind),
+        None => Err(CoreError::InvalidValue {
+            key: "kind".to_string(),
+            message: format!("`{name}` is not a profile kind: expected `base` or `patch`"),
+        }),
+    }
+}
+
+/// The base/patch shape, checked against `derives` and the delta lists: a base
+/// stands alone with nothing below it to drop or exchange, and a patch names
+/// exactly one link below it and carries at least one element. This is the half
+/// of the `kind`/`derives` contradiction the contract refuses per document; the
+/// half that needs the chain (`kind` against chain position) is `chain_ops`'
+/// step 4.
+fn check_link_shape(
+    kind: ProfileKind,
+    derives: &[String],
+    set: &[(ActionId, InputId)],
+    clear: &[ActionId],
+    swap: &[(ActionId, ActionId)],
+) -> Result<(), CoreError> {
+    let shape_fault = |key: &str, message: String| CoreError::InvalidValue {
+        key: key.to_string(),
+        message,
+    };
+    if kind == ProfileKind::Base {
+        if let Some(first) = derives.first() {
+            let message =
+                format!("`{first}` names a link below a base: a base derives from nothing");
+            return Err(shape_fault("derives", message));
+        }
+        if let Some(first) = clear.first() {
+            let action = first.as_str();
+            let message = format!(
+                "`{action}` is a `clear` element on a base: a base has nothing below it to drop"
+            );
+            return Err(shape_fault("clear", message));
+        }
+        if let Some((first, second)) = swap.first() {
+            let pair = format!("{} {}", first.as_str(), second.as_str());
+            let message = format!(
+                "`{pair}` is a `swap` element on a base: a base has nothing below it to exchange"
+            );
+            return Err(shape_fault("swap", message));
+        }
+        return Ok(());
+    }
+    if derives.is_empty() {
+        let message = "a patch names the one link below it in `derives`".to_string();
+        return Err(shape_fault("derives", message));
+    }
+    if let Some(second) = derives.get(1) {
+        let message =
+            format!("`{second}` is a second ancestor: a v2 chain is one path, not a tree");
+        return Err(shape_fault("derives", message));
+    }
+    if set.is_empty() && clear.is_empty() && swap.is_empty() {
+        let message =
+            "a patch carries at least one element across `set`, `clear`, `swap`".to_string();
+        return Err(shape_fault("set", message));
+    }
+    Ok(())
+}
+
+/// One of the three delta lists: absent means empty, and each list is capped by
+/// `MAX_PATCH_DELTA_ELEMENTS` — the budget, not the shape, is what bounds a
+/// hostile patch driving the load-time join over an unbounded action set.
+fn delta_elements(key: &str, entries: &BTreeMap<String, Value>) -> Result<Vec<String>, CoreError> {
+    let Some(value) = entries.get(key) else {
+        return Ok(Vec::new());
+    };
+    let raws = string_array(key, value)?;
+    if raws.len() > MAX_PATCH_DELTA_ELEMENTS {
+        let message = format!(
+            "more than {MAX_PATCH_DELTA_ELEMENTS} elements: the patch delta budget for `{key}`"
+        );
+        return Err(CoreError::InvalidValue {
+            key: key.to_string(),
+            message,
+        });
+    }
+    Ok(raws)
+}
+
+/// The `set` list: each element is exactly `"<action-id> <input-id>"`, split at
+/// the first space, both halves grammar-validated here — an input outside the
+/// closed vocabulary refuses at parse, the same 012 gap it already pinned.
+fn parse_set(entries: &BTreeMap<String, Value>) -> Result<Vec<(ActionId, InputId)>, CoreError> {
+    let mut set = Vec::new();
+    for raw in delta_elements("set", entries)? {
+        let (action_text, input_text) = pair_fields("set", &raw)?;
+        let action =
+            ActionId::parse(action_text).map_err(|err| name_the_element(err, "set", &raw))?;
+        let input = InputId::parse(input_text).map_err(|err| name_the_element(err, "set", &raw))?;
+        set.push((action, input));
+    }
+    Ok(set)
+}
+
+/// The `clear` list: each element is one action id, and a second field is a
+/// malformed delta, not a pair with an implied meaning.
+fn parse_clear(entries: &BTreeMap<String, Value>) -> Result<Vec<ActionId>, CoreError> {
+    let mut clear = Vec::new();
+    for raw in delta_elements("clear", entries)? {
+        if raw.contains(' ') {
+            let reason = "expected one action id".to_string();
+            return Err(delta_fault("clear", &raw, reason));
+        }
+        let action = ActionId::parse(&raw).map_err(|err| name_the_element(err, "clear", &raw))?;
+        clear.push(action);
+    }
+    Ok(clear)
+}
+
+/// The `swap` list: each element is two space-joined action ids, and the two
+/// are distinct — exchanging an action with itself is a delta that means
+/// nothing, not a legal no-op.
+fn parse_swap(entries: &BTreeMap<String, Value>) -> Result<Vec<(ActionId, ActionId)>, CoreError> {
+    let mut swap = Vec::new();
+    for raw in delta_elements("swap", entries)? {
+        let (first_text, second_text) = pair_fields("swap", &raw)?;
+        let first =
+            ActionId::parse(first_text).map_err(|err| name_the_element(err, "swap", &raw))?;
+        let second =
+            ActionId::parse(second_text).map_err(|err| name_the_element(err, "swap", &raw))?;
+        if first == second {
+            let reason = "a `swap` pair names two distinct actions".to_string();
+            return Err(delta_fault("swap", &raw, reason));
+        }
+        swap.push((first, second));
+    }
+    Ok(swap)
+}
+
+/// The shipped pair encoding (A8): exactly two fields split at the first space.
+/// No input or action id carries a space, which is what makes that one split
+/// point unambiguous; one field or three names the element and refuses.
+fn pair_fields<'a>(key: &str, raw: &'a str) -> Result<(&'a str, &'a str), CoreError> {
+    let fields: Vec<&str> = raw.split(' ').collect();
+    if fields.len() != 2 {
+        let reason = "expected two space-joined ids".to_string();
+        return Err(delta_fault(key, raw, reason));
+    }
+    Ok((fields[0], fields[1]))
+}
+
+/// The refusal for a malformed delta element: `InvalidValue` keyed by the list
+/// that holds it and naming the whole element, so the reader sees which line of
+/// the document to fix.
+fn delta_fault(key: &str, raw: &str, reason: String) -> CoreError {
+    CoreError::InvalidValue {
+        key: key.to_string(),
+        message: format!("`{raw}` is not a well-formed `{key}` element: {reason}"),
+    }
+}
+
+/// Re-keys a refusal raised inside the id grammars so it names the delta
+/// element and its list instead of a bare `id` — the same re-keying
+/// `action::registry_from_entries` applies to a registry array.
+fn name_the_element(err: CoreError, key: &str, raw: &str) -> CoreError {
+    let reason = match err {
+        CoreError::InvalidValue { message, .. } => message,
+        other => other.to_string(),
+    };
+    delta_fault(key, raw, reason)
+}
+
+/// The `for` pin: `"<manifest-id>@<revision>"`, exactly design 013's canonical
+/// identity — one `@`, a slug head, and a decimal revision of at least 1 written
+/// the way `serialize` writes it. A pin that parses two ways would answer
+/// "which manifest?" twice, and `revision 0` is the shipped refusal shape (A7).
+fn check_pin(text: &str) -> Result<(), CoreError> {
+    let fault = |reason: String| CoreError::InvalidValue {
+        key: "for".to_string(),
+        message: format!("`{text}` is not a manifest pin: {reason}"),
+    };
+    let Some((head, tail)) = text.split_once('@') else {
+        return Err(fault(
+            "the pin is `\"<manifest-id>@<revision>\"`".to_string(),
+        ));
+    };
+    if tail.contains('@') {
+        return Err(fault("the pin splits at its one `@`".to_string()));
+    }
+    if !is_slug_name(head) || head.len() > MAX_SLUG_OCTETS {
+        return Err(fault(format!("`{head}` is not a manifest id: {SLUG_RULE}")));
+    }
+    let Ok(revision) = tail.parse::<i64>() else {
+        let reason = format!("`{tail}` is not a decimal integer at least 1");
+        return Err(fault(reason));
+    };
+    if revision < 1 || tail != revision.to_string() {
+        let reason = format!("`{tail}` is not a data revision: revisions start at 1");
+        return Err(fault(reason));
+    }
+    Ok(())
+}
+
+/// The id grammar a v2 profile `id`, each `derives` element, and each
+/// `seeded-from` ride: the shipped slug grammar plus the DNS-label octet bound.
+/// A v2 id is a chain lookup key and a file name, which is why v1's "not empty"
+/// is tightened here and stays tightened nowhere else (A14, A15). `chain_ops`
+/// holds a caller-supplied fresh id to the same rule, so one definition binds
+/// every id a chain can carry.
+pub(crate) fn check_profile_slug(key: &str, value: &str) -> Result<(), CoreError> {
+    if !is_slug_name(value) {
+        let message = format!("`{value}` is not a slug: {SLUG_RULE}");
+        return Err(CoreError::InvalidValue {
+            key: key.to_string(),
+            message,
+        });
+    }
+    if value.len() > MAX_SLUG_OCTETS {
+        let message = format!("`{value}` is longer than the {MAX_SLUG_OCTETS} octet label bound");
+        return Err(CoreError::InvalidValue {
+            key: key.to_string(),
+            message,
+        });
+    }
+    Ok(())
+}
+
+/// The `generated-by` label: 1 to `MAX_GENERATED_BY_OCTETS` octets, and no
+/// ASCII control, default-ignorable, or bidi-control character. The refusal
+/// names the entry and the rule rather than echoing the label, because the label
+/// is exactly the kind of document-controlled text a log line must not carry
+/// (A13, Provenance labels).
+fn check_generated_by(text: &str) -> Result<(), CoreError> {
+    let fault = |reason: String| CoreError::InvalidValue {
+        key: "generated-by".to_string(),
+        message: format!("the `generated-by` label {reason}"),
+    };
+    if text.is_empty() {
+        let reason = format!("is empty: it holds 1 to {MAX_GENERATED_BY_OCTETS} octets");
+        return Err(fault(reason));
+    }
+    if text.len() > MAX_GENERATED_BY_OCTETS {
+        let length = text.len();
+        let reason = format!("is {length} octets, past the {MAX_GENERATED_BY_OCTETS} octet bound");
+        return Err(fault(reason));
+    }
+    if !text.chars().all(is_label_char) {
+        return Err(fault(
+            "carries a control, default-ignorable, or bidi-control character".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+/// Which characters a provenance label may carry. The excluded set is the one
+/// that can steer what a reader *sees* rather than what it stores: the C1 and
+/// C0 controls, the bidi embedding/override/isolate controls, the zero-width
+/// and joiner controls, soft hyphen, and the other default-ignorables — none of
+/// which a tool, a policy name, or `human` ever needs.
+fn is_label_char(ch: char) -> bool {
+    !ch.is_control()
+        && !matches!(
+            ch,
+            '\u{00ad}'
+                | '\u{034f}'
+                | '\u{061c}'
+                | '\u{180e}'..='\u{180f}'
+                | '\u{200b}'..='\u{200f}'
+                | '\u{202a}'..='\u{202e}'
+                | '\u{2060}'..='\u{2065}'
+                | '\u{2066}'..='\u{206f}'
+                | '\u{feff}'
+                | '\u{fff9}'..='\u{fffb}'
+        )
 }
 
 fn parse_reach_classes(

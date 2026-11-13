@@ -1,0 +1,15 @@
+# What a first patch looks like: one `derives` element naming the link below it,
+# the pin its chain shares, and one element in each delta list. The action ids
+# shown are registry-shaped, not registry members — the first real chain lands
+# with its registry and manifest rows in the same PR, as design 013's growth
+# order states.
+format = "profile"
+version = "v2"
+id = "mike-remnant-retune"
+derives = ["remnant-2-default"]
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:w"]
+clear = ["aim.zoom"]
+swap = ["combat.dodge-left combat.dodge-right"]
+generated-by = "human"

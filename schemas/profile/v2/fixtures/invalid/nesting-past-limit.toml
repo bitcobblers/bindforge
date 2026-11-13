@@ -1,0 +1,12 @@
+# Arrays nested 17 levels deep — one past MAX_NESTING_DEPTH (16), the budget
+# `schemas/README.md` states as a rejection every implementer must perform
+# before it builds any value. The v2 delta lists are arrays of strings, so a
+# nested array is never legal here; the limit is what stops a hostile document
+# costing the reader stack before it is refused. Regenerate this fixture if the
+# budget moves.
+format = "profile"
+version = "v2"
+id = "nesting-past-limit"
+kind = "patch"
+for = "remnant-2@3"
+set = [[[[[[[[[[[[[[[[["deep"]]]]]]]]]]]]]]]]]

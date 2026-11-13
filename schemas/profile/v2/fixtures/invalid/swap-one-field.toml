@@ -1,0 +1,10 @@
+# A `swap` element is two space-joined action ids: the exchange has two sides.
+# One field names no exchange, so the element is refused naming itself.
+format = "profile"
+version = "v2"
+id = "swap-one-field"
+derives = ["game-base"]
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]
+swap = ["move.steer-left"]

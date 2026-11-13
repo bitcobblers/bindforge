@@ -1,0 +1,11 @@
+# A v2 patch carries exactly one `derives` element: a chain is one path, not a
+# tree, and a second ancestor has nothing to point to — there is no rule that
+# says which link below it a patch modifies. The refusal names the second
+# element.
+format = "profile"
+version = "v2"
+id = "derives-two-elements"
+derives = ["game-base", "other-base"]
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]

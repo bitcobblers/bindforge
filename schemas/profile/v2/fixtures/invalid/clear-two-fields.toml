@@ -1,0 +1,11 @@
+# A `clear` element is one action id: there is nothing a second field could
+# mean, because dropping a binding takes only the action. Two fields refuse
+# naming the element.
+format = "profile"
+version = "v2"
+id = "clear-two-fields"
+derives = ["game-base"]
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]
+clear = ["move.steer-left aim.camera"]

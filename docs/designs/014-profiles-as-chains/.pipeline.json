@@ -1,0 +1,1437 @@
+{
+  "version": 1,
+  "slug": "profiles-as-chains",
+  "nnn": "014",
+  "branch": "pipeline/014-profiles-as-chains",
+  "source": {
+    "kind": "adr",
+    "path": "docs/adrs/014-profiles-as-chains.md"
+  },
+  "status": "done",
+  "lastStage": "doc-sync",
+  "designRound": 2,
+  "codeRound": 1,
+  "designBudgetUsed": 1,
+  "codeBudgetUsed": 2,
+  "editorialDone": false,
+  "testsGreen": true,
+  "testsNeedUpdate": false,
+  "stageFailures": {
+    "code-review:testing": 1
+  },
+  "stageCommits": [
+    "8c13243d13467cddab08217b8bddfba8d3ddffd4",
+    "9802a856cc7b83f3dd73cd70083212b9ffca605e",
+    "df8b896449aa3ba4a4cb3bc15bc5c477ceb1e5a2",
+    "25cdc7984c1d0e0c691b7ae54cf18c33ca9b9755",
+    "8212f6fd967c339be83cf881080db23884373ca1",
+    "78608b9e08fc8f4fec79b8ddf94867d0d3b77c62",
+    "af19bdabc57c441b68eb2e0c5c20f456e34585bb",
+    "ea0b546764c53466d04106f1ed87000ab5bbd8ea",
+    "9d0c5e45a5558293655dd27aee4c3bfcbd02c12c",
+    "41b41281a6d59ae454d80d851c22ef795835ed90",
+    "6918055f9d5e00d4fc7a17efafbf90dafc3995e4",
+    "c9bcfb5535ede7c252f090d747b79297d9fd1d92",
+    "4844669384fd046eebfd47960283e178990617a4",
+    "6684daf29b2607db9942012629c284485b0d96c6",
+    "f29991318701c42ffedf82ebc30a5321814cd3c4",
+    "aaf079642b993a5bf4b6173f236d0f51f0dbefa3",
+    "3852b63c6c62328233ea4da112107c96eb3036a8",
+    "5d9cbaf43223366e1b854cbad5e53f12c98489d1",
+    "fedf5b318b38cff95203f8251d6acc18bc0dadac"
+  ],
+  "forceNext": null,
+  "results": [
+    {
+      "stage": "research",
+      "round": 0,
+      "sessionID": "ses_e2ad2b46bffe7wIjC9jn3oNkxN",
+      "agent": "research/researcher",
+      "at": 1794578289798,
+      "reply": {
+        "summary": "Researched ADR-014 (profiles as chains) and wrote docs/designs/014-profiles-as-chains/01-research.md. Verified the shipped chain substrate on main (profile/v1 closed entry set, resolve_chain with MAX_CHAIN_DEPTH=32 and Cycle/ChainTooDeep, per-format version gate, conformance harness round-trip and zero-fixture rules, parse budgets) and mapped the open v2 work against prior art and standards: git rebase, quilt, Nix overlays, systemd drop-ins, Steam Input action set layers, RFC 6902 JSON Patch and RFC 7396/7386 JSON Merge Patch, with security-landscape evidence (billion laughs, CVE-2022-28948, toml-rs recursion advisories, TF2 config-chain hangs and 1 MiB exec-bypass). Key risks flagged: single-document-only cycle/depth guards before cross-file resolution exists, undefined mixed-major chains, delta-list encoding under the table-free grammar, kind/derives contradiction, unstated composite chain budget, and the re-pinned-base drift with no named failure mode. Every claim carries its source URL or repo path inline; three lenses applied (Prior art, Standards, Security landscape).",
+        "commitMessage": "docs: add research artifact for profiles-as-chains (014)"
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/research-r0.md",
+      "durationMs": 411849,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal",
+      "round": 0,
+      "sessionID": "ses_e2acc6b2afferYMBudypS2q9Lq",
+      "agent": "design/designer",
+      "at": 1794578475438,
+      "reply": {
+        "commitMessage": "docs: add design proposal for ADR-014 profiles as chains"
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/proposal-r0.md",
+      "durationMs": 185516,
+      "nudges": 0,
+      "docLines": 612,
+      "docLinesAdded": 612,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2ac995feffeTHLeL31Co05Yxa",
+      "agent": "review/design-correctness",
+      "at": 1794578751597,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chain operations: `fork`, `diff`, `merge` — fork bullet: \"empty delta lists for the caller to fill\"; contradicts The contract per-link rule \"A `patch` has non-empty `derives` and at least one element across `set`/`clear`/`swap`\" and invalid fixture `patch-empty-deltas.toml`; also Test strategy #5 \"`resolve(fork(a) + diff, manifest)` equals `resolve(b, manifest)`\"",
+            "problem": "fork's output is always a patch with zero delta elements, which the v2 grammar refuses at parse, so the one chain operation ADR-014 Decision Three names never returns a document that parses, re-parses, or loads; the round-trip property test composes that illegal document.",
+            "fix": "Either state that fork returns a not-yet-loadable shell and pin it (Test #5: fork's output refuses to load until the caller adds a delta; the round-trip property appends `diff` to `a` alone, dropping `fork(a) +`), or give fork the caller's first delta elements so its output is a valid patch."
+          },
+          {
+            "severity": "major",
+            "location": "Chain operations: `merge` — \"When no such patch exists — one side clears an action the other sets, an order the fixed list order cannot express — `merge` refuses the whole result\"; Test strategy #5 \"conflicting patches (clear vs set on one action) refuse the whole merge\"",
+            "problem": "Clear-vs-set on one action is expressible as one patch under the design's own determinism rules (fixed order set → clear → swap, last write wins): upper patch clears → emit `clear X`, upper patch sets → emit `set X i`. The stated predicate therefore refuses merges the same paragraph promises are fine (\"Compatible overlaps are not conflicts\") and contradicts the Options criterion \"a conflict is representable iff the composed effect cannot be written as one patch\"; Test #5 pins the wrong case.",
+            "fix": "State the predicate as per-action non-representability under the fixed order and use an example that has no one-patch form — lower patch `clear X`, upper patch `swap X Y` with Y bound: the net \"X takes Y's binding, Y unbound\" requires a swap before a clear, which the order forbids — and re-word Test #5 to that pair."
+          },
+          {
+            "severity": "minor",
+            "location": "Chain operations: `diff` bullet \"Its output is a v2 patch document (the diff *is* the grammar) that `resolve`s to exactly what it must\"; same shape in the `merge` bullet",
+            "problem": "When the two chains resolve to the same layout (b is a, or a plus a self-cancelling patch) diff emits zero elements, which the `patch-empty-deltas.toml` rule refuses; merge of two mutually inverse swap patches composes to the identity, same illegal shape. Two of the three operations are undefined on legal input.",
+            "fix": "One clause each reusing the existing refusal: diff refuses when the two resolved layouts are equal, naming both heads; merge refuses an identity composition."
+          },
+          {
+            "severity": "minor",
+            "location": "Resolution — \"Mount at any rung\" paragraph: \"a consumer takes a prefix, a suffix, or the documents singly. The chain is only meaningful whole, so a suffix without its base is refused by `load_chain` at load\"",
+            "problem": "The sentence grants a suffix and the very next sentence refuses it, so the paragraph both allows and forbids the same read, leaving the ADR Decision Three mount-at-any-rung requirement ambiguous.",
+            "fix": "Delete \"a suffix\" (a prefix and single documents are what \"take its base and patch independently\" needs) and let the refusal sentence stand as the rule."
+          },
+          {
+            "severity": "minor",
+            "location": "Cross-file loading step 3 — \"more than `MAX_CHAIN_DEPTH` links is `ChainTooDeep` — both written against the constant\"; Goals \"the same guard rules the shipped single-document guard states\"; Test strategy #3 \"a chain of exactly `MAX_CHAIN_DEPTH` links resolves and one link more refuses\"",
+            "problem": "The shipped predicate is `derives.len() > MAX_CHAIN_DEPTH` (chain.rs:27), so today a head with 32 ancestors (33 resolved links) passes, while the new cross-file boundary test refuses 33. The two layers disagree at exactly one link, so the re-issued `chain-past-max-depth.toml` and the `chain_ops` boundary test can pin different documents.",
+            "fix": "Name the counted unit once: either \"more than `MAX_CHAIN_DEPTH` ancestor links (the shipped `derives.len() > MAX_CHAIN_DEPTH` predicate)\", or keep the resolved-links unit and state that the cross-file guard refuses one link earlier than the single-document guard, then write the fixture and the boundary test to that unit."
+          },
+          {
+            "severity": "minor",
+            "location": "Chain operations signatures — \"pub fn merge(p1: &Profile, p2: &Profile) -> Result<Profile, CoreError>\" and the diff bullet",
+            "problem": "The documents diff and merge emit have unspecified `id`, `derives`, and `for`, although those entries are the chain lookup key and file name and must be slug-grammar and collision-free; only fork states the collision rule, so merge/diff output may be unloadable by construction.",
+            "fix": "One clause each: diff emits `derives = [<a's head id>]` and the joined manifest's pin; merge inherits `id`, `derives`, `for` from p1 and takes a fresh caller-supplied id with fork's collision rule (or refuses when p1 and p2 name the same id)."
+          },
+          {
+            "severity": "minor",
+            "location": "The contract: `schemas/profile/v2/` invalid fixture list — \"chain-past-max-depth.toml  self-deriving-chain.toml  table-header.toml  dotted-key.toml …\" (no `forged-log-line.toml`); Test strategy #7 \"every invalid fixture is refused with a single-line, control-free, truncating message\"",
+            "problem": "The v2 corpus re-issues every v1 grammar fixture except the log-injection one, while v2 refusals echo far more untrusted strings than v1's did (id, derives elements, both pin halves, delta elements, seeded-from, generated-by, ChainLinkMissing's id); `generated-by-control-char.toml` pins the entry's own grammar, not the escape-and-truncate path #7 asserts, so no v2 fixture exercises it.",
+            "fix": "Re-issue `forged-log-line.toml` at v2 with a `\\n`-escaped `generated-by` (or `id`) — the existing fixture mechanism, no new rule."
+          },
+          {
+            "severity": "minor",
+            "location": "Resolution — \"pub struct Chain { pub links: Vec<Profile> }   // deepest base first … head last\" and `pub fn resolve(chain: &Chain, manifest: &Manifest)`",
+            "problem": "A public field makes Chain consumer-buildable: an empty chain (no rule defines its output), a suffix, and a chain whose `kind` positions were never checked all reach resolve/fork/diff, since the completeness and position rules live only inside load_chain.",
+            "fix": "State that Chain is only ever produced by load_chain (keep `links` private or give a non-public constructor), and state that resolve refuses an empty chain."
+          },
+          {
+            "severity": "minor",
+            "location": "The model: `document.rs` — \"`serialize` writes the ten entries in the fixed order\"; Test strategy #6 \"a hand-built document carrying all ten entries\"",
+            "problem": "The entry table and the Goals define eleven entries (v1's four plus for, kind, set, clear, swap, seeded-from, generated-by), and the order the sentence itself enumerates names eleven; a wrong count in the section that fixes the closed set propagates to PROFILE_V2_ENTRIES and the grammar_closure.rs expectations.",
+            "fix": "Change both occurrences to \"eleven entries\"."
+          },
+          {
+            "severity": "nit",
+            "location": "Cross-file loading / Resolution — \"pub fn resolve(chain: &Chain, manifest: &Manifest) -> Result<Vec<ResolvedBinding>, CoreError>\" alongside the untouched public `resolve_chain`",
+            "problem": "The crate will export `resolve_chain` (id-level validation) and `resolve` (delta application), two public names one token apart doing different jobs, and no sentence maps ADR-014 Decision Two's \"Resolve the chain with `resolve_chain`\" onto the split a reader will notice.",
+            "fix": "Add one sentence: resolve_chain keeps the id-level validation the ADR names, load_chain walks the files, resolve applies the deltas; consider naming the new one `resolve_layout`."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/design-review-correctness-r1c0.md",
+      "durationMs": 276036,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2ac55f7affeTgoLC7bJB9xHR5",
+      "agent": "review/design-compatibility",
+      "at": 1794578823954,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → Delta inventory (Edited) — \"`PROFILE_ENTRIES` renamed `PROFILE_V1_ENTRIES`, new `PROFILE_V2_ENTRIES`\"",
+            "problem": "The rename is presented as an ordinary edit, but the proposal never states whether PROFILE_ENTRIES is private or part of core's public surface; the zz_api_probe.rs edit is listed for 'the new public names' only, so nothing says whether existing downstream users of the old name break, and the Compatibility matrix has no core-API row.",
+            "fix": "State in the Edited list (or a matrix row) that the rename is internal because PROFILE_ENTRIES is private — as the assumption register already does for placement::is_slug_name (pub(crate)) — or, if it is public, record the rename as a public-surface break in the matrix; do not add a compat alias."
+          },
+          {
+            "severity": "minor",
+            "location": "The contract: schemas/profile/v2/ — \"The `spec.md` also states the load-level rules below (the directory rule, pin equality, the joins)\"",
+            "problem": "The keyboard-reality check is only half covered: non-ASCII binding names are refused (slug grammar, uppercase fixtures) and named keys are Deferred consistently with the ADR, but chain documents bake input ids like `keyboard:d` into artifacts shared across players (the example carries `set = [\"move.steer-left keyboard:d\"]`), and nowhere — contract, matrix, or Deferred — is it stated that the physical-key semantics of the closed `keyboard:` vocabulary (character vs position on non-QWERTY layouts) are inherited unchanged from the shipped input/reach-classes contract and are not this design's to define.",
+            "fix": "One sentence appended to the spec.md load-rule list pinned in Rollout 1: input-id semantics are inherited unchanged from the shipped contract and a chain is layout-neutral data. It adds no mechanism; it clarifies the boundary the determinism rules already assume."
+          },
+          {
+            "severity": "nit",
+            "location": "Compatibility matrix — \"macOS contributor | no (v1)\"",
+            "problem": "The status cell \"no (v1)\" is cryptic: a first-time reader cannot tell which posture '(v1)' names or whether a 014-era contribution on macOS is in or out.",
+            "fix": "Spell the cell out, e.g. \"no — outside design 008's supported matrix\", and drop the bare \"(v1)\" marker."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/design-review-compatibility-r1c0.md",
+      "durationMs": 72300,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e2ac444ddffegipYo4wUVDZ5xN",
+      "agent": "review/design-security",
+      "at": 1794578892307,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design → Cross-file loading: `load_chain` in `chain_ops.rs` — \"Walk `derives` nearest-first: the ancestor `<id>.toml` is looked up *directly in that same directory*\" (with \"Resolution: deterministic\" — \"a resolution reads at most `MAX_CHAIN_DEPTH × MAX_DOCUMENT_BYTES` (32 MiB) across at most 32 documents\")",
+            "problem": "The walk text is singular but the entry table keeps v1's plural `derives` array (\"ancestor chain, nearest first\") and `merge` refers to `derives[0]`, so multi-element lists are expected to be legal; nothing states what `derives[1..]` means at v2. Under an untrusted-input format this collapses the design's own mitigation: if the walk follows every element the chain is a tree, `MAX_CHAIN_DEPTH` no longer bounds documents opened (the ≤32 × 1 MiB figure the Risks row \"Cross-file machinery is new attack surface\" leans on is false) and \"more than `MAX_CHAIN_DEPTH` links\" is left to the implementer, so two implementers disagree about how much hostile input they read. If only `derives[0]` is followed, every later element is an ancestor claim never resolved, so `ChainLinkMissing`'s completeness posture stops covering part of the document.",
+            "fix": "State one rule at v2: a `patch` has exactly one `derives` element, a `base` none (v1's array untouched per A15/A1; the ADR's \"nearest ancestor first\" reading survives), pin it with a new `fixtures/invalid/derives-two-elements.toml`, and rewrite the composite-cost sentence to count documents opened per resolution under that rule. Alternative if the array stays: say all elements are followed, give the walk a visited-set plus a documents-opened counter, and replace the ≤32 × 1 MiB sentence with the resulting bound — do not leave both readings available."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Cross-file loading: `load_chain` — \"the ancestor `<id>.toml` is looked up *directly in that same directory*\"",
+            "problem": "This is the only point where untrusted document content becomes a filesystem path, and the security property is never stated. It holds only incidentally because `derives` elements are slug-grammar-checked at parse (excluding `/`, `.`, `..`); the design never pins the constructed path's parent to the head's directory, never says no other entry may name a location, and Test strategy #3 has no traversal-shaped case — `derives-element-uppercase.toml` tests case, not path.",
+            "fix": "Add one sentence to the load rule: the filesystem path is `<major dir>/<parse-validated slug>.toml`, no other entry names a location, and the constructed path must be a direct child of the head's directory; add the parse case that a `derives` element of `..` or `a/b` refuses as `InvalidValue` (the slug refusal already yields it — name it so a non-Rust implementer conforms)."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Cross-file loading / Deferred — \"A hub upload bundle is exactly such a directory (ADR-018 ships the transport; this is the shape it transports\"",
+            "problem": "The only source classified as untrusted is `data/profiles/` (A12; Risks says \"`data/profiles/` posture unchanged\"). This design defines a second, network-sourced input — a directory of chain documents arriving from a hub — and writes `load_chain(head: &Path)` for a third, a player's personal chain directory; neither is classified. (Deferring trust-over-a-channel to ADR-018 is consistent with the ADR's Decision Four and Consequences, so this is not re-opening a deferral — it is the missing classification of sources whose guards are decided here.)",
+            "fix": "One sentence where the bundle shape is recorded (or in A12's row): every document `load_chain` opens — fixtures, `data/profiles/`, a hub bundle directory, a personal chain directory — is parsed under the same version gate, byte budget and chain guards, source-independent; trust stays with validation and explicit adoption."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Chain operations — \"`diff` requires the two chains to share their deepest link id — the same base\"",
+            "problem": "Base identity is the id string, not the document. Chains loaded from different directories can name the same base id with different bytes (the id↔filename rule is unique only within one directory), so `diff` asserts a property — \"the chain `a` extended by the diff resolves to `b`'s resolved layout\" — that is false for a consumer applying the emitted patch over its own base, and pin equality at load will not catch it because the ids match. `diff`'s output is precisely the artifact that gets shared.",
+            "fix": "Make the shared-base test content-bearing: require the deepest link's parsed `Profile` (or its `serialize` bytes) to be equal for both chains, refusing with a named error when the ids match and the documents differ, and state that in the `diff` bullet instead of \"share their deepest link id\"."
+          },
+          {
+            "severity": "minor",
+            "location": "Entry table / Provenance labels — \"`generated-by` | string | no | 1–128 octets, no ASCII control characters: a label naming what produced the document\"",
+            "problem": "This is the format's only free-text field and the checklist's \"what may be logged, what leaves the machine when bindings are shared\" is unanswered for it. It is exported with the document in the bundle shape defined here, echoed into logs via the `one_line` path on every refusal (A13), and its grammar allows arbitrary non-ASCII, so it can carry a personal name or email or a bidi-override/homoglyph string that renders as an authority name in a UI. Decision Four bounds the damage but does not make the label non-public or non-spoofable.",
+            "fix": "Add one sentence in Provenance labels: the label is a public, shared artifact, must not be treated as secret or displayed as authority, and reaches logs only through `one_line`; tighten the grammar to exclude default-ignorable and bidi control characters, reusing the existing `generated-by-control-char.toml` fixture shape."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/design-review-security-r1c0.md",
+      "durationMs": 68299,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2ac339dbffenDH1N3imYkq1gY",
+      "agent": "review/design-performance",
+      "at": 1794578968680,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design → Cross-file loading: `load_chain` in `chain_ops.rs`, step 2, with the Resolution paragraph — \"Walk `derives` nearest-first: the ancestor `<id>.toml` is looked up *directly in that same directory*\" / \"a resolution reads at most `MAX_CHAIN_DEPTH × MAX_DOCUMENT_BYTES` (32 MiB) across at most 32 documents\"",
+            "problem": "The composite load bound counts documents, but the document never states that the walk is a single path. `derives` is inherited from v1 as an array of ancestors, nearest first (A1, A15), the model keeps `derives: Vec<String>`, and A6 records that nothing bounds array sizes — so one 1 MiB document can carry tens of thousands of ancestor ids. Whether `load_chain` follows `derives[0]` only, follows every element, or refuses extras is unstated, and the design requires `spec.md` to carry the load-level rules so a non-Rust implementer can conform; such an implementer reading \"an array of ancestors, nearest first\" will traverse all of them, evading the \"at most 32 documents\" bound through file references — the exact mechanism the design's own prior-art finding names (\"TF2 shows per-file caps evaded once files reference files\", A20).",
+            "fix": "In `load_chain` step 2 add one clause fixing the walk's shape: the walk follows `derives[0]` only; any further element is carried as data and never traversed (state refusal instead if that is the intent). Restate the composite as \"`≤ MAX_CHAIN_DEPTH` documents opened per resolution, regardless of `derives` array length\". This replaces the implicit reading; it adds no mechanism and no new cap."
+          },
+          {
+            "severity": "minor",
+            "location": "Options → \"Composite chain budget\", Chosen design → The contract → Delta elements (\"the cap the manifest row cap already prices\"), Resolution composite paragraph, and Chain operations → `diff`/`merge`",
+            "problem": "The claim that cost \"is bounded and now stated\" stops at bytes, link count and per-list count. It omits the derived totals that drive `resolve`'s work (≤ 32 links × 3 lists × 256 = 24,576 delta elements per chain; resolved bindings ≤ the joined manifest's action-row count) and never quantifies the \"manifest row cap\" it justifies the 256 cap by mirroring. That number is load-bearing for the chain operations: `diff` emits one element per differing/unbound action and `merge` composes \"over every action either touches\", so their outputs are capped only while the manifest row cap ≤ `MAX_PATCH_DELTA_ELEMENTS`. The Risks table prices raising the delta cap but not the opposite direction, which would let `diff`/`merge` emit documents that fail the design's own per-list parse rule — a case with no stated refusal and no case in Test strategy #5.",
+            "fix": "Name the manifest row-cap constant with its value at first use, add the derived element total to the composite sentence, and add one clause to the `diff`/`merge` bullets that their output obeys `MAX_PATCH_DELTA_ELEMENTS` because the joined action table is capped, with a refusal if that ever stops holding."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Resolution → Load-time joins (\"every action id in any `set`/`clear`/`swap` must be a row of that manifest's `actions` table\") and determinism rule 3 (\"`set` replaces any binding for that action (last writer wins)\")",
+            "problem": "The load-path cost depends on representation, and the document fixes only ordering, which pushes toward arrays: the action table's \"row order is data\" (rule 5), deltas apply sequentially in array order, and `fork` is \"refused if it collides with any link id in the chain\". Array membership for the action join, for \"any binding for that action\", and for `swap`'s two lookups is O(deltas × rows) — bounded but quadratic in the caps (worst case ~6M comparisons per resolution).",
+            "fix": "One sentence in `resolve`'s contract: action-row membership and the action→binding layout are held in a lookup built once per `load_chain`/`resolve` call, and the manifest's `actions` array order is used only to order output, never for membership. No new mechanism; determinism rule 5 is untouched."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Cross-file loading: `load_chain` (\"a file whose `id` entry disagrees with its name is `InvalidValue` — the location rule, one rule\") and Resolution → Load-time joins (\"Manifest identity\")",
+            "problem": "The design states an invalidation rule for only one side of the resolution input: pin equality catches a bumped manifest revision. Nothing covers the other side. Because id↔filename equality is a contract rule and links are looked up by id in one directory, a consumer (ADR-017 storage, ADR-018 hub) that identifies a chain by its head id and caches the resolved layout goes stale silently on an in-place link edit under an unchanged pin and unchanged ids. Deferring caching to 017/018 is consistent with the ADR; leaving chain identity undefined is what turns a fast consumer cache into a wrong one.",
+            "fix": "One line in the `load_chain` section, mirrored in `spec.md` since the spec carries the load rules: a chain's identity is the contents of its link documents — id equality pins the lookup, not the value — and pin equality invalidates only against manifest changes."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/design-review-performance-r1c0.md",
+      "durationMs": 76331,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e2ac20f89ffe6Sngqw1XIr8UWH",
+      "agent": "review/design-complexity",
+      "at": 1794579022978,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "The contract: `schemas/profile/v2/` — the `id` entry row: \"the profile's identifier: slug grammar (A14), ≤ 63 octets\"",
+            "problem": "The 63-octet cap has no stated provenance: it is absent from Options considered, from the assumption register (A14 cites the shared slug grammar with no length cap), and from Rollout 2's named budget constants (`MAX_PATCH_DELTA_ELEMENTS`, `MAX_GENERATED_BY_OCTETS`) — yet it is enforced via the entry table, the Id grammars rule, `id-past-cap.toml`, and Test strategy #1. The cap itself traces to the profile-id↔file-name directory rule, so this is a traceability gap, not YAGNI: the number is unowned and unjustified in the text.",
+            "fix": "One line: if the cap mirrors a cap already shipped for manifest/preset ids, add that citation to A14's basis; if it is new, name it beside the two rollout constants or state the in-text reason (the directory rule wants a bounded path segment)."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/design-review-complexity-r1c0.md",
+      "durationMs": 54259,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e2ac13b34ffeukk2e67wUv5fmg",
+      "agent": "design/designer",
+      "at": 1794579281177,
+      "reply": {
+        "changed": true,
+        "summary": "All four majors are consumed by changing the design, not appending to it: security/performance majors (derives-array ambiguity) are resolved by one new rule — a v2 `patch` carries exactly one `derives` element and a `base` none, pinned by `derives-two-elements.toml`, making the walk a single path and the ≤`MAX_CHAIN_DEPTH`-documents bound true — while the re-issued `chain-past-max-depth.toml` fixture and the Goals claim about it are deleted (depth now pinned only by `chain_ops` tests, unit named once); correctness major 1 is fixed by stating `fork`'s empty-delta shell is unloadable until filled and recomposing the round-trip over `a + diff` (diff's output now pins `id`/`derives`/`for`); correctness major 2 is fixed by restating `merge`'s conflict as per-action non-representability under the fixed list order with the `clear X`-under-`swap X Y` example, and Test #5 re-worded to match. The minors landing on the same passages were folded in (one-path walk names the slug-built path and `..`/`a/b` refusals; chain identity is document contents; shared base means the same deepest document; sources share one gate; `generated-by` tightened and pinned as a public label; `Chain` only built by `load_chain`; suffix withdrawn from 'mount at any rung'; 'ten' corrected to eleven; `MAX_MANIFEST_ROWS = 256` named with the derived totals). The diff is net positive (~+40 lines) because the placeholder Revision log grew to its mandated index entries and the three majors each forced a new rule sentence; body additions were offset by deletions (withdrawn fixture and Goals claim, withdrawn suffix clause, merged provenance sentence, compressed load/merge/budget prose).",
+        "commitMessage": "docs: revise profile-chains proposal for r1 review findings"
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/proposal-revise-r1.md",
+      "durationMs": 258101,
+      "nudges": 0,
+      "docLines": 652,
+      "docLinesAdded": 117,
+      "docLinesRemoved": 77
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2abd4a96ffe1Qf7195xp0TZkR",
+      "agent": "review/design-correctness",
+      "at": 1794579389876,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chain operations — merge bullet: \"When some action's composed effect has no one-patch form under the fixed list order — lower `clear X`, upper `swap X Y` with `Y` bound: the net needs the `swap` before the `clear`\"; Test strategy #5 \"a non-representable pair (a `clear X` under a `swap X Y`) refuses the whole merge\"",
+            "problem": "The pinned example is a representable pair under the design's own rules. The fixed list order is set → clear → swap, so the clear precedes the swap — exactly the composition order of lower-then-upper. If swap exchanges bindings (entry-table reading), the single patch clear=[\"X\"] + swap=[\"X Y\"] reproduces the composed effect on every base layout; if instead \"an unbound side stays unbound\" makes a half-bound swap a no-op, the composition collapses to clearing X, whose one-patch form is clear=[\"X\"]. Under either reading merge must emit a patch, so the text and Test #5 refuse something the stated criterion (Options: \"a conflict is representable iff the composed effect cannot be written as one patch\") composes. The predicate and the set-under-clear clause are now correct; only the exemplar (which my own r1 fix supplied, backwards) and the test case remain wrong.",
+            "fix": "Swap the pair: lower `swap X Y`, upper `clear X` (both actions bound in the base) — the net is X unbound and Y bound to X's former, base-dependent input, which needs the clear after the swap (forbidden by the fixed order) and cannot be named by `set`; mirror the same flipped pair in Test #5."
+          },
+          {
+            "severity": "minor",
+            "location": "Chain operations — merge bullet: \"emits one patch producing that composition on the base\" (no identity case)",
+            "problem": "The identity half of the r1 empty-output edge is still open: two identical swap patches (`swap X Y` under `swap X Y`) compose to the identity, whose only one-patch form is the empty patch that `patch-empty-deltas` refuses. diff gained \"chains resolving to equal layouts refuse too\" but merge states no refusal and Test #5 has no case, so merge can return a document the grammar will not accept.",
+            "fix": "One clause: a composition that cancels to the identity refuses as the empty-patch case; add the matching clause to Test #5."
+          },
+          {
+            "severity": "minor",
+            "location": "Cross-file loading — \"pub struct Chain { links: Vec<Profile> }  // only load_chain builds one\" vs Resolution \"a consumer takes a prefix or the documents singly\" and Test strategy #5 \"appending its output to `a` resolves to `resolve(b, manifest)`\"",
+            "problem": "The revised private `links` with no public constructor closes the buildability hole but strands the promised consumer access: with no accessor named anywhere, neither a consumer taking a prefix/singles from a returned Chain nor the integration test building the chain `a + diff` is expressible through the public surface.",
+            "fix": "Either add a read-only accessor (`pub fn links(&self) -> &[Profile]`, construction still only via `load_chain`, and name it in the `zz_api_probe` list), or restate the mount route and Test #5 as file-level moves (prefix = `load_chain` of the lower link as head, singly = `parse_file`, round-trip = write diff's output into the directory and `load_chain` it as the new head)."
+          },
+          {
+            "severity": "nit",
+            "location": "The contract — `generated-by` row: \"no ASCII control, default-ignorable, or bidi-control characters\"",
+            "problem": "The rule widened to two new refused classes while the per-link promise \"each with a named fixture above\" is backed only by `generated-by-control-char.toml` for the ASCII-control branch.",
+            "fix": "Extend that fixture or name one more (e.g. a bidi-bearing label) so each refused class has a fixture."
+          },
+          {
+            "severity": "nit",
+            "location": "Chain operations — diff and merge bullets: \"(`fork`'s collision rule)\"",
+            "problem": "fork's collision rule is \"refused if it collides with any link id in the chain\", but merge takes no chain and diff takes two; the set of ids the caller's `id` must not hit is unspecified.",
+            "fix": "One parenthetical each naming the set: merge — `p1` and `p2` ids; diff — every link id of `a` (and optionally of `b`)."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/design-review-correctness-r1c1.md",
+      "durationMs": 108584,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e2abba238ffez5gqVlXkvqy08J",
+      "agent": "review/design-security",
+      "at": 1794579476426,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Provenance labels / The contract entry table — \"`generated-by` | string | no | 1–128 octets, no ASCII control, default-ignorable, or bidi-control characters\"",
+            "problem": "The r1 closure adds two new character classes to the label grammar but neither is defined nor pinned: the invalid-fixture list still names only `generated-by-past-cap.toml` and `generated-by-control-char.toml`, and Test strategy #1 still tests only \"`generated-by` past 128 octets or control-character-bearing\". The compatibility matrix makes `profile/v2/spec.md` + fixtures the whole contract for a \"Third-party reader, non-Rust\", so an undefined Unicode class with no fixture leaves two implementers free to disagree about whether a bidi override or a default-ignorable codepoint in a label is refused — the renders-as-authority case the ban was added to close (checklist: what may be logged / what leaves the machine when bindings are shared).",
+            "fix": "Extend the existing pair with one fixture carrying a bidi formatting character (or add `generated-by-bidi-control.toml`) and name it in Test #1's `generated-by` clause, and state the classes in the entry row implementably without a Unicode table: `Default_Ignorable_Code_Point` plus the explicit ranges U+202A–U+202E and U+2066–U+2069. No mechanism changes; this pins the rule the revision added."
+          },
+          {
+            "severity": "nit",
+            "location": "Cross-file loading: `load_chain` in `chain_ops.rs`, step 2 — \"the constructed path is always a direct child of the head, `<major dir>/<parse-validated slug>.toml`\" and \"mirroring `load_manifest`'s id↔directory equality, which pins the lookup but not the value\"",
+            "problem": "Two wording slips in the sentence that now carries the path-containment property: \"a direct child of the head\" names a document where a directory is meant, and \"but not the value\" follows immediately after a rule whose subject is the `id` value, so it can be read as waiving the id↔filename check that stops one file answering for another link's id.",
+            "fix": "Rewrite as \"a direct child of the head's directory\", and replace \"which pins the lookup but not the value\" with \"which pins the lookup, not the document: equal ids in different directories are not the same link\" — the sentence's own closing clause (\"a chain's identity is its documents' contents\") already states that."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/design-review-security-r1c1.md",
+      "durationMs": 86499,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2aba501fffe5ucQka12Kk8Bb1",
+      "agent": "review/design-performance",
+      "at": 1794579534743,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chain operations → `diff`/`merge` — \"`diff` … a `set` per differing action, a `clear` per action `b` unbinds\" and \"`merge` … composes the two delta lists in chain order … over every action either touches\"",
+            "problem": "re-raised residue of my r1 finding #2, downgraded. The bullets still carry no output-cap clause. The substance is closed: with `MAX_MANIFEST_ROWS = 256` now named and equal to `MAX_PATCH_DELTA_ELEMENTS`, every loadable input's touched actions are rows of the shared pin's capped action table, so output lists are provably within the per-list cap. The only remaining path is `merge` over parse-valid, action-join-invalid patches (each can touch up to 1024 distinct action ids across its three lists), which can return Ok with a 257th element — caught later by the load's own parse rule rather than by `merge` itself.",
+            "fix": "One clause per bullet: output lists are capped because touched actions are rows of the shared pin's `MAX_MANIFEST_ROWS`-capped action table; state that `merge` refuses when the composition would exceed a list (or that its inputs are taken to be loadable against the shared pin)."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/design-review-performance-r1c1.md",
+      "durationMs": 58266,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e2ab96c2dffe9bzovLTZg4riUj",
+      "agent": "design/designer",
+      "at": 1794579707956,
+      "reply": {
+        "changed": true,
+        "summary": "All five open findings consumed by rewrites, not additions: (major) flipped merge's exemplar and Test #5's pair to lower `swap X Y` / upper `clear X` with both bound in the base, making the pair non-representable under the fixed set→clear→swap order and consistent with the design's own criterion; (minor) merge now refuses an identity-cancelling composition as the empty-patch case, with a matching Test #5 clause; (minor) closed the private-`links` consumer hole without new public surface by restating the mount route and Test #5's round-trip as file-level moves (`load_chain` of a lower link as head, `parse_file` singly, write diff's output beside `a`'s head and `load_chain` it as the new head); (nit) added `generated-by-bidi-char.toml` to the invalid corpus so the generated-by rule's widened entry set keeps its named fixture; (nit) the `fork`-collision parentheticals in `diff`/`merge` now name the set the caller's id must not hit (`a`'s link ids; `p1` and `p2`). The Revision log was maintained in place — three compressed entries, the Chain operations entry superseded with the flipped pair and the identity rule. Net diff is one line shorter than the previous document.",
+        "commitMessage": "docs: flip merge conflict exemplar, close Chain access and fixture-coverage findings in 014 proposal"
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/proposal-revise-r1.md",
+      "durationMs": 173122,
+      "nudges": 0,
+      "docLines": 651,
+      "docLinesAdded": 27,
+      "docLinesRemoved": 28
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2ab6c77fffemoeXU90jmZGS0C",
+      "agent": "review/design-correctness",
+      "at": 1794579784456,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chain operations — merge bullet: \"the output carries the caller's `id` (`fork`'s collision rule against `p1` and `p2`) and inherits `derives` and `for` from `p1`\"",
+            "problem": "The set named in the revised parenthetical is one member short, and it is the member that matters: the merged patch inherits `derives = [base id]` and, by the same-major-directory rule, must be written into that base's own directory as `<id>.toml`. A caller `id` equal to the shared base id therefore names the base document's file, so the consumer's write replaces the base; core only notices afterwards at `load_chain`, as a repeated-id `Cycle` on a chain whose base is gone. diff guards exactly this case (\"against every link id of `a`\"), so the two operations are asymmetric. Note: this set came from my own r1 fix, which on re-reading is incomplete — not a defect the revision introduced beyond naming the set.",
+            "fix": "Extend the parenthetical, no new mechanism: \"`fork`'s collision rule against `p1`, `p2`, and the `derives` base id inherited from `p1`\"; mirror it in Test strategy #5's collision clause."
+          },
+          {
+            "severity": "nit",
+            "location": "The contract — `generated-by` row: \"no ASCII control, default-ignorable, or bidi-control characters\"",
+            "problem": "Three refused classes, two fixtures: `generated-by-control-char.toml` and the newly named `generated-by-bidi-char.toml` cover the ASCII-control and bidi branches, but the default-ignorable branch is pinned by nothing, in a section that makes the corpus the thing that \"makes `profile/v2` supported\". Test strategy #1 still enumerates only \"`generated-by` past 128 octets or control-character-bearing\", naming neither new class. The bidi half of my r1 nit is closed as prescribed; this is the remaining half.",
+            "fix": "Name one more fixture (e.g. `generated-by-default-ignorable.toml`, a soft-hyphen label) or state that the control-char fixture carries a default-ignorable codepoint; let Test #1 read \"control-, bidi-, or default-ignorable-character-bearing\"."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/design-review-correctness-r1c2.md",
+      "durationMs": 76391,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2ab59cb4ffe0v6gWU2Fx43rF7",
+      "agent": "review/design-compatibility",
+      "at": 1794579875042,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → The contract: `schemas/profile/v2/`, `generated-by` row — \"1–128 octets, no ASCII control, default-ignorable, or bidi-control characters\"",
+            "problem": "The revision adds two exclusion classes named as Unicode properties that the std-only story the matrix commits to (\"Toolchain floor (1.85.0, edition 2024) | yes | std-only, no new dependency, `Cargo.lock` byte-unchanged\") cannot answer: `char::is_control()` covers Cc only and std exposes no Default_Ignorable or bidi-category accessor (shipped code checks exactly that: document.rs:875, error.rs:164). The reference implementation therefore needs a hand-maintained range table the document never states, and since `profile/v2/spec.md` is the language-neutral contract (matrix row \"Third-party reader, non-Rust\"), a third-party reader cannot decide whether a label carrying U+FE0F (Default_Ignorable) or a soft hyphen is a valid shipped document — a validity disagreement over a shared public artifact. Only bidi and ASCII-control are fixture-pinned (`generated-by-bidi-char.toml`, `generated-by-control-char.toml`); \"default-ignorable\" has none.",
+            "fix": "In the entry row and `spec.md`, replace the property names with the closed code-point list — bidi-control U+061C, U+200E–U+200F, U+202A–U+202E, U+2066–U+2069 — and either drop \"default-ignorable\" or pin it to an explicit range list; add the matching invalid fixture so the third boundary is corpus-pinned like the other two. Adds no mechanism; it replaces two Unicode-property names with the ranges they mean."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Cross-file loading: `load_chain` in `chain_ops.rs`, step 2 — \"the constructed path is always a direct child of the head, `<major dir>/<parse-validated slug>.toml`\"",
+            "problem": "The link path is stated as a `/`-joined template; the compatibility checklist asks that separators be handled by a library rather than string formatting, and the Windows contributor row is `yes`, where the separator is `\\`. Traversal safety is already closed (slug grammar refuses `..` and `/`, pinned in Test strategy #1) — only the separator wording is missing.",
+            "fix": "One clause naming the std construction — \"the link path is `Path::join`ed from the head's parent directory\" — and drop the `/`-template spelling."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Chain operations: `fork`, `diff`, `merge` — \"empty delta lists — a shell `load_chain` refuses as `patch-empty-deltas` until the caller fills one element\"",
+            "problem": "`patch-empty-deltas` is a fixture name, not a refusal; every other promise to a caller names the typed variant (`InvalidValue`, `ChainLinkMissing`, `MissingEntry`), and the variant a caller must match is part of the public error surface. Test strategy #5 repeats the behavior without naming the variant.",
+            "fix": "Name the typed refusal (`InvalidValue` naming the link/element, the shape the Per-link rules already implies) and cite `patch-empty-deltas.toml` as the fixture that pins it."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Resolution, \"Mount at any rung\" — \"`pub struct Chain { links: Vec<Profile> }  // only load_chain builds one`\" with \"a consumer mounts a prefix by `load_chain`ing a lower link as head, or reads the documents singly with `parse_file`\"",
+            "problem": "The revision made the only read path into `Chain` private without adding an accessor, so a consumer holding a `Chain` cannot see its links; the mount-at-any-rung capability (ADR Decision Three, \"take its base and patch independently\") is then reachable only by re-parsing files and walking `Profile.derives` by hand, and `zz_api_probe.rs`'s \"new public names\" is undecidable before implementation.",
+            "fix": "One clause stating the intent: either a `Chain::links()` iteration accessor, or \"`Chain` is opaque by design; the rung ids come from the head document's `derives` read with `parse_file`\". The second option names the text the accessor would otherwise replace."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/design-review-compatibility-r1c3.md",
+      "durationMs": 90480,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e2ab43b0cffehUhDXuRY0Q1WDG",
+      "agent": "review/design-security",
+      "at": 1794579961510,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chain operations → `merge` (and Test strategy #5, chain operations) — \"the output carries the caller's `id` (`fork`'s collision rule against `p1` and `p2`)\"",
+            "problem": "new: the revision newly names the collision set, and the set it names is narrower than the rule applied in the same paragraph pair — `fork` refuses an id that \"collides with any link id in the chain\", `diff` now refuses \"against every link id of `a`\", but `merge` omits the shared base: both patches name the same `derives` element (mismatch is already a refusal), so that base id is in hand and is not in the named set. Under the same-major-directory rule a link path is exactly `<major dir>/<slug>.toml`, so a merged patch whose `id` equals the shared base id takes the base document's file name; the file-level append move this revision made the sanctioned round-trip (\"write it beside `a`'s head, `load_chain` it as the new head\") then overwrites the base link. A hostile shared chain chooses the patch pair and the consumer supplies the id, so the clobber happens before any guard runs — the `Cycle` refusal only fires afterwards, on a chain whose base file is already gone (checklist: path handling; hostile input must fail closed).",
+            "fix": "One clause: \"`fork`'s collision rule against `p1`, `p2`, and the `derives` base id they share\", with the same words in Test #5's merge clause. No new mechanism — it is the rule `fork` and `diff` already state."
+          },
+          {
+            "severity": "minor",
+            "location": "Test strategy #7 + Provenance labels + the `fixtures/invalid/` tree — new entry \"generated-by-bidi-char.toml\"; Provenance: \"reaches logs only through `one_line`, the same escape-and-truncate path whenever a refusal echoes it (A13)\"; Test #7: \"every invalid fixture is refused with a single-line, control-free, truncating message\"",
+            "problem": "new: adding the fixture creates a refusal message that carries a bidi formatting character, and no text keeps it out of the log. `one_line` is defined (A13) as escape-and-truncate for control-bearing strings; a U+202E-class or tag-block character is not an ASCII control character, so the refusal for the new fixture can echo the very codepoint the fixture exists to ban while still satisfying the \"single-line, control-free\" assertion — the renders-as-authority case in the log line that the ban was added to close (checklist: what may be logged).",
+            "fix": "Pin it in the same clause as `forged-log-line.toml` in Test #7: the refusal for a `generated-by` value in the banned non-ASCII classes names the entry and the offending byte offset rather than echoing the value (or state that `one_line`'s escape set covers exactly the classes the grammar bans), and assert the message contains none of the fixture's banned codepoints."
+          },
+          {
+            "severity": "minor",
+            "location": "Provenance labels / The contract entry table — \"`generated-by` | string | no | 1–128 octets, no ASCII control, default-ignorable, or bidi-control characters\"",
+            "problem": "re-raised: my r1 finding is only partly closed — the fixture half landed (`generated-by-bidi-char.toml` is now in the invalid tree), the definition half did not; the row is byte-identical to the one I flagged and neither class is pinned. The new fixture makes the gap concrete: the file must contain some specific character that `spec.md` never names, while the Compatibility matrix makes \"`profile/v2/spec.md` + fixtures\" the whole contract for a \"Third-party reader, non-Rust\". `default-ignorable` still has neither a fixture nor a range, so two implementers can still disagree over whether a U+E0020 tag or a U+F0000-adjacent default-ignorable in a shared label is refused.",
+            "fix": "State the classes in the row implementably without a Unicode table: `Default_Ignorable_Code_Point` plus the explicit ranges U+202A–U+202E and U+2066–U+2069, and add `generated-by-default-ignorable.toml` beside the bidi fixture so both classes have a pinned case."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/design-review-security-r1c3.md",
+      "durationMs": 86425,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2ab2e94bffeno8a1ZgBh3FGNl",
+      "agent": "review/design-performance",
+      "at": 1794579991688,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chain operations → `diff`/`merge` — \"`diff` … a `set` per differing action, a `clear` per action `b` unbinds\" and \"`merge` … composes the two delta lists in chain order … over every action either touches\"",
+            "problem": "re-raised, unchanged by this diff (not a regression): the bullets still carry no output-cap clause. Substance remains closed — the action join plus MAX_MANIFEST_ROWS = 256 = MAX_PATCH_DELTA_ELEMENTS provably cap the output for loadable inputs, and a merge over parse-valid, action-join-invalid patches can emit a 257th element only to be refused at the output's own parse (\"a 257th element in any delta list\"). The c3 revisions (flipped merge conflict example, identity-cancelling refusal, file-level mount/round-trip rewrites) neither fixed nor broke this, and broke nothing else the performance seat approved: the composite 32-document / 32 MiB / MAX_CHAIN_DEPTH × 3 × MAX_PATCH_DELTA_ELEMENTS cost model still covers every newly spelled mount path, and the identity-cancelling refusal removes a write-then-refuse round-trip rather than adding cost.",
+            "fix": "One clause per bullet: output lists are capped because touched actions are rows of the shared pin's MAX_MANIFEST_ROWS-capped action table, and merge takes its inputs to be loadable against the shared pin (or refuses a composition exceeding a list)."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/design-review-performance-r1c3.md",
+      "durationMs": 30136,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e2ab27370ffeXov97upnIgFGXu",
+      "agent": "review/design-complexity",
+      "at": 1794580050025,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Options considered → \"Profile ids\" and The contract → `id` row / **Id grammars**: \"`id` and each `derives` element are slug-grammar checked and capped at 63 octets\"",
+            "problem": "re-raised — the 63-octet cap still has no provenance or owning name: absent from A14's basis (the shipped slug grammar, no length cap), from Rollout 2's named constants (`MAX_PATCH_DELTA_ELEMENTS` / `MAX_GENERATED_BY_OCTETS`), and from the matrix's shipped limits, while the entry table, the Id grammars rule, `id-past-cap.toml` and Test strategy #1's \"64-octet\" case enforce it. The r1 revision made the gap more visible rather than closing it: the same Options bullet now sources the sibling cap to a shipped constant (\"mirroring the shipped `MAX_MANIFEST_ROWS = 256`\"), so the document demonstrates the citation practice and leaves this bound unowned. The cap itself is wanted (the profile-id↔file-name directory rule needs a bounded path segment), so this is traceability, not YAGNI.",
+            "fix": "One line: if manifest/codec/preset ids already carry a length cap, cite it in A14's basis; otherwise name the constant beside the two in Rollout 2 (it is a parse-time bound like them) and state the reason in the Id grammars rule — the directory rule needs a bounded path segment."
+          },
+          {
+            "severity": "minor",
+            "location": "The contract → `generated-by` entry row: \"1–128 octets, no ASCII control, default-ignorable, or bidi-control characters\"",
+            "problem": "new — the two added character classes are a validation surface with no Goal trace and no home in the text: Goals state only that provenance entries are \"validated referentially … and consumed by nothing\", no Options bullet or Risks row justifies them, and the Revision log's r1 entry does not record this contract change at all. The cost is out of proportion to the benefit: the Compatibility matrix commits to \"std-only, no new dependency, `Cargo.lock` byte-unchanged\", and std exposes no default-ignorable or bidi-control predicate, so the rule means a hand-rolled codepoint-range table — a fourth closed table in a parser whose shipped posture is a closed escape table (A19) — plus a new fixture (`generated-by-bidi-char.toml`) and widened Test strategy #1 scope. The protection they target is already shipped once: A13's `one_line` escape-and-truncate runs on every document string echoed in a refusal, which the Provenance labels section now states outright (\"reaches logs only through `one_line`\").",
+            "fix": "Restore the row to \"1–128 octets, no ASCII control characters\" and rely on `one_line` for echo safety (drop `generated-by-bidi-char.toml` and the matching Test strategy #1 clause). If bidi filtering is genuinely wanted, keep it but state the requirement it serves in a Goal or an Options line and enumerate the codepoint ranges in the same row, so the table is a cited list rather than something invented during implementation."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/design-review-complexity-r1c3.md",
+      "durationMs": 58302,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-final",
+      "round": 0,
+      "sessionID": "ses_e2ab18f4fffeOY1AakWS83kYZD",
+      "agent": "design/editor",
+      "at": 1794580186994,
+      "reply": {
+        "ambiguities": [
+          "Context — \"each answered below with the research's open questions closed in Chosen design or listed under Deferred / out of scope\" is compressed; the antecedent of \"each\" (the new items vs. the three chain operations) is recoverable only from context, kept as written.",
+          "Options considered — \"makes the grammar of one chain depend on which file answers\" is elliptical about what \"answers\" refers to (which file's declared grammar applies); kept as written, author to confirm.",
+          "The model — \"the writer branches on `version` alone, exactly as `reach-classes` grades do\" uses the repo's grade terminology elliptically; kept as written since A4 documents the referenced mechanism."
+        ],
+        "commitMessage": "docs: final language pass on the profiles-as-chains proposal"
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/proposal-final-r0.md",
+      "durationMs": 136855,
+      "nudges": 0,
+      "docLines": 650,
+      "docLinesAdded": 28,
+      "docLinesRemoved": 29
+    },
+    {
+      "stage": "editorial-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e2aaf7839ffeU7s4K43lvbnr64",
+      "agent": "review/design-correctness",
+      "at": 1794580225326,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Assumption register / checklist coverage — A20 (\"The research's standards convergences\")",
+            "problem": "Correctness checklist item 2 (spot-check 3–5 research URLs) cannot be executed in this pass: the editorial-r2.diff adds no citation and no claim resting on one, and the pass's inputs exclude 01-research.md, so the anti-hallucination gate was not exercised here. Noted for the record rather than passed; A20 is the register's only `unverified` row, it is labelled as such, and no hunk changed it or a sentence depending on it, so no unverified assumption is stated as fact by this diff.",
+            "fix": "No document change: run the URL spot-check on a whole-proposal pass, or have the reviser confirm A20's research citations were gated in r1."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/editorial-review-correctness-r2.md",
+      "durationMs": 38209,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e2aaee2cdffeLjoLzIHNpOySN3",
+      "agent": "review/design-compatibility",
+      "at": 1794580257498,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/editorial-review-compatibility-r2.md",
+      "durationMs": 32144,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:security",
+      "round": 2,
+      "sessionID": "ses_e2aae6521ffe8l9Zg4TH3K78tq",
+      "agent": "review/design-security",
+      "at": 1794580289707,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/editorial-review-security-r2.md",
+      "durationMs": 32182,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:performance",
+      "round": 2,
+      "sessionID": "ses_e2aade750ffeyOxLVBB4g4PtD5",
+      "agent": "review/design-performance",
+      "at": 1794580315841,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/editorial-review-performance-r2.md",
+      "durationMs": 26108,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:complexity",
+      "round": 2,
+      "sessionID": "ses_e2aad8138ffeYMP355oqgbJCTL",
+      "agent": "review/design-complexity",
+      "at": 1794580343985,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/editorial-review-complexity-r2.md",
+      "durationMs": 28119,
+      "nudges": 0
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_e2aad1314ffefz6bF2Zy2yD05H",
+      "agent": "code/test-engineer",
+      "at": 1794581918406,
+      "reply": {
+        "testsAdded": 75,
+        "commitMessage": "test: pin profile/v2 chain contract with chain_ops suite and updated gate suites"
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/test-authoring-r0.md",
+      "durationMs": 1574337,
+      "nudges": 0
+    },
+    {
+      "stage": "implement",
+      "round": 0,
+      "sessionID": "ses_e2a950cf2ffeK4wsVvVa22MuDB",
+      "agent": "code/coder",
+      "at": 1794582567972,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "feat: implement profile/v2 chains with load_chain, resolve, fork, diff, merge",
+        "moves": []
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/implement-r0.md",
+      "durationMs": 649464,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e2a8af930ffe4kmN8uEgAZmhK0",
+      "agent": "code/test-engineer",
+      "at": 1794582706119,
+      "reply": {
+        "commitMessage": "test: fix chain_ops fixture builders, diff collision head, and repeat_n lints",
+        "moves": []
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/test-update-r0.md",
+      "durationMs": 127183,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2a88de57ffeI7jWNejnJM4Y2D",
+      "agent": "codereview/code-correctness",
+      "at": 1794582906690,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "blocker",
+            "location": "crates/core/src/chain_ops.rs:763 (emit_composition, 746-789)",
+            "problem": "The `exchanged` partner guard tests the wrong key (`exchanged.contains(other)` while the code inserts `action`), so the second half of any reciprocal base-binding pair always hits `composition_fault`. `emitted.swap` can therefore never be non-empty: every `merge` whose composed result keeps a net exchange refuses as a conflict, including plainly compatible ones where the two patches touch disjoint actions (`p1 = swap a b`, `p2 = set c k` must merge into one patch with `set [c k]` + `swap [a b]`). That contradicts the proposal's merge contract (\"Compatible overlaps are not conflicts\", deterministic element order including swap elements) and breaks ADR-014 Decision Three's `merge` for a whole input class. No test sees it: no merge test asserts a non-empty `swaps_of(&merged)` (chain_ops.rs:1984 asserts it empty), and the two swap-carrying merge tests (:2017, :2046) expect a refusal either way.",
+            "fix": "Refuse only on a non-reciprocal composition and skip the partner of an already-emitted pair: `if !reciprocal { return Err(composition_fault(action, other)); } if exchanged.contains(other) { continue; } exchanged.insert(action.clone()); emitted.swap.push((action.clone(), other.clone()));`. Add the missing pin: `p1 = swap a b` with `p2 = set c k` (or `clear d`) merges to one patch carrying the swap plus the second patch's element, and resolves over the base to the same layout as the two-patch chain; keep the `swap X Y` under `clear X` case refusing via the `!reciprocal` branch."
+          },
+          {
+            "severity": "major",
+            "location": "crates/core/src/error.rs:141",
+            "problem": "A shipped refusal string was edited to satisfy a new test: `CoreError::Cycle`'s Display text gained \"(`Cycle`)\". The proposal states \"No `CoreError` variant is removed or changed; one is added\", the compatibility matrix pins existing `resolve_chain` refusals as untouched, and A15 pins the shipped guard as delivered. The only driver is the needle list in the new assertion at crates/core/tests/chain_ops.rs:1281 (`[\"Cycle\", \"link-a\", \"link-b\"]`), which the original message cannot satisfy — and which no message can satisfy for the two link ids since `Cycle` carries no payload, so the test passes on the `\"Cycle\"` needle alone via `assert_refusal_names`' `any()`. A frozen contract string should not move to make a test green.",
+            "fix": "Revert the arm to `write!(f, \"chain derives from itself\")` and drop `\"Cycle\"` from that needle list; the variant is already asserted at chain_ops.rs:1277-1280, which is what Test strategy #3 pins."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/chain_ops.rs:394-408 (check_link_version); test comment at crates/core/tests/chain_ops.rs:1404-1427",
+            "problem": "The proposal's Options says the one-directory rule \"reuses `check_dir_version` (A5)\". The code re-implements it and answers `UnsupportedVersion` naming profile's majors, while every shipped loader applying this same rule answers `InvalidValue` (document.rs:1337-1352 via reach.rs:160, placement.rs:160, action.rs:235-241) — the rule the codebase keeps as one definition precisely so loaders \"cannot drift into two spellings of it\" (document.rs:1354-1358). The new test's doc comment claims the chain refuses \"exactly as the shipped loaders already refuse it (`reach_v2.rs`)\", which is false: reach_v2.rs:626-657 pins `InvalidValue` for the identical fault. It fails closed either way, so this is contract consistency plus a wrong comment.",
+            "fix": "Call `check_dir_version(directory, &link.version, &format!(\"{expected}.toml\"))` and delete `check_link_version`; or, if `UnsupportedVersion` is the intended chain answer (which schemas/profile/v2/spec.md:120-123 states), record that divergence in the proposal's Options and correct the test comment to name it."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/chain_ops.rs:334-335 with inherit_provenance at :650-656",
+            "problem": "`merge` copies `seeded-from`/`generated-by` from the operands onto the merged document — behavior the proposal's merge contract never asks for (it pins only id, inherited derives/for, and the composed delta lists). `generated-by` means \"a label naming what produced the document\", so carrying p1's label asserts that whatever produced p1 produced the merge result: a false fact in a label the design insists is never displayed as authority (ADR-014 Decision Four).",
+            "fix": "Leave both provenance labels absent on merge output, or add the inheritance rule to the proposal with a test stating which operand is inherited and why."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/chain_ops.rs:118-119 with open_link at :347-352",
+            "problem": "`load_chain` applies the missing-link rule to the head as well, so a missing head answers `ChainLinkMissing { id: <file stem> }`. The proposal's step 1 is `parse_file(head)` and A13 assigns read failures to `Io`, whose variant carries the path for `source_path`; `ChainLinkMissing` deliberately omits the path, so a consumer cannot log which head was missing, and the echoed value is a raw, grammar-unvalidated file stem rather than a profile id. The ancestor rule A18 is about is correct and pinned (:348-351, tests/chain_ops.rs:1322-1346).",
+            "fix": "Resolve the head through `parse_file` (its `Io` already carries the path) and apply `ChainLinkMissing` only to links the walk constructed from a `derives` element."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/chain_ops.rs:714-738 (apply_lists)",
+            "problem": "`Binding::Base` is never unbound, so the symbol model always moves a `swap` while `resolve`'s rule 3 makes it a no-op when a side is unbound. The effect is over-refusal only (`p1 = set X a`, `p2 = swap X Y` refuses, although over a base leaving Y unbound the composition is just `set X a`), and the comment says the assumption is deliberate — but the proposal says merge composes \"exactly, not heuristically\" and never states the assumption.",
+            "fix": "State it in one sentence of the merge section (\"the base is assumed to bind both sides of an exchange; a merge that would need otherwise refuses\") so the refusal is predictable to a third-party implementer."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/document.rs:639",
+            "problem": "The proposal says the v2 writer \"branches on `version` alone\", but `serialize_profile_link` skips `kind` and `for` when `kind` is `None`. Unreachable from a parse, but `Profile`'s fields are public, so a consumer can build a v2 model with `kind: None` and get text that will not re-parse — the one case the function's own doc comment promises not to produce.",
+            "fix": "Write `kind`/`for` unconditionally on the v2 branch and document that a v2 model must carry a kind, or state the precondition in the doc comment."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/code-review-correctness-r1c0.md",
+      "durationMs": 189813,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2a85f8a5ffe4bUSuMs4nWNdkI",
+      "agent": "codereview/code-compatibility",
+      "at": 1794583076272,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/chain_ops.rs:347-375 (open_link: try_exists at :348, id check at :363-373; lookup built at :131, stem at :379)",
+            "problem": "The id↔file-name equality rule compares the document's declared `id` with the stem of the path `load_chain` itself constructed, never with the name the filesystem matched. On a case-insensitive filesystem (the matrix's Windows row, 'Supported? yes'), a directory holding `Game-Base.toml` with `id = \"game-base\"` satisfies a `derives = [\"game-base\"]` lookup and loads, while the same chain refuses `ChainLinkMissing` on the Linux CI runner. The Windows matrix row rests on 'profile-id ↔ file-name equality is case-unique', which the loader does not enforce in that direction; no test pins a case-only mismatch (tests/chain_ops.rs:1354 differs by more than case), and the Windows leg of Test strategy #9 is the one leg that would miss it.",
+            "fix": "Pin the byte-exact on-disk name before opening the link: in `open_link`, require `fs::read_dir(directory)` to contain an entry whose `file_name()` equals `{expected}.toml` byte-for-byte (one scan per link, inside the existing MAX_CHAIN_DEPTH budget), and add the case-only mismatch to the load_chain guard cases (Test strategy #3). Alternatively state the caveat contract-side — one sentence in schemas/profile/v2/spec.md §'Loading a chain' rule 3 plus the matrix's Windows row — but the platform divergence must be refused or written down, not left implicit."
+          },
+          {
+            "severity": "minor",
+            "location": "schemas/profile/v2/spec.md:46 and §Per-link rules; enforcing code crates/core/src/document.rs:1074 (check_generated_by) with is_label_char at :1101",
+            "problem": "spec.md states the `generated-by` character rule as 'no ASCII control or bidi-control characters', but the reference reader also refuses the default-ignorable/joiner set the proposal names (soft hyphen, U+034F, U+061C, U+180E-180F, U+200B-200F, U+202A-202E, U+2060-206F, U+FEFF, U+FFF9-FFFB). Only the two halves the spec states are corpus-pinned (generated-by-control-char.toml, generated-by-bidi-char.toml — the latter's comment asserts the default-ignorable rule, which is not contract text), and no fixture or test carries a non-ASCII label at all, so the accept side of the boundary is unpinned too. Under the matrix's 'third-party reader, non-Rust — spec.md + fixtures are the contract' row, a conforming reader accepts documents bindforge-core refuses.",
+            "fix": "Restore the proposal's three-way wording in spec.md:46 and state the excluded set once as is_label_char's comment enumerates it; then pin the boundary in tests/chain_ops.rs grammar cases: one refusal for a U+00AD label, one for U+200B, and one accept case for a plain non-ASCII label. Keep the design's fixture list as written; if the panel prefers corpus pins (generated-by-soft-hyphen.toml, a valid unicode-label fixture), edit the design's fixture list in the same PR."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/document.rs:1051 (check_profile_slug), used as a file name at crates/core/src/chain_ops.rs:131 and :348; fresh ids via chain_ops.rs:581",
+            "problem": "The slug grammar admits Windows reserved device basenames (`con`, `aux`, `prn`, `nul`, `com1`-`com9`, `lpt1`-`lpt9`), which on Windows are not file names: they cannot be created, git refuses to check them out, and Path::try_exists answers through the device. A chain with `id = \"con\"` loads on Linux and is unbuildable/unfetchable for the Windows contributor the matrix marks supported, and a hub bundle could carry one. Nothing in the diff addresses it. Precedent note: placement::is_slug_name already turns manifest and geometry ids into path components with the same grammar and no guard, so this is a widening of existing exposure, not new.",
+            "fix": "Decide it once where the grammar lives: either reject a reserved Windows basename inside check_profile_slug (naming the rule, with a grammar/chain_ops case pinning it) and open the same question for placement::is_slug_name as a follow-up, or record it under Deferred/out of scope with an owner and add one sentence to spec.md §'Id grammars' plus the matrix's Windows row that the id grammar does not exclude platform-reserved names."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/code-review-compatibility-r1c0.md",
+      "durationMs": 169530,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e2a83623cffeUU3r4cSVX3WHGo",
+      "agent": "codereview/code-security",
+      "at": 1794583199243,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/document.rs:1101-1116 (is_label_char); escape side at crates/core/src/error.rs:173",
+            "problem": "The provenance-label policy excludes char::is_control() (C0+C1) plus an explicit bidi/default-ignorable list, but not U+2028 LINE SEPARATOR or U+2029 PARAGRAPH SEPARATOR, and one_line escapes only is_control characters too. toml.rs:230 decodes \\uXXXX escapes, so a generated-by label carrying U+2028 parses and ships, and a refusal echoing kind/format/a delta element can carry that code point into a message the contract fixes as 'a single bounded line' — the conformance assertion only checks for '\\n' and '\\r' (tests/conformance.rs:295). The helper's own comment claims the excluded set is the one that can steer what a reader sees; line separators are exactly that.",
+            "fix": "Add '\\u{2028}' | '\\u{2029}' to the matches! list in is_label_char, widen the spec.md generated-by sentence to say so, and pin it with an invalid fixture (generated-by-line-separator.toml) beside generated-by-bidi-char.toml; if the log-line invariant is meant to cover echoed values generally, also escape those two code points in one_line."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/chain_ops.rs:650-656 (inherit_provenance), applied at 334-335",
+            "problem": "The function's doc says a label is inherited only when the two operands agree and a disagreement is dropped, but the arm (Some(one), None) => Some(one) copies a one-sided label onto the merged document: merging a patch asserting generated-by = \"human\" with a silent one yields a document authored by merge that claims a producer neither operand asserted for it — the provenance-drift class the contract refuses elsewhere. Impact is bounded by ADR Decision Four (provenance never consumed as trust), hence minor.",
+            "fix": "Inherit only when both operands carry equal labels ((Some(a), Some(b)) if a == b) and drop otherwise, or state the one-sided rule in spec.md's provenance paragraph and correct the comment; pin the chosen rule with a merge test."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/chain_ops.rs:315-333 (merge emit path), with merge_touch_order at 679-690 and emit_composition at 746-789",
+            "problem": "MAX_PATCH_DELTA_ELEMENTS is enforced only at parse (document.rs:914-928); nothing bounds what merge writes out. Touched actions per operand reach 1024 (256 set + 256 clear + 2x256 swap halves) and the union 2048, and emit_composition writes one element per touched action, so a grammar-valid pair of operands can yield a merged patch whose set or clear list exceeds the 256 cap — a Profile no reader of the same grammar accepts, so the refusal surfaces at the next load_chain instead of at the operation, and the composite-cost statement in spec.md no longer holds for merge output.",
+            "fix": "After emit_composition, refuse with the same InvalidValue shape delta_elements uses when any emitted list passes MAX_PATCH_DELTA_ELEMENTS, and pin the refusal with a test in tests/chain_ops.rs."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/code-review-security-r1c0.md",
+      "durationMs": 122922,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2a8181d8ffeF89W7j7c45XghT",
+      "agent": "codereview/code-performance",
+      "at": 1794583261657,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/chain_ops.rs:523-537 (scan at 525; dedupe at 549-570)",
+            "problem": "The manifest action join in check_joins runs `manifest.actions.iter().any(...)` once per unique touched action of every link: for a maximum-size chain this is up to 32 links × ≤256 actions × a scan over ≤256 rows ≈ ~1–2M ActionId string comparisons per resolve, and a hostile near-miss chain pays the same before refusing. The contract's own cost sentence (schemas/profile/v2/spec.md:188-189, proposal composite-cost paragraph) promises the delta elements apply 'through one per-resolution lookup of the MAX_MANIFEST_ROWS-capped action table'; the implementation builds no lookup structure, so the stated cost shape is product-of-caps linear scans, not one table plus lookups. Bounded by parse budgets and load-time only, hence minor.",
+            "fix": "Build one BTreeSet<&ActionId> from manifest.actions per resolution in check_joins/resolve and test membership against it; dedupe touched_actions with a BTreeSet<&ActionId> alongside the order-preserving Vec instead of Vec::contains (same shape in merge_touch_order, chain_ops.rs:684-687)."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/chain_ops.rs:250-252",
+            "problem": "diff compares the two resolved layouts with a linear find per manifest row: O(rows × layout) = at most 256×256 ≈ 65k comparisons per call. Harmless today, but both layouts already follow manifest row order, so a map or two-cursor walk makes it linear for free.",
+            "fix": "Index before/after into a BTreeMap<&ActionId, &InputId>, or walk the two row-ordered vectors with two cursors."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/code-review-performance-r1c0.md",
+      "durationMs": 62356,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e2a808e23ffeUd7XZhQkGLVzNf",
+      "agent": "codereview/code-testing",
+      "at": 1794583443413,
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/code-review-testing-r1c0.md",
+      "durationMs": 181734,
+      "nudges": 0,
+      "failure": "independence violation: read a review report: docs/designs/014-profiles-as-chains/reviews/code/*"
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e2a7dc81bffeI4MjnbqZyfSweI",
+      "agent": "codereview/code-testing",
+      "at": 1794583572547,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/chain_ops.rs:449-475 (check_positions); crates/core/tests/chain_ops.rs:1162, 1195, 1221",
+            "problem": "The step-4 load-level position check is unreachable: link_below (chain_ops.rs:437-443) only descends on kind=Patch and only stops on kind=Base, and the parse shape rules refuse every other kind/derives combination, so no chain that completes the walk can fail check_positions (dead branch per the testing checklist). The three tests citing the position rule (a base carrying a clear at load, deepest link a patch, a base mid-chain) actually drive parse-invalid documents — the same shapes the base-clear-element, missing-derives-patch, and base-derives-nonempty fixtures pin at parse — and pass only because name_the_link prefixes the link id onto the wrapped parse refusal; the cited rule is not what they prove.",
+            "fix": "Document that step 4 is subsumed by the per-document parse rules (keep check_positions with a subsumed-by-parse comment or fold it into link_below's terminating case), and recite the three tests' proves: comments to what they actually pin: 'a chain link whose document fails its shape rules refuses at load as InvalidValue naming the link'."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/chain_ops.rs:354-361 and crates/core/src/chain_ops.rs:439",
+            "problem": "Two reachable load-level refusals have no test: open_link's non-profile arm ('must hold a profile document' — e.g. a manifest document named game-base.toml in the chain directory) and link_below's kind=None fault (a v1 profile head in a v1 directory passes check_link_version, then faults). Both are hostile-chain shapes the 'one gate per opened source' posture promises, and neither is pinned anywhere.",
+            "fix": "Add two chain_ops.rs cases in the Test strategy #3 section: a chain link holding a non-profile document refuses as InvalidValue naming the id, and a v1 profile head refuses with the named kind fault."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/chain_ops.rs:650-656 (inherit_provenance, called from merge at :334-335)",
+            "problem": "merge's provenance inheritance — keep a label present on one operand, keep a shared label, drop a disagreement — is behavior the proposal's merge paragraph never states (it pins only id, derives, and for inheritance) and no test pins any of its three arms. An unpinned, unsourced semantic decision ships in the public surface.",
+            "fix": "Either pin it with merge tests asserting the one-sided, equal, and disagreeing provenance outcomes, or drop the inheritance so the shipped behavior matches the proposal."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/chain_ops.rs:614-619 (no_head)",
+            "problem": "no_head is unreachable by construction: Chain is only built by load_chain, whose loop pushes at least one link before any break, so head() is never None for a value a caller can hold. An untestable dead branch is a finding under the checklist's dead-branch item, not a pass.",
+            "fix": "Comment the corner as unreachable-by-construction (or replace with a debug_assert-style guard) so no later test can be written vacuously around it."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/chain_ops.rs:1-55 (module header); design 014 Test strategy #9",
+            "problem": "Test strategy #9 (three gate commands green on Linux, one Windows contributor leg) is cited by no test in the tree. The Linux leg was evaluated by the seat (fmt/clippy/test all green, tail in the report), but the tree carries no note that #9's legs are CI/rollout checks, unlike the 013 precedent at conformance.rs:39-45.",
+            "fix": "Add one header comment in chain_ops.rs (or the design-014 block in conformance.rs) stating that #9's legs are the merge PR's CI job and a Rollout-7 contributor check, mirroring design 013's note."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/code-review-testing-attempt2-r1c0.md",
+      "durationMs": 129080,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e2a7bcf75ffeTf1SiBfgy4Y4yx",
+      "agent": "code/coder",
+      "at": 1794584240939,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "fix(core): correct merge composition and the chain's refusal shapes\n\nRound 1's correctness review, design 014:\n\n- merge: a kept exchange's partner is stepped past, not faulted, so a\n  merge whose net effect keeps a swap emits one swap element instead of\n  refusing a compatible overlap; the non-reciprocal refusal (a swap under\n  a clear of one swapped action) still refuses.\n- error: CoreError::Cycle's Display text is back to design 008's bytes —\n  a shipped contract string is not re-worded to satisfy an assertion.\n- chain_ops: the directory-major rule reuses document::check_dir_version,\n  so a chain answers the same InvalidValue every other loader answers.\n- chain_ops: a head the caller named is Io, whose payload carries the\n  path; only a link the walk constructed is ChainLinkMissing.\n- merge: no provenance label rides the merged document.\n- document: serialize writes kind/for for every v2 document, branching on\n  version alone; a kindless model refuses on re-parse.\n- chain_ops: the manifest action join does one lookup per resolution.\n\nGate: fmt and clippy --all-targets clean; 251 tests pass, 2 chain_ops\nassertions (the Cycle needle list, and the directory-major variant) now\nawait the test engineer — see 03-build-notes.md.",
+        "moves": []
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/fix-r1.md",
+      "durationMs": 668286,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 1,
+      "sessionID": "ses_e2a717307ffeyGsCe98PXfy2iT",
+      "agent": "code/test-engineer",
+      "at": 1794584486161,
+      "reply": {
+        "commitMessage": "test(core): pin merge's kept exchange, label-free merge output, and the chain's refusal shapes\n\nDesign 014, round 1's accepted correctness findings (reviews/code/correctness-r1c0.md):\n\n- merge (blocker): a composition whose net effect keeps an exchange is a compatible\n  overlap — p1 = swap move.a move.b under p2's untouched set merges into one patch\n  carrying that swap once plus p2's element, and written beside the base it resolves\n  to exactly the stacked chain's layout. This is the pin the suite lacked: no merge\n  test asserted a non-empty swap list before.\n- merge (minor 4): no provenance label rides the merged document, even where both\n  operands carried the same seeded-from/generated-by (ADR Decision Four).\n- Cycle (major 2): the assertion stops leaning on the frozen shipped message — the\n  payload-free variant is the pin, plus the one-line/control-free shape; the\n  \"Cycle\"/link-id needle list is gone.\n- Directory-major rule (minor 3): the chain answers the one InvalidValue every other\n  loader answers (spec.md → Loading a chain rule 2), not the version gate's\n  UnsupportedVersion; the test comment names that rule instead of claiming a\n  precedent it contradicted.\n- Absent head (minor 5): the caller-named head is the read refusal whose payload\n  carries the path through source_path, never ChainLinkMissing.\n\nGate, run here: cargo fmt --all -- --check (no output), cargo clippy --workspace\n--all-targets --locked -- -D warnings (Finished, no warnings), cargo test\n--workspace --locked — tests/chain_ops.rs: 74 passed, 0 failed; every other suite ok.",
+        "moves": []
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/test-update-r1.md",
+      "durationMs": 234475,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2a6db546ffe3MOiU3e6MzC7T1",
+      "agent": "codereview/code-correctness",
+      "at": 1794584633951,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "crates/core/src/chain_ops.rs:302-309 (`merge` doc), :720-731 (`apply_lists` doc); contract side: 02-proposal.md → Chain operations (`merge`, 460-475)",
+            "problem": "My round-1 nit asked for one sentence in the merge contract stating that the composition assumes the base binds both sides of any exchange either patch names, and that a merge needing otherwise refuses. The sentence now exists in the rustdoc for `merge` and for `apply_lists`, and the behavior it describes is correct and deterministic (`set X a` under `swap X Y` refuses, as does `swap X Y` under `clear X`, both pinned at tests/chain_ops.rs:2207). It is still absent from the proposal's merge paragraph, and `schemas/profile/v2/spec.md` has no merge section, so the only normative text a third-party implementer has for `merge` remains the proposal's \"composes ... exactly, not heuristically\", which does not disclose that a pair with one side re-bound by the other patch is a refusal rather than a composition. The docs half of the fix sits outside this diff's declared scope (`docs/designs` excluded), so no code is wrong; this is a documentation gap that survives the revision.",
+            "fix": "Add to the proposal's merge paragraph: \"the base is assumed to bind both sides of any exchange either patch names; a composition whose answer would depend on the base's bindings has no one-patch form and refuses\" — and, if merge semantics are meant to be conformable by a non-Rust implementer, mirror that sentence in spec.md where the rest of the load-level contract already lives."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/code-review-correctness-r1c1.md",
+      "durationMs": 137098,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2a6b9d4fffeh6bpuXH1AykQz0",
+      "agent": "codereview/code-compatibility",
+      "at": 1794584843690,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/chain_ops.rs:381-384 (open_ancestor try_exists), :406 (id vs constructed stem), :144 (path build); spec.md:70-74",
+            "problem": "Carried from r1, unchanged by the revisions: the id↔file-name rule compares the declared `id` with the stem the walk constructed, never with the name the filesystem matched, so on a case-insensitive filesystem (the matrix's Windows row) `Game-Base.toml` with `id = \"game-base\"` loads while the same chain refuses `InvalidValue` on Linux CI. spec.md states 'profile-id ↔ file-name equality must be case-unique' as loader-enforced fact; no case-only-mismatch case exists, and the Windows leg of Test strategy #9 would miss it. The fix stage took neither r1 disposition.",
+            "fix": "Pin the byte-exact on-disk name before opening the link (a `fs::read_dir` entry whose `file_name()` equals `{expected}.toml` byte-for-byte, inside the depth budget) and add a case-only mismatch to the load_chain guard cases, or state the divergence explicitly in spec.md §'Loading a chain' rule 3 plus the matrix's Windows row."
+          },
+          {
+            "severity": "minor",
+            "location": "schemas/profile/v2/spec.md:46; enforcing code crates/core/src/document.rs:1083 (check_generated_by) via is_label_char at :1110",
+            "problem": "Carried from r1, unchanged: spec.md states the generated-by rule as 'no ASCII control or bidi-control characters', but the reference reader also refuses the default-ignorable/joiner set the proposal's entry table (proposal:236) names. Under the matrix's 'third-party reader — spec.md + fixtures are the contract' row, a conforming reader accepts documents bindforge-core refuses; no fixture or grammar case carries U+00AD/U+200B or any valid non-ASCII label.",
+            "fix": "Restore the proposal's three-way wording at spec.md:46, state the excluded set once (as is_label_char's comment enumerates it), and pin the boundary with a U+00AD refusal, a U+200B refusal, and an accept case for a plain non-ASCII label — or add the matching corpus fixtures in the same PR."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/document.rs:1060 (check_profile_slug); file names built at crates/core/src/chain_ops.rs:144, fresh ids at :608",
+            "problem": "Carried from r1, unchanged: the slug grammar admits Windows reserved device basenames (`con`, `aux`, `prn`, `nul`, `com1`-`com9`, `lpt1`-`lpt9`), which cannot be file names on Windows; such a chain loads on Linux and is unbuildable/unfetchable for the Windows contributor the matrix marks supported, and a hub bundle could carry one.",
+            "fix": "Decide it once where the grammar lives: reject a reserved Windows basename inside check_profile_slug with a pinned case, or record it under Deferred/out of scope with an owner and add one sentence to spec.md §'Id grammars' plus the matrix's Windows row."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/code-review-compatibility-r1c2.md",
+      "durationMs": 209625,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e2a686a39ffe0mxjeY3641BJwv",
+      "agent": "codereview/code-security",
+      "at": 1794585044856,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/error.rs:172-186 (one_line), with the new echo at crates/core/src/document.rs:1346-1361 (check_dir_version) reached from crates/core/src/chain_ops.rs:372,405; label side unchanged at document.rs:1110-1125 (is_label_char)",
+            "problem": "The r1 U+2028/U+2029 gap is still open: is_label_char still admits LINE/paragraph SEPARATOR, and one_line escapes only is_control() (Cc), so Zl/Zp flow raw into echoed refusal text. The revision widens the echo surface by one path: the head's directory-major mismatch now answers InvalidValue naming `{file_stem}.toml` (where the base answered UnsupportedVersion without the stem), so a caller-named head file whose stem carries U+2028 — legal in a Linux filename — has that code point echoed into the rejection line the contract (spec.md:198-203) fixes as a single escaped line. \\n/\\r remain escaped and the message stays bounded, so severity stays minor (same terminal/JS-adjacent log-splitting class accepted for 013's native_name).",
+            "fix": "As in r1: add '\\u{2028}' | '\\u{2029}' (ideally U+0085 too) to the is_label_char matches! list, mirror the sentence in spec.md's generated-by row, and pin with an invalid fixture; since the new check_dir_version echo is not document-content-guarded, also escape Zl/Zp/U+0085 in one_line if the log-line invariant is meant to cover echoed values generally."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/chain_ops.rs:340-359 (merge, post-emit_composition), emit_composition at 772-820",
+            "problem": "The diff rewrote emit_composition (reciprocal-pair continue) but added no bound on what merge writes out, so r1's open finding stands: parse caps each operand list at 256, yet touched actions per operand reach 1024 and the union 2048, so a grammar-valid pair of operands can yield a merged patch whose set or clear exceeds MAX_PATCH_DELTA_ELEMENTS — a Profile the same grammar refuses at the next load_chain, so the refusal surfaces downstream instead of at the operation, and spec.md's composite-cost paragraph still does not describe merge output. The revision's continue only shrinks the swap side.",
+            "fix": "Unchanged from r1: after emit_composition, refuse with the same InvalidValue shape delta_elements uses when any emitted list passes MAX_PATCH_DELTA_ELEMENTS, and pin the refusal with a test in tests/chain_ops.rs."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/code-review-security-r1c2.md",
+      "durationMs": 201093,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2a655870ffeSCFTHfr27BjYCI",
+      "agent": "codereview/code-performance",
+      "at": 1794585105252,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "crates/core/src/chain_ops.rs:576-597, 694-705",
+            "problem": "Carried unchanged from round 1 (not broken by the later fixes): the residual half of the round-1 fix was not taken — touched_actions dedupes with Vec::contains and merge_touch_order with iter().any, so per-link dedupe stays O(d²) with d ≤ 3×MAX_PATCH_DELTA_ELEMENTS = 768 (≈0.3M string comparisons per link worst case, load-time only). Bounded by the parse budgets, so non-blocking; the primary product-of-caps join scan I flagged in r1 is fixed at chain_ops.rs:545-552 with the BTreeSet<&ActionId> built once per resolution, matching the cost sentence at 02-proposal.md:421-426 and schemas/profile/v2/spec.md:192-196.",
+            "fix": "Dedupe with a BTreeSet<&ActionId> alongside the order-preserving Vec in touched_actions, and test membership against it in merge_touch_order, instead of Vec::contains / iter().any."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/chain_ops.rs:264-266",
+            "problem": "Carried unchanged from round 1: diff still compares the two resolved layouts with a linear find per manifest row — O(rows × layout) = at most 256×256 ≈ 65k comparisons per call. Bounded by MAX_MANIFEST_ROWS and load-time only; the fixes neither touched nor worsened it.",
+            "fix": "Index before/after into a BTreeMap<&ActionId, &InputId>, or walk the two row-ordered vectors with two cursors."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/code-review-performance-r1c2.md",
+      "durationMs": 60345,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e2a646c92ffe1Iq8y6bk7uwPZu",
+      "agent": "codereview/code-testing",
+      "at": 1794585274619,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/chain_ops.rs:467-497; crates/core/tests/chain_ops.rs:1164-1168, 1199-1201, 1223-1227",
+            "problem": "Carry-over from r1, not broken by the revisions but not fixed either: check_positions remains unreachable (the walk descends only through kind = patch and terminates on kind = base, so no chain reaching it can fail it), and the three tests that cite Cross-file loading step 4 still drive parse-invalid documents (base-with-clear, patch with empty derives, base with non-empty derives — the shapes pinned at parse by tests at :620, :669, :606), passing on name_the_link's id prefix. The revision added a subsumption comment on the function but left the three proves comments misciting the position rule the tests do not drive.",
+            "fix": "Recite the three proves comments to what they actually pin — 'a chain link whose document fails its parse-level shape rules refuses at load as InvalidValue naming the link' — and keep check_positions commented as the subsumed position half (or fold it into link_below's terminating case)."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/chain_ops.rs:397-403 (check_link non-profile arm); crates/core/src/chain_ops.rs:459-465 (link_below no-kind fault)",
+            "problem": "Carry-over from r1, unchanged: the two load-level refusals remain unpinned — a chain link holding a non-profile document ('must hold a profile document') and a v1 profile head in a v1 directory (passes check_dir_version, then faults on missing kind). The revisions restructured exactly this region (open_head/open_ancestor/check_link split) without adding tests for either arm.",
+            "fix": "Add the two chain_ops.rs cases from strategy #3: a chain link holding a manifest document refuses as InvalidValue naming the id; a v1 profile head in v1/ refuses with the named kind fault."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/chain_ops.rs:55-63 (module header)",
+            "problem": "Carry-over from r1, unchanged: Test strategy #9 (fmt/clippy/test green on Linux CI, one Windows contributor leg) is cited by no test and no note states its legs are CI/rollout checks, unlike design 013's precedent at conformance.rs:39-42. The seat itself ran the Linux legs green for this pass.",
+            "fix": "One header line stating that #9's legs are the merge PR's CI job and a Rollout-7 contributor check, mirroring design 013's note."
+          }
+        ]
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/code-review-testing-r1c2.md",
+      "durationMs": 169335,
+      "nudges": 0
+    },
+    {
+      "stage": "doc-sync",
+      "round": 1,
+      "sessionID": "ses_e2a61d6afffe8iqEpqzyy2Jlva",
+      "agent": "ops/doc-sync",
+      "at": 1794585482399,
+      "reply": {
+        "drifted": true,
+        "commitMessage": "docs: record 014-profiles-as-chains as-built drift and complete build notes"
+      },
+      "transcript": "docs/designs/014-profiles-as-chains/transcripts/doc-sync-r1.md",
+      "durationMs": 207666,
+      "nudges": 0
+    }
+  ],
+  "gateLog": [
+    {
+      "gate": "sourceAdmissible",
+      "round": 0,
+      "proceed": true,
+      "reason": "ADR is proposed and complete",
+      "at": 1794577877875
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: correctness, security, performance",
+      "at": 1794579023041
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c2 pending: correctness",
+      "at": 1794579534793
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c3 pending: compatibility, security, performance, complexity",
+      "at": 1794579784513
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794580050088
+    },
+    {
+      "gate": "editorial-review",
+      "round": 2,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1794580344037
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794582578877
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1794582716821
+    },
+    {
+      "gate": "stageFailure",
+      "round": 1,
+      "proceed": false,
+      "reason": "code-review:testing: independence violation: read a review report: docs/designs/014-profiles-as-chains/reviews/code/*",
+      "at": 1794583443420
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: correctness",
+      "at": 1794583572610
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794584251622
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1794584496809
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c2 pending: compatibility, security, performance, testing",
+      "at": 1794584634024
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794585274695
+    },
+    {
+      "gate": "done",
+      "round": 0,
+      "proceed": true,
+      "reason": "pipeline complete",
+      "at": 1794585482458
+    }
+  ],
+  "startedAt": 1794577877857,
+  "updatedAt": 1794585482458,
+  "flow": "full",
+  "baseRef": "4cfcd8db4477247e8e6ecb26ecade40451e0ad91",
+  "designCycle": 4,
+  "designStamp": "2aae9c9eed298b076191c645f1686c764e0b8a01",
+  "seats": {
+    "design": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "2aae9c9eed298b076191c645f1686c764e0b8a01",
+        "dissents": 2,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chain operations — merge bullet: \"the output carries the caller's `id` (`fork`'s collision rule against `p1` and `p2`) and inherits `derives` and `for` from `p1`\"",
+            "problem": "The set named in the revised parenthetical is one member short, and it is the member that matters: the merged patch inherits `derives = [base id]` and, by the same-major-directory rule, must be written into that base's own directory as `<id>.toml`. A caller `id` equal to the shared base id therefore names the base document's file, so the consumer's write replaces the base; core only notices afterwards at `load_chain`, as a repeated-id `Cycle` on a chain whose base is gone. diff guards exactly this case (\"against every link id of `a`\"), so the two operations are asymmetric. Note: this set came from my own r1 fix, which on re-reading is incomplete — not a defect the revision introduced beyond naming the set.",
+            "fix": "Extend the parenthetical, no new mechanism: \"`fork`'s collision rule against `p1`, `p2`, and the `derives` base id inherited from `p1`\"; mirror it in Test strategy #5's collision clause."
+          },
+          {
+            "severity": "nit",
+            "location": "The contract — `generated-by` row: \"no ASCII control, default-ignorable, or bidi-control characters\"",
+            "problem": "Three refused classes, two fixtures: `generated-by-control-char.toml` and the newly named `generated-by-bidi-char.toml` cover the ASCII-control and bidi branches, but the default-ignorable branch is pinned by nothing, in a section that makes the corpus the thing that \"makes `profile/v2` supported\". Test strategy #1 still enumerates only \"`generated-by` past 128 octets or control-character-bearing\", naming neither new class. The bidi half of my r1 nit is closed as prescribed; this is the remaining half.",
+            "fix": "Name one more fixture (e.g. `generated-by-default-ignorable.toml`, a soft-hyphen label) or state that the control-char fixture carries a default-ignorable codepoint; let Test #1 read \"control-, bidi-, or default-ignorable-character-bearing\"."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "2aae9c9eed298b076191c645f1686c764e0b8a01",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → The contract: `schemas/profile/v2/`, `generated-by` row — \"1–128 octets, no ASCII control, default-ignorable, or bidi-control characters\"",
+            "problem": "The revision adds two exclusion classes named as Unicode properties that the std-only story the matrix commits to (\"Toolchain floor (1.85.0, edition 2024) | yes | std-only, no new dependency, `Cargo.lock` byte-unchanged\") cannot answer: `char::is_control()` covers Cc only and std exposes no Default_Ignorable or bidi-category accessor (shipped code checks exactly that: document.rs:875, error.rs:164). The reference implementation therefore needs a hand-maintained range table the document never states, and since `profile/v2/spec.md` is the language-neutral contract (matrix row \"Third-party reader, non-Rust\"), a third-party reader cannot decide whether a label carrying U+FE0F (Default_Ignorable) or a soft hyphen is a valid shipped document — a validity disagreement over a shared public artifact. Only bidi and ASCII-control are fixture-pinned (`generated-by-bidi-char.toml`, `generated-by-control-char.toml`); \"default-ignorable\" has none.",
+            "fix": "In the entry row and `spec.md`, replace the property names with the closed code-point list — bidi-control U+061C, U+200E–U+200F, U+202A–U+202E, U+2066–U+2069 — and either drop \"default-ignorable\" or pin it to an explicit range list; add the matching invalid fixture so the third boundary is corpus-pinned like the other two. Adds no mechanism; it replaces two Unicode-property names with the ranges they mean."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Cross-file loading: `load_chain` in `chain_ops.rs`, step 2 — \"the constructed path is always a direct child of the head, `<major dir>/<parse-validated slug>.toml`\"",
+            "problem": "The link path is stated as a `/`-joined template; the compatibility checklist asks that separators be handled by a library rather than string formatting, and the Windows contributor row is `yes`, where the separator is `\\`. Traversal safety is already closed (slug grammar refuses `..` and `/`, pinned in Test strategy #1) — only the separator wording is missing.",
+            "fix": "One clause naming the std construction — \"the link path is `Path::join`ed from the head's parent directory\" — and drop the `/`-template spelling."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Chain operations: `fork`, `diff`, `merge` — \"empty delta lists — a shell `load_chain` refuses as `patch-empty-deltas` until the caller fills one element\"",
+            "problem": "`patch-empty-deltas` is a fixture name, not a refusal; every other promise to a caller names the typed variant (`InvalidValue`, `ChainLinkMissing`, `MissingEntry`), and the variant a caller must match is part of the public error surface. Test strategy #5 repeats the behavior without naming the variant.",
+            "fix": "Name the typed refusal (`InvalidValue` naming the link/element, the shape the Per-link rules already implies) and cite `patch-empty-deltas.toml` as the fixture that pins it."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Resolution, \"Mount at any rung\" — \"`pub struct Chain { links: Vec<Profile> }  // only load_chain builds one`\" with \"a consumer mounts a prefix by `load_chain`ing a lower link as head, or reads the documents singly with `parse_file`\"",
+            "problem": "The revision made the only read path into `Chain` private without adding an accessor, so a consumer holding a `Chain` cannot see its links; the mount-at-any-rung capability (ADR Decision Three, \"take its base and patch independently\") is then reachable only by re-parsing files and walking `Profile.derives` by hand, and `zz_api_probe.rs`'s \"new public names\" is undecidable before implementation.",
+            "fix": "One clause stating the intent: either a `Chain::links()` iteration accessor, or \"`Chain` is opaque by design; the rung ids come from the head document's `derives` read with `parse_file`\". The second option names the text the accessor would otherwise replace."
+          }
+        ]
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "2aae9c9eed298b076191c645f1686c764e0b8a01",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chain operations → `merge` (and Test strategy #5, chain operations) — \"the output carries the caller's `id` (`fork`'s collision rule against `p1` and `p2`)\"",
+            "problem": "new: the revision newly names the collision set, and the set it names is narrower than the rule applied in the same paragraph pair — `fork` refuses an id that \"collides with any link id in the chain\", `diff` now refuses \"against every link id of `a`\", but `merge` omits the shared base: both patches name the same `derives` element (mismatch is already a refusal), so that base id is in hand and is not in the named set. Under the same-major-directory rule a link path is exactly `<major dir>/<slug>.toml`, so a merged patch whose `id` equals the shared base id takes the base document's file name; the file-level append move this revision made the sanctioned round-trip (\"write it beside `a`'s head, `load_chain` it as the new head\") then overwrites the base link. A hostile shared chain chooses the patch pair and the consumer supplies the id, so the clobber happens before any guard runs — the `Cycle` refusal only fires afterwards, on a chain whose base file is already gone (checklist: path hand… [elided by the checkpoint cap]",
+            "fix": "One clause: \"`fork`'s collision rule against `p1`, `p2`, and the `derives` base id they share\", with the same words in Test #5's merge clause. No new mechanism — it is the rule `fork` and `diff` already state."
+          },
+          {
+            "severity": "minor",
+            "location": "Test strategy #7 + Provenance labels + the `fixtures/invalid/` tree — new entry \"generated-by-bidi-char.toml\"; Provenance: \"reaches logs only through `one_line`, the same escape-and-truncate path whenever a refusal echoes it (A13)\"; Test #7: \"every invalid fixture is refused with a single-line, control-free, truncating message\"",
+            "problem": "new: adding the fixture creates a refusal message that carries a bidi formatting character, and no text keeps it out of the log. `one_line` is defined (A13) as escape-and-truncate for control-bearing strings; a U+202E-class or tag-block character is not an ASCII control character, so the refusal for the new fixture can echo the very codepoint the fixture exists to ban while still satisfying the \"single-line, control-free\" assertion — the renders-as-authority case in the log line that the ban was added to close (checklist: what may be logged).",
+            "fix": "Pin it in the same clause as `forged-log-line.toml` in Test #7: the refusal for a `generated-by` value in the banned non-ASCII classes names the entry and the offending byte offset rather than echoing the value (or state that `one_line`'s escape set covers exactly the classes the grammar bans), and assert the message contains none of the fixture's banned codepoints."
+          },
+          {
+            "severity": "minor",
+            "location": "Provenance labels / The contract entry table — \"`generated-by` | string | no | 1–128 octets, no ASCII control, default-ignorable, or bidi-control characters\"",
+            "problem": "re-raised: my r1 finding is only partly closed — the fixture half landed (`generated-by-bidi-char.toml` is now in the invalid tree), the definition half did not; the row is byte-identical to the one I flagged and neither class is pinned. The new fixture makes the gap concrete: the file must contain some specific character that `spec.md` never names, while the Compatibility matrix makes \"`profile/v2/spec.md` + fixtures\" the whole contract for a \"Third-party reader, non-Rust\". `default-ignorable` still has neither a fixture nor a range, so two implementers can still disagree over whether a U+E0020 tag or a U+F0000-adjacent default-ignorable in a shared label is refused.",
+            "fix": "State the classes in the row implementably without a Unicode table: `Default_Ignorable_Code_Point` plus the explicit ranges U+202A–U+202E and U+2066–U+2069, and add `generated-by-default-ignorable.toml` beside the bidi fixture so both classes have a pinned case."
+          }
+        ]
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "2aae9c9eed298b076191c645f1686c764e0b8a01",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chain operations → `diff`/`merge` — \"`diff` … a `set` per differing action, a `clear` per action `b` unbinds\" and \"`merge` … composes the two delta lists in chain order … over every action either touches\"",
+            "problem": "re-raised, unchanged by this diff (not a regression): the bullets still carry no output-cap clause. Substance remains closed — the action join plus MAX_MANIFEST_ROWS = 256 = MAX_PATCH_DELTA_ELEMENTS provably cap the output for loadable inputs, and a merge over parse-valid, action-join-invalid patches can emit a 257th element only to be refused at the output's own parse (\"a 257th element in any delta list\"). The c3 revisions (flipped merge conflict example, identity-cancelling refusal, file-level mount/round-trip rewrites) neither fixed nor broke this, and broke nothing else the performance seat approved: the composite 32-document / 32 MiB / MAX_CHAIN_DEPTH × 3 × MAX_PATCH_DELTA_ELEMENTS cost model still covers every newly spelled mount path, and the identity-cancelling refusal removes a write-then-refuse round-trip rather than adding cost.",
+            "fix": "One clause per bullet: output lists are capped because touched actions are rows of the shared pin's MAX_MANIFEST_ROWS-capped action table, and merge takes its inputs to be loadable against the shared pin (or refuses a composition exceeding a list)."
+          }
+        ]
+      },
+      "complexity": {
+        "verdict": "approve",
+        "stamp": "2aae9c9eed298b076191c645f1686c764e0b8a01",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Options considered → \"Profile ids\" and The contract → `id` row / **Id grammars**: \"`id` and each `derives` element are slug-grammar checked and capped at 63 octets\"",
+            "problem": "re-raised — the 63-octet cap still has no provenance or owning name: absent from A14's basis (the shipped slug grammar, no length cap), from Rollout 2's named constants (`MAX_PATCH_DELTA_ELEMENTS` / `MAX_GENERATED_BY_OCTETS`), and from the matrix's shipped limits, while the entry table, the Id grammars rule, `id-past-cap.toml` and Test strategy #1's \"64-octet\" case enforce it. The r1 revision made the gap more visible rather than closing it: the same Options bullet now sources the sibling cap to a shipped constant (\"mirroring the shipped `MAX_MANIFEST_ROWS = 256`\"), so the document demonstrates the citation practice and leaves this bound unowned. The cap itself is wanted (the profile-id↔file-name directory rule needs a bounded path segment), so this is traceability, not YAGNI.",
+            "fix": "One line: if manifest/codec/preset ids already carry a length cap, cite it in A14's basis; otherwise name the constant beside the two in Rollout 2 (it is a parse-time bound like them) and state the reason in the Id grammars rule — the directory rule needs a bounded path segment."
+          },
+          {
+            "severity": "minor",
+            "location": "The contract → `generated-by` entry row: \"1–128 octets, no ASCII control, default-ignorable, or bidi-control characters\"",
+            "problem": "new — the two added character classes are a validation surface with no Goal trace and no home in the text: Goals state only that provenance entries are \"validated referentially … and consumed by nothing\", no Options bullet or Risks row justifies them, and the Revision log's r1 entry does not record this contract change at all. The cost is out of proportion to the benefit: the Compatibility matrix commits to \"std-only, no new dependency, `Cargo.lock` byte-unchanged\", and std exposes no default-ignorable or bidi-control predicate, so the rule means a hand-rolled codepoint-range table — a fourth closed table in a parser whose shipped posture is a closed escape table (A19) — plus a new fixture (`generated-by-bidi-char.toml`) and widened Test strategy #1 scope. The protection they target is already shipped once: A13's `one_line` escape-and-truncate runs on every document string echoed in a refusal, which the Provenance labels section now states outright (\"reaches logs only through `one_line… [elided by the checkpoint cap]",
+            "fix": "Restore the row to \"1–128 octets, no ASCII control characters\" and rely on `one_line` for echo safety (drop `generated-by-bidi-char.toml` and the matching Test strategy #1 clause). If bidi filtering is genuinely wanted, keep it but state the requirement it serves in a Goal or an Options line and enumerate the codepoint ranges in the same row, so the table is a cited list rather than something invented during implementation."
+          }
+        ]
+      }
+    },
+    "code": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "aaf079642b993a5bf4b6173f236d0f51f0dbefa3",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "crates/core/src/chain_ops.rs:302-309 (`merge` doc), :720-731 (`apply_lists` doc); contract side: 02-proposal.md → Chain operations (`merge`, 460-475)",
+            "problem": "My round-1 nit asked for one sentence in the merge contract stating that the composition assumes the base binds both sides of any exchange either patch names, and that a merge needing otherwise refuses. The sentence now exists in the rustdoc for `merge` and for `apply_lists`, and the behavior it describes is correct and deterministic (`set X a` under `swap X Y` refuses, as does `swap X Y` under `clear X`, both pinned at tests/chain_ops.rs:2207). It is still absent from the proposal's merge paragraph, and `schemas/profile/v2/spec.md` has no merge section, so the only normative text a third-party implementer has for `merge` remains the proposal's \"composes ... exactly, not heuristically\", which does not disclose that a pair with one side re-bound by the other patch is a refusal rather than a composition. The docs half of the fix sits outside this diff's declared scope (`docs/designs` excluded), so no code is wrong; this is a documentation gap that survives the revision.",
+            "fix": "Add to the proposal's merge paragraph: \"the base is assumed to bind both sides of any exchange either patch names; a composition whose answer would depend on the base's bindings has no one-patch form and refuses\" — and, if merge semantics are meant to be conformable by a non-Rust implementer, mirror that sentence in spec.md where the rest of the load-level contract already lives."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "aaf079642b993a5bf4b6173f236d0f51f0dbefa3",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/chain_ops.rs:381-384 (open_ancestor try_exists), :406 (id vs constructed stem), :144 (path build); spec.md:70-74",
+            "problem": "Carried from r1, unchanged by the revisions: the id↔file-name rule compares the declared `id` with the stem the walk constructed, never with the name the filesystem matched, so on a case-insensitive filesystem (the matrix's Windows row) `Game-Base.toml` with `id = \"game-base\"` loads while the same chain refuses `InvalidValue` on Linux CI. spec.md states 'profile-id ↔ file-name equality must be case-unique' as loader-enforced fact; no case-only-mismatch case exists, and the Windows leg of Test strategy #9 would miss it. The fix stage took neither r1 disposition.",
+            "fix": "Pin the byte-exact on-disk name before opening the link (a `fs::read_dir` entry whose `file_name()` equals `{expected}.toml` byte-for-byte, inside the depth budget) and add a case-only mismatch to the load_chain guard cases, or state the divergence explicitly in spec.md §'Loading a chain' rule 3 plus the matrix's Windows row."
+          },
+          {
+            "severity": "minor",
+            "location": "schemas/profile/v2/spec.md:46; enforcing code crates/core/src/document.rs:1083 (check_generated_by) via is_label_char at :1110",
+            "problem": "Carried from r1, unchanged: spec.md states the generated-by rule as 'no ASCII control or bidi-control characters', but the reference reader also refuses the default-ignorable/joiner set the proposal's entry table (proposal:236) names. Under the matrix's 'third-party reader — spec.md + fixtures are the contract' row, a conforming reader accepts documents bindforge-core refuses; no fixture or grammar case carries U+00AD/U+200B or any valid non-ASCII label.",
+            "fix": "Restore the proposal's three-way wording at spec.md:46, state the excluded set once (as is_label_char's comment enumerates it), and pin the boundary with a U+00AD refusal, a U+200B refusal, and an accept case for a plain non-ASCII label — or add the matching corpus fixtures in the same PR."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/document.rs:1060 (check_profile_slug); file names built at crates/core/src/chain_ops.rs:144, fresh ids at :608",
+            "problem": "Carried from r1, unchanged: the slug grammar admits Windows reserved device basenames (`con`, `aux`, `prn`, `nul`, `com1`-`com9`, `lpt1`-`lpt9`), which cannot be file names on Windows; such a chain loads on Linux and is unbuildable/unfetchable for the Windows contributor the matrix marks supported, and a hub bundle could carry one.",
+            "fix": "Decide it once where the grammar lives: reject a reserved Windows basename inside check_profile_slug with a pinned case, or record it under Deferred/out of scope with an owner and add one sentence to spec.md §'Id grammars' plus the matrix's Windows row."
+          }
+        ]
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "aaf079642b993a5bf4b6173f236d0f51f0dbefa3",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/error.rs:172-186 (one_line), with the new echo at crates/core/src/document.rs:1346-1361 (check_dir_version) reached from crates/core/src/chain_ops.rs:372,405; label side unchanged at document.rs:1110-1125 (is_label_char)",
+            "problem": "The r1 U+2028/U+2029 gap is still open: is_label_char still admits LINE/paragraph SEPARATOR, and one_line escapes only is_control() (Cc), so Zl/Zp flow raw into echoed refusal text. The revision widens the echo surface by one path: the head's directory-major mismatch now answers InvalidValue naming `{file_stem}.toml` (where the base answered UnsupportedVersion without the stem), so a caller-named head file whose stem carries U+2028 — legal in a Linux filename — has that code point echoed into the rejection line the contract (spec.md:198-203) fixes as a single escaped line. \\n/\\r remain escaped and the message stays bounded, so severity stays minor (same terminal/JS-adjacent log-splitting class accepted for 013's native_name).",
+            "fix": "As in r1: add '\\u{2028}' | '\\u{2029}' (ideally U+0085 too) to the is_label_char matches! list, mirror the sentence in spec.md's generated-by row, and pin with an invalid fixture; since the new check_dir_version echo is not document-content-guarded, also escape Zl/Zp/U+0085 in one_line if the log-line invariant is meant to cover echoed values generally."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/chain_ops.rs:340-359 (merge, post-emit_composition), emit_composition at 772-820",
+            "problem": "The diff rewrote emit_composition (reciprocal-pair continue) but added no bound on what merge writes out, so r1's open finding stands: parse caps each operand list at 256, yet touched actions per operand reach 1024 and the union 2048, so a grammar-valid pair of operands can yield a merged patch whose set or clear exceeds MAX_PATCH_DELTA_ELEMENTS — a Profile the same grammar refuses at the next load_chain, so the refusal surfaces downstream instead of at the operation, and spec.md's composite-cost paragraph still does not describe merge output. The revision's continue only shrinks the swap side.",
+            "fix": "Unchanged from r1: after emit_composition, refuse with the same InvalidValue shape delta_elements uses when any emitted list passes MAX_PATCH_DELTA_ELEMENTS, and pin the refusal with a test in tests/chain_ops.rs."
+          }
+        ]
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "aaf079642b993a5bf4b6173f236d0f51f0dbefa3",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "crates/core/src/chain_ops.rs:576-597, 694-705",
+            "problem": "Carried unchanged from round 1 (not broken by the later fixes): the residual half of the round-1 fix was not taken — touched_actions dedupes with Vec::contains and merge_touch_order with iter().any, so per-link dedupe stays O(d²) with d ≤ 3×MAX_PATCH_DELTA_ELEMENTS = 768 (≈0.3M string comparisons per link worst case, load-time only). Bounded by the parse budgets, so non-blocking; the primary product-of-caps join scan I flagged in r1 is fixed at chain_ops.rs:545-552 with the BTreeSet<&ActionId> built once per resolution, matching the cost sentence at 02-proposal.md:421-426 and schemas/profile/v2/spec.md:192-196.",
+            "fix": "Dedupe with a BTreeSet<&ActionId> alongside the order-preserving Vec in touched_actions, and test membership against it in merge_touch_order, instead of Vec::contains / iter().any."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/chain_ops.rs:264-266",
+            "problem": "Carried unchanged from round 1: diff still compares the two resolved layouts with a linear find per manifest row — O(rows × layout) = at most 256×256 ≈ 65k comparisons per call. Bounded by MAX_MANIFEST_ROWS and load-time only; the fixes neither touched nor worsened it.",
+            "fix": "Index before/after into a BTreeMap<&ActionId, &InputId>, or walk the two row-ordered vectors with two cursors."
+          }
+        ]
+      },
+      "testing": {
+        "verdict": "approve",
+        "stamp": "aaf079642b993a5bf4b6173f236d0f51f0dbefa3",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/chain_ops.rs:467-497; crates/core/tests/chain_ops.rs:1164-1168, 1199-1201, 1223-1227",
+            "problem": "Carry-over from r1, not broken by the revisions but not fixed either: check_positions remains unreachable (the walk descends only through kind = patch and terminates on kind = base, so no chain reaching it can fail it), and the three tests that cite Cross-file loading step 4 still drive parse-invalid documents (base-with-clear, patch with empty derives, base with non-empty derives — the shapes pinned at parse by tests at :620, :669, :606), passing on name_the_link's id prefix. The revision added a subsumption comment on the function but left the three proves comments misciting the position rule the tests do not drive.",
+            "fix": "Recite the three proves comments to what they actually pin — 'a chain link whose document fails its parse-level shape rules refuses at load as InvalidValue naming the link' — and keep check_positions commented as the subsumed position half (or fold it into link_below's terminating case)."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/chain_ops.rs:397-403 (check_link non-profile arm); crates/core/src/chain_ops.rs:459-465 (link_below no-kind fault)",
+            "problem": "Carry-over from r1, unchanged: the two load-level refusals remain unpinned — a chain link holding a non-profile document ('must hold a profile document') and a v1 profile head in a v1 directory (passes check_dir_version, then faults on missing kind). The revisions restructured exactly this region (open_head/open_ancestor/check_link split) without adding tests for either arm.",
+            "fix": "Add the two chain_ops.rs cases from strategy #3: a chain link holding a manifest document refuses as InvalidValue naming the id; a v1 profile head in v1/ refuses with the named kind fault."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/chain_ops.rs:55-63 (module header)",
+            "problem": "Carry-over from r1, unchanged: Test strategy #9 (fmt/clippy/test green on Linux CI, one Windows contributor leg) is cited by no test and no note states its legs are CI/rollout checks, unlike design 013's precedent at conformance.rs:39-42. The seat itself ran the Linux legs green for this pass.",
+            "fix": "One header line stating that #9's legs are the merge PR's CI job and a Rollout-7 contributor check, mirroring design 013's note."
+          }
+        ]
+      }
+    }
+  },
+  "lastReviewPass": {
+    "phase": "code",
+    "round": 1,
+    "cycle": 2,
+    "seats": [
+      "compatibility",
+      "security",
+      "performance",
+      "testing"
+    ]
+  },
+  "reviseNoChange": false,
+  "codeCycle": 3,
+  "codeStamp": "aaf079642b993a5bf4b6173f236d0f51f0dbefa3"
+}

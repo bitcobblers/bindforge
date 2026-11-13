@@ -1,0 +1,9 @@
+# No `version` entry at all: the document is never defaulted to the version of
+# the directory its fixture sits under, and the refusal names the majors the
+# format supports.
+format = "profile"
+id = "missing-version"
+derives = ["game-base"]
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]

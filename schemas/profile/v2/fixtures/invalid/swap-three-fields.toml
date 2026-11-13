@@ -1,0 +1,11 @@
+# Three fields in a `swap` element is a malformed delta — `swap` is always
+# action-to-action, and a spelled pair type (`action-input`) would multiply the
+# grammar for something two `set` elements already express.
+format = "profile"
+version = "v2"
+id = "swap-three-fields"
+derives = ["game-base"]
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]
+swap = ["move.steer-left aim.camera keyboard:d"]

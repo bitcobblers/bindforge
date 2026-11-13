@@ -1,0 +1,9 @@
+# The smallest legal `profile/v2` link: a base, and nothing else. Every other
+# entry is optional, so `derives` and the three delta lists default empty and
+# both provenance labels default absent. An unbound base is legal and resolves
+# to the all-unbound layout (determinism rule 6).
+format = "profile"
+version = "v2"
+id = "bare-base"
+kind = "base"
+for = "remnant-2@3"

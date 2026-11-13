@@ -1,0 +1,14 @@
+# The entry set is closed: `spec.md` says any other entry is rejected, so a
+# document carrying an entry the v2 grammar does not define must be refused, not
+# ignored. This one aliases a known entry (`derives_`): a reader that ignores
+# unknown entries reads it as *no ancestors at all*, quietly turning a link of a
+# chain into a standalone profile under the very version whose contract is the
+# chain.
+format = "profile"
+version = "v2"
+id = "unknown-entry"
+derives = ["game-base"]
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]
+derives_ = ["ancestor-1"]

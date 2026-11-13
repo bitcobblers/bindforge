@@ -1,0 +1,10 @@
+# The chain guard's own boundary case, in the v2 spelling: the link's only
+# ancestor is itself. The document parses — every single-document rule holds —
+# and chain resolution refuses it as `Cycle` instead of walking into it.
+format = "profile"
+version = "v2"
+id = "self-deriving"
+derives = ["self-deriving"]
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]

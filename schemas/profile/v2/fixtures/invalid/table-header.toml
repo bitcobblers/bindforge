@@ -1,0 +1,12 @@
+# Legal TOML, outside the v2 grammar (`spec.md`): the grammar is line-oriented
+# `key = value` entries only, so a table header is rejected. A v2 reader built
+# on a standard TOML parser reads `[set]` as a table and the link's delta list
+# vanishes, so every implementer refuses this document.
+format = "profile"
+version = "v2"
+id = "table-header"
+kind = "patch"
+for = "remnant-2@3"
+
+[set]
+entry = "move.steer-left keyboard:d"

@@ -1,0 +1,152 @@
+diff --git a/tmp/bindforge-editorial-profiles-as-chains-r2.md b/home/mike/repos/bindforge/docs/designs/014-profiles-as-chains/02-proposal.md
+index 2aae9c9..42dad0e 100644
+--- a/tmp/bindforge-editorial-profiles-as-chains-r2.md
++++ b/home/mike/repos/bindforge/docs/designs/014-profiles-as-chains/02-proposal.md
+@@ -76,7 +76,7 @@ walk, refuse before descending — to the *resolved* chain (A2, A15).
+ 
+ **Where ancestor documents come from: a search path, the hub, or the head's
+ own directory.** A search path invents precedence nobody pinned; the hub is
+-ADR-018's and storage location is explicitly undecided (A11). Chosen: the
++ADR-018's, and storage location is explicitly undecided (A11). Chosen: the
+ same-major-directory rule — every link is `<profile-id>.toml` directly in the
+ major directory of the head document. It reuses `check_dir_version` (A5),
+ makes a hub upload bundle exactly one such directory, and closes the
+@@ -85,7 +85,7 @@ mixed-major question by construction: one directory, one grammar.
+ **May a v2 chain include a v1 link: default its `kind` to `base`, or refuse.**
+ Defaulting invents semantics v1 never stated (a v1 profile has no layout
+ content at all — A1) and makes the grammar of one chain depend on which file
+-answers. Chosen: refused — a chain is single-major by the directory rule; a
++answers. Chosen: refuse — a chain is single-major by the directory rule; a
+ v1 document is carried forward by re-issuing it as a v2 `base`, which v2's
+ `set` makes expressible.
+ 
+@@ -117,7 +117,8 @@ intermediate state (A20); an exchange primitive avoids that whole class.
+ Refusing strands meaningful documents — `set X a` then `clear X`, or a
+ retune `set X a` then `set X b`, are how a patch is *edited*. Chosen: the
+ RFC 6902 convention (A20): elements apply sequentially in array order, last
+-write wins, and the fixed list order `set` → `clear` → `swap` per patch.
++write wins, and the fixed list order `set` → `clear` → `swap` applies per
++patch.
+ Array order is data, pinned by valid fixtures and stated in the determinism
+ rules.
+ 
+@@ -166,7 +167,7 @@ New: `schemas/profile/v2/` (`spec.md` + `fixtures/valid/` +
+ operations), and `crates/core/tests/chain_ops.rs` (module-mirrored per
+ ADR-004).
+ 
+-Edited: `crates/core/src/document.rs` (`PROFILE_ENTRIES` renamed
++Edited: `crates/core/src/document.rs` (`PROFILE_ENTRIES` renamed to
+ `PROFILE_V1_ENTRIES`, new `PROFILE_V2_ENTRIES`, a `profile_entries(version)`
+ selector beside `reach_classes_entries`, the v2 branch of `parse_profile`, a
+ `serialize` branch by version, the two budget constants),
+@@ -213,7 +214,7 @@ schemas/profile/v2/
+ ```
+ 
+ The grammar is the same documented TOML subset (A19); the entry set is
+-closed, and the set is chosen from the declared `version` by the shipped
++closed, and the set is selected from the declared `version` by the shipped
+ mechanism (A4). The `spec.md` also states the load-level rules below (the
+ directory rule, pin equality, the joins) so a non-Rust implementer can
+ conform to the whole chain contract, while the fixture corpus stays
+@@ -343,7 +344,7 @@ has loaded so far:
+    directory*: the constructed path is always a direct child of the head,
+    `<major dir>/<parse-validated slug>.toml`, and no other entry names a
+    location (the slug grammar refuses `..` and `/` as `InvalidValue`).
+-   Absent is `ChainLinkMissing` naming the id (a chain is a contract
++   An absent file is `ChainLinkMissing` naming the id (a chain is a contract
+    object, and "link missing" is not an I/O detail — A18); a file whose
+    `id` disagrees with its name is `InvalidValue` — the location rule,
+    mirroring `load_manifest`'s id↔directory equality, which pins the
+@@ -418,7 +419,7 @@ contract from merge on, and changing one rides a future `profile/v3`.
+   consumed as trust (Decision Four).
+ 
+ The composite cost is bounded and now stated (A21): one resolution opens
+-at most `MAX_CHAIN_DEPTH` documents — one per link — at most
++at most `MAX_CHAIN_DEPTH` documents — one per link — totalling at most
+ `MAX_CHAIN_DEPTH × MAX_DOCUMENT_BYTES` (32 MiB), and applies at most
+ `MAX_CHAIN_DEPTH × 3 × MAX_PATCH_DELTA_ELEMENTS` delta elements through
+ one per-resolution lookup of the `MAX_MANIFEST_ROWS`-capped action table —
+@@ -444,7 +445,7 @@ pub fn merge(p1: &Profile, p2: &Profile, id: &str) -> Result<Profile, CoreError>
+   grammar, and refused if it collides with any link id in the chain),
+   `derives = [head id]`, `kind = patch`, `for` inherited from the head so
+   the forked chain is loadable against the same manifest, and empty delta
+-  lists — a shell `load_chain` refuses as `patch-empty-deltas` until the
++  lists — a shell that `load_chain` refuses as `patch-empty-deltas` until the
+   caller fills one element. Copying the chain's *files* is the consumer's
+   move — core builds documents, not filesystems (storage is ADR-017's).
+ - **`diff`** requires the two chains' deepest links to be the *same
+@@ -452,24 +453,22 @@ pub fn merge(p1: &Profile, p2: &Profile, id: &str) -> Result<Profile, CoreError>
+   directory — and refuses naming both heads otherwise; chains resolving to
+   equal layouts refuse too (no legal non-empty output). Its output is a
+   v2 patch document (the diff *is* the grammar): the caller's `id`
+-  (`fork`'s collision rule against every link id of `a`), `derives = [a's head
+-   id]`, `for` the joined
+-  pin. Appended to `a`, it resolves to `b`'s layout — a `set` per
+-  differing action, a `clear` per action `b` unbinds — pinned by a corpus
+-  test.
++  (`fork`'s collision rule against every link id of `a`), `derives = [a's
++  head id]`, `for` the joined pin. Appended to `a`, it resolves to
++  `b`'s layout — a `set` per differing action, a `clear` per action `b`
++  unbinds — pinned by a corpus test.
+ - **`merge`** takes two patches that both name the same `derives` base id
+   and the same `for` (or refuses naming the mismatch — the pin equality
+   rule above, cross-referenced); the output carries the caller's `id`
+-  (`fork`'s collision rule against `p1` and `p2`) and inherits `derives` and
+-   `for` from `p1`. It
+-  composes the two delta lists in chain order (`p1` below, `p2` above)
+-  over every action either touches — exactly, not heuristically — and
++  (`fork`'s collision rule against `p1` and `p2`) and inherits `derives`
++  and `for` from `p1`. It composes the two delta lists in chain
++  order (`p1` below, `p2` above) over every action either touches — exactly, not heuristically — and
+   emits one patch producing that composition on the base. When some action's
+   composed effect has no one-patch form under the fixed list order — lower
+-  `swap X Y` with both bound in the base, upper `clear X`: the net needs the `swap`
+-  before the `clear` — `merge` refuses the whole result with `InvalidValue`
+-  naming the colliding action id (Options: no markers, no guessing, A20); a
+-   composition that cancels to the identity refuses as the empty-patch case.
++  `swap X Y` with both bound in the base, upper `clear X`: the net needs
++  the `swap` before the `clear` — `merge` refuses the whole result with `InvalidValue`
++  naming the colliding action id (Options: no markers, no guessing, A20);
++  a composition that cancels to the identity refuses as the empty-patch case.
+   Compatible overlaps are not conflicts: equal sets emit one element,
+   equal clears one `clear`, a `set` under a `clear` composes to the lone
+   `clear`. Output element order is deterministic — first-patch touch
+@@ -548,13 +547,13 @@ escape-and-truncate path whenever a refusal echoes it (A13).
+    the slug grammar, its empty-delta shell refusing to load until one delta
+    is added; `diff` round-trips over the corpus pairs — appending its output
+    to `a` is a file-level move — write it beside `a`'s head, `load_chain` it as
+-    the new head — resolving to `resolve(b, manifest)`; chains whose deepest link
+-   differs, by id or by contents, and chains with equal resolved layouts
+-   both refuse naming both heads; `merge` of compatible patches emits the
++   the new head — resolving to `resolve(b, manifest)`; chains whose deepest
++   link differs, by id or by contents, and chains with equal resolved
++   layouts both refuse naming both heads; `merge` of compatible patches emits the
+    deterministic merged patch (equal-sets emit once), and a
+    non-representable pair (a `swap X Y` under a `clear X`) refuses the
+-   whole merge naming the colliding action id, and an identity-cancelling
+-    composition refuses as the empty-patch case.
++   whole merge naming the colliding action id; an identity-cancelling
++   composition refuses as the empty-patch case.
+ 6. Unit — round-trip: `parse(serialize(parse(text)))` equals the first parse
+    for every v2 valid fixture and for a hand-built document carrying all
+    eleven entries, delta array order included (delta order is data, A3); a
+@@ -563,8 +562,8 @@ escape-and-truncate path whenever a refusal echoes it (A13).
+    `schemas/*/v*/` walk picks up `profile/v2`: every valid fixture parses,
+    passes the guards, and re-serializes to a semantically equal value
+    (profiles keep the round-trip path); every invalid fixture is refused
+-   with a single-line, control-free, truncating message — `forged-log-line
+-   .toml` pins that for newline-bearing values; the zero-fixture
++   with a single-line, control-free, truncating message — `forged-log-line.toml`
++   pins that for newline-bearing values; the zero-fixture
+    rule and the case-unique fixture-name rule cover the new directory (A3).
+ 8. Integration — the untouched halves stay green: every pre-014 fixture,
+    loader test, and refusal byte-unchanged; `version_gate.rs` gains the case
+@@ -625,7 +624,7 @@ escape-and-truncate path whenever a refusal echoes it (A13).
+   only makes an all-`set` base expressible.
+ - The CI matrix re-validating dependent chains on each manifest bump: the
+   operand side shipped here (the pin, the equality rule); the matrix stays
+-  deferred exactly as design 013 left it — needs one before the first
++  deferred exactly as design 013 left it — needed before the first
+   pinned chain ships.
+ - Named-key and modifier input members (`tab`, `esc`, arrows, F-keys):
+   widening the closed sets rides the `reach-classes` vocabulary major

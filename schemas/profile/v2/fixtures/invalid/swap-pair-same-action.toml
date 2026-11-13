@@ -1,0 +1,11 @@
+# A `swap` pair names two distinct actions: exchanging an action with itself is
+# a delta that means nothing, and the contract refuses the vacuous rather than
+# pinning it as a legal no-op.
+format = "profile"
+version = "v2"
+id = "swap-pair-same-action"
+derives = ["game-base"]
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]
+swap = ["move.steer-left move.steer-left"]

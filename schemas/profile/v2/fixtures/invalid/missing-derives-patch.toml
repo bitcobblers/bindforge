@@ -1,0 +1,10 @@
+# A patch names nothing below it: an empty `derives` list on a `kind = "patch"`
+# link means the walk can never terminate at a base, and the label contradicts
+# the document's own shape. A base carries no `derives` element at all.
+format = "profile"
+version = "v2"
+id = "missing-derives-patch"
+derives = []
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]

@@ -1,0 +1,10 @@
+# Legal TOML, outside the v2 grammar (`spec.md`): dotted keys are rejected, so
+# an entry cannot smuggle a nested path into a flat link document. A v2 reader
+# that accepts `for.slug` would be reading a second, invisible `for` beside the
+# one the pin equality rule compares.
+format = "profile"
+version = "v2"
+id = "dotted-key"
+kind = "patch"
+for = "remnant-2@3"
+for.slug = "remnant-2"

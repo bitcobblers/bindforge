@@ -1,0 +1,9 @@
+# `for` is required: a link that pins nothing cannot be joined to a manifest at
+# load, and every resolution runs that join. A link is never silently attached
+# to whichever manifest a reader happens to have open.
+format = "profile"
+version = "v2"
+id = "missing-for"
+derives = ["game-base"]
+kind = "patch"
+set = ["move.steer-left keyboard:d"]

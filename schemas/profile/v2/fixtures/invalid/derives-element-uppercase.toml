@@ -1,0 +1,10 @@
+# Every `derives` element is slug-checked at parse, which is what makes the link
+# path a chain builds always a direct child of the major directory: an element
+# that capitalizes, spells `..`, or carries a `/` never reaches a path at all.
+format = "profile"
+version = "v2"
+id = "derives-element-uppercase"
+derives = ["Game-Base"]
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]

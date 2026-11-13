@@ -20,15 +20,21 @@
 //! `Manifest`, `ManifestAction`, `ExclusivityGroup`, `DockedAction`, `load_manifest`,
 //! and the four budget constants") — the same probe for ADR-013's manifest names,
 //! whose behavior `manifest.rs` pins (#1–#5).
+//!
+//! proves: design 014's Test strategy #8 + its Delta inventory (`lib.rs` gains
+//! the `chain_ops` module and its re-exports — `Chain`, `load_chain`,
+//! `resolve`, `ResolvedBinding`, `fork`, `diff`, `merge`, `ProfileKind` — and
+//! `error.rs` the one `ChainLinkMissing` variant) — the same probe for the
+//! chain names, whose behavior `chain_ops.rs` pins (#1–#6).
 
 mod common;
 
 use std::path::PathBuf;
 
 use bindforge_core::{
-    ActionRegistry, CoreError, DockedAction, ExclusivityGroup, GradeBound, Hand, InputGrade,
-    InputId, InputNamespace, KeyboardGeometry, Manifest, ManifestAction, PlacementCheck,
-    ReachClass, ReachTable, ReachTables,
+    ActionRegistry, Chain, CoreError, DockedAction, Document, ExclusivityGroup, GradeBound, Hand,
+    InputGrade, InputId, InputNamespace, KeyboardGeometry, Manifest, ManifestAction,
+    PlacementCheck, Profile, ProfileKind, ReachClass, ReachTable, ReachTables, ResolvedBinding,
 };
 use common::{ScratchDir, schemas_root};
 
@@ -201,5 +207,171 @@ presets = ["default"]
     assert!(
         refused.is_err(),
         "a game directory whose name is not the manifest's id is a structured refusal"
+    );
+}
+
+/// proves: design 014's Test strategy #8 + its Delta inventory (`lib.rs` adds
+/// the `chain_ops` module, its re-exports, and the public-surface doc;
+/// `error.rs` adds `ChainLinkMissing`) — every name ADR-014 promises resolves
+/// at the crate root and connects to the next one: budgets → load → resolve →
+/// fork/diff/merge → the new refusal variant. The behavior is
+/// `chain_ops.rs`'s (Test strategy #1–#6); this target only keeps the names
+/// honest, which is what a consumer that has not been written yet compiles
+/// against.
+#[test]
+fn the_adr_014_names_resolve_at_the_crate_root() {
+    // The two new budgets, exported beside the existing family (Rollout 2).
+    let budgets = [
+        bindforge_core::MAX_PATCH_DELTA_ELEMENTS,
+        bindforge_core::MAX_GENERATED_BY_OCTETS,
+    ];
+    assert!(
+        budgets.iter().all(|limit| *limit > 0),
+        "the v2 delta budgets are the public names for the caps: {budgets:?}"
+    );
+
+    // `load_chain` over a scratch chain directory: the cross-file loader in
+    // call position, answering with the `Chain` only it builds.
+    let scratch = ScratchDir::new("api-probe-chain");
+    scratch.write(
+        "v2/probe-base.toml",
+        r#"format = "profile"
+version = "v2"
+id = "probe-base"
+kind = "base"
+for = "probe-game@1"
+set = ["move.steer-left keyboard:w"]
+"#,
+    );
+    scratch.write(
+        "v2/probe-patch.toml",
+        r#"format = "profile"
+version = "v2"
+id = "probe-patch"
+derives = ["probe-base"]
+kind = "patch"
+for = "probe-game@1"
+set = ["move.steer-left keyboard:e"]
+"#,
+    );
+    let chain: Chain = bindforge_core::load_chain(&scratch.path().join("v2/probe-patch.toml"))
+        .expect("a two-link v2 chain in its major directory must load");
+
+    let manifest: Manifest = match bindforge_core::parse(
+        r#"format = "manifests"
+version = "v1"
+id = "probe-game"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["move.steer-left Turn left"]
+"#,
+    )
+    .expect("the probe manifest is a valid document")
+    {
+        Document::Manifest(manifest) => manifest,
+        _ => panic!("a `manifests` document must parse into the manifest arm"),
+    };
+
+    // `resolve` → `ResolvedBinding`: the deterministic layout in call
+    // position, typed ids on both sides.
+    let layout: Vec<ResolvedBinding> =
+        bindforge_core::resolve(&chain, &manifest).expect("the probe chain joins its manifest");
+    assert_eq!(
+        layout.first().map(|binding| binding.action.as_str()),
+        Some("move.steer-left"),
+        "the layout answers with the manifest's one row"
+    );
+    assert_eq!(
+        layout.first().map(|binding| binding.input.as_str()),
+        Some("keyboard:e"),
+        "the patch's `set` is the last writer over the base"
+    );
+
+    // `fork` → `Profile` + `ProfileKind`: the appended patch, deriving the
+    // head.
+    let shell: Profile = bindforge_core::fork(&chain, "probe-fork")
+        .expect("forking under a fresh slug id must work");
+    assert!(
+        matches!(shell.kind, Some(ProfileKind::Patch)),
+        "`fork` answers with a patch, got {:?}",
+        shell.kind
+    );
+    assert_eq!(shell.derives, vec!["probe-patch".to_string()]);
+
+    // `diff` between two chains over the same base document.
+    scratch.write(
+        "v2/probe-other.toml",
+        r#"format = "profile"
+version = "v2"
+id = "probe-other"
+derives = ["probe-base"]
+kind = "patch"
+for = "probe-game@1"
+clear = ["move.steer-left"]
+"#,
+    );
+    let other: Chain = bindforge_core::load_chain(&scratch.path().join("v2/probe-other.toml"))
+        .expect("the second probe chain must load");
+    let patch: Profile = bindforge_core::diff(&chain, &other, &manifest, "probe-diff")
+        .expect("two chains over one base must diff");
+    assert_eq!(patch.derives, vec!["probe-patch".to_string()]);
+
+    // `merge` over two parsed patches: `Profile` in argument position.
+    let lower = bindforge_core::parse(
+        r#"format = "profile"
+version = "v2"
+id = "probe-lower"
+derives = ["probe-base"]
+kind = "patch"
+for = "probe-game@1"
+set = ["move.steer-left keyboard:w"]
+"#,
+    )
+    .expect("the lower probe patch is valid");
+    let upper = bindforge_core::parse(
+        r#"format = "profile"
+version = "v2"
+id = "probe-upper"
+derives = ["probe-base"]
+kind = "patch"
+for = "probe-game@1"
+clear = ["move.steer-left"]
+"#,
+    )
+    .expect("the upper probe patch is valid");
+    let merged: Profile = bindforge_core::merge(
+        lower
+            .profile()
+            .expect("a profile document parses into the profile arm"),
+        upper
+            .profile()
+            .expect("a profile document parses into the profile arm"),
+        "probe-merge",
+    )
+    .expect("a set under a clear composes to the lone clear");
+    assert_eq!(
+        merged.clear.first().map(|action| action.as_str()),
+        Some("move.steer-left"),
+        "`merge` composes the two delta lists into one patch"
+    );
+
+    // `CoreError::ChainLinkMissing`: the one new variant, in pattern
+    // position — a missing ancestor is this refusal, not an I/O detail (A18).
+    scratch.write(
+        "v2/probe-orphan.toml",
+        r#"format = "profile"
+version = "v2"
+id = "probe-orphan"
+derives = ["probe-absent"]
+kind = "patch"
+for = "probe-game@1"
+set = ["move.steer-left keyboard:w"]
+"#,
+    );
+    let missing: Result<Chain, CoreError> =
+        bindforge_core::load_chain(&scratch.path().join("v2/probe-orphan.toml"));
+    assert!(
+        matches!(missing, Err(CoreError::ChainLinkMissing { .. })),
+        "a missing link is the named completeness refusal, got {missing:?}"
     );
 }

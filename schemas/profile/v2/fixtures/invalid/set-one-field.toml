@@ -1,0 +1,10 @@
+# A `set` element is the shipped pair encoding: `"<action-id> <input-id>"`, two
+# space-joined ids, no id carrying a space (A8). One field is a binding with no
+# input to bind it to, so the element is refused naming itself.
+format = "profile"
+version = "v2"
+id = "set-one-field"
+derives = ["game-base"]
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left"]

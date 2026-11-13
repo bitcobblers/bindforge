@@ -1,0 +1,10 @@
+# A v2 id is capped at 63 octets — the DNS-label bound the slug grammar already
+# borrows — because it is a file name and a lookup key that a refusal echoes.
+# This id is grammatically a slug and 64 octets long, so it refuses on length.
+format = "profile"
+version = "v2"
+id = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+derives = ["game-base"]
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]

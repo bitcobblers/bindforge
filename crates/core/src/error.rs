@@ -14,6 +14,11 @@
 //! they are written, so one hostile upload cannot forge extra log lines or
 //! inflate log volume. A local filesystem path stays out of the message
 //! entirely — `source_path` is how a server-side log asks for it.
+//!
+//! A wording one of these arms ships is part of the contract the fixtures and
+//! the loader tests pin: a variant's message is not re-worded to satisfy a new
+//! assertion, and a variant with no payload has no offender to name — the test
+//! asserts its variant instead.
 
 use std::fmt;
 
@@ -56,6 +61,15 @@ pub enum CoreError {
     /// A chain is longer than `MAX_CHAIN_DEPTH` links (Chosen design ->
     /// Adversarial guard).
     ChainTooDeep,
+    /// A chain link names an ancestor document that is not there. A chain is a
+    /// contract object, so a missing link is a completeness failure about a
+    /// named link, not an I/O detail a reader could work around (design 014,
+    /// A18): the `id` says which link, and the path it was looked for at stays
+    /// out of the message like every other path. Only a link a walk constructed
+    /// from a `derives` element gets this refusal — the `id` it carries is
+    /// parse-validated, and the directory rule fixes where the file belongs. A
+    /// head the caller named is an `Io` refusal, whose variant carries the path.
+    ChainLinkMissing { id: String },
     /// A contract file could not be read. `path` says where it was read from
     /// (a file path, or a label when the source has none) and stays out of
     /// the message: `source_path` is the way to log it.
@@ -138,6 +152,9 @@ impl fmt::Display for CoreError {
                     f,
                     "chain is longer than the maximum of {MAX_CHAIN_DEPTH} links"
                 )
+            }
+            CoreError::ChainLinkMissing { id } => {
+                write!(f, "chain link `{}` is missing", one_line(id))
             }
             CoreError::Io { path: _, message } => {
                 write!(f, "could not read a contract file: {}", one_line(message))

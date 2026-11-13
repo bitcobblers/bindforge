@@ -378,10 +378,19 @@ fn fixture_file_names_are_lowercase_ascii_dash_separated_and_case_unique() {
 /// proves: Chosen design → Formats contract + Rollout 3, and design 012's Test
 /// strategy #6 —
 /// the scaffold ships `profile/v1` and `reach-classes/v1`, ADR-011 added
-/// `action-ids/v1`, and ADR-012 adds `reach-classes/v2` and
-/// `keyboard-geometry/v1`; the same `schemas/*/v*/` walk picks up all of them with
-/// no harness change, which is also how `patch`, `manifest` and `policy` join when
-/// ADR-013, ADR-014 and ADR-015 add them.
+/// `action-ids/v1`, ADR-012 adds `reach-classes/v2` and
+/// `keyboard-geometry/v1`, ADR-013 adds `manifests/v1`, and design 014 adds
+/// `profile/v2`; the same `schemas/*/v*/` walk picks up all of them with
+/// no harness change, which is also how `patch` and `policy` join when
+/// ADR-015 and its successors add them.
+///
+/// proves: design 014's Test strategy #7 — the unchanged walk picks up
+/// `profile/v2`: every valid v2 fixture parses, passes the guards, and re-
+/// serializes to a semantically equal value (profiles keep the round-trip
+/// path), every invalid one is refused with a single-line, control-free,
+/// truncating message, and the zero-fixture rule and the case-unique fixture-
+/// name rule cover the new directory — all of which the loops above run over
+/// it the moment `schemas/profile/v2/` ships (A3, A16).
 #[test]
 fn the_walk_picks_up_every_version_directory_the_contract_tree_ships() {
     let found: Vec<String> = format_dirs()
@@ -396,6 +405,7 @@ fn the_walk_picks_up_every_version_directory_the_contract_tree_ships() {
         "reach-classes/v2",
         "keyboard-geometry/v1",
         "manifests/v1",
+        "profile/v2",
     ] {
         assert!(
             found.iter().any(|dir| dir == expected),

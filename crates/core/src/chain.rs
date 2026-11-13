@@ -6,6 +6,11 @@
 //! same compiled types the CLI and desktop use: it walks the chain
 //! iteratively and refuses adversarial shapes with typed errors instead of
 //! recursing into them.
+//!
+//! Cross-file chain loading — reading a chain's documents and applying these
+//! same two refusals to the *resolved* chain — is `chain_ops::load_chain`
+//! (design 014). This module keeps its single-document meaning and its shipped
+//! code untouched; its fixtures stay the contract for what it pins (A15).
 
 use std::collections::HashSet;
 

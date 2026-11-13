@@ -1,0 +1,10 @@
+# The revision half of the pin is a decimal integer of at least 1 — the shipped
+# `manifests/v1` `revision-zero` refusal shape (A7). A pin naming revision 0
+# names a data revision no manifest can carry.
+format = "profile"
+version = "v2"
+id = "for-revision-zero"
+derives = ["game-base"]
+kind = "patch"
+for = "remnant-2@0"
+set = ["move.steer-left keyboard:d"]

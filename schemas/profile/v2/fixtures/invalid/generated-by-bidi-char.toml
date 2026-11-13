@@ -1,0 +1,11 @@
+# A provenance label admits no bidi-control character either: `U+202E` rewrites
+# the *order* of everything displayed after it, so a label carrying it could
+# make "policy name" read as something else entirely. Default-ignorable and
+# joiner controls are refused the same way.
+format = "profile"
+version = "v2"
+id = "generated-by-bidi-char"
+kind = "base"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]
+generated-by = "policy ‮name"

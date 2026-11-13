@@ -39,6 +39,21 @@
 //! `MAX_GROUP_MEMBERS`, `MAX_NATIVE_NAME_OCTETS` — ride `manifest` beside the
 //! existing budget family.
 //!
+//! The chains of ADR-014 (design 014) are read and answered here too:
+//! `load_chain` walks a `profile/v2` chain out of the major directory its head
+//! sits in — the shipped `Cycle`/`ChainTooDeep` refusals applied to the
+//! resolved chain, and one new named refusal, `ChainLinkMissing`, for a link the
+//! walk itself constructed from a `derives` element and could not find, while an
+//! absent head stays `Io` and carries the path — `resolve` answers what layout
+//! that chain produces against one manifest, in the manifest's own row order,
+//! and `fork`, `diff`, and `merge` are chain operations over documents. The
+//! determinism rules that make `resolve` a compatibility surface, the
+//! one-directory rule, and the pin equality the joins check are stated in
+//! `schemas/profile/v2/spec.md` for third-party readers and pinned by
+//! `tests/chain_ops.rs`. The two new budgets, `MAX_PATCH_DELTA_ELEMENTS` and
+//! `MAX_GENERATED_BY_OCTETS`, join the exported family beside `MAX_CHAIN_DEPTH`
+//! so a caller caps a patch before it allocates it.
+//!
 //! The public surface exercised by the conformance suites: `parse`,
 //! `parse_file`, `parse_reader`, `serialize`, `supported_majors`,
 //! `resolve_chain`, `MAX_CHAIN_DEPTH`, `MAX_DOCUMENT_BYTES`,
@@ -49,10 +64,13 @@
 //! `load_geometry`, `geometry_matches_file_name`, `GradeBound`,
 //! `PlacementCheck`, and `placement_is_legal` — and, from ADR-013, `Manifest`,
 //! `ManifestAction`, `ExclusivityGroup`, `DockedAction`, `load_manifest`, and
-//! the four manifest budget constants named above.
+//! the four manifest budget constants named above — and, from ADR-014, `Chain`,
+//! `load_chain`, `resolve`, `ResolvedBinding`, `fork`, `diff`, `merge`,
+//! `ProfileKind`, and the two chain budgets named above.
 
 mod action;
 mod chain;
+mod chain_ops;
 mod document;
 mod error;
 mod input;
@@ -63,8 +81,11 @@ mod toml;
 
 pub use action::{ActionId, ActionRegistry, AxisKind, load_action_registry};
 pub use chain::{MAX_CHAIN_DEPTH, resolve_chain};
-pub use document::{Document, GeometryKey, KeyboardGeometryTable, Profile, ReachClassTable};
-pub use document::{parse, parse_file, parse_reader, serialize, supported_majors};
+pub use chain_ops::{Chain, ResolvedBinding, diff, fork, load_chain, merge, resolve};
+pub use document::{Document, GeometryKey, KeyboardGeometryTable};
+pub use document::{MAX_GENERATED_BY_OCTETS, MAX_PATCH_DELTA_ELEMENTS, supported_majors};
+pub use document::{Profile, ProfileKind, ReachClassTable};
+pub use document::{parse, parse_file, parse_reader, serialize};
 pub use error::CoreError;
 pub use input::{InputId, InputNamespace};
 pub use manifest::{

@@ -1,0 +1,11 @@
+# A provenance label admits no ASCII control character, even spelled through the
+# closed escape table's `\u0007`: a label a document controls cannot steer what a
+# reader displays or a log line holds. The refusal names the entry and the rule
+# rather than echoing the label.
+format = "profile"
+version = "v2"
+id = "generated-by-control-char"
+kind = "base"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]
+generated-by = "policy\u0007name"

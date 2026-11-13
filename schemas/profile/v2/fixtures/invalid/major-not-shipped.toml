@@ -1,0 +1,12 @@
+# Declares a major the `profile` format does not ship: `profile/v1` and
+# `profile/v2` are the only two directories, so this document is refused naming
+# the majors *that format* supports — both of them. A reader that gated on one
+# global list would read it with some grammar it happens to have, the misreading
+# the per-format version gate exists to prevent.
+format = "profile"
+version = "v3"
+id = "major-not-shipped"
+derives = ["game-base"]
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]

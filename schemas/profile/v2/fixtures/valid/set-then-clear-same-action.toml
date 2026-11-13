@@ -1,0 +1,12 @@
+# Duplicates within one patch are data, not a fault: a `set` and a `clear` for
+# one action is how a retune is edited down. Resolution decides what it means —
+# the fixed list order runs `set` before `clear`, so the action ends unbound
+# (determinism rules 2 and 3).
+format = "profile"
+version = "v2"
+id = "retune-then-remove"
+derives = ["remnant-2-default"]
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:w", "combat.fire keyboard:space"]
+clear = ["move.steer-left"]

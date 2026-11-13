@@ -1,0 +1,11 @@
+# A v2 profile id rides the shipped slug grammar (A14): v1's "not empty" is
+# tightened because a v2 id is a chain lookup key *and* a file name. An
+# uppercase spelling cannot become that file name on a case-insensitive
+# contributor filesystem, so it refuses at parse, naming the id.
+format = "profile"
+version = "v2"
+id = "My-Profile"
+derives = ["game-base"]
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]

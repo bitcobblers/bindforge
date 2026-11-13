@@ -1,0 +1,12 @@
+# A patch carries at least one element across `set`/`clear`/`swap`. The empty
+# patch is the vacuous link the guard posture refuses — it changes nothing about
+# the layout below it and costs a chain slot — spelled here as three empty lists.
+format = "profile"
+version = "v2"
+id = "patch-empty-deltas"
+derives = ["game-base"]
+kind = "patch"
+for = "remnant-2@3"
+set = []
+clear = []
+swap = []

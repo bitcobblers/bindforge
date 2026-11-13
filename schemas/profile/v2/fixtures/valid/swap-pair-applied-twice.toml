@@ -1,0 +1,11 @@
+# One `swap` pair written twice in the same list: each element is a separate
+# exchange applied in array order, so the pair composes to no net change. That
+# is legal input at parse; it is `merge` that refuses a composition cancelling
+# to the identity, because its merged document would be the empty patch.
+format = "profile"
+version = "v2"
+id = "swap-back-again"
+derives = ["remnant-2-default"]
+kind = "patch"
+for = "remnant-2@3"
+swap = ["move.steer-left move.steer-right", "move.steer-left move.steer-right"]

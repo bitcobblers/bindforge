@@ -1,0 +1,10 @@
+# `kind` is the closed pair `base`/`patch`. A third label is refused naming the
+# value: it is never read as one of the two, and its position is never inferred
+# from what the document happens to carry.
+format = "profile"
+version = "v2"
+id = "kind-outside-vocabulary"
+derives = ["game-base"]
+kind = "layer"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]

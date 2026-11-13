@@ -1,0 +1,10 @@
+# Three fields in a `set` element is a malformed delta: the pair encoding has
+# one split point and no third column, so guessing what the extra field means is
+# the second answer to one fact the contract refuses everywhere else.
+format = "profile"
+version = "v2"
+id = "set-three-fields"
+derives = ["game-base"]
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d now"]

@@ -1,0 +1,11 @@
+# The same action set twice inside one list: elements apply sequentially in
+# array order and the last write wins, so `keyboard:e` is the binding
+# (determinism rule 3). Array order is data, and a writer puts it back as the
+# document wrote it — never a canonicalized list.
+format = "profile"
+version = "v2"
+id = "retune-twice"
+derives = ["remnant-2-default"]
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:w", "move.steer-left keyboard:e"]

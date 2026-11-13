@@ -1,0 +1,11 @@
+# `generated-by` is capped at 128 octets (`MAX_GENERATED_BY_OCTETS`), the same
+# bound the manifest puts on one game-native name: the cap is what bounds a
+# refusal that has to name the label, so one hostile document cannot inflate log
+# volume past the message bound. This label runs 140 octets.
+format = "profile"
+version = "v2"
+id = "generated-by-past-cap"
+kind = "base"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]
+generated-by = "policy-policy-policy-policy-policy-policy-policy-policy-policy-policy-policy-policy-policy-policy-policy-policy-policy-policy-policy-policy-"

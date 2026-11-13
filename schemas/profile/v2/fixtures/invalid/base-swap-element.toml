@@ -1,0 +1,9 @@
+# A base has no `swap` elements: an exchange needs bindings written below it,
+# and a base is the bottom of the chain. Refused naming the element.
+format = "profile"
+version = "v2"
+id = "base-swap-element"
+kind = "base"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:d"]
+swap = ["move.steer-left aim.camera"]

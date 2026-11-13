@@ -1,0 +1,10 @@
+# Legal TOML, outside the v2 grammar (`spec.md`): values are strings and
+# one-line arrays of strings only, and an integer literal must be a plain
+# decimal integer. A float anywhere in a document is rejected — including a
+# `version` that looks like a newer major, which a lenient reader might round
+# down to a version it does ship.
+format = "profile"
+version = 2.5
+id = "float-value"
+kind = "base"
+for = "remnant-2@3"

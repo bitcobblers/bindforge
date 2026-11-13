@@ -1,0 +1,10 @@
+# The same hostile `format` value as `profile/v1`, in the v2 spelling: a `\n`
+# escape and a timestamp-shaped tail. The rejection this document produces is
+# shown and logged by the CLI and the hub, so it must stay one bounded line: an
+# implementer may not echo the value's newline into a log line, nor the whole
+# string.
+format = "profile\n2026-11-11T03:17:00Z INFO hub: upload accepted id=fake"
+version = "v2"
+id = "forged-log-line"
+kind = "base"
+for = "remnant-2@3"

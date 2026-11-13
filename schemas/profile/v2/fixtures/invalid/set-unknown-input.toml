@@ -1,0 +1,11 @@
+# The input half of a `set` is validated against the closed vocabulary at parse
+# (A9): `keyboard:` has no `tab` member, so a v2 `set` still cannot name Tab.
+# Widening the closed sets rides the `reach-classes` vocabulary major, and until
+# then this refusal is the contract — not an unknown member a reader tolerates.
+format = "profile"
+version = "v2"
+id = "set-unknown-input"
+derives = ["game-base"]
+kind = "patch"
+for = "remnant-2@3"
+set = ["move.steer-left keyboard:tab"]

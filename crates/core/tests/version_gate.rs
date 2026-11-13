@@ -119,21 +119,18 @@ fn rejects_a_document_that_declares_no_version_naming_the_supported_majors() {
 }
 
 /// proves: Test strategy #2 + A2 — the gate is per-format, so a major one format
-/// ships does not widen what another format accepts. `reach-classes` is the only
-/// format carrying a `v2`, so a `profile`, `action-ids` or `keyboard-geometry`
-/// document declaring `v2` names a major its format never shipped: it is refused
-/// as the version gate's structured error naming that format's own supported
-/// majors, never read with v1 semantics. The `keyboard-geometry` case is the one
-/// the format's own guard already refuses; it stays pinned here because a
-/// per-format gate subsumes that guard, and the refusal must survive the
-/// subsumption.
+/// ships does not widen what another format accepts. `reach-classes` carries a
+/// `v2` (design 012), and design 014 grew `profile` to carry one too — so the
+/// formats still refusing `v2` here are `action-ids` and `keyboard-geometry`:
+/// they name a major their format never shipped, refused as the version gate's
+/// structured error naming that format's own supported majors, never read with
+/// v1 semantics. The `keyboard-geometry` case is the one the format's own guard
+/// already refuses; it stays pinned here because a per-format gate subsumes
+/// that guard, and the refusal must survive the subsumption. `profile`'s own
+/// unshipped-major case is design 014's `v3`, pinned by the two cases below.
 #[test]
 fn rejects_a_document_declaring_a_major_that_only_another_format_ships() {
     let documents = [
-        (
-            "profile",
-            profile_doc_declaring("future-major", Some("v2"), &[]),
-        ),
         ("action-ids", declaring(ACTION_IDS_DOC, "v2")),
         ("keyboard-geometry", declaring(GEOMETRY_DOC, "v2")),
     ];
@@ -181,15 +178,18 @@ fn the_invalid_corpus_ships_a_missing_version_fixture() {
     );
 }
 
-/// proves: Test strategy #2 — the corpus carries the per-format half of the gate
-/// as well: `schemas/profile/v1/fixtures/invalid/major-not-shipped.toml` declares
-/// a major no `profile` directory ships, so a third-party reader is held to the
-/// same refusal `version_gate.rs` pins for `bindforge-core`, and the refusal names
-/// the majors *that format* supports.
+/// proves: Test strategy #2 + design 014's Test strategy #8 — the corpus
+/// carries the per-format half of the gate: design 014 grows `profile`'s
+/// shipped majors to `v1` and `v2` (A4), so the unshipped-major case now lives
+/// in the v2 corpus: `schemas/profile/v2/fixtures/invalid/major-not-shipped.toml`
+/// declares a major no `profile` directory ships, and the refusal names the
+/// majors *that format* supports — now both of them. The v1 corpus's own
+/// `major-not-shipped.toml` stays byte-exact (A15) and stays a refused fixture
+/// under the walk; what it pinned for the gate, the v2 fixture pins now.
 #[test]
 fn the_invalid_corpus_ships_a_fixture_for_a_major_the_format_does_not_ship() {
-    let profile_v1 = version_dir("profile", "v1");
-    let path = profile_v1
+    let profile_v2 = version_dir("profile", "v2");
+    let path = profile_v2
         .path
         .join("fixtures")
         .join("invalid")
@@ -197,7 +197,7 @@ fn the_invalid_corpus_ships_a_fixture_for_a_major_the_format_does_not_ship() {
 
     assert!(
         path.is_file(),
-        "profile/v1 must ship `fixtures/invalid/major-not-shipped.toml`: the per-format gate is \
+        "profile/v2 must ship `fixtures/invalid/major-not-shipped.toml`: the per-format gate is \
          part of the language-neutral contract, and the invalid-fixture corpus is the contract for \
          it (missing at {})",
         path.display()
@@ -209,7 +209,45 @@ fn the_invalid_corpus_ships_a_fixture_for_a_major_the_format_does_not_ship() {
         );
     };
     let supported = format_majors("profile");
-    assert_version_rejection(err, "the profile major-not-shipped fixture", &supported);
+    assert!(
+        supported.iter().any(|major| major == "v2"),
+        "design 014's A4: `profile`'s shipped majors must include `v2` once its directory \
+         exists; the tree carries {supported:?}"
+    );
+    assert_version_rejection(err, "the profile v2 major-not-shipped fixture", &supported);
+}
+
+/// proves: design 014's Test strategy #8 + A4 — `profile` now ships two majors,
+/// and the gate closes at the top of the series: a `profile` document declaring
+/// `v3` is refused as the version gate's structured error naming `profile`'s
+/// majors, `v1` and `v2` — and only those. Widening `profile` grows exactly one
+/// `format_majors` line; the majors-equality invariant at the end of this file
+/// needs no change, which is the case this one keeps green.
+#[test]
+fn rejects_a_profile_document_declaring_v3_naming_profiles_shipped_majors() {
+    let document = profile_doc_declaring("profile-v3", Some("v3"), &[]);
+    let supported = format_majors("profile");
+
+    assert!(
+        !supported.iter().any(|major| major == "v3"),
+        "this case needs `profile` to ship no `v3`; the tree carries {supported:?}"
+    );
+
+    let Err(err) = bindforge_core::parse(&document) else {
+        panic!("a profile document declaring `version = \"v3\"` must be refused, not parsed");
+    };
+    assert!(
+        matches!(err, CoreError::UnsupportedVersion { .. }),
+        "expected the version gate's structured error, got {err:?}"
+    );
+    let message = err.to_string();
+    for major in ["v1", "v2"] {
+        assert!(
+            message.contains(major),
+            "design 014 grows `profile`'s majors to v1 and v2 (A4), and the refusal must name \
+             `{major}`: `{message}`"
+        );
+    }
 }
 
 /// proves: design 013's Test strategy #3, #7 + A2 — the gate is per-format for the
