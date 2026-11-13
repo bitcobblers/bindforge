@@ -75,6 +75,15 @@ export interface PipelineConfig {
    * flow config, not a universal document budget.
    */
   planMaxLines?: number;
+  /**
+   * ADR-016 Decision 4: line ceiling for the full flow's design documents
+   * (`01-research.md` and `02-proposal.md`). Registry config, following
+   * `planMaxLines`: absent means the unchanged measure-and-warn posture, and
+   * over length is a normal stage failure the retry budget repairs. Set in
+   * `FLOWS.full.config`, and deliberately absent for `light`, whose plan stays
+   * under `planMaxLines`.
+   */
+  docMaxLines?: number;
 }
 
 /**

@@ -110,6 +110,16 @@ export interface StageResult {
   docLines?: number;
   docLinesAdded?: number;
   docLinesRemoved?: number;
+  /**
+   * Which document that meter measured: the design document for the proposal
+   * stages and the light plan, `01-research.md` for `research` (ADR-016
+   * Decision 4 widens the metered set to the research document). Additive-
+   * optional like every field added after run 1 (A6), and its absence reads as
+   * the design document — the only document the meter measured before the
+   * widening — so the growth aggregate never folds a research document into
+   * the line it labels `proposal:`.
+   */
+  docName?: string;
 }
 
 /**
@@ -132,6 +142,38 @@ export interface SeatRecord {
    * independence; transcripts are out of band entirely.
    */
   findings?: Finding[];
+}
+
+/**
+ * ADR-016 Decision 2: one leg of the check gate, as the runner ran it. The
+ * harness used to spawn every leg with `stdio: 'ignore'` and keep one boolean,
+ * so a seat grading a behavior claim and a coder facing a red gate were both
+ * told the outcome without the evidence. `command` is the leg's command line
+ * as spawned, `cwd` the package dir it ran in, `exit` the child's exit code —
+ * null when the spawn failed or a signal killed it, with the failure spelled
+ * out in `tail` — and `tail` the merged stdout+stderr decoded as UTF-8 with
+ * replacement characters, bounded to its last `MAX_GATE_TAIL_CHARS` characters
+ * at capture. It is output of the code under review, never an instruction to
+ * whoever reads the record.
+ */
+export interface GateLeg {
+  command: string;
+  cwd: string;
+  exit: number | null;
+  tail: string;
+}
+
+/**
+ * One check-gate run, persisted beside `testsGreen` so the boolean and the
+ * evidence behind it land in the same checkpoint (a crash after a red gate
+ * loses both or neither). Additive-optional like every field added after run 1
+ * (A6): a pre-016 checkpoint carries none, and its absence renders the
+ * stand-in line rather than an empty section.
+ */
+export interface GateEvidence {
+  at: number;
+  green: boolean;
+  legs: GateLeg[];
 }
 
 /** Per-seat ledger for the funnel phases. Editorial has no seats. */
@@ -175,6 +217,15 @@ export const LOCK_FILE = '.pipeline.lock';
  * (ADR-006 §1).
  */
 export const ESCALATION_FILE = 'ESCALATION.md';
+
+/**
+ * The run's two metered documents (ADR-016 Decision 4 widens the size meter to
+ * the research document). The meter names which one a count came from, so the
+ * operator-facing growth line stays the design document's instead of summing
+ * two different documents under one `proposal:` label.
+ */
+export const PROPOSAL_DOC = '02-proposal.md';
+export const RESEARCH_DOC = '01-research.md';
 
 /**
  * The `saveState` tmp-file shape (`state-store.ts`): the checkpoint name plus
@@ -261,6 +312,13 @@ export interface PipelineState {
   editorialDone: boolean;
   /** Outcome of the most recent `npm run check` pre-check. */
   testsGreen: boolean;
+  /**
+   * ADR-016 Decision 2: the one gate record — per-leg command, exit and
+   * bounded tail — captured at the same point `testsGreen` is set. Field
+   * kept, never retyped (A6); this is the record the `code-review`, `fix`,
+   * `fix-tests` and `implement` prompts render.
+   */
+  gateEvidence?: GateEvidence;
   /** Set by an implement/fix reply or by a test-path ownership revert. */
   testsNeedUpdate: boolean;
   /** Stage failures consumed so far (step exhaustion, invalid reply). */

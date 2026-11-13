@@ -1,5 +1,7 @@
 import type { SessionMessageInfo } from '@opencode/client';
 
+import { STATE_FILE } from './types.js';
+
 // ---------------------------------------------------------------------------
 // Review-independence audit (runner-side).
 //
@@ -26,6 +28,22 @@ import type { SessionMessageInfo } from '@opencode/client';
 // - A completed glob/list over transcripts/ IS a violation: enumerating run
 //   record names is rummaging in the run-records directory, and no stage
 //   prompt gives a reason to go there.
+// - A `reviews/` access that IS the attempt's own report — the path its prompt
+//   handed it, matched on the canonical spelling the permission layer
+//   normalizes to and scoped to that run's design directory — is not a
+//   violation, on the read side as well as the write side (design 016 §1).
+//   Re-reading the report the seat itself wrote burned attempts through runs
+//   011-013. Everything else still fails: a sibling report, another design
+//   directory's same-named report, a directory, a glob, a grep path, or a
+//   command naming a second report. Transcripts are never exempted — there is
+//   no own report under `transcripts/`.
+// - The checkpoint (`STATE_FILE`, `.pipeline.json`) is a run record as well: it
+//   carries every seat's verdict and findings (the independence this module
+//   guards) and the gate record, and only the runner reads or writes it
+//   (ADR-006 §1). Decision 3's permission deny covers it for every
+//   shell-holding agent; the name is tested here as the same deed-audit backstop
+//   the two directories have, because a stage has no prompt-given reason to
+//   open it (security r2, finding 2).
 // - A `subagent` part is never judged on its text (design 007 §1): a
 //   delegation input carries no access fields, and a hardened prompt that
 //   recites the prohibition is not an access. The evidence for a delegation
@@ -145,8 +163,115 @@ const WRITE_TOOLS = new Set(['write', 'edit', 'patch']);
 const TRANSCRIPTS_SEGMENT = /(?:^|[/\s"'`()=,;|&])transcripts(?:[/\s"'`()=,;|&]|$)/;
 const REVIEWS_SEGMENT = /(?:^|[/\s"'`()=,;|&])reviews(?:[/\s"'`()=,;|&]|$)/;
 
+/**
+ * The same segment test for the checkpoint's name, built from `STATE_FILE` so
+ * the audit and the writer can never drift apart: `git show
+ * HEAD:docs/designs/002-x/.pipeline.json`, a bare `cat .pipeline.json`, and a
+ * listing that buries the name all match, and a file merely named
+ * `pipeline-notes.md` does not. Case-folded, like the ownership fence over the
+ * same name (`namesReservedSegment`).
+ */
+const STATE_FILE_SEGMENT = new RegExp(
+  `(?:^|[/\\s"'()\`=,;|&])${STATE_FILE.replace(/\./g, '\\.')}(?:[/\\s"'()\`=,;|&]|$)`,
+  'i',
+);
+
 /** `reviews/<path>` captured from the segment on — the report identity of a path. */
 const REVIEWS_KEY = /(?:^|[/\s"'`()=,;|&])(reviews\/[^\s"'`()=,;|&]+)/;
+
+/**
+ * Command/argument token boundaries. A shell token keeps its `/` — the whole
+ * token, prefix included, is what the own-report identity is judged on, never
+ * the prefix-stripped `REVIEWS_KEY` fragment (design 016 §1, revision r2).
+ */
+const TOKEN_BOUNDARY = /[\s"'`()=,;|&]+/;
+
+/**
+ * The permission layer's canonical spelling of a path (A17): `\` to `/`, case
+ * folded. Identity is compared on this, so the seat's own report answers to its
+ * repo-relative, absolute, separator- and case-variant spellings and to
+ * nothing else.
+ */
+function canonicalPath(value: string): string {
+  return value.split('\\').join('/').toLowerCase();
+}
+
+/**
+ * A path split into its report key (from the `reviews` segment on) and the
+ * path prefix that sits before that segment, both in canonical spelling.
+ * Undefined for anything that is not under a run's `reviews/` directory.
+ */
+function reviewsKeyOf(value: string): { key: string; dir: string } | undefined {
+  const canonical = canonicalPath(value);
+  const match = REVIEWS_KEY.exec(canonical);
+  if (match === null) {
+    return undefined;
+  }
+  const key = match[1] ?? '';
+  const at = match.index + match[0].length - key.length;
+  return { key, dir: canonical.slice(0, at) };
+}
+
+/**
+ * The attempt's own report (§1 of design 016): the key the write side already
+ * holds, plus the design-directory prefix the handed path carries. The prefix
+ * is what makes another design directory's same-named report a different
+ * report, and its absence is why a prefix-less `reviews/...` spelling fails
+ * closed instead of resolving to the seat's own file.
+ */
+interface OwnReport {
+  key: string;
+  /** Everything before the `reviews` segment, `/`-terminated; `''` when none. */
+  designDir: string;
+}
+
+function ownReportOf(path: string): OwnReport | undefined {
+  const where = reviewsKeyOf(path);
+  if (where === undefined) {
+    return undefined;
+  }
+  return { key: where.key, designDir: where.dir };
+}
+
+/**
+ * The canonical statement of the own-report exemption (design 016 §1): a
+ * `reviews/` access value is this seat's own report iff its canonical spelling
+ * lies under the attempt's own design directory and its report key equals the
+ * handed report's. Anything else — a directory, a glob, a listing, a sibling,
+ * another design directory's same-named report — is not an identity match.
+ */
+function isOwnReport(value: string, own: OwnReport): boolean {
+  const where = reviewsKeyOf(value);
+  if (where === undefined || where.key !== own.key) {
+    return false;
+  }
+  if (own.designDir === '') {
+    // Handed a prefix-less path: nothing wider can be proven to be its own.
+    return where.dir === '';
+  }
+  // The prefix sits at the start of a repo-relative path and is a path suffix
+  // of an absolute one; either way it must end at a path boundary.
+  return where.dir === own.designDir || where.dir.endsWith(`/${own.designDir}`);
+}
+
+/**
+ * Does this shell command reach run records? Transcripts: any spelling of the
+ * segment, never exempt — there is no own report under `transcripts/`.
+ * `reviews/`: the bare segment test would fail the re-read of its own report
+ * that Decision 1 legalizes, so the command is judged token by token — every
+ * whole token carrying a `reviews` segment must be the seat's own report, and
+ * one sibling among them denies the call.
+ */
+function shellReachesReviews(command: string, own: OwnReport | undefined): boolean {
+  if (!REVIEWS_SEGMENT.test(command)) {
+    return false;
+  }
+  if (own === undefined) {
+    return true;
+  }
+  const tokens = command.split(TOKEN_BOUNDARY).filter((token) => REVIEWS_SEGMENT.test(token));
+  return tokens.length === 0 || !tokens.every((token) => isOwnReport(token, own));
+}
 
 /** Violation descriptions; empty means the attempt stayed inside its inputs. */
 export function auditSessionIndependence(
@@ -156,7 +281,10 @@ export function auditSessionIndependence(
   const violations: string[] = [];
   // Keyed from the `reviews` segment on, so an absolute path and the
   // repo-relative path the prompt handed the seat describe the same report.
-  const own = opts.ownReportPath === undefined ? undefined : reportKey(opts.ownReportPath);
+  const ownKey = opts.ownReportPath === undefined ? undefined : reportKey(opts.ownReportPath);
+  // Design 016 §1: the read side and the shell side judge the same identity the
+  // write side already holds — one authority for one fact, no options flag.
+  const own = opts.ownReportPath === undefined ? undefined : ownReportOf(opts.ownReportPath);
   for (const m of messages) {
     if ((m.time?.created ?? 0) < opts.since) {
       continue;
@@ -164,7 +292,8 @@ export function auditSessionIndependence(
     if (m.type === 'shell') {
       if (
         TRANSCRIPTS_SEGMENT.test(m.command) ||
-        (opts.reviewStage && REVIEWS_SEGMENT.test(m.command))
+        STATE_FILE_SEGMENT.test(m.command) ||
+        (opts.reviewStage && shellReachesReviews(m.command, own))
       ) {
         violations.push(`shell touched run records: ${brief(m.command)}`);
       }
@@ -179,20 +308,23 @@ export function auditSessionIndependence(
       }
       const values = accessValues(part.name, part.state.input);
       for (const value of values) {
-        if (TRANSCRIPTS_SEGMENT.test(value)) {
+        // Transcripts and the checkpoint are judged for every stage: neither is
+        // any stage's input, whichever seat ran the tool.
+        if (TRANSCRIPTS_SEGMENT.test(value) || STATE_FILE_SEGMENT.test(value)) {
           violations.push(`${part.name} accessed run records: ${brief(value)}`);
         } else if (
           opts.reviewStage &&
           READONLY_TOOLS.has(part.name) &&
           REVIEWS_SEGMENT.test(value) &&
-          !value.endsWith('.diff') // the editorial diff is the editorial seat's named scope
+          !value.endsWith('.diff') && // the editorial diff is the editorial seat's named scope
+          !(own !== undefined && isOwnReport(value, own)) // re-reading the report the prompt handed this seat is its own
         ) {
           violations.push(`read a review report: ${brief(value)}`);
-        } else if (opts.reviewStage && own !== undefined && WRITE_TOOLS.has(part.name)) {
+        } else if (opts.reviewStage && ownKey !== undefined && WRITE_TOOLS.has(part.name)) {
           // A caller that hands no report path cannot be judged on writes; the
           // audit says nothing rather than guessing.
           const key = reportKey(value);
-          if (key !== undefined && key !== own) {
+          if (key !== undefined && key !== ownKey) {
             violations.push(`wrote a review report: ${brief(value)}`);
           }
         }

@@ -39,6 +39,7 @@ Everything lives under `docs/designs/NNN-<slug>/`:
 | `01-research.md`                     | Findings with a URL behind every claim                                    |
 | `02-proposal.md`                     | The design, incl. assumption register and test strategy                   |
 | `03-build-notes.md`                  | Deviations the coder had to make                                          |
+| `03-build-notes.md` § Gate posture   | The runner's own gate record: each leg, exit, bounded tail (ADR-016)      |
 | `reviews/design/<specialty>-rNcM.md` | Design review reports, per specialty, per pass of a round                 |
 | `reviews/design/editorial-rN.diff`   | The editor's diff that the editorial review checks                        |
 | `reviews/code/<specialty>-rNcM.md`   | Code review reports (`cM` absent for single-pass stages)                  |
@@ -91,7 +92,20 @@ named `rNc0`, `rNc1`, …:
   those from the seat ledger, so no reviewer reads a report file. Reports
   and transcripts are the run's record, not review input: every stage agent
   is denied *reading* `transcripts/`, review seats are additionally denied
-  `reviews/**`, and code-review diff scopes exclude `docs/designs/`.
+  `reviews/**`, and code-review diff scopes exclude `docs/designs/`. Since
+  ADR-016 those two paths and the run's checkpoint (`.pipeline.json` — every
+  seat's verdict and findings and the gate record, a file only the runner reads
+  or writes) are denied in the **permission layer** of every shell-holding
+  stage agent (`shell *transcripts*`/`*reviews*`/`*pipeline.json*`, plus the
+  matching `read`/`glob`/`grep` denies), not only by the post-hoc deed audit —
+  knowingly coarse, with the audit still the backstop. Each review seat
+  re-opens exactly its own last report through `git diff`, so a seat can
+  re-read what it already wrote. Every review and implementation prompt also
+  carries one bounded block of the runner's own gate record — the legs it ran,
+  their exits and capped tails, credential-bearing and absolute-path lines
+  already dropped where the record is written — as evidence the seat may cite;
+  it is never an instruction to run anything, and a run with no record yet
+  renders an explicit stand-in line.
 - **The runner commits each stage's work** (models have no git access),
   reverting paths outside the stage's ownership. The runner never runs the
   formatter itself: `node_modules/.bin` is git-ignored, and executing a
@@ -249,6 +263,7 @@ The flow selects a budget partial over the defaults below
 | `maxPassesPerRound`   | 6                                                  | 3 — the binding cap: 2 seats × 3 passes = 6 sessions |
 | `maxRounds`           | 5                                                  | 2 (bounds the mutating fix loop)               |
 | `planMaxLines`        | absent — the size meter warns, it does not gate    | 80 — a plan over it stops the run              |
+| `docMaxLines`         | 900 — a metered document (`01-research.md`, `02-proposal.md`) over it fails that stage attempt, and the normal retry-then-escalate budget decides | absent — the plan stays under `planMaxLines`   |
 | `stageTimeoutMs`      | 30 min                                             | 12 min                                         |
 
 Pipeline config defaults (set in `tools/orchestration/src/pipeline/stages.ts`):
@@ -302,7 +317,12 @@ are given the shell they need to close their own loop:
 - `.opencode/agents/{code,codereview}/*` deny `shell *` and then allow the
   toolchain (`cargo *`, `rustfmt *`, `npm run *`, `npm test *`, `npx vitest *`)
   and read-only inspection (`cd`, `git status|diff|log|show`, `ls`, `cat`,
-  `head`, `tail`, `wc`, `grep`, `rg`, `find`).
+  `head`, `tail`, `wc`, `grep`, `rg`, `find`). Since ADR-016 the five design
+  seats carry the same check block — read-only gate legs allowed, every
+  tree-writing leg denied — and the five document families
+  (`research/`, `design/`, `ops/`) carry the read-only inspection set in the
+  same star form, with no toolchain allow: their leading `shell *` deny stays
+  authoritative, so `cargo` and `npm` never reach a document stage.
 - Denied last, because the last matching rule wins: commits, branch state,
   pushing, `rm`/`mv` (the runner owns moves — ADR-005), `tee`/`sed -i`/`dd`
   (writes that bypass the ownership audit), and publishing. Review seats

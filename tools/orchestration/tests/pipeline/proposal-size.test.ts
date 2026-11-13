@@ -396,3 +396,93 @@ describe('proposalGrowth', () => {
     expect(md).toContain('proposal:  660 lines (+300/-41 across 1 design stage(s))');
   });
 });
+
+// ---------------------------------------------------------------------------
+// ADR-016 Decision 4: the meter generalizes to a document name —
+// `documentSize(repoDir, designDir, docName)` with `docFileFor(stage)` mapping
+// `research` to `01-research.md` — and `FLOWS.full.docStages` gains `research`,
+// so the ceiling gate can run against the research document exactly as it runs
+// against the proposal. The count is still taken from the worktree, never the
+// stage reply.
+// ---------------------------------------------------------------------------
+
+describe('the research document meter (ADR-016 Decision 4)', () => {
+  /** Stage session that writes `01-research.md` while it works, then replies;
+   * the reply says nothing about size, so the meter must read the file. */
+  function writingResearchClient(repoDir: string, doc: string): OpenCodeClient {
+    const sessions = new Map<string, { prompts: number; lists: number }>();
+    let clock = 0;
+    const client = {
+      session: {
+        create: async () => {
+          const id = `ses_${String(sessions.size + 1)}`;
+          sessions.set(id, { prompts: 0, lists: 0 });
+          return { id };
+        },
+        prompt: async (input: { sessionID: string }) => {
+          const s = sessions.get(input.sessionID);
+          if (!s) {
+            return;
+          }
+          s.prompts += 1;
+          writeFileSync(join(repoDir, DESIGN_DIR_REL, '01-research.md'), doc);
+        },
+        remove: async () => undefined,
+        list: async () => ({ data: [], cursor: { previous: null, next: null } }),
+      },
+      message: {
+        list: async (input: { sessionID: string }) => {
+          const s = sessions.get(input.sessionID) ?? { prompts: 0, lists: 0 };
+          s.lists += 1;
+          const messages: SessionMessageInfo[] = [];
+          if (Math.min(s.lists - 1, s.prompts) > 0) {
+            clock += 1;
+            messages.push({
+              id: `m_a${String(clock)}`,
+              time: { created: clock },
+              type: 'assistant',
+              content: [
+                {
+                  type: 'text',
+                  text: '{"summary": "researched", "commitMessage": "docs: research"}',
+                },
+              ],
+            });
+            clock += 1;
+            messages.push({ id: `m_i${String(clock)}`, time: { created: clock }, type: 'idle' });
+          }
+          return { data: messages, cursor: { previous: null, next: null } };
+        },
+      },
+    } as unknown as OpenCodeClient;
+    return client;
+  }
+
+  // proves: Test strategy #6 — `documentSize` measures `01-research.md` for the
+  // `research` stage: the meter counts the research document from the worktree,
+  // on the same `docLines*` fields of the stage result the proposal stages use.
+  it('measures 01-research.md for the research stage', async () => {
+    const repoDir = tmpRepo();
+    const s = state();
+
+    const outcome = await executeStage(
+      options(writingResearchClient(repoDir, lines(12)), repoDir),
+      s,
+      {
+        stage: 'research',
+        stageKey: 'research',
+        attempt: 1,
+        round: 1,
+        vars: {
+          designDir: DESIGN_DIR_REL,
+          sourcePath: 'docs/adrs/002-x.md',
+          round: 1,
+        },
+      },
+      FAST,
+    );
+
+    expect(outcome.ok).toBe(true);
+    expect(s.results[0]?.docLines, 'the research stage is a metered doc stage').toBe(12);
+  });
+});

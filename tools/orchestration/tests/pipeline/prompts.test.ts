@@ -226,11 +226,15 @@ describe('run-2 stage guidance', () => {
     expect(text).toContain('Do not open review reports or transcripts');
     // proves: Test strategy #8 — Design 007 §4's bright line: walking a
     // forbidden directory is already opening it, and every path a seat needs
-    // is named for it.
+    // is named for it. §3 keeps this sentence.
     expect(text).toContain(
       'Listing, globbing, or grepping those directories counts as opening them',
     );
-    expect(text).toContain('never browse to verify one');
+    // §3 rewording (correctness r2c0 finding 5): the blanket "never browse to
+    // verify" is REPLACED — the seat may run the project's read-only checks and
+    // re-read its own `reportPath`; only the run's records stay closed. The
+    // pre-016 phrase is therefore not pinned verbatim, while the prohibition §3
+    // keeps is pinned above and at `Do not open review reports or transcripts`.
     expect(text).not.toContain('Earlier reports for every specialty');
     // T4: "Apply only this change set: the whole document" is contradictory.
     expect(text).not.toContain('Apply only this change set');

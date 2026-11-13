@@ -35,6 +35,27 @@ const SeatSchema = z.object({
 });
 
 /**
+ * ADR-016 Decision 2 — the gate record (A6 rule set applies): added after run
+ * 1, so it is optional and its absence is "no record", never an empty one
+ * materialised at the read seam. `exit` is nullable because a leg that failed
+ * to spawn or died on a signal has no exit code; the tail then names the
+ * failure. Size bounding is the writer's job (`boundedGateEvidence` in
+ * `runner.ts`), exactly as `SeatSchema.findings` relies on `boundedFindings`.
+ */
+const GateLegSchema = z.object({
+  command: z.string(),
+  cwd: z.string(),
+  exit: z.number().int().nullable(),
+  tail: z.string(),
+});
+
+const GateEvidenceSchema = z.object({
+  at: z.number(),
+  green: z.boolean(),
+  legs: z.array(GateLegSchema),
+});
+
+/**
  * The cross-version resume contract (ADR-006 §2), stated as rule set:
  *
  * - GUARANTEED: any runner loads and resumes any `version: 1` checkpoint
@@ -82,6 +103,10 @@ const StateSchema = z.object({
   editorialDone: z.boolean(),
   testsGreen: z.boolean(),
   testsNeedUpdate: z.boolean(),
+  // ADR-016 Decision 2: the gate record, optional-with-absence per the rule
+  // set above — every golden fixture in `tests/pipeline/fixtures/checkpoints/`
+  // loads with no `gateEvidence` key materialised.
+  gateEvidence: GateEvidenceSchema.optional(),
   stageFailures: z.record(z.string(), z.number()),
   stageCommits: z.array(z.string()).optional(),
   forceNext: z.string().nullable(),
@@ -124,6 +149,9 @@ const StateSchema = z.object({
       docLines: z.number().optional(),
       docLinesAdded: z.number().optional(),
       docLinesRemoved: z.number().optional(),
+      // ADR-016 Decision 4: which document the meter measured. Optional like
+      // every field added after run 1; absence is the design document.
+      docName: z.string().optional(),
     }),
   ),
   gateLog: z.array(

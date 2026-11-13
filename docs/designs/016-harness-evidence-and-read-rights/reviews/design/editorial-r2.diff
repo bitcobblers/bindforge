@@ -1,0 +1,153 @@
+diff --git a/tmp/bindforge-editorial-harness-evidence-and-read-rights-r2.md b/home/mike/repos/bindforge/docs/designs/016-harness-evidence-and-read-rights/02-proposal.md
+index 4e18f4f..4939757 100644
+--- a/tmp/bindforge-editorial-harness-evidence-and-read-rights-r2.md
++++ b/home/mike/repos/bindforge/docs/designs/016-harness-evidence-and-read-rights/02-proposal.md
+@@ -8,9 +8,9 @@ self-change in the line of ADR-001/007/010: (1) the independence audit's read
+ side exempts a review seat's own report, exactly as the write side already
+ does; (2) the check gate captures per-leg exit status and a bounded output
+ tail as run evidence instead of discarding the streams; (3) the document
+-families get a read-only shell allowlist, both review panels the project's
+-check commands, and the run-record directories are denied in the permission
+-layer as well as by the audit; (4) per-stage token usage is recorded in the
++families get a read-only shell allowlist and both review panels get the
++project's check commands, and the run-record directories are denied in the
++permission layer as well as by the audit; (4) per-stage token usage is recorded in the
+ transcript and document size becomes a budgeted flow config. This design
+ implements the ADR's Decision clauses 1–4 and nothing else — the exclusions
+ are the Non-goals.
+@@ -18,7 +18,7 @@ are the Non-goals.
+ ## Goals / Non-goals
+ 
+ - Goals:
+-  - A review seat re-reading the report the prompt handed it is not a failed
++  - A review seat's re-reading of the report the prompt handed it is not a failed
+     attempt; every other `reviews/` access still fails it (Decision 1).
+   - One canonical gate record — per-leg command, exit, bounded tail —
+     persisted in the checkpoint and rendered into the `code-review`, `fix`,
+@@ -119,7 +119,7 @@ the repo root — lies under the attempt's own design directory (the directory o
+ `opts.ownReportPath`) and its `reportKey` (everything from the `reviews` segment on)
+ equals `reportKey(opts.ownReportPath)`. Anything else — a directory, a glob, a
+ listing, a command naming a second report, another design directory's same-named
+-report — is not an identity match and fails as today.*
++report — is not an identity match and fails as it does today.*
+ 
+ - Read-tools branch (`reviewStage && READONLY_TOOLS && REVIEWS_SEGMENT &&
+   !.diff`, independence.ts:184–190): add the identity test above — skip the
+@@ -144,7 +144,7 @@ report — is not an identity match and fails as today.*
+   grepping those directories counts as opening them" sentence stay.
+ 
+ The permission layer keeps its shape: the seat `read` deny over
+-`docs/designs/**/reviews/**` (A10) stays and the own-report re-open is §3's;
++`docs/designs/**/reviews/**` (A10) stays, and the own-report re-open is §3's;
+ the seam between the two is the recorded risk, not a hidden gap.
+ 
+ ### 2. The gate record (Decision 2)
+@@ -154,20 +154,20 @@ Canonical shape, defined once here:
+ `GateLeg = { command: string; cwd: string; exit: number | null; tail: string }`
+ — `command` the leg's command line as spawned (e.g. `cargo test --workspace
+ --locked`), `cwd` the package dir, `exit` the child exit code (null when
+-spawned failed or a signal killed it, with the failure spelled in `tail`),
++spawning failed or a signal killed it, with the failure spelled in `tail`),
+ `tail` the leg's merged stdout+stderr captured as bytes, decoded once as
+ UTF-8 with replacement so the stored tail never cuts a code point, and bounded
+ to the last `MAX_GATE_TAIL_CHARS = 2_000` characters of that decode, then
+ passed through `printable` (independence.ts:311) at write and again at render
+ (A7). `MAX_GATE_LEGS = 32` bounds the array; an elision note leg is
+-appended like `boundedFindings` does (A7).
++appended as `boundedFindings` does (A7).
+ 
+ - `tools/orchestration/src/pipeline/gates.ts`: new exported
+   `checkGate(repoDir): Promise<{ green: boolean; legs: GateLeg[] }>` —
+-  `packageDirs`/`CARGO_GATE`/`hasCargoWorkspace` logic unchanged (A5) except
++  `packageDirs`/`CARGO_GATE`/`hasCargoWorkspace` logic unchanged (A5) except that
+   each spawn uses `stdio: ['ignore', 'pipe', 'pipe']` and a rolling tail
+   buffer holding the last `MAX_GATE_TAIL_CHARS` of decoded output per leg.
+-  `testsGreen` becomes the thin `(await checkGate(repoDir)).green` wrapper so
++  `testsGreen` becomes the thin `(await checkGate(repoDir)).green` wrapper, so
+   its existing callers and tests keep their signature.
+ - `tools/orchestration/src/pipeline/types.ts`: `PipelineState.gateEvidence?:
+   GateEvidence` (the `GateLeg`/`GateEvidence` interfaces live here, beside
+@@ -179,7 +179,7 @@ appended like `boundedFindings` does (A7).
+   set `state.testsGreen` from `.green` (field kept, never retyped — A6), set
+   `state.gateEvidence = boundedGateEvidence(gate)` before the same
+   `checkpoint()` call, so a crash after a red gate persists the record exactly
+-  like the boolean does today. `gateLog` reasons unchanged.
++  as the boolean does today. `gateLog` reasons unchanged.
+ - Prompt rendering, bounded separately from capture: `gateEvidenceText(state,
+   cfg)` returns a fenced block capped at `MAX_EVIDENCE_BLOCK_CHARS = 6_000`
+   whose header line fixes provenance — output the runner captured *from the
+@@ -233,8 +233,8 @@ notes), and respecting last-match-wins (A16):
+   denies `*transcripts*` and `*reviews*` — knowingly partial: a `grep` rule
+   matches the requested regex, not the search path, and a shell rule is raw
+   command text (A17), so these stop the accidental plain-spelling access and
+-  the deeds audit stays the backstop, exactly as ADR-007 says.
+-- Own-report re-open, per seat agent after the deny:
++  the deed audit stays the backstop, exactly as ADR-007 says.
++- Own-report re-open, per-seat agent after the deny:
+   `shell git diff *reviews/<phase>/<specialty>-*` → allow, naming the agent's
+   own specialty in the pattern (A11) — design seats get
+   `git diff *reviews/design/<specialty>-*`, code seats
+@@ -282,7 +282,7 @@ notes), and respecting last-match-wins (A16):
+   `docLines*` fields of `StageResult` (types.ts:110–112, already optional)
+   carry the counts unchanged.
+ - Gate: `documentOutgrewFlow(lines, cfg)` in gates.ts runs at the existing
+-  stage-ok point where the meter already measures (runner.ts:1701–1723); over
++  stage-ok point where the meter already measures (runner.ts:1701–1723); going over
+   length turns the attempt into a normal stage failure —
+   `document outgrew the flow cap (<N> lines over cap <M>)` — so the retry
+   mechanism (same-session reply retry or attempt 2 with `failureNote`,
+@@ -291,7 +291,7 @@ notes), and respecting last-match-wins (A16):
+   unchanged measure-and-warn behavior. Not the plan-stop pre-commit: see
+   Options.
+ - Decision 4 also names what does not change: `maxParallelReviews` stays 1
+-  (stages.ts:119), with no `--max-parallel`, KV or server change — one served
++  (stages.ts:119), with no `--max-parallel`, KV, or server change — one served
+   slot and A20's memory picture mean more concurrency evicts prefixes.
+ 
+ ## Risks
+@@ -327,7 +327,7 @@ notes), and respecting last-match-wins (A16):
+ 1. Unit — capture: against a fixture repo, `checkGate` records one leg per
+    probed package and per `CARGO_GATE` leg with `exit` and the last
+    `MAX_GATE_TAIL_CHARS` characters of the leg's decoded output (a tail from
+-   the end contains a `test result:` line; bytes that are not valid UTF-8 come
++   the end contains a `test result:` line; bytes that are not valid UTF-8 become
+    replacement characters, never a split code point); a spawn failure records
+    `exit: null` and names the failure in the tail; legs over `MAX_GATE_LEGS`
+    collapse to an elision leg — the capture-budget test the ADR names as
+@@ -344,7 +344,7 @@ notes), and respecting last-match-wins (A16):
+    spelling §3's allow opens — is clean; the same path under another run, or
+    own plus a sibling in one command, fails; `ls .../reviews` fails;
+    transcripts access is never exempted; a child session reading the parent's
+-   own report inherits the exemption, a sibling names the child session.
++   own report inherits the exemption; a sibling names the child session.
+ 4. Unit — agent shell matrix (extend `agent-shell.test.ts`): the five design
+    seats and the five document families carry shell rules covering every
+    compound gate command leg (design seats only — doc families deny
+@@ -372,7 +372,7 @@ notes), and respecting last-match-wins (A16):
+    a fixture message list; `writeTranscript` prints `- tokens:` when present
+    and omits the line when not; the `- parameters:` line is byte-unchanged.
+ 9. Integration — red gate round trip: in a fixture repo with a failing leg,
+-   after an `implement` the checkpoint's `gateEvidence.legs` names the failing
++   after an `implement`, the checkpoint's `gateEvidence.legs` names the failing
+    command with nonzero `exit` and a tail containing the failure, and the
+    next `fix` attempt's prompt contains that leg's tail.
+ 10. Integration — green gate evidence for a seat: a run whose gate passes
+@@ -398,7 +398,7 @@ notes), and respecting last-match-wins (A16):
+ 
+ 1. Land as one branch; no migration and no checkpoint version bump —
+    `gateEvidence` and the widened agent configs are additive (A6). Merged
+-   runs pick the gate record, the prompt blocks, and the token lines
++   runs pick up the gate record, the prompt blocks, and the token lines
+    immediately.
+ 2. Shipped constants: `MAX_GATE_TAIL_CHARS = 2_000`, `MAX_GATE_LEGS = 32`,
+    `MAX_EVIDENCE_BLOCK_CHARS = 6_000`, `docMaxLines: 900` in
+@@ -448,3 +448,9 @@ notes), and respecting last-match-wins (A16):
+   inspection set, cargo/npm legs); `engines.node` → `>=22.23.5`; A16/#4 pin the matcher.
+ - A24 + §4 Document ceiling (r1): shipped artifact sizes measured and registered — largest
+   `02-proposal.md` 733 lines — so the cap rises 600 → 900, which 600 sat under.
++
++Editor notes: Options considered — "raw logs blow past the 8 MiB checkpoint
++ceiling and the seat-board clone problem A7 exists for" is ambiguous; author to
++clarify.
++Editor notes: Test strategy #3 — "a sibling names the child session" is
++ambiguous; author to clarify.

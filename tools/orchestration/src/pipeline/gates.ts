@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { type ChildProcess, spawn } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -7,7 +7,7 @@ import { flowDef } from './flows.js';
 import type { FlowId } from './flows.js';
 import type { PipelineConfig } from './stages.js';
 import { namesReservedSegment } from './types.js';
-import type { Finding, PipelineState, VerdictReply } from './types.js';
+import type { Finding, GateLeg, PipelineState, VerdictReply } from './types.js';
 
 // ---------------------------------------------------------------------------
 // Gates are code: deterministic guards, round-end verdict aggregation, and
@@ -143,6 +143,28 @@ export function planOutgrewFlow(lines: number, cfg: PipelineConfig): GateResult 
   return deny(`plan outgrew the light flow (${String(lines)} lines, cap ${String(cap)})`);
 }
 
+/**
+ * ADR-016 Decision 4 — the full flow's document ceiling, the sibling of
+ * `planOutgrewFlow` and deliberately not its twin. The plan stop is terminal
+ * because the light plan is written once and the stop must outlive the
+ * escalation it minted; a full-flow document over length is shrinkable by the
+ * next revise, so this gate's denial is a normal stage failure that the
+ * stage's own retry-then-escalate budget repairs (design 016 §4, Options).
+ * The count is the size meter's, taken from the worktree — a stage cannot
+ * report its own growth. The cap is registry config (`FLOWS.full.config`);
+ * its absence is the unchanged measure-and-warn posture.
+ */
+export function documentOutgrewFlow(lines: number, cfg: PipelineConfig): GateResult {
+  const cap = cfg.docMaxLines;
+  if (cap === undefined) {
+    return allow('this flow sets no document line cap');
+  }
+  if (lines <= cap) {
+    return allow(`document is ${String(lines)} lines, within the cap of ${String(cap)}`);
+  }
+  return deny(`document outgrew the flow cap (${String(lines)} lines, cap ${String(cap)})`);
+}
+
 // --- round-end aggregation ---------------------------------------------------
 
 export function verdictsFor(
@@ -275,44 +297,209 @@ export const CARGO_GATE: readonly string[][] = [
   ['test', '--workspace', '--locked'],
 ];
 
-/** Run the cargo gate mirroring `repo-practices`: fmt check, clippy, tests. */
-async function cargoGreen(repoDir: string): Promise<boolean> {
-  for (const args of CARGO_GATE) {
-    const ok = await new Promise<boolean>((resolve) => {
-      const child = spawn('cargo', args, { cwd: repoDir, stdio: 'ignore' });
-      child.on('error', () => resolve(false));
-      child.on('exit', (code) => resolve(code === 0));
-    });
-    if (!ok) {
-      return false;
-    }
-  }
-  return true;
+/**
+ * ADR-016 Decision 2 — the capture budgets. One gate record is cloned into
+ * every later checkpoint and rendered into every later review and coder
+ * prompt, so the two bounds are what keep it from climbing toward the 8 MiB
+ * checkpoint ceiling (A6) or pricing the very context Decision 4 measures:
+ * `MAX_GATE_TAIL_CHARS` bounds each leg's captured tail, `MAX_GATE_LEGS`
+ * bounds the leg array (an over-cap run keeps its leading legs and gains one
+ * elision note leg, exactly as `boundedFindings` does — A7).
+ */
+export const MAX_GATE_TAIL_CHARS = 2_000;
+export const MAX_GATE_LEGS = 32;
+
+/**
+ * Byte window kept per leg before decoding. It sits far above the character
+ * budget so the decode-then-bound step (which is what stops a tail cutting a
+ * code point) always has the leg's real ending to work from; it only exists
+ * so a chatty leg cannot make the runner hold its whole log.
+ */
+const MAX_TAIL_BYTES = 64 * 1024;
+
+/** The one gate record: whether the gate passed, and the legs that decided it. */
+export interface GateRun {
+  green: boolean;
+  legs: GateLeg[];
+}
+
+/** The elision marker's text with no digits in it, so its length is derivable. */
+const ELISION_NOTE_OVERHEAD = '[ characters elided by the gate tail cap]'.length;
+
+/** The stated elision, as the tail's own line-leading marker. */
+function elisionNote(elided: number): string {
+  return `[${String(elided)} characters elided by the gate tail cap]`;
 }
 
 /**
- * The check gate: `npm run check` in every package, plus the cargo gate when the
- * repo has a cargo workspace. A repo with neither has no gate to pass and fails.
+ * Bounds a decoded tail to `MAX_GATE_TAIL_CHARS`, keeping its END — a leg's
+ * finding is in its last lines — and stating the cut, so a reader never takes
+ * a truncated tail for the leg's whole output. Code points, not UTF-16 units:
+ * slicing units can cut a surrogate pair and store a lone half of it.
+ *
+ * The kept span and the count the marker states are one equation, not two
+ * guesses: the marker must fit inside the budget it explains, and it explains
+ * how much the kept span drops. So `elided = chars.length − keep` and
+ * `keep = MAX_GATE_TAIL_CHARS − note.length`, where `note.length` is the fixed
+ * overhead plus the digit count of `elided` — one solution, found by
+ * substituting it into itself. Sizing the span against a fixed 64-character
+ * reservation instead made the marker overstate the elision by however far the
+ * note fell short of that reservation (correctness r2, finding 4).
  */
-export async function testsGreen(repoDir: string): Promise<boolean> {
+function boundedTail(text: string): string {
+  const chars = Array.from(text);
+  if (chars.length <= MAX_GATE_TAIL_CHARS) {
+    return chars.join('');
+  }
+  // Seeded one digit high; the substitution is a contraction, so this settles
+  // in a step or two and the loop bound is a guard, not the mechanism.
+  let elided = chars.length - MAX_GATE_TAIL_CHARS + ELISION_NOTE_OVERHEAD + 1;
+  for (let step = 0; step < 8; step += 1) {
+    const next = Math.min(
+      chars.length,
+      Math.max(0, chars.length - MAX_GATE_TAIL_CHARS + ELISION_NOTE_OVERHEAD + digits(elided)),
+    );
+    if (next === elided) break;
+    elided = next;
+  }
+  const keep = chars.length - elided;
+  return `${elisionNote(elided)}${chars.slice(chars.length - keep).join('')}`;
+}
+
+function digits(value: number): number {
+  return String(value).length;
+}
+
+/**
+ * Runs one gate leg and records it. `stdio` pipes are the whole change from
+ * the boolean-era spawn: the merged stdout+stderr is decoded once, with
+ * replacement characters for bytes that are not valid UTF-8, and kept from the
+ * END, because `cargo test` writes the `test result:` summary last (A18) and
+ * a failing leg's whole point is its last lines.
+ */
+function runLeg(command: string, args: readonly string[], cwd: string): Promise<GateLeg> {
+  const line = [command, ...args].join(' ');
+  return new Promise((resolve) => {
+    let child: ChildProcess;
+    try {
+      child = spawn(command, args as string[], { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (error) {
+      resolve({
+        command: line,
+        cwd,
+        exit: null,
+        tail: boundedTail(`spawn failed: ${errorText(error)}`),
+      });
+      return;
+    }
+    const chunks: Buffer[] = [];
+    let kept = 0;
+    const collect = (chunk: Buffer | string): void => {
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
+      chunks.push(buf);
+      kept += buf.length;
+      while (kept > MAX_TAIL_BYTES && chunks.length > 1) {
+        const drop = chunks.shift();
+        if (drop !== undefined) kept -= drop.length;
+      }
+    };
+    child.stdout?.on('data', collect);
+    child.stderr?.on('data', collect);
+    // A leg whose spawn failed has no exit code, and the reason sits in this
+    // message rather than in an empty tail: `exit: null` without a spelled-out
+    // failure is the discarded stream this decision exists to end.
+    let spawnError: string | undefined;
+    const tailOf = (note: string | undefined): string => {
+      const text = Buffer.concat(chunks).toString('utf8').trimEnd();
+      if (note === undefined) return boundedTail(text);
+      return boundedTail(text.length === 0 ? note : `${note}\n${text}`);
+    };
+    let settled = false;
+    const settle = (leg: GateLeg): void => {
+      if (settled) return;
+      settled = true;
+      resolve(leg);
+    };
+    child.on('error', (error) => {
+      spawnError = errorText(error);
+      // A child that never started emits `error` and no numeric exit; the
+      // `close` event that follows it carries nothing further.
+      if (child.pid === undefined) {
+        settle({ command: line, cwd, exit: null, tail: tailOf(`spawn failed: ${spawnError}`) });
+      }
+    });
+    child.on('close', (code, signal) => {
+      const note =
+        signal !== null
+          ? `killed by signal ${signal}`
+          : code === null
+            ? spawnError === undefined
+              ? 'no exit code recorded'
+              : `spawn failed: ${spawnError}`
+            : undefined;
+      // Null exit is the recorded shape of "the child never produced one":
+      // a failed spawn or a signal kill, never a silent pass.
+      settle({
+        command: line,
+        cwd,
+        exit: signal === null && code !== null ? code : null,
+        tail: tailOf(note),
+      });
+    });
+  });
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** Bounds the leg array at capture, appending one elision note leg (A7). */
+function boundedLegs(legs: readonly GateLeg[]): GateLeg[] {
+  if (legs.length <= MAX_GATE_LEGS) {
+    return [...legs];
+  }
+  const kept = legs.slice(0, MAX_GATE_LEGS);
+  kept.push({
+    command: '(gate legs elided)',
+    cwd: '',
+    exit: 0,
+    tail: `${String(legs.length - MAX_GATE_LEGS)} further gate leg(s) elided by the record cap`,
+  });
+  return kept;
+}
+
+/**
+ * The check gate, with its evidence kept: `npm run check` in every probed
+ * package, plus the three `CARGO_GATE` legs when the repo has a cargo
+ * workspace. `green` judges every leg that ran — the array bound is a record
+ * budget, never a reason to stop running the gate — while `legs` is the
+ * bounded record the checkpoint stores and the prompts render.
+ * A repo with neither packages nor a workspace has no gate to pass and fails.
+ */
+export async function checkGate(repoDir: string): Promise<GateRun> {
   const pkgs = packageDirs(repoDir);
   const cargo = hasCargoWorkspace(repoDir);
   if (pkgs.length === 0 && !cargo) {
-    return false;
+    return { green: false, legs: [] };
   }
-  const npmResults = await Promise.all(
-    pkgs.map(
-      (cwd) =>
-        new Promise<boolean>((resolve) => {
-          const child = spawn('npm', ['run', 'check'], { cwd, stdio: 'ignore' });
-          child.on('error', () => resolve(false));
-          child.on('exit', (code) => resolve(code === 0));
-        }),
-    ),
-  );
-  const npmOk = npmResults.every(Boolean);
-  const cargoOk = cargo ? await cargoGreen(repoDir) : true;
-  return npmOk && cargoOk;
+  const legs = await Promise.all(pkgs.map((cwd) => runLeg('npm', ['run', 'check'], cwd)));
+  if (cargo) {
+    // The cargo legs stay serial, as the boolean-era gate ran them: they share
+    // one workspace target dir and each is expensive on its own.
+    for (const args of CARGO_GATE) {
+      legs.push(await runLeg('cargo', args, repoDir));
+    }
+  }
+  const green = legs.every((leg) => leg.exit === 0);
+  return { green, legs: boundedLegs(legs) };
+}
+
+/**
+ * The check gate's boolean view — the unchanged contract every existing caller
+ * and test keeps. The evidence side of the same run is `checkGate`.
+ */
+export async function testsGreen(repoDir: string): Promise<boolean> {
+  return (await checkGate(repoDir)).green;
 }
 
 const COMMIT_RE = /^[a-z]+(\([a-z0-9-]+\))?: [a-z0-9].{1,90}$/;

@@ -44,8 +44,10 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           # The repo's Node floor: tools/orchestration's engines.node value
-          # (A28), the version the package already builds under.
-          node-version: "22.23.4"
+          # (A28), the version the package already builds under. The workspace
+          # gate contract pins this string to that floor, so the two move
+          # together.
+          node-version: "22.23.5"
       - name: Install dependencies
         run: npm ci
         working-directory: tools/orchestration

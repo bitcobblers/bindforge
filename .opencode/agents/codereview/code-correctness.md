@@ -149,6 +149,48 @@ permissions:
   - action: webfetch
     resource: "*"
     effect: allow
+  # ADR-016 Decision 3: the run's records are denied in the permission layer as
+  # well as audited. Coarse on purpose — a shell rule judges raw command text
+  # and a grep rule the requested regex — so these stop the plain-spelling
+  # access and the deed audit stays the backstop.
+  - action: shell
+    resource: "*transcripts*"
+    effect: deny
+  - action: shell
+    resource: "*reviews*"
+    effect: deny
+  - action: glob
+    resource: "docs/designs/**/transcripts/**"
+    effect: deny
+  - action: glob
+    resource: "docs/designs/**/reviews/**"
+    effect: deny
+  - action: grep
+    resource: "*transcripts*"
+    effect: deny
+  - action: grep
+    resource: "*reviews*"
+    effect: deny
+  # The checkpoint is a run record too: every seat's verdict and findings and the
+  # gate record live there, and only the runner reads or writes it (ADR-006 §1).
+  # Same coarse rule shape as the two directories above, same deed-audit backstop.
+  - action: shell
+    resource: "*pipeline.json*"
+    effect: deny
+  - action: read
+    resource: "docs/designs/**/.pipeline.json"
+    effect: deny
+  - action: glob
+    resource: "docs/designs/**/.pipeline.json"
+    effect: deny
+  # The exception that keeps Decision 1 open, last so it wins: this seat may
+  # re-read the report its own specialty writes, through the `git diff` allow.
+  # The wildcard's extra reach over this seat's prior-round reports and another
+  # design directory's same-named report is the recorded seam — the audit's
+  # design-directory-scoped identity rule is what actually bounds it.
+  - action: shell
+    resource: "git diff *reviews/code/correctness-*"
+    effect: allow
 ---
 
 Load the `code-review` skill and apply the `correctness` checklist to the diff

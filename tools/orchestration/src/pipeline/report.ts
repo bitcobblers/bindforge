@@ -3,7 +3,7 @@ import { printable } from './independence.js';
 import { hasSeats, reviewSessionsUsed, seatSummary } from './panel.js';
 import type { FunnelPhase } from './panel.js';
 import type { ReviewPhase } from './states.js';
-import type { PipelineState } from './types.js';
+import { type PipelineState, RESEARCH_DOC } from './types.js';
 
 // ---------------------------------------------------------------------------
 // Operator-facing escalation report. Reporting only: the gate reads verdict
@@ -167,15 +167,24 @@ export interface ProposalGrowth {
   docLines: number;
   added: number;
   removed: number;
-  /** Design stages carrying a size record. */
+  /** Design stages carrying a size record for the design document. */
   stages: number;
   /** Consecutive net-positive design stages at the end of the run. */
   netPositiveStreak: number;
 }
 
-/** Design-scope growth over the run, from the size meter the runner records. */
+/**
+ * Design-scope growth over the run, from the size meter the runner records.
+ * The meter now also measures the research document (ADR-016 Decision 4), and
+ * its counts are not this line's: `docName` names the document a size record
+ * measured, so the aggregate stays the document the label names. A record with
+ * no name predates that widening, and the meter measured only the design
+ * document then — absence reads as it did before (A6).
+ */
 export function proposalGrowth(state: PipelineState): ProposalGrowth | undefined {
-  const sized = state.results.filter((r) => typeof r.docLines === 'number');
+  const sized = state.results.filter(
+    (r) => typeof r.docLines === 'number' && r.docName !== RESEARCH_DOC,
+  );
   if (sized.length === 0) {
     return undefined;
   }

@@ -44,7 +44,9 @@ export interface FlowDef {
   path: string;
   /**
    * Budget, seat-panel and plan-cap overrides, applied last in `configFor`.
-   * `full`'s is empty: `DEFAULT_CONFIG` stays the sole default authority there.
+   * `full`'s carried nothing until ADR-016 Decision 4 added the single
+   * `docMaxLines` key: `DEFAULT_CONFIG` stays the default authority for every
+   * other knob there.
    */
   config: Partial<PipelineConfig>;
 }
@@ -66,9 +68,13 @@ export const FLOWS: Record<Flow, FlowDef> = {
       'code-review',
       'doc-sync',
     ],
-    docStages: ['proposal', 'proposal-revise', 'proposal-final'],
+    docStages: ['research', 'proposal', 'proposal-revise', 'proposal-final'],
     path: 'research → proposal → design review → proposal-final → editorial review → test authoring → implement → code review → doc-sync',
-    config: {},
+    // ADR-016 Decision 4: the one key the full flow's registry writes — the
+    // document line ceiling, with headroom above the largest full-flow
+    // document this repo has shipped (733 lines) and far below the 2,696-line
+    // runaway the size meter exists for. Everything else stays DEFAULT_CONFIG's.
+    config: { docMaxLines: 900 },
   },
   light: {
     name: 'light',
@@ -172,6 +178,7 @@ const PANELS: Record<SeatPhase, readonly string[]> = {
 function validateConfig(cfg: Partial<PipelineConfig>, def: FlowDef, flow: Flow): void {
   validateSeatNames(cfg);
   validatePlanMaxLines(cfg);
+  validateDocMaxLines(cfg);
   validatePanels(cfg, def, flow);
 }
 
@@ -242,6 +249,21 @@ function validatePlanMaxLines(cfg: Partial<PipelineConfig>): void {
   }
   if (!Number.isInteger(max) || max <= 0) {
     throw new Error(`planMaxLines must be a positive integer (got ${String(max)})`);
+  }
+}
+
+/**
+ * ADR-016 Decision 4: the same shape as `validatePlanMaxLines`, so a
+ * non-positive `docMaxLines` is a usage error rather than a run that silently
+ * carries no document ceiling while its meter still prints line counts.
+ */
+function validateDocMaxLines(cfg: Partial<PipelineConfig>): void {
+  const max = cfg.docMaxLines;
+  if (max === undefined) {
+    return;
+  }
+  if (!Number.isInteger(max) || max <= 0) {
+    throw new Error(`docMaxLines must be a positive integer (got ${String(max)})`);
   }
 }
 

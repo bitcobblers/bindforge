@@ -35,13 +35,25 @@ export function testOwnershipLine(flow: Flow): string {
 }
 
 /**
+ * What a prompt shows when the run has no gate record yet: the first
+ * `implement`, or a run resumed from a checkpoint written before ADR-016
+ * (Decision 2). A template that asks for the block still renders a section.
+ */
+export const NO_GATE_EVIDENCE = '(no gate record for this run yet)';
+
+/**
  * Values a template may ask for that are NOT flow config: the standing rule is
  * the full flow's, so a caller that renders a coder prompt without naming a
  * flow gets the rule every coder prompt carried before ADR-010. The runner
  * always passes the flow's line, so this default is the fallback, never the
- * authority.
+ * authority. `gateEvidence` sits here for the same reason: the runner renders
+ * it from the run's record, and a caller that assembles its own vars gets the
+ * no-record line rather than a failed render.
  */
-const TEMPLATE_DEFAULTS: TemplateVars = { testOwnership: TEST_OWNERSHIP_FULL };
+const TEMPLATE_DEFAULTS: TemplateVars = {
+  testOwnership: TEST_OWNERSHIP_FULL,
+  gateEvidence: NO_GATE_EVIDENCE,
+};
 
 /**
  * Strict render: every placeholder in the TEMPLATE must be filled.
@@ -94,6 +106,13 @@ export interface TranscriptInput {
   endedAt: number;
   /** Inference parameters exposed by the endpoint (best-effort). */
   parameters?: Record<string, unknown>;
+  /**
+   * ADR-016 Decision 4: the attempt's token usage, summed per key over the
+   * session's assistant messages (`sessionTokens`). Absent when no message
+   * carried usage — the transcript then prints no `- tokens:` line, and the
+   * `- parameters:` line keeps its old meaning of endpoint exposure.
+   */
+  tokens?: Record<string, number>;
   prompt: string;
   rawReply: string;
   gate?: { name: string; proceed: boolean; reason: string };
@@ -102,6 +121,64 @@ export interface TranscriptInput {
 /** `rN` or `rNcM` when the stage ran inside a review pass of round N. */
 export function roundLabel(t: Pick<TranscriptInput, 'round' | 'pass'>): string {
   return `r${String(t.round)}${t.pass === undefined ? '' : `c${String(t.pass)}`}`;
+}
+
+/** Adds one numeric usage field to the per-key totals; non-numeric is skipped. */
+function addUsage(total: Record<string, number>, key: string, value: unknown): boolean {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return false;
+  }
+  total[key] = (total[key] ?? 0) + value;
+  return true;
+}
+
+/**
+ * ADR-016 Decision 4 — the token usage of a stage's whole session. A stage is
+ * a tool loop of many assistant messages, so the reply message's usage is one
+ * turn's, not the session's; summing every assistant message's `tokens` over
+ * the attempt's message list answers what Decision 4 names. The sums are
+ * per key, because the SDK's usage shape is not enumerated here (A13): a field
+ * the endpoint adds is counted, a non-numeric one is skipped. A list with no
+ * usage anywhere returns undefined — the transcript then prints no line
+ * rather than a row of zeros.
+ *
+ * One level of grouping is flattened into dotted keys rather than skipped. The
+ * pinned client types `tokens` as `TokenUsageInfo = { input, output, reasoning,
+ * cache: { read, write } }`, so the two cached-usage terms sit under `cache`:
+ * summing only the top-level keys would drop them silently, and `cache.read` is
+ * the largest term for a session whose prefix is re-prefilled — the very
+ * quantity Decision 4 exists to make checkable. A nested object therefore
+ * contributes `cache.read`/`cache.write`; nesting deeper than one level, and
+ * anything non-numeric, is still skipped, so an unexpected shape can only add a
+ * key, never lose one.
+ */
+export function sessionTokens(messages: readonly unknown[]): Record<string, number> | undefined {
+  const total: Record<string, number> = {};
+  let seen = false;
+  for (const message of messages) {
+    if (message === null || typeof message !== 'object') {
+      continue;
+    }
+    const { type, tokens } = message as { type?: unknown; tokens?: unknown };
+    if (type !== 'assistant' || tokens === null || typeof tokens !== 'object') {
+      continue;
+    }
+    for (const [key, value] of Object.entries(tokens as Record<string, unknown>)) {
+      if (addUsage(total, key, value)) {
+        seen = true;
+        continue;
+      }
+      if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+        continue;
+      }
+      for (const [inner, innerValue] of Object.entries(value as Record<string, unknown>)) {
+        if (addUsage(total, `${key}.${inner}`, innerValue)) {
+          seen = true;
+        }
+      }
+    }
+  }
+  return seen ? total : undefined;
 }
 
 export function transcriptFileName(t: TranscriptInput): string {
@@ -132,6 +209,9 @@ export async function writeTranscript(designDir: string, t: TranscriptInput): Pr
     `- started: ${new Date(t.startedAt).toISOString()}`,
     `- ended: ${new Date(t.endedAt).toISOString()}`,
     `- parameters: ${JSON.stringify(t.parameters ?? { note: 'not exposed by endpoint' })}`,
+    // ADR-016 Decision 4: one measured line per stage, beside the parameters
+    // line it must never be confused with.
+    ...(t.tokens === undefined ? [] : [`- tokens: ${JSON.stringify(t.tokens)}`]),
     `- gate: ${gate}`,
     '',
     '## Prompt',

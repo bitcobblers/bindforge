@@ -7,8 +7,15 @@ the panel's value is five independent reads of the same text, and another
 seat's verdict anchors yours. Reports and transcripts are the run's record,
 not review input.
 Listing, globbing, or grepping those directories counts as opening them.
-Every path you need is named in this prompt — never browse to verify one,
-even when a named path lives under a directory you must not open.
+Every path you need is named in this prompt — never browse to verify one, in
+the sense that sentence prohibits: walking a directory to locate a path, or to
+check that a named path exists. That bar is on finding paths; it is not a bar on
+running checks. What is open to you instead: the project's read-only check
+commands — the cargo, rustfmt and npm legs, with every write leg denied — to
+verify what the design claims about the code, and the report at {{reportPath}}
+you already wrote, which is yours to re-read through your `git diff*` shell
+allow (your `read` tool stays fenced off `reviews/`). Opening any other run
+record to check a claim is not open to you.
 The Revision log records findings the author deliberately rejected, with
 reasons — read it before treating a finding as new.
 Your own previous findings ({{specialty}} seat):

@@ -345,3 +345,235 @@ describe('judging deeds, not payload text (design 007)', () => {
     ).toHaveLength(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// ADR-016 Decision 1: the audit's read side gains the same own-report identity
+// the write side already holds. A `reviews/` access is the seat's own report iff
+// its canonical spelling lies under the attempt's own design directory (the
+// directory of `ownReportPath`) and its report key — everything from the
+// `reviews` segment on — equals the own report's key. Anything broader fails:
+// a sibling report, another design directory's same-named report, a directory,
+// a glob, a grep path, or a command naming a second report. The exemption is
+// report-identity-scoped, so it propagates through the child walk (A3) and every
+// sibling still fails. Transcripts are never exempted — there is no own report
+// under `transcripts/`.
+// ---------------------------------------------------------------------------
+
+const OWN = 'docs/designs/003-x/reviews/design/security-r1c1.md';
+const OWN_OPTS = { since: 0, reviewStage: true, ownReportPath: OWN };
+
+describe('own-report identity on the read side (ADR-016 Decision 1)', () => {
+  // proves: Test strategy #3 — reading own report in repo-relative, absolute and
+  // separator- / case-variant spellings is clean (the identity normalizes the way
+  // the permission layer does: `\` to `/`, case folded, resolved against root).
+  it('clears every canonical spelling of the seat’s own report', () => {
+    for (const spelling of [
+      OWN,
+      '/home/op/repo/docs/designs/003-x/reviews/design/security-r1c1.md',
+      'docs\\designs\\003-x\\reviews\\design\\security-r1c1.md',
+      'DOCS/DESIGNS/003-X/REVIEWS/DESIGN/SECURITY-R1C1.MD',
+    ]) {
+      expect(
+        auditSessionIndependence([toolPart('read', { filePath: spelling })], OWN_OPTS),
+        spelling,
+      ).toEqual([]);
+    }
+  });
+
+  // proves: Test strategy #3 — the seat’s `git diff` route to its own report (the
+  // spelling §3’s per-seat allow opens) is clean.
+  it('clears a shell git-diff of the seat’s own report', () => {
+    expect(auditSessionIndependence([shellPart(`git diff ${OWN}`)], OWN_OPTS)).toEqual([]);
+  });
+
+  // proves: Test strategy #3 — a sibling report, another design directory’s
+  // same-spelled report, a directory, a glob pattern and a grep path under
+  // `reviews/` all fail.
+  it('fails anything broader than the one report identity', () => {
+    expect(
+      auditSessionIndependence(
+        [toolPart('read', { filePath: 'docs/designs/003-x/reviews/design/correctness-r1c1.md' })],
+        OWN_OPTS,
+      ),
+    ).toHaveLength(1);
+    expect(
+      auditSessionIndependence(
+        [toolPart('read', { filePath: 'docs/designs/099-y/reviews/design/security-r1c1.md' })],
+        OWN_OPTS,
+      ),
+    ).toHaveLength(1);
+    expect(
+      auditSessionIndependence(
+        [toolPart('read', { filePath: 'docs/designs/003-x/reviews/design' })],
+        OWN_OPTS,
+      ),
+    ).toHaveLength(1);
+    expect(
+      auditSessionIndependence(
+        [toolPart('glob', { pattern: 'docs/designs/003-x/reviews/design/*' })],
+        OWN_OPTS,
+      ),
+    ).toHaveLength(1);
+    expect(
+      auditSessionIndependence(
+        [toolPart('grep', { pattern: 'status', path: 'docs/designs/003-x/reviews' })],
+        OWN_OPTS,
+      ),
+    ).toHaveLength(1);
+  });
+
+  // proves: Test strategy #3 — a shell naming own under another run, and own plus
+  // a sibling in one command, fail; listing the reviews directory fails.
+  it('fails a git-diff off the run, a git-diff naming a second report, and a listing', () => {
+    expect(
+      auditSessionIndependence(
+        [shellPart('git diff docs/designs/099-z/reviews/design/security-r1c1.md')],
+        OWN_OPTS,
+      ),
+    ).toHaveLength(1);
+    expect(
+      auditSessionIndependence(
+        [
+          shellPart(
+            'git diff docs/designs/003-x/reviews/design/security-r1c1.md ' +
+              'docs/designs/003-x/reviews/design/correctness-r1c1.md',
+          ),
+        ],
+        OWN_OPTS,
+      ),
+    ).toHaveLength(1);
+    expect(
+      auditSessionIndependence([shellPart('ls docs/designs/003-x/reviews')], OWN_OPTS),
+    ).toHaveLength(1);
+  });
+
+  // proves: Test strategy #3 — a prefix-less `reviews` token — the report tail
+  // without the attempt's design-directory prefix — resolves outside the
+  // attempt's design directory and fails closed (§1's identity rule).
+  it('fails closed on a prefix-less reviews token', () => {
+    expect(
+      auditSessionIndependence([shellPart('git diff reviews/design/security-r1c1.md')], OWN_OPTS),
+    ).toHaveLength(1);
+  });
+
+  // proves: Test strategy #3 — transcripts access is never exempted, even with an
+  // own-report identity in scope.
+  it('never exempts transcripts access', () => {
+    expect(
+      auditSessionIndependence(
+        [
+          toolPart('read', {
+            filePath: 'docs/designs/003-x/transcripts/design-review-security-r1.md',
+          }),
+        ],
+        OWN_OPTS,
+      ),
+    ).toHaveLength(1);
+    expect(
+      auditSessionIndependence([shellPart('cat docs/designs/003-x/transcripts/x.md')], OWN_OPTS),
+    ).toHaveLength(1);
+  });
+
+  // proves: Test strategy #3 — the exemption is scoped to the one report, so a
+  // child session reading the parent’s own report inherits it (the child walk
+  // reuses one options object, A3) while reading a sibling fails.
+  it('inherits the exemption into a child reading the parent’s own report, not a sibling', () => {
+    expect(auditSessionIndependence([toolPart('read', { filePath: OWN })], OWN_OPTS)).toEqual([]);
+    expect(
+      auditSessionIndependence(
+        [toolPart('read', { filePath: 'docs/designs/003-x/reviews/design/correctness-r1c1.md' })],
+        OWN_OPTS,
+      ),
+    ).toHaveLength(1);
+  });
+});
+
+// proves: Test strategy #11 — a staged design-seat list that writes its report,
+// then re-reads exactly that path via `read` and `git diff`, passes the audit;
+// adding one sibling path fails it, naming the sibling.
+describe('the own-report seat round trip (ADR-016 Decision 1)', () => {
+  it('passes a seat that re-reads only its own report', () => {
+    const v = auditSessionIndependence(
+      [
+        toolPart('write', { filePath: OWN, content: 'my findings' }),
+        toolPart('read', { filePath: OWN }),
+        shellPart(`git diff ${OWN}`),
+      ],
+      OWN_OPTS,
+    );
+    expect(v).toEqual([]);
+  });
+
+  it('fails the same seat that also opens a sibling report, naming it', () => {
+    const sibling = 'docs/designs/003-x/reviews/design/correctness-r1c1.md';
+    const v = auditSessionIndependence(
+      [
+        toolPart('write', { filePath: OWN, content: 'my findings' }),
+        toolPart('read', { filePath: OWN }),
+        shellPart(`git diff ${OWN}`),
+        toolPart('read', { filePath: sibling }),
+      ],
+      OWN_OPTS,
+    );
+    expect(v).toHaveLength(1);
+    expect(v[0]).toContain(sibling);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// security r2c0 finding 2 (accepted): the run checkpoint is a run record. Every
+// agent config already denies *edit* on `docs/designs/**/.pipeline.json`, the
+// permission fence now denies the shell/read/glob routes to it, and the deed
+// audit names its segment as the backstop exactly as it names `transcripts`:
+// the file carries every seat's findings and verdicts (the anchoring ADR-002/007
+// independence guards) and now the gate record beside them, so a stage that
+// opens it has opened the run's records. No own-report exemption reaches it.
+// ---------------------------------------------------------------------------
+
+describe('the run checkpoint is out of band (ADR-016 run records)', () => {
+  const CHECKPOINT = 'docs/designs/003-x/.pipeline.json';
+
+  // proves: security r2c0 finding 2 — a completed read or glob of the checkpoint
+  // fails the audit for any stage, review seat or not.
+  it('catches any stage reading the run checkpoint', () => {
+    expect(
+      auditSessionIndependence([toolPart('read', { filePath: CHECKPOINT })], {
+        since: 0,
+        reviewStage: false,
+      }),
+    ).toHaveLength(1);
+    expect(
+      auditSessionIndependence([toolPart('glob', { pattern: CHECKPOINT })], {
+        since: 0,
+        reviewStage: true,
+      }),
+    ).toHaveLength(1);
+  });
+
+  // proves: security r2c0 finding 2 — the shell routes the widened allowlists
+  // open (`cat`, `git show`) are caught by the audit as well, with the seat's
+  // own-report identity in scope.
+  it('catches a shell command naming the run checkpoint', () => {
+    expect(auditSessionIndependence([shellPart(`cat ${CHECKPOINT}`)], OWN_OPTS)).toHaveLength(1);
+    expect(
+      auditSessionIndependence([shellPart(`git show HEAD:${CHECKPOINT}`)], OWN_OPTS),
+    ).toHaveLength(1);
+  });
+
+  // proves: security r2c0 finding 2, the other direction — the audit judges the
+  // access, never the text (design 007): a stage writing source that merely
+  // names the checkpoint path — exactly what this run's own tests do — has not
+  // opened the run's records.
+  it('does not flag write content that merely names the checkpoint', () => {
+    const v = auditSessionIndependence(
+      [
+        toolPart('write', {
+          filePath: 'tools/orchestration/tests/pipeline/gate-evidence-integration.test.ts',
+          content: "readFileSync(join(dir, 'docs/designs/002-x/.pipeline.json'), 'utf8')",
+        }),
+      ],
+      { since: 0, reviewStage: false },
+    );
+    expect(v).toEqual([]);
+  });
+});

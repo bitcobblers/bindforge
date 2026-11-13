@@ -1,0 +1,1450 @@
+{
+  "version": 1,
+  "slug": "harness-evidence-and-read-rights",
+  "nnn": "016",
+  "branch": "pipeline/016-harness-evidence-and-read-rights",
+  "source": {
+    "kind": "adr",
+    "path": "docs/adrs/016-harness-evidence-and-read-rights.md"
+  },
+  "status": "done",
+  "lastStage": "doc-sync",
+  "designRound": 2,
+  "codeRound": 2,
+  "designBudgetUsed": 1,
+  "codeBudgetUsed": 3,
+  "editorialDone": false,
+  "testsGreen": true,
+  "testsNeedUpdate": false,
+  "stageFailures": {
+    "research": 1,
+    "test-authoring": 1
+  },
+  "stageCommits": [
+    "e4e0e19f6cf8f75b87cb09ff39060b7d68c84c42",
+    "ade2bea5708d4c17bf09a77892f0acf0908d0eb5",
+    "c66f1ef3363d774c01ed6517cad546c1bbc8c6a6",
+    "51345205711beb1d3e066659459abd4939e723be",
+    "684d1e0da0373dc24bb6fdec79ae2e84266dbe76",
+    "5336a2a0bf3e1cbb68a3082d86fd223e1eef6a1f",
+    "4c6238b23fe8e118107c8748efa3f2b84d86178d",
+    "f757a71fffafee9822a2f0c372f49d0eb20df3cd",
+    "5d4a419a00ae720c6b994612d9730e77ae849755",
+    "1e4273849797d87abb4f837c558e5e8193f21407",
+    "3a3cd43dbe01478376d1b2c7d5ea8ef8f12d8c19",
+    "6216f2c3f563da990bf20aac9199cbfde2939f3d",
+    "09bebd34ad266a56ab5685efd0d31c92e0f2086c",
+    "873204e447cd43ee89f814a31c99c524867dffcb",
+    "c3c085ff5cf404dd5ae4af1334fab0fda98d1e0a",
+    "c2fd15eac35a89194e345161fc997c4118cacf1d",
+    "fe424f1235bb598eee5bd447a20676cbf185b25b",
+    "a946b69e8008745456179a4c63f5e7e9bd353ed4",
+    "3e8511fcdf754f727d5f2b5274dea6287105aa0f"
+  ],
+  "forceNext": null,
+  "results": [
+    {
+      "stage": "research",
+      "round": 0,
+      "sessionID": "ses_e2a0296ebffeQywa0Gz4iSGh4K",
+      "agent": "research/researcher",
+      "at": 1794591755190,
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/research-r0.md",
+      "durationMs": 238170,
+      "nudges": 0,
+      "failure": "independence violation: grep accessed run records: /home/mike/repos/bindforge/docs/designs/012-input-vocabulary-and-reach-classes/transcripts; grep accessed run records: /home/mike/repos/bindforge/docs/designs/015-transforms-as-preconditioned-policies/transcripts; grep accessed run records: /home/mike/repos/bindforge/docs/designs/012-input-vocabulary-and-reach-classes/transcripts/research-attempt2-r0.md"
+    },
+    {
+      "stage": "research",
+      "round": 0,
+      "sessionID": "ses_e29fef427ffeqOgx59k8nJLGHh",
+      "agent": "research/researcher",
+      "at": 1794591896698,
+      "reply": {
+        "summary": "Rewrote docs/designs/016-harness-evidence-and-read-rights/01-research.md for ADR-016, this time staying fully independent: no reads, greps, globs, or shells touched any run's transcripts/ or reviews/ records (the previous attempt's gate failure). Findings are grounded in the source ADR, the shipped harness (gates.ts stdio:'ignore' booleans and CARGO_GATE legs; independence.ts read/write asymmetry and reportKey identity machinery; state-store.ts additive-optional grammar and 8MiB cap; prompts.ts 'not exposed by endpoint' parameters default; opencode-runner.ts tokens/cost already on the SDK reply; flows/cli planMaxLines and --max-parallel=1), the .opencode agent permission configs, and verified external primary sources (OpenCode permissions docs, llama.cpp server README flags, GitHub Actions 1MiB step-summary cap, Claude Code sandboxing protected paths, Rust Book test-result line). Lenses applied: Prior art, Security landscape, Performance baselines. Every factual claim carries an inline source; unverifiable ADR operator numbers are flagged as operator-observed, and eight open questions are handed to the designer.",
+        "commitMessage": "docs: research harness evidence and read rights for ADR-016"
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/research-attempt2-r0.md",
+      "durationMs": 141446,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal",
+      "round": 0,
+      "sessionID": "ses_e29fccb3bffeARpsSR5ACeCfUh",
+      "agent": "design/designer",
+      "at": 1794592114920,
+      "reply": {
+        "commitMessage": "docs: add design proposal for ADR-016 harness evidence and read rights"
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/proposal-r0.md",
+      "durationMs": 218106,
+      "nudges": 0,
+      "docLines": 437,
+      "docLinesAdded": 437,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e29f976c6ffeJQ205z8tHchMSc",
+      "agent": "review/design-correctness",
+      "at": 1794592227667,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design §3, \"Document families\" bullet vs \"Run-record block\" bullet — \"then trailing denies: `*transcripts*` and `*reviews*` over shell, `glob` and `grep` rules over `docs/designs/**/transcripts/**`\" vs the block \"appended last to every shell-holding agent (… the five document families)\" with \"`glob` denies over `docs/designs/**/transcripts/**` and `docs/designs/**/reviews/**`; `grep` denies `*transcripts*` and `*reviews*`\"",
+            "problem": "The document families are specified with two different run-record rule sets: the first bullet scopes their glob/grep denies to transcripts/ only, the second appends denies over reviews/** as well. A grep rule keyed to the path-shaped resource docs/designs/**/transcripts/** can never match under the proposal's own A17 semantics (grep resources are the requested regex, not the search path), so it is a dead rule; and if the transcripts-only reading governs, ADR Decision 3's clause \"`glob`/`grep` pattern rules for the same directories\" (both transcripts/ and reviews/) is under-delivered for the document families.",
+            "fix": "Make the run-record block the single authority for the doc families' run-record denies — drop the narrower glob/grep clause from the first bullet, keeping its note that the read route to handed reports stays open — so one rule set per agent is specified."
+          },
+          {
+            "severity": "major",
+            "location": "Chosen design §3, \"Document families\" bullet — \"(`cd`, `ls`, `cat`, `head`, `tail`, `wc`, `grep`, `rg`, `find`, `git status *`, `git diff *`, `git log *`, `git show *`)\"",
+            "problem": "Under the permission grammar the proposal itself relies on (A16/A17; whole-value matching where only a rule ending in ` *` additionally matches the bare command), bare resources like `cat` and `wc` match only argument-less commands, so every useful inspection command (`wc <file>`, `cat <path>`) stays denied behind the kept leading `shell * → deny`. As written the widening buys nothing and defeats Decision 3's purpose (\"so a proposal can check a path and a line count\"). The git entries carry stars; the rest do not — an inconsistency in exactly the rule text an implementer copies.",
+            "fix": "Spell every entry in star form (`cat *`, `ls *`, `wc *`, `find *`, `cd *`, …) or state \"byte-identical to the inspection set already shipped in `code/coder.md`\" as the design-panel bullet does; pin with-argument commands (`wc <file>` allowed) in Test strategy #4 instead of bare names."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design §1, \"Prompts\" bullet — \"the report at `{{reportPath}}` is yours — re-reading it is allowed\" while \"seat agents' `read` deny over `docs/designs/**/reviews/**` (A10) stays\"",
+            "problem": "The seat's only reachable re-read route is `git diff`, and for a report written this attempt and not yet committed, `git diff <untracked>` prints nothing; the prompt invites the seat to try the permission-denied `read` tool first and burn a turn on a dead route — the friction class ADR-016 exists to stop.",
+            "fix": "One clause naming the route and its audit-level meaning, e.g. \"re-reading it is allowed (via your `git diff` allow — your `read` tool stays fenced off `reviews/`)\"."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design §4, \"Document ceiling\" bullet — \"above the observed shipped artifacts (this run's `01-research.md` is 440 lines; the 012 proposal ~505)\"",
+            "problem": "These run-artifact line counts are stated as fact but appear in no assumption-register row, unlike every other operator-observed number (A19/A20 register that class explicitly); the 600-line cap's headroom rests entirely on them, and a miscount above 600 turns every normal full-flow run red at a document stage.",
+            "fix": "Add one unverified register row for the current artifact sizes behind the 600 cap, or drop the specific counts and cite fixture evidence."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design §3 — \"Run-record block, appended last to every shell-holding agent\" vs next bullet \"Own-report re-open, per seat agent after the deny\"",
+            "problem": "The own-report re-open must come after the block for last-match-wins to work, so the block is not actually appended last; the two bullets state contradictory orderings.",
+            "fix": "Reword to \"appended after all other rules except the per-seat own-report re-open\"."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/design-review-correctness-r1c0.md",
+      "durationMs": 112633,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e29f7be9cffeVm8mmxHRZeroal",
+      "agent": "review/design-compatibility",
+      "at": 1794592308068,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Compatibility matrix — \"| macOS | unknown | Nothing platform-specific is added (pipe capture and `spawn` are portable Node), but no environment here exercises it |\" and \"| Windows / WSL2 | unknown | Same posture as macOS |\"",
+            "problem": "The checklist treats an `unknown` matrix status as a major finding, and the rows' justification is contradicted by §3: doc families gain a POSIX-only inspection set (\"append the inspection set (`cd`, `ls`, `cat`, `head`, `tail`, `wc`, `grep`, `rg`, `find`, …)\") and the design panel gains spawned cargo/rustfmt/npm legs. Both are platform-dependent tool surfaces, so \"nothing platform-specific is added\" overstates portability instead of justifying the abstraction.",
+            "fix": "Replace `unknown` in both rows with a declared posture (\"not exercised — harness change developed and tested on Linux only\") and add one sentence naming the two platform-dependent additions (POSIX inspection set, cargo/npm check legs) as the reason no claim is made. Document-only."
+          },
+          {
+            "severity": "minor",
+            "location": "§1 Own-report identity — \"a `reviews/` access value is the seat's own report iff `reportKey(value)` (everything from the `reviews` segment on) equals `reportKey(opts.ownReportPath)`\"",
+            "problem": "The identity rule, §3's `glob` denies over `docs/designs/**/reviews/**`, and the per-seat shell allow all key on `/`-separated, case-exact path spelling, and no assumption row (A2, A16, A17) states that access values or shell command text reach the audit separator-normalized. Where paths are spelled with `\\` or differ in case, the deny side fails safe but the own-report exemption silently never fires, so Decision 1's promise is unmet on that host while the matrix claims nothing platform-specific changes.",
+            "fix": "Add one clause to the identity rule: `reportKey` compares after normalizing separators to `/` and case — or, if the SDK already normalizes, add an assumption row stating that with where it was verified."
+          },
+          {
+            "severity": "minor",
+            "location": "§3 Read-only reach — \"`shell git diff *reviews/<phase>/<specialty>-*` → allow, naming the agent's own specialty in the pattern (A11)\"",
+            "problem": "The deny-then-reallow order depends entirely on OpenCode's matcher grammar (`*` spans `/`, a rule ending ` *` matches the bare command, last match wins), and A16 says the pin is \"a repo-local re-implementation of OpenCode's wildcard matching\". The matrix row \"Pre-ADR-016 OpenCode server config | yes | Only standard rule types … are used\" vouches for rule types, not for that grammar, so drift in the engine silently inverts the whole §3 deny stack.",
+            "fix": "Name the OpenCode version whose documented grammar the rules rely on in one assumption row and in that matrix row's note, and state in Test strategy #4 that the repo-local matcher stays pinned to that version."
+          },
+          {
+            "severity": "minor",
+            "location": "Compatibility matrix — \"| A run in flight across the merge | yes | Pre-016 checkpoint ⇒ `gateEvidence` absent ⇒ prompts render \\\"(no gate record for this run yet)\\\" |\"",
+            "problem": "The row claims a flat `yes` but accounts only for the checkpoint and transcript effects. The same merge applies `docMaxLines: 600` and `research` in `docStages` to a resumed run, and the Risks table itself says \"A resumed or in-flight run meets the new `docMaxLines`: a document already over 600 fails its next document stage\". The matrix understates a behavior change across the merge.",
+            "fix": "Extend that row with the condition: \"…; a document already over `docMaxLines` fails its next document stage — raise the cap or force the stage (Risks)\", keeping the status."
+          },
+          {
+            "severity": "minor",
+            "location": "§2 The gate record — \"`tail` the last `MAX_GATE_TAIL_BYTES = 2_000` bytes of the leg's merged stdout+stderr, passed through `printable` (independence.ts:311) before storage\"",
+            "problem": "The bound is in bytes over raw child output, so the slice can cut a multi-byte code point, and cargo/npm output under a non-UTF-8 console codepage (the Windows row) is not UTF-8 at all; that string is persisted in the checkpoint and rendered into four prompts and the build note. The Risks row about the rolling tail covers only truncation of the `test result:` line, so \"tails are evidence, not parsed contracts\" does not cover mojibake reaching five seats.",
+            "fix": "One clause: capture bytes, decode once as UTF-8 with replacement, then bound the tail in characters against the same `2_000` budget — or state explicitly that a tail's head may drop a partial code point and who strips it."
+          },
+          {
+            "severity": "nit",
+            "location": "Compatibility matrix, Linux row — \"all changes are Node ≥ 22.23.4 in `tools/orchestration`, agent-config YAML text, and prompt text\"",
+            "problem": "The Node floor is asserted with no anchor (no engines reference, no assumption row), so the checklist's Node-floor check cannot be verified from the document; and §3 edits `.md` agent rule files (\"Config edits in `.opencode/agents/`, using the rule text already shipped in `code/coder.md`\"), not \"YAML\".",
+            "fix": "Cite the declared floor's source (the package's engines field) and write \"agent rule text in `.opencode/agents/`\" instead of \"agent-config YAML text\"."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/design-review-compatibility-r1c0.md",
+      "durationMs": 80355,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e29f68489ffeAb8qime7GnMqCB",
+      "agent": "review/design-security",
+      "at": 1794592410629,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design §1 Own-report identity on the audit's read side — \"a `reviews/` access value is the seat's own report iff `reportKey(value)` (everything from the `reviews` segment on) equals `reportKey(opts.ownReportPath)`\"",
+            "problem": "Keying from the `reviews` segment on drops the design-directory prefix, but every run shares the report grammar `reviews/<phase>/<specialty>-rN[cM].md` (A11), so a seat's own key is identical to the same-named report under every other design directory. Reads of another run's reports — a violation today — would pass the exemption silently, contradicting ADR Decision 1's clause \"Every other `reviews/` path stays a violation\" and letting a panel anchor on prior runs' verdicts. The §3 per-seat allow `git diff *reviews/design/<specialty>-*` opens the same cross-run paths (A16: `*` spans `/`), so both the permission layer and the audit open and no backstop fails it; the Risks seam row covers only same-run prior rounds.",
+            "fix": "Scope the identity to the run before comparing keys: canonicalize the access value and require it to lie under the attempt's design directory (the directory of `opts.ownReportPath`) — i.e. compare canonicalized full paths against `ownReportPath`, which keeps the ADR's absolute-vs-repo-relative spelling equivalence while rejecting a foreign design dir's same-named report. Apply the same containment to the shell branch's REVIEWS_KEY matches; extend Test strategy #3 with a cross-design-directory same-name read fixture that must fail the audit."
+          },
+          {
+            "severity": "major",
+            "location": "Chosen design §2 The gate record — \"the block is the runner's own record and its failing-leg tail belongs, verbatim, in the `03-build-notes.md` 'Gate posture' section\"",
+            "problem": "The tail is merged stdout+stderr of the very code the run writes and fixes; a stage can plant text in its test output (2,000 bytes is ample for an instruction line) that then reaches all five review seats and the fix loop fenced and labeled as the runner's own record, with a mandate to quote it verbatim into the committed build note. The proposal never classifies this data source (security checklist item 1), while §1/§3 exist to close exactly this stage-to-seat anchoring channel.",
+            "fix": "Fix provenance in one sentence rendered in the block header and the prompt: the tails are output the runner captured from the code under review — citable evidence, not instructions — and replace \"verbatim\" with \"cited with the leg command and exit\" for the build note. No new mechanism; does not touch the ADR's decision that the record is shared ground truth."
+          },
+          {
+            "severity": "major",
+            "location": "Compatibility matrix, Linux row — \"all changes are Node ≥ 22.23.4 in `tools/orchestration`\"",
+            "problem": "Node 22.23.4 carries the HIGH-severity CVEs of the 2026-11-11 Node.js security release (CVE-2026-123864, -123865, -123866, -123872; all 22.x < 22.23.5 affected), fixed in 22.23.5 published two days before this review. A named dependency with a known advisory must be addressed (checklist item 5).",
+            "fix": "Raise the stated floor to Node ≥ 22.23.5 in the compatibility-matrix row and the package `engines` pin — one-line change."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design §2 capture shape — \"`tail` the last `MAX_GATE_TAIL_BYTES = 2_000` bytes of the leg's merged stdout+stderr, passed through `printable`\"",
+            "problem": "Checklist item 4 unaddressed: the design never states what a leg tail may carry (absolute local paths, env echoes, failing-npm error lines that can embed registry URLs and credential-bearing text), where it persists (checkpoint, transcripts, five prompts), or what is committed once the verbatim tail lands in `03-build-notes.md` in an open-source repo.",
+            "fix": "State the posture in §2: extend the `printable` pass with a redaction step (known token patterns, home-directory paths) before storage, or declare the record local-only and require the scrub before build-note insertion."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/design-review-security-r1c0.md",
+      "durationMs": 102514,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e29f4f3e7ffePus0hmkXMmja52",
+      "agent": "review/design-performance",
+      "at": 1794592454879,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "§4 Budgeted, measured context — \"and states a ceiling: at most 25 reads of files outside that set.\"",
+            "problem": "The ceiling bounds the count of reads but not their size. Unlike every other constant in the design (600 derived from the observed 440/505-line artifacts and the 2,696-line runaway; 2,000/6,000 pinned against the 8 MiB checkpoint and the 189,788-token prompt baseline), 25 is stated without derivation. Prior-run artifacts are not size-capped by this design (run 2's 2,696-line proposal is still on disk), so the worst case of 25 large out-of-set reads plausibly re-creates the large research prompt Decision 4 exists to measure, and it exceeds what A20's 32,768-token resident KV can hold — a gap between the design's numbers and the research baseline without explanation (performance checklist item 6).",
+            "fix": "One sentence deriving 25 against the ADR's numbers: the estimated worst-case token cost of 25 out-of-set reads versus the 189,788-token largest-prompt / 32,768-resident-prefix figures — or state that the ceiling's worst case assumes out-of-set documents under docMaxLines. No mechanism change."
+          },
+          {
+            "severity": "nit",
+            "location": "§2 The gate record — \"GateEvidence = { at: number; green: boolean; legs: GateLeg[] }\"",
+            "problem": "The record carries `at` but nothing renders or checks it, and the design never states the record's freshness rule: a seat reading the block cannot tell which diff a tail belongs to. Invalidation is overwrite-at-each-gate-call, which is correct by construction (only the gated implement/fix/test-update stages change code; the resumed pre-016 case renders the absent-record line), but that correspondence — invalidation being correct, not just fast — is left implicit (checklist item 5).",
+            "fix": "One sentence at the runner bullet: the gate call replaces state.gateEvidence wholesale, so a rendered block always describes the gate over the current state; `at` is for forensics only. Or render `at` into the block header."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/design-review-performance-r1c0.md",
+      "durationMs": 44202,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e29f4471dffe2gTP6tMEqyoJQ0",
+      "agent": "review/design-complexity",
+      "at": 1794592507113,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design §3, document-family bullet — \"then trailing denies: `*transcripts*` and `*reviews*` over shell, `glob` and `grep` rules over `docs/designs/**/transcripts/**`\"",
+            "problem": "This inline deny list overlaps but does not match the 'Run-record block, appended last to every shell-holding agent (... the five document families)', which also covers the doc families but additionally denies glob over `docs/designs/**/reviews/**` and denies grep of `*transcripts*`/`*reviews*` rather than path-scoped grep rules. Two overlapping, differently-worded rule lists for the same agents leave the implementer to choose which wins, and duplicated rule text drifts — §3 elsewhere holds rule text to byte-identical reuse. (new)",
+            "fix": "End the document-family bullet with '...then the run-record block below' and delete its inline trailing-deny clause, making the run-record block the single statement of the denies; this removes text rather than adding any."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design §2 — \"Canonical shape, defined once here: `GateEvidence = { at: number; green: boolean; legs: GateLeg[] }`\"",
+            "problem": "`at` has no stated consumer: the `gateEvidenceText` spec, the build-note sentence, and the test strategy never reference it. Every other field traces to a named use; this one is record weight with no reader (checklist #6's consumer-less knob applied to a record field). (new)",
+            "fix": "Drop the field, or state its one consumer in a clause — e.g. `gateEvidenceText` prints `at` as a 'gate run at' header line, which also disambiguates the evidence in a multi-attempt run."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/design-review-complexity-r1c0.md",
+      "durationMs": 52208,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e29f37aceffe5dQziIS0R4AueW",
+      "agent": "design/designer",
+      "at": 1794592821126,
+      "reply": {
+        "changed": true,
+        "summary": "All six majors were consumed by changing the design, mostly by deletion: correctness #1 — the doc-families bullet's narrower transcripts-only glob/grep clause is deleted so the run-record block is the single rule set; correctness #2 — the hand-written inspection list is deleted in favour of \"byte-identical to `code/coder.md`'s star-form rules\", with Test strategy #4 now pinning `wc <file>`/`cat <path>`; compatibility #1 — both `unknown` matrix rows replaced by `not exercised` postures naming the POSIX inspection set and the cargo/npm legs; security #1 — the own-report identity now canonicalizes the access value (A17's `/`- and case-normalization, newly registered on the live V2 permissions page) and requires containment in the attempt's design directory, in both the read and shell branches, with Test strategy #3's cross-design-directory fixture and the Risks seam row extended to cover it; security #2 — the rendered block carries a provenance header (runner-captured output from the code under review, never instructions) and \"verbatim\" is replaced by citing the tail with its leg command and exit; security #3 — the stated floor rises to Node ≥ 22.23.5 in the matrix row plus a Rollout line for the `engines.node` change. The minors/nits are handled in the same passages: prompt names the `git diff` re-read route, run-record block ordering, printable-at-write-and-render placement, character-bounded UTF-8 decode of the tail, in-flight-run `docMaxLines` condition, engines-field citation, matcher-grammar pin (A16/#4); the doc-ceiling minor forced a measurement — the body's unregistered counts were wrong and a 600 cap sits below shipped artifacts (014's 733-line proposal), so the sizes are registered as verified A24 and the cap rises to 900. Deletions balance the additions: the duplicate run-record rule set, the §3 subagent restatement, §1's child-walk bullet, the worktree/Non-goals duplication, and the read-ceiling Non-goals bullet are gone, and the Revision log replaced its r0 placeholder with six two-line entries. The diff is +13 lines net because five majors each required a clause the document did not previously state (directory-scoped identity, provenance header, decoded character bound, declared non-Linux posture, raised engines floor) and a measured cap value had to be registered; nothing was added that an existing passage already said.",
+        "commitMessage": "docs: scope own-report identity to the run, fix gate-tail provenance and platform posture in the ADR-016 proposal"
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/proposal-revise-r1.md",
+      "durationMs": 313902,
+      "nudges": 0,
+      "docLines": 450,
+      "docLinesAdded": 105,
+      "docLinesRemoved": 92
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e29eeb021ffeAvNZcUZHNRY7bN",
+      "agent": "review/design-correctness",
+      "at": 1794592950132,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design §1, shell branch — \"collect every `REVIEWS_KEY` match in the command; if the set is non-empty and every match canonicalizes, under the rule above, to `own`, exempt\" combined with the identity rule's \"resolved against the repo root — lies under the attempt's own design directory\"",
+            "problem": "new: the canonicalization input is ambiguous and both readings have a defect. If the REVIEWS_KEY match itself (a span starting at `reviews/`) is canonicalized, resolving it against the repo root never lands under the attempt's design directory, so under that literal reading no shell access is ever exempt — contradicting Test #3's \"shell `git diff <own>` is clean\". Under the sensible reading (canonicalize the full path token), the legitimate relative spelling the per-seat permission wildcard itself allows — `cd docs/designs/<dir> && git diff reviews/design/<specialty>-r1c1.md`, since A16's `*` matches zero characters and the inspection set allows `cd *` — resolves to `<repo>/reviews/...`, fails the new directory test, and loses the exemption it had under the pre-revision `reportKey(value) === own` rule: a regression in exactly the friction class Decision 1 removes.",
+            "fix": "Canonicalize the full path token the match sits in, and apply the design-directory test only to values that spell a design directory — bare `reviews/...` spans pass on reportKey equality alone; add the cd-relative `git diff <own>` spelling to Test strategy #3's clean set."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design §1 identity rule — \"normalized the way the permission layer normalizes paths (A17: `\\` to `/`, case folded)\"",
+            "problem": "new: the gloss over-attributes A17's authority. A17 and the cited permissions page make case-insensitive matching Windows-only, so \"the way the permission layer normalizes paths\" on Linux (the only exercised host) does not case-fold — yet Test #3 expects case-variant spellings of own report to pass the exemption, so the audit must fold case unconditionally by its own rule, a deliberate superset of both the permission layer's Linux normalization and ADR Decision 1's exact \"identity match on the report key\". Unreachable through the permission layer on Linux (the `reviews/**` read deny is segment-exact), so no exploitable over-exemption — but the citation claims support the rule does not actually receive.",
+            "fix": "State that the audit's canonicalization folds case on every platform as its own rule (citing A17 only for the `\\`→`/` normalization), or drop \"case folded\" from the rule and the case-variant spellings from Test #3."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/design-review-correctness-r1c1.md",
+      "durationMs": 128891,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e29ecb87dffe7ecyWMP7yRteJJ",
+      "agent": "review/design-compatibility",
+      "at": 1794593040665,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design §3 Read-only reach — \"then the inspection set byte-for-byte as `code/coder.md` ships it — star form throughout\"",
+            "problem": "new: The inherited read-only set was enumerated inside the document in r0 (matching ADR-016 Decision 3's named commands); the revision defines it only by reference to code/coder.md. ADR Decision 3 names four read commands (git status, git diff, git log, git show) besides the file readers, and Test strategy #4 simultaneously narrowed its pin from r0's \"doc families allow `cat`/`wc`/`git status`\" to \"doc families allow `wc <file>` and `cat <path>`\" — so neither the document nor its tests pin that the referenced coder.md set contains the ADR's git read commands, and drift in coder.md would silently shrink the doc families' ADR-mandated reach; the matrix's own macOS/Windows rows cite \"§3's inspection set\" as the host-dependent surface, which is now un-enumerable from the document. Fix replaces the dropped r0 enumeration rather than adding a mechanism.",
+            "fix": "One clause (or one assumption row with coder.md line refs, as A8 provides) stating coder.md's inspection set is exactly ADR-016 Decision 3's read-only set in star form, and extend Test #4's pin to the `git status *`/`git diff *`/`git log *`/`git show *` allows for doc families."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/design-review-compatibility-r1c1.md",
+      "durationMs": 90479,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e29eb56ceffeu0AQ5511V6v8cq",
+      "agent": "review/design-security",
+      "at": 1794593141370,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design §1 Own-report identity, shell branch — \"collect every `REVIEWS_KEY` match in the command; if the set is non-empty and every match canonicalizes, under the rule above, to `own`, exempt\"",
+            "problem": "The containment test r1 asked for has no defined operand on the shell route, so the cross-run read is not closed by determinate text. The rule tests a \"canonical spelling … resolved against the repo root\" for lying under the attempt's design directory, but the operand the shell bullet hands it is the REVIEWS_KEY match, which by the design's own definition (A2, §1's \"everything from the `reviews` segment on\") has the design-directory prefix stripped. A prefix-less fragment (`reviews/design/security-r1c1.md`) resolved against the repo root can never lie under `docs/designs/<run>/`, so either (a) the exemption never fires on the shell route — the only route a seat can use to re-read its own report (A21; §1's new prompt sentence says re-reading is allowed \"through your `git diff*` allow\") — so Decision 1 does not take effect and Test strategy #11 fails; or (b) the implementer restores it by resolving the fragment against the attempt's own design directory, which makes containment vacuously true and reopens the hole: `git diff docs/designs/014-<…>/reviews/design/security-r1.md` yields the same fragment as the seat's own key and passes the exemption. Prior runs' `reviews/` trees are committed in this repo, the per-seat wildcard already opens those paths at the permission layer, and the Risks seam row concedes that reach, so the audit's identity rule is the only backstop — and it is the ambiguous text. Re-raised: the r1 revision states the right intent but does not name the string that carries the discriminating prefix.",
+            "fix": "Name the compared operand once in §1's shell bullet: take the whole path token in the command leg that contains the `reviews` segment, canonicalize it against the repo root, require it to lie under the attempt's design directory, and only then compare `reportKey`; state that a match with no design-directory prefix is not an identity match (fails closed). Add to Test strategy #3 the two spellings §3's allow actually opens: `git diff docs/designs/<own>/reviews/design/<specialty>-r1c1.md` clean, `git diff docs/designs/<other-run>/reviews/design/<specialty>-r1c1.md` fails. No new mechanism."
+          },
+          {
+            "severity": "minor",
+            "location": "Risks tail row (\"no redaction pass ships and no whole tail is published\") vs Chosen design §2 build-note sentence (\"a failing-leg tail belongs in the `03-build-notes.md` 'Gate posture' section cited with its leg command and exit\")",
+            "problem": "The rebuttal's premise contradicts the §2 sentence it answers: 03-build-notes.md is a committed artifact in this open repo and §2 mandates tail content land there, so tail content is published, just selectively. The same row concedes a tail \"can carry absolute paths or registry text\" — checklist item 4's boundary, since a failing `npm run check` line can embed a credential-bearing registry URL and a test can echo environment variables — yet nothing states what must be dropped before the citation is committed, and the design never says where the record persists (checkpoint/transcripts local, build note committed). The decision to ship no redaction pass is sound and is not re-argued; only the claimed coverage is wrong.",
+            "fix": "One clause on §2's build-note sentence: the citation is line-selective and drops any line carrying a credential-bearing token or an absolute local path — the posture the Risks row already claims — and name in that row which artifacts are committed. No redaction pass added."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/design-review-security-r1c1.md",
+      "durationMs": 100632,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e29e9cd2fffeBxv4gB7Y90bysj",
+      "agent": "design/designer",
+      "at": 1794593278481,
+      "reply": {
+        "changed": true,
+        "summary": "Major (r1c1 shell-branch identity): §1's shell bullet now names the compared operand — whole command tokens containing the `reviews` segment, prefix included, explicitly never the prefix-stripped REVIEWS_KEY fragment — exempted only via the §1 identity rule, with a prefix-less token stated to resolve outside the attempt's design directory and fail closed; Test strategy #3 pins the two spellings §3's allow opens (own design-dir path clean, same path under another run fails). Minor (Risks row vs §2): the contradictory 'no whole tail is published' claim is deleted — the Risks row now names the checkpoint and transcripts as local and the committed build note as the one carrier, and §2's build-note sentence states the citation is line-selective, dropping credential-bearing and absolute-path lines. Offsetting trims: Context's exclusions tail (dup of Non-goals) and the research-ceiling parenthetical (dup of Deferred) were removed; Revision log's §1 and §2 entries superseded in place with r2 wording. Net line change is zero (450 → 450).",
+        "commitMessage": "docs: fix own-report shell operand and build-note citation scope in ADR-016 proposal"
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/proposal-revise-r1.md",
+      "durationMs": 136994,
+      "nudges": 0,
+      "docLines": 450,
+      "docLinesAdded": 25,
+      "docLinesRemoved": 25
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e29e7b590ffezqONeFhQXuWD75",
+      "agent": "review/design-security",
+      "at": 1794593322829,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design §1 shell branch + Test strategy #3 — \"a prefix-less token resolves outside the attempt's design directory and fails closed\"",
+            "problem": "new: The r2 revision's fail-closed half — a prefix-less shell spelling of the own report (e.g. `git diff reviews/design/<specialty>-r1c1.md`), which §3's `*`-prefixed wildcard allow does let through the permission layer so the audit is the only thing that can stop it — is asserted in the rule text and the Revision log but has no fixture. Test strategy #3 pins the clean own-spelling and the cross-run/sibling failures but not this spelling.",
+            "fix": "Add one assertion to Test strategy #3: the prefix-less shell spelling fails the audit even though §3's wildcard permits it at the permission layer. No new mechanism."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/design-review-security-r1c2.md",
+      "durationMs": 44213,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e29e70873ffeaH95glyEEnBqkJ",
+      "agent": "review/design-correctness",
+      "at": 1794593409282,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design §1, shell branch — \"a prefix-less token resolves outside the attempt's design directory and fails closed\"",
+            "problem": "new (surviving half of my r1 minor, re-raised): the fail-closed clause this revision adds is reachable through rules the same document ships, and is neither pinned nor enumerated. §3's per-seat re-open `shell git diff *reviews/design/<specialty>-*` matches, under A16's grammar, with the leading `*` spanning the empty prefix, and §3's inspection set (byte-for-byte `code/coder.md`, ADR Decision 3's `cd`) permits `cd docs/designs/<dir> && git diff reviews/design/<specialty>-r1c1.md` — so the permission layer admits a command the audit then fails, while §3 asserts prompt, permission layer, and audit \"say the same thing\". The Risks seam row enumerates only \"the seat's prior-round reports and another design directory's same-named report\", and §3's seam sentence only \"prior-round and other runs' same-named reports\", so the one own-report spelling the allow admits and §1 rejects is described nowhere, and Test strategy #3 pins neither direction of it. Not blocking: the rule is deterministic, conservative, and no worse than pre-016 behavior (the row's own \"a burned attempt for an off-prompt read is today's behavior (no regression)\"). The r1 defect itself — the ambiguous canonicalization input — is closed: the operand is now the whole token, prefix included, never the prefix-stripped `REVIEWS_KEY` fragment, and Test #3 pins the operative `git diff docs/designs/<own>/reviews/design/<specialty>-r1c1.md` clean case.",
+            "fix": "Extend Test strategy #3's fail set with that one compound command (`cd docs/designs/<dir> && git diff reviews/design/<specialty>-r1c1.md` fails) — or move it to the clean set if exemption was intended — and add the prefix-less own-report spelling to §3's enumeration \"the wildcard's extra reach over prior-round and other runs' same-named reports\" so the seam names every spelling the allow admits but §1 fails."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/design-review-correctness-r1c3.md",
+      "durationMs": 86363,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e29e5b6e7ffetrqdwn0I8NKXzk",
+      "agent": "review/design-compatibility",
+      "at": 1794593445455,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/design-review-compatibility-r1c3.md",
+      "durationMs": 36124,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e29e529aeffeDaSlsZHg1efwqY",
+      "agent": "review/design-performance",
+      "at": 1794593495764,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/design-review-performance-r1c3.md",
+      "durationMs": 50284,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e29e46518ffeegyPqqQijYPUl9",
+      "agent": "review/design-complexity",
+      "at": 1794593540052,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Rollout, item 2 — \"`tools/orchestration/package.json` `engines.node` rises to `>=22.23.5` for the 2026-11-11 Node security release — the only runtime prerequisite added\"",
+            "problem": "This is the one change the post-approval revisions landed that traces to no Goal or ADR-016 Decision clause: the ADR never mentions Node, and nothing this design ships (byte capture, UTF-8 replacement decode, `printable` bounding) requires 22.23.5. It sits in tension with the approved Context claim \"implements the ADR's Decision clauses 1–4 and nothing else\", and since Rollout #1 lands as one branch, hosts on 22.23.4 now fail an engines gate for a reason external to the design's features (complexity checklist #2 — moving part with no stated Goal trace).",
+            "fix": "One clause marking it as an environment chore riding the branch (\"no Decision 1–4 code requires it; it rides this branch as a chore bump\"), or drop it from Rollout and land it as a separate `chore:` change. Either keeps the \"nothing else\" scope claim true without adding a mechanism."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/design-review-complexity-r1c3.md",
+      "durationMs": 44240,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-final",
+      "round": 0,
+      "sessionID": "ses_e29e3b7e8ffeaiTCjYu6L2G36Q",
+      "agent": "design/editor",
+      "at": 1794593638625,
+      "reply": {
+        "ambiguities": [
+          "Options considered — \"raw logs blow past the 8 MiB checkpoint ceiling and the seat-board clone problem A7 exists for\": the verb \"blow past\" does not clearly govern \"the seat-board clone problem A7 exists for\"; how raw logs relate to that problem is unclear (flagged in editor notes).",
+          "Test strategy #3 — \"a sibling names the child session\": the verb phrase is elided, so which case fails and what names the child session is unclear (flagged in editor notes)."
+        ],
+        "commitMessage": "docs: language pass on the ADR-016 harness evidence proposal"
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/proposal-final-r0.md",
+      "durationMs": 98469,
+      "nudges": 0,
+      "docLines": 456,
+      "docLinesAdded": 25,
+      "docLinesRemoved": 19
+    },
+    {
+      "stage": "editorial-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e29e236d3ffe3sue3liihnhK73",
+      "agent": "review/design-correctness",
+      "at": 1794593680952,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/editorial-review-correctness-r2.md",
+      "durationMs": 42226,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e29e191c4ffe0EbdO3fE3zWb32",
+      "agent": "review/design-compatibility",
+      "at": 1794593711134,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/editorial-review-compatibility-r2.md",
+      "durationMs": 30161,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:security",
+      "round": 2,
+      "sessionID": "ses_e29e11bd4ffe0jZilxT4DJZAZX",
+      "agent": "review/design-security",
+      "at": 1794593755352,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/editorial-review-security-r2.md",
+      "durationMs": 44183,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:performance",
+      "round": 2,
+      "sessionID": "ses_e29e06f23ffeB93fzfWFuTppOL",
+      "agent": "review/design-performance",
+      "at": 1794593777484,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/editorial-review-performance-r2.md",
+      "durationMs": 22102,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:complexity",
+      "round": 2,
+      "sessionID": "ses_e29e018b0ffeyXeD7i6K3d9iR0",
+      "agent": "review/design-complexity",
+      "at": 1794593821715,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/editorial-review-complexity-r2.md",
+      "durationMs": 44195,
+      "nudges": 0
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_e29df6ba3ffe4AEDX8pFxaJfTY",
+      "agent": "code/test-engineer",
+      "at": 1794594177953,
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/test-authoring-r0.md",
+      "durationMs": 356138,
+      "nudges": 0,
+      "failure": "independence violation: glob accessed run records: docs/designs/**/transcripts/*.md"
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_e29d9fc4effeAlHEHKnlnRbI9w",
+      "agent": "code/test-engineer",
+      "at": 1794595147822,
+      "reply": {
+        "testsAdded": 52,
+        "commitMessage": "test: add ADR-016 gate evidence, read rights, and document budget suites"
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/test-authoring-attempt2-r0.md",
+      "durationMs": 969827,
+      "nudges": 1
+    },
+    {
+      "stage": "implement",
+      "round": 0,
+      "sessionID": "ses_e29cb2f8dffer0GYE2yhh1Wm6g",
+      "agent": "code/coder",
+      "at": 1794596003870,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "feat: capture gate evidence, widen read rights, and budget run documents",
+        "moves": []
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/implement-r0.md",
+      "durationMs": 855942,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e29bdef4fffeR2XFzA3RM7HCUa",
+      "agent": "code/test-engineer",
+      "at": 1794596218110,
+      "reply": {
+        "commitMessage": "test: fix doc-cap integration fixture design-dir resolution and raise the cap at the registry seam",
+        "moves": []
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/test-update-r0.md",
+      "durationMs": 201766,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e29b4de35ffe41Fo7UGWRpJIsd",
+      "agent": "codereview/code-correctness",
+      "at": 1794597212425,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "tools/orchestration/src/pipeline/prompts.ts:136–157 (summation at :148)",
+            "problem": "sessionTokens sums only the top-level numeric keys of an assistant message's `tokens` and skips non-numeric values. The pinned client types that field as TokenUsageInfo = { input, output, reasoning, cache: { read, write } } (node_modules/@opencode/client/dist/promise/generated/types.d.ts:64–70; SessionMessageAssistant.tokens?: TokenUsageInfo), so the transcript's `- tokens:` line silently drops cache.read/cache.write — the largest term for a stage whose prompt prefix is cached, i.e. the quantity Decision 4 and Rollout 4 exist to make checkable. A13 is registered as *unverified*; the code resolved that open assumption by omission, and transcript-tokens.test.ts:27–38 pins only a flat fixture, so nothing catches it.",
+            "fix": "Recurse one level: flatten nested numeric objects to dotted keys (`cache.read`, `cache.write`) while still skipping non-numeric values, and add a fixture in the real TokenUsageInfo shape so a usage group can never be dropped silently again."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3102",
+            "problem": "§2 requires green legs as one-liners (\"command exit 0\" plus any tail line starting `test result:`). The tail it reads has already been flattened — boundedGateEvidence passes every field through printable (independence.ts:418 replaces all of \\p{Cc}, newlines included) at write and gateEvidenceText re-applies it — so no \\n survives and /test result:[^\\n]*/ matches from the first summary to the end of a single-line tail, up to MAX_GATE_TAIL_CHARS of joined per-target summaries for `cargo test --workspace`. A green leg stops being a one-liner and can crowd other legs' lines out under MAX_EVIDENCE_BLOCK_CHARS.",
+            "fix": "Bound what is emitted: take the last `test result:` occurrence and slice a fixed window, or split the flattened tail on ` finished in ` and emit the last summary, so a green leg stays one citable line."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:1723–1726 with flows.ts:71 and the unchanged report.ts:178",
+            "problem": "Adding `research` to FLOWS.full.docStages makes the research document's docLines* counts flow into the existing design-scope aggregate (proposalGrowth filters on typeof r.docLines === 'number'), so the operator-facing line `proposal:  N lines (+A/-B across K design stage(s))` (report.ts:208–221) now sums 01-research.md growth into a total labelled `proposal:` and counts research as one of the \"design stages\". Neither the proposal nor 03-build-notes.md names this; the Non-goals only rule out new report.ts display.",
+            "fix": "Keep the growth aggregate scoped to the 02-proposal.md stages (name the metered document on StageResult, or filter proposalGrowth by stage), or declare the mixed total in the build notes as intended."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/gates.ts:340–341",
+            "problem": "The elision marker's character count is computed from a fixed 64-character reservation (chars.length - (MAX_GATE_TAIL_CHARS - 64)) while the kept span is MAX_GATE_TAIL_CHARS - note.length, so the marker overstates the number of elided characters by 64 - note.length (~20). The budget itself holds (note.length + keep <= 2000).",
+            "fix": "Size `keep` first, build the note from `chars.length - keep`, then trim the kept span to MAX_GATE_TAIL_CHARS - note.length."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/prompts/design-review.md:10",
+            "problem": "§3 asks for the \"never browse to verify\" wording to be replaced; the sentence is kept verbatim with the allowance added after it. The intent (prompt, permission layer, audit agreeing) is met and the build notes record the keeping, but they file it under \"no deviation\".",
+            "fix": "Scope the kept sentence to what it actually prohibits — locating a named path by browsing — so it cannot read as a bar on running the checks the next sentence grants."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/code-review-correctness-r2c0.md",
+      "durationMs": 601855,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e29abaed5ffea3NA9Otq5Rbxk8",
+      "agent": "codereview/code-compatibility",
+      "at": 1794597380286,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "README.md:24 and .opencode/skills/repo-practices/SKILL.md:79-80 (against tools/orchestration/package.json:31 and .github/workflows/check.yml:50 in this diff)",
+            "problem": "Compatibility checklist item 2 names README as a Node-floor authority. The diff raises the floor to `>=22.23.5` and moves the CI pin with it (and `crates/core/tests/gate_contract.rs:304-322` keeps those two in lockstep), but two other statements of the same floor were left at `22.23.4`: README's gate paragraph (\"`npm ci && npm run check` in `tools/orchestration` (Node 22.23.4)\") and the repo-practices skill's \"Node floor for the orchestration gate: 22.23.4 (`tools/orchestration` `engines.node`)\")\". No machine pin reads either file, so they drift silently; the skill copy is the live trap, because every coder/test-engineer stage loads it and a stage that follows it would restate 22.23.4 in check.yml, which the Rust gate-contract test then fails.",
+            "fix": "In this branch change README.md:24 and .opencode/skills/repo-practices/SKILL.md:80 to `22.23.5`, so the floor reads identically in all four places."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/gate-evidence-integration.test.ts:60-95 (tmpGateRepo has no Cargo.toml), own-report-seat.test.ts:63-84, document-cap-integration.test.ts:52-81, gate-evidence-capture.test.ts:205-247; claim at 02-proposal.md Test strategy #14",
+            "problem": "Test strategy #14 claims \"the cargo legs run against the real workspace in the integration tests that need a green gate\"; no shipped test does. All three new integration fixtures are mkdtemp repos with a package.json check script and no Cargo.toml, so hasCargoWorkspace is false and no cargo leg is ever spawned — the persisted records contain only `npm run check` legs. The only cargo capture in the suite stubs `cargo` on PATH. So A18's premise, that a `test result:` line at the END of real cargo output survives the MAX_TAIL_BYTES window and the 2,000-char tail bound and is found by the green-leg render, is pinned only against a two-line synthetic stub.",
+            "fix": "Add one integration leg aimed at a fixture workspace (`Cargo.toml` with `[workspace] members = []` plus a trivial member, or `checkGate` against the repo's own workspace) asserting a `cargo test --workspace --locked` leg with a real `test result:` line in its tail; or amend Test strategy #14 to the shipped posture (cargo legs stubbed at unit level, real-workspace proof delegated to the CI orchestration job) and register it under Deferred."
+          },
+          {
+            "severity": "minor",
+            "location": "02-proposal.md Test strategy #14 and Compatibility matrix Linux row, with .github/workflows/check.yml:50 (`node-version: \"22.23.5\"`)",
+            "problem": "Checklist item 7 cannot be closed on evidence in this pass: the runner captured no gate record for this run (\"(no gate record for this run yet)\") and this seat's shell is limited to `git diff`, so no `test result:` line exists in any review input. Whether the nine new and four extended vitest files plus the existing suite are green under the floor this diff raises is asserted by the matrix and Rollout 2 but never shown — the exact \"unevaluable\" class Decision 2 exists to end. The static half holds (nothing version-sensitive is added; CI runs `npm run check` at exactly the new pin), but per the skill an unevaluated checklist item is a finding, not a pass.",
+            "fix": "Run `npm run check` in tools/orchestration at Node 22.23.5 and record the leg's command, exit and `test result:` line in the new 03-build-notes.md \"Gate posture\" section this diff's own prompts create — or state there that the CI orchestration job is the standing proof, quoting the pinned node-version."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/pipeline/gate-evidence-capture.test.ts:218-247 (shebang `cargo` stub written with mode 0o755, PATH prefixed) and :166-178 (PATH swapped to a non-existent bin dir)",
+            "problem": "The suite's established pattern for a host-specific leg is an explicit guard (moves.test.ts:704, :753, :765 use describe.runIf on process.platform); this new POSIX-only leg has none. The Compatibility matrix lists macOS and Windows/WSL2 as `not exercised`, so no support claim breaks, but a contributor on an unclaimed host gets a red `npm run check` from a shebang script that cannot execute there instead of the repo's usual skipped-and-labelled leg.",
+            "fix": "Wrap the stub-cargo case (and the PATH-shadowing spawn-failure case) in `describe.runIf(process.platform !== 'win32')` with a one-line note pointing at the matrix's `not exercised` rows, matching moves.test.ts's spelling."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/code-review-compatibility-r2c0.md",
+      "durationMs": 167780,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 2,
+      "sessionID": "ses_e29a91f27ffe0f3LtBjO1IIN98",
+      "agent": "codereview/code-security",
+      "at": 1794597577923,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "tools/orchestration/src/pipeline/runner.ts:2872; tools/orchestration/src/pipeline/gates.ts:385-387",
+            "problem": "The gate record's raw per-leg tails (up to 32 × 2,000 chars of npm/cargo output, a category the design itself says can carry registry/credential text) and absolute package cwds are persisted into .pipeline.json, which the pass's `git add -A` commits to git history — verified on this run's history (commits 09bebd3/6a5c454 list the checkpoint; the 6a5c454 version contains gateEvidence). The design's mitigation (Risks row, revision r2) assumes 'the checkpoint and transcripts stay local and the build note is the one committed carrier' with credential/absolute-path lines dropped line-selectively; that premise is false in this repo, so the diff opens an unredacted committed channel while the design's drop rule reaches only the build note (checklist item 4).",
+            "fix": "Apply the build note's line-selective rule at capture/write, not only at the prompt: in boundedGateEvidence (or in runLeg/boundedTail before storing), drop tail lines matching credential shapes (e.g. _authToken, ://<user>:<pass>@, token=) and lines carrying absolute paths, and store cwd repo-relative. Add a fixture test whose leg emits a fake token and an absolute path and assert neither survives into the persisted record."
+          },
+          {
+            "severity": "major",
+            "location": ".opencode/agents/research/researcher.md:71-93 (same run-record block in all shell-holding agents)",
+            "problem": "The §3 fence denies *transcripts*/*reviews* but never names the checkpoint (docs/designs/**/.pipeline.json), which holds every seat's findings/verdicts (the anchoring ADR-002/007 independence guards) and now also the gate record. Commands like `cat docs/designs/<dir>/.pipeline.json` or `git show HEAD:docs/designs/<dir>/.pipeline.json` carry no denied token, so the newly granted star-form inspection set allows them, and the audit's segment regexes don't name pipeline.json either. The repo already treats the path as a run record (every agent config denies edit on it, line 12), and ADR-016's Context calls a research child reading the checkpoint a real violation; this diff grants that route to five doc families that had none, enriches the file, and its comment claims the block is 'the single authority' for run-record denies.",
+            "fix": "Extend the run-record block on every shell-holding agent with shell deny `*pipeline.json*` and read/glob deny `docs/designs/**/.pipeline.json`, add the STATE_FILE name to the audit's segment test as backstop, and pin both directions in agent-shell.test.ts as the transcripts/reviews pair is pinned."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3085-3123",
+            "problem": "gateEvidenceText emits captured tails and command lines verbatim (modulo printable) inside a ```text fence, and the 'output, never instructions' header is the only injection defense for output controlled by the code under review. A tail containing a ``` line closes the fence early, placing later captured text outside the quoted region, and a tail line shaped like `$ <command> (exit 0)` impersonates a leg line; the final MAX_EVIDENCE_BLOCK_CHARS slice can also drop the closing fence, leaving an unbalanced block.",
+            "fix": "At render, neutralize fence sequences inside captured strings (escape runs of three or more backticks, or prefix each tail line with a renderer-owned continuation marker), and reserve the closing fence inside the cap so the hard slice can never remove it."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/code-review-security-r2c0.md",
+      "durationMs": 197588,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 2,
+      "sessionID": "ses_e29a61b24ffef3tpyWr2dmGH3C",
+      "agent": "codereview/code-performance",
+      "at": 1794597674734,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/gates.ts:451-467",
+            "problem": "checkGate removed the boolean-era cargo short-circuit: the old cargoGreen returned false on the first failing cargo leg, so a red `cargo fmt --all -- --check` skipped the expensive clippy and `cargo test --workspace --locked` legs. The new gate always runs all three serially on every implement/fix/test-update checkpoint — the fix loop's hot path, where gates go red — so every red round now pays full clippy + full workspace-test wall-clock time. The choice is deliberate (Decision 2 needs the test leg's tail) and is only recorded in a code comment; the proposal's Risks table prices the record's context cost, not this wall-clock cost, and no measurement is cited.",
+            "fix": "Accept the cost explicitly: add one line to the build note / Risks stating the red-gate wall-clock change, and make it checkable by recording a per-leg duration (a duration field on GateLeg, or timestamps in the render header) so the next run's gate record cites the actual seconds instead of a debate. Do not re-add the short-circuit — it would gut Decision 2."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/gate-evidence-capture.test.ts / gate-evidence-render.test.ts (performance checklist item 6)",
+            "problem": "The capture-budget tests the ADR names as load-bearing could not be exercised by this seat: the run supplied no gate record and the seat's shell permission set rejects `npx vitest` and the cargo legs. Per the specialty checklist, a timing-sensitive claim I could not run counts as unevaluated, so the verdict on the red-path cost rests on static reading of the pinned caps (tail ≤ 2000, legs ≤ 33, block ≤ 6000 — all verified statically, all constants matching Rollout 2).",
+            "fix": "No code change: this is a verification gap of the review posture. Capturing per-leg gate durations (see the F1 fix) would let the gate record the runner hands to future seats close it without widening any seat's shell."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/code-review-performance-r2c0.md",
+      "durationMs": 96722,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 2,
+      "sessionID": "ses_e29a4a0fbffe0zvwpeTSLxsIlU",
+      "agent": "codereview/code-testing",
+      "at": 1794597838490,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/gate-evidence-capture.test.ts:203 (Test strategy #14)",
+            "problem": "The strategy promises the cargo legs run \"against the real workspace in the integration tests that need a green gate\", but no test in the suite runs a real cargo binary: the cargo coverage stubs cargo on PATH and the green-gate integration tests use a node check script. The real command lines do run in the CI rust job and the shipped runner gate, but the suite itself does not close the loop the strategy sentence describes.",
+            "fix": "Add a probe-guarded integration case that points checkGate at the repo's own cargo workspace when cargo is on PATH (asserting the three CARGO_GATE legs and a real `test result:` line), or record in the fixture comment/build note that the real-workspace cargo legs live in the CI rust job and the runner gate, not the vitest suite."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/gates.ts:369-375 (runLeg rolling tail buffer, MAX_TAIL_BYTES at :318)",
+            "problem": "The eviction loop that drops oldest chunks past 64 KiB is never exercised: the largest fixture leg emits ~4 KiB, so a bug in the eviction (wrong-end drop, miscounted kept bytes, code point split at the eviction seam) would pass the whole suite while corrupting tails of chatty legs — the exact artifact behavior claims cite.",
+            "fix": "Add a generator mode writing ~200 KB (fill plus a final TAIL_END line) and assert the recorded tail still ends at the leg's last line and stays within MAX_GATE_TAIL_CHARS."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/agent-shell.test.ts:340",
+            "problem": "The run-record glob/grep deny set is pinned only for the doc families and the five design seats; the same blocks added to code/coder.md, code/test-engineer.md and the five codereview seats by this diff are asserted only on their shell leg (SHELL_HOLDING deny test), so their glob/grep denies ship unpinned and could be dropped silently, while docs/workflows.md promises the denies for every shell-holding stage agent.",
+            "fix": "Extend the deniesResource glob/grep loop to CODE_AGENTS and REVIEW_AGENTS so all 17 shell-holding agents are pinned."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/gates.ts:406 (signal branch of runLeg)",
+            "problem": "The proposal names two exit:null cases (spawn failure, signal kill); only the spawn-failure case has a fixture, so the 'killed by signal' tail path is untested.",
+            "fix": "Add a generator mode that self-SIGKILLs and assert exit === null with the spelled signal in the tail."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/independence.ts:251",
+            "problem": "The `tokens.length === 0 ||` guard in shellReachesReviews is provably dead: whenever REVIEWS_SEGMENT matches the command, at least one TOKEN_BOUNDARY-delimited token re-matches it (TOKEN_BOUNDARY's class is the segment class minus `/`, and a surviving `/` is itself a segment delimiter). Harmless fail-closed defense, but a dead branch is a finding.",
+            "fix": "Drop the guard, or comment it as defense-against-divergence between the two character classes so no reader expects it to be exercised."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/pipeline/gate-evidence-render.test.ts:125",
+            "problem": "Test strategy #2 says gateEvidenceText re-applies both the printable strip and the array bound at render; only the printable re-application is asserted there — no case pushes more than MAX_GATE_LEGS legs through gateEvidenceText to prove the render-time array re-bound.",
+            "fix": "Pass 40 legs to gateEvidenceText and assert the rendered block names the elision note while staying within MAX_EVIDENCE_BLOCK_CHARS."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/code-review-testing-r2c0.md",
+      "durationMs": 163701,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 2,
+      "sessionID": "ses_e29a220fdffevWwQUOuEQg2fs7",
+      "agent": "code/coder",
+      "at": 1794598384824,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "fix: sanitize gate evidence, fence the checkpoint, and name metered docs",
+        "moves": []
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/fix-r2.md",
+      "durationMs": 546197,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 2,
+      "sessionID": "ses_e299994b5ffeuRb6On7oyLib53",
+      "agent": "code/test-engineer",
+      "at": 1794598740496,
+      "reply": {
+        "commitMessage": "test: pin gate-record hygiene, token cache groups and the checkpoint fence",
+        "moves": []
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/test-update-r2.md",
+      "durationMs": 341642,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e29942b22ffeI70BOkPK2JB8MZ",
+      "agent": "codereview/code-correctness",
+      "at": 1794598902590,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "docs/designs/016-harness-evidence-and-read-rights/03-build-notes.md (deviation 14) vs tools/orchestration/tests/pipeline/prompts.test.ts:233–237",
+            "problem": "Deviation 14 claims the scoped browse sentence's wording is pinned by prompts.test.ts (\"It is still kept — `prompts.test.ts` pins the wording\"), but this diff removed the `expect(text).toContain('never browse to verify one')` assertion; the test now states in its own comment that \"the pre-016 phrase is therefore not pinned verbatim\" and pins only the listing/globbing/grepping sentence and `Do not open review reports or transcripts`. A build-notes claim checked against the code and found false (correctness checklist item 5). The prompt change itself correctly closes my round-2 finding 5.",
+            "fix": "Correct deviation 14's sentence to name what is actually pinned (the kept prohibition via `Do not open review reports or transcripts` plus the listing/globbing/grepping sentence), or add a `toContain` on the scoped browse sentence so the pin claim is true again."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/code-review-correctness-r2c1.md",
+      "durationMs": 149049,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 2,
+      "sessionID": "ses_e2991e4b3ffe8HUEq4Ee1fMNzj",
+      "agent": "codereview/code-security",
+      "at": 1794599051511,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/gates.ts:366; tools/orchestration/src/pipeline/runner.ts:3090-3105",
+            "problem": "boundedTail concatenates the tail-cap elision note directly onto the kept span with no separator, so when the kept span begins exactly at a line-initial absolute path (rustc/cargo emit such lines), the line the citation rule sees starts `[…]` followed by `/home/...`; the POSIX branch of ABSOLUTE_PATH_LINE is anchored (`^` or `[\\s'\"(=,]` must precede the slash), so the glue hides it and one absolute host path survives into the committed checkpoint and prompts. Credential patterns are unanchored and unaffected; this is host-layout disclosure only. The dirty fixture uses short tails, so it never exercises the glue.",
+            "fix": "Separate the boundedTail note from the kept span with a newline (or strip a leading elision note in citableTail before judging each line / add `]` to ABSOLUTE_PATH_LINE's leading class), and extend the dirty fixture with a >MAX_GATE_TAIL_CHARS output whose cut lands at a line-initial absolute path, asserting it does not reach the persisted record."
+          },
+          {
+            "severity": "nit",
+            "location": ".opencode/agents/*/*.md (new run-record block, e.g. codereview/code-security.md:174-185); docs/workflows.md run-record paragraph",
+            "problem": "The transcripts/reviews pair includes a grep deny, but the new checkpoint block omits one, while the block's own comment claims the 'same coarse rule shape as the two directories above' and the revised workflows.md sentence says 'plus the matching read/glob/grep denies' — both overstate the fence for `.pipeline.json`. Per A17 a grep resource matches the requested regex, so the gap is only the regex-spelling route (path-targeted grep is still caught by the deed audit via accessValues.grep), but the config and its docs disagree.",
+            "fix": "Add `- action: grep / resource: \"*pipeline.json*\" / effect: deny` to each agent's run-record block (pinned alongside the read/glob denies in agent-shell.test.ts), or reword the agent comment and the workflows.md sentence to name only read/glob for the checkpoint."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/code-review-security-r2c1.md",
+      "durationMs": 148881,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e298f9ec3ffeipmkFdxCRowrb7",
+      "agent": "codereview/code-compatibility",
+      "at": 1794599196584,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3188-3195 (greenSummary), against 02-proposal.md A18 and Test strategy #10, and this pass's own gate record",
+            "problem": "The r2 fix for the too-long green-leg join changed which summary a green leg cites: greenSummary uses tail.lastIndexOf('test result:'). For a `cargo test --workspace --locked` leg the last target cargo reports is a doc-test target, so the citable line becomes `test result: ok. 0 passed; …` (in this pass's gate record, the `Doc-tests bindforge_transforms` summary) while the crate totals (`29 passed`, `2 passed`) sit earlier in the flattened tail. The round-2 render this seat approved emitted the 29-passed line, so the fix removed the artifact Decision 2 exists to hand a seat — \"a behavior claim has a citable `test result:` line\" — and left a line that reads as though no tests ran. gate-evidence-render.test.ts:150-165 pins the new shape only against a fixture whose last summary is the meaningful one, so the workspace ordering is the unpinned case.",
+            "fix": "Pick the first non-vacuous summary (skip a `0 passed; 0 failed` clause, lastIndexOf as fallback), or render the first summary plus a count of further ones; pin with a fixture ending in a doc-test `0 passed` target after an integration-target summary, i.e. the shape the captured gate record shows."
+          },
+          {
+            "severity": "minor",
+            "location": "README.md:24 and .opencode/skills/repo-practices/SKILL.md:65-66 (against tools/orchestration/package.json:31 and .github/workflows/check.yml:50) — carried from r2, not in this range",
+            "problem": "The Node-floor drift this seat reported in r2 is untouched by the c2 commits: two of the four statements of the orchestration gate's floor still read `22.23.4` while `engines.node` is `>=22.23.5` and the CI pin is `22.23.5`. crates/core/tests/gate_contract.rs keeps only the package.json/CI pair in lockstep, so the prose drifts silently, and the skill copy is the live trap since every coder and test-engineer stage loads it.",
+            "fix": "Change README.md:24 and SKILL.md:66 to `22.23.5` so the floor reads identically in all four places."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/gate-evidence-integration.test.ts:38-95 (new `dirty` mode of gateScript, tmpGateRepo unchanged) with 02-proposal.md:393-395 Test strategy #14 — carried and widened from r2",
+            "problem": "Test strategy #14 still claims \"the cargo legs run against the real workspace in the integration tests that need a green gate\", and the c2 range adds a third mkdtemp fixture with the same shape (package.json check script, no Cargo.toml), so hasCargoWorkspace is false there too and no cargo leg is ever spawned in any integration test; the suite's only cargo capture stubs `cargo` on PATH. A18's premise — that a real cargo tail carries and surfaces the summary — is pinned only against synthetic two-line output, which is precisely how the greenSummary regression above escaped the suite.",
+            "fix": "Add one integration leg against a fixture workspace (`[workspace] members = []` plus a trivial member, or checkGate against the repo's own workspace) asserting a real `cargo test --workspace --locked` leg with a `test result:` tail and its rendered citable line; or amend #14 to the shipped posture (cargo stubbed at unit level, real-workspace proof is the CI orchestration job) and register it under Deferred."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3133-3147 (citableCwd), against the repo idiom at runner.ts:222 / identity.ts:59 / moves.ts:175",
+            "problem": "Checklist item 3: the new relativization is hand-rolled string manipulation (`split('\\\\').join('/')`, `startsWith(root + '/')`, `slice`) rather than the shipped `relative(repoDir, target)` idiom. The comparison is case-sensitive, so on the case-insensitive hosts whose absolute-path spelling the code explicitly handles (`C:\\Work\\…` vs `c:\\work\\…`) it falls through to `'(cwd withheld)'` and every leg's package dir silently disappears from the committed record — where `path.win32.relative` would be case-insensitive. Linux, the only exercised platform, derives the dirs from `join(repoDir, …)`, so the match is guaranteed there.",
+            "fix": "Use `relative(repoDir, cwd).split(/[\\\\/]/).join('/')` and keep `'(cwd withheld)'` only when the result escapes the root (a `..` segment)."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3192-3194 (greenSummary slice), against boundedTail's stated rule in tools/orchestration/src/pipeline/gates.ts:323-370",
+            "problem": "Checklist item 5: the citable clause is cut with `tail.slice(at, stop)`, i.e. by UTF-16 units, while boundedTail in the same feature was written to bound by code points explicitly because \"slicing units can cut a surrogate pair\". A 160-unit window ending inside a surrogate pair (non-BMP character in a test name or path) puts a lone surrogate into the rendered evidence block: printable runs at write, before the slice, and neither defuseFences nor the cap re-sanitizes it.",
+            "fix": "Slice code points (`Array.from(tail).slice(a, b).join('')`) as boundedTail does, or re-apply the code-point guard after slicing."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/pipeline/gate-evidence-capture.test.ts:218-247 and :166-178 — carried from r2, unchanged in this range",
+            "problem": "The POSIX-only legs (shebang `cargo` stub written 0o755 with PATH prefixed; PATH swapped to a non-existent bin dir) still have no host guard, while the suite's established pattern for a host-specific leg is `describe.runIf(...)` (moves.test.ts:704, :753, :765). No support claim breaks — the Compatibility matrix marks macOS and Windows/WSL2 `not exercised` — but a contributor on an unclaimed host gets a red `npm run check` from a script that cannot execute there rather than a skipped-and-labelled leg.",
+            "fix": "Wrap both legs in `describe.runIf(process.platform !== 'win32')` with a one-line note pointing at the matrix's `not exercised` rows, matching moves.test.ts's spelling."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/code-review-compatibility-r2c2.md",
+      "durationMs": 144973,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 2,
+      "sessionID": "ses_e298d684effeCCgGZbkUfqyUpA",
+      "agent": "codereview/code-performance",
+      "at": 1794599275111,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/gates.ts:479-495",
+            "problem": "Carried from r2, unchanged: checkGate still records no per-leg duration, so the deliberate red-gate wall-clock cost of removing the cargo short-circuit (Decision 2 needs the test leg's tail) remains priced only by a code comment. The r2c1/c1 fixes do not touch checkGate, so nothing I approved changed — but the finding is still open. This pass measured the green path: `npm run check` Duration 7.27s (570 tests), targeted capture-budget suite 1.52s (19 tests), cargo test legs 'finished in 0.00s' per the gate record.",
+            "fix": "Accept the cost explicitly with one measured line and add a duration field to GateLeg (or timestamps in the render header) so future gate records cite real seconds for the red path. Do not re-add the short-circuit."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:412-421 (CREDENTIAL_LINE_PATTERNS / unshipped comment)",
+            "problem": "The new comment claims 'Linear patterns only ... nothing here may backtrack.' The credential-assignment pattern ([\\w.-]*(?:token|...)[\\w.-]*\\s*[:=]) does backtrack — the trailing [:=] fails at every split of a long word-char run, worst case quadratic per line. The cost is bounded by the capture caps (tail <= 2,000 chars x 32 legs, once per write and once per render -> milliseconds), so it is performance-acceptable; only the comment overstates.",
+            "fix": "Comment-only: state that no unbounded-cascade pattern is used and the worst case is bounded by the capture caps, rather than implying zero backtracking. No code change requested."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/code-review-performance-r2c2.md",
+      "durationMs": 78491,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 2,
+      "sessionID": "ses_e298c358cffeshrq4Ha0HAg02h",
+      "agent": "codereview/code-testing",
+      "at": 1794599440375,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/report.ts:186 + tools/orchestration/tests/pipeline/proposal-size.test.ts:303",
+            "problem": "The c2 aggregate fix (research size records must not fold into the proposal growth line, correctness r2c0 finding 3) has no test: no fixture anywhere carries docName: RESEARCH_DOC, and the research-meter test asserts docLines but never the stamped docName. Deleting the `&& r.docName !== RESEARCH_DOC` filter — the exact mutation reproducing the accepted defect — leaves the suite green.",
+            "fix": "Add a proposalGrowth case mixing proposal-size records with one docName: RESEARCH_DOC record and assert the aggregate counts only the proposal records; assert the research stage's result carries docName."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/gates.ts:349-367 (boundedTail elision equation)",
+            "problem": "The elision-equation rewrite (correctness r2c0 finding 4: the marker must state the true elision) is not pinned by any test — no assertion in the suite greps the `characters elided by the gate tail cap` note. The old fixed-64 reservation, which overstated the elision, passes every current capture assertion (length <= 2000, contains TAIL_END, not startsWith 'xxxx').",
+            "fix": "In the `big` capture test, match /^\\[(\\d+) characters elided by the gate tail cap\\]/ and assert the stated number equals the fixture's known 4009-char output minus the kept span, so the marker and the kept span are pinned as one equation."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3188-3197 (greenSummary) vs tools/orchestration/tests/pipeline/gate-evidence-integration.test.ts:47",
+            "problem": "The single-citable-line fix selects the LAST test result summary, but every fixture (unit and the strategy-#10 integration) emits exactly one summary per leg, so the choice is never exercised against a multi-summary tail. The repo's real cargo test --workspace tail ends with the doc-tests summary (`test result: ok. 0 passed`, visible in the runner's own gate record), so the citable line a seat actually gets is the least informative one; no test distinguishes 'the summary behind the behavior claim' from 'the last summary in the flatten'.",
+            "fix": "Make the integration green script emit several per-target summaries ending with a 0-passed doc-test line as real cargo does, and assert the chosen citable clause — either knowingly pin the last-summary choice or prefer the last summary with nonzero counts."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3113-3144,3193-3196",
+            "problem": "Three new helper branches ship untested: citableTail's all-lines-dropped marker-only return, citableCwd's '(cwd withheld)' result (an exported-behavior branch no test asserts), and greenSummary's fixed-window fallback when ' finished in ' is absent. Untested branches are checklist findings, not passes.",
+            "fix": "Three small unit cases in gate-evidence-render.test.ts: a tail with every line dropped, an absolute cwd with no repoDir, and a flattened tail with a test result: clause and no ' finished in ' terminator."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/gate-evidence-capture.test.ts:203 (Test strategy #14)",
+            "problem": "Still open after c2: the strategy promises the cargo legs run 'against the real workspace in the integration tests that need a green gate', but no test runs a real cargo binary — cargo is PATH-stubbed in the unit test and the green-gate integration legs are node scripts. The c2 diff added neither the probe-guarded real-workspace case nor a comment recording that the real legs live in the CI rust job and the shipped runner gate.",
+            "fix": "Add a probe-guarded integration case pointing checkGate at the repo's own cargo workspace when cargo is on PATH, or record the divergence in the fixture comment/build note."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/gates.ts:401-404 (runLeg MAX_TAIL_BYTES eviction)",
+            "problem": "Still open after c2: the rolling tail buffer's eviction loop is never exercised — the largest fixture leg emits ~4 KiB against a 64 KiB window. A wrong-end drop or miscounted kept bytes would corrupt exactly the tails behavior claims cite and pass the whole suite.",
+            "fix": "Add a generator mode writing ~200 KB (fill plus a final TAIL_END line) and assert the recorded tail ends at the leg's last line and stays within MAX_GATE_TAIL_CHARS."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/agent-shell.test.ts:340-351",
+            "problem": "Partially mitigated by c2: the new checkpoint tests pin the .pipeline.json read/glob denies for all 17 shell-holding agents, but the *transcripts*/*reviews* glob/grep deny loop still covers only DOC_FAMILIES + DESIGN_SEATS (10 of 17); the two CODE_AGENTS' and five codereview seats' glob/grep run-record denies remain unpinned and could be dropped silently.",
+            "fix": "Extend the existing glob/grep deniesResource loop to CODE_AGENTS and REVIEW_AGENTS (or loop over SHELL_HOLDING) so all 17 are pinned for the transcripts/reviews denies as they now are for the checkpoint."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/gates.ts:431-447 (close/signal branch of runLeg)",
+            "problem": "Still open after c2: the proposal names two exit:null cases (spawn failure, signal kill); only the spawn-failure case has a fixture, so the 'killed by signal' tail path is untested.",
+            "fix": "Add a generator mode that self-SIGKILLs and assert exit === null with the spelled signal in the tail."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/independence.ts:273",
+            "problem": "Still open after c2: the `tokens.length === 0 ||` guard in shellReachesReviews remains provably dead (any command matching REVIEWS_SEGMENT yields at least one token re-matching it) and remains uncommented, so no reader knows it is defense-against-divergence rather than an exercised branch.",
+            "fix": "Drop the guard, or comment it as defense-against-divergence between the two character classes."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/pipeline/gate-evidence-render.test.ts:91-211",
+            "problem": "Still open after c2: test strategy #2 says gateEvidenceText re-applies the array bound at render, but the largest gateEvidenceText fixture uses 24 legs (below MAX_GATE_LEGS = 32); no case pushes more than 32 legs through the renderer to prove the render-time re-bound.",
+            "fix": "Pass 40 legs to gateEvidenceText and assert the rendered block names the elision note while staying within MAX_EVIDENCE_BLOCK_CHARS."
+          }
+        ]
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/code-review-testing-r2c2.md",
+      "durationMs": 165227,
+      "nudges": 0
+    },
+    {
+      "stage": "doc-sync",
+      "round": 2,
+      "sessionID": "ses_e2989afa7ffePseBmK9SYmQCcg",
+      "agent": "ops/doc-sync",
+      "at": 1794599672888,
+      "reply": {
+        "drifted": true,
+        "commitMessage": "docs: record as-built drift and finish build notes for ADR-016 harness evidence"
+      },
+      "transcript": "docs/designs/016-harness-evidence-and-read-rights/transcripts/doc-sync-r2.md",
+      "durationMs": 232381,
+      "nudges": 0
+    }
+  ],
+  "gateLog": [
+    {
+      "gate": "sourceAdmissible",
+      "round": 0,
+      "proceed": true,
+      "reason": "ADR is proposed and complete",
+      "at": 1794591516896
+    },
+    {
+      "gate": "stageFailure",
+      "round": 0,
+      "proceed": false,
+      "reason": "research: independence violation: grep accessed run records: /home/mike/repos/bindforge/docs/designs/012-input-vocabulary-and-reach-classes/transcripts; grep accessed run records: /home/mike/repos/bindforge/docs/designs/015-transforms-as-preconditioned-policies/transcripts; grep accessed run records: /home/mike/repos/bindforge/docs/designs/012-input-vocabulary-and-reach-classes/transcripts/research-attempt2-r0.md",
+      "at": 1794591755208
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: correctness, compatibility, security",
+      "at": 1794592507174
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c2 pending: security",
+      "at": 1794593141445
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c3 pending: correctness, compatibility, performance, complexity",
+      "at": 1794593322883
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794593540110
+    },
+    {
+      "gate": "editorial-review",
+      "round": 2,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1794593821781
+    },
+    {
+      "gate": "stageFailure",
+      "round": 0,
+      "proceed": false,
+      "reason": "test-authoring: independence violation: glob accessed run records: docs/designs/**/transcripts/*.md",
+      "at": 1794594177959
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794596016282
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1794596230119
+    },
+    {
+      "gate": "escalate",
+      "round": 0,
+      "proceed": false,
+      "reason": "unhandled pipeline error after stage test-update: unresolved template placeholder: {{gateEvidence}}",
+      "at": 1794596230136
+    },
+    {
+      "gate": "code-review",
+      "round": 2,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: correctness, security",
+      "at": 1794597838584
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1794598398757
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1794598753467
+    },
+    {
+      "gate": "code-review",
+      "round": 2,
+      "proceed": false,
+      "reason": "ratify pass c2 pending: compatibility, performance, testing",
+      "at": 1794599051573
+    },
+    {
+      "gate": "code-review",
+      "round": 2,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794599440455
+    },
+    {
+      "gate": "done",
+      "round": 0,
+      "proceed": true,
+      "reason": "pipeline complete",
+      "at": 1794599672954
+    }
+  ],
+  "startedAt": 1794591516874,
+  "updatedAt": 1794599672954,
+  "flow": "full",
+  "baseRef": "22ce12bf09a600d3983f374294d9d5844b07af54",
+  "designCycle": 4,
+  "designStamp": "4e18f4f58f54dffca8fc0c2a5beab1cc6d4af345",
+  "seats": {
+    "design": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "4e18f4f58f54dffca8fc0c2a5beab1cc6d4af345",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design §1, shell branch — \"a prefix-less token resolves outside the attempt's design directory and fails closed\"",
+            "problem": "new (surviving half of my r1 minor, re-raised): the fail-closed clause this revision adds is reachable through rules the same document ships, and is neither pinned nor enumerated. §3's per-seat re-open `shell git diff *reviews/design/<specialty>-*` matches, under A16's grammar, with the leading `*` spanning the empty prefix, and §3's inspection set (byte-for-byte `code/coder.md`, ADR Decision 3's `cd`) permits `cd docs/designs/<dir> && git diff reviews/design/<specialty>-r1c1.md` — so the permission layer admits a command the audit then fails, while §3 asserts prompt, permission layer, and audit \"say the same thing\". The Risks seam row enumerates only \"the seat's prior-round reports and another design directory's same-named report\", and §3's seam sentence only \"prior-round and other runs' same-named reports\", so the one own-report spelling the allow admits and §1 rejects is described nowhere, and Test strategy #3 pins neither direction of it. Not blocking: the rule is deterministic, co… [elided by the checkpoint cap]",
+            "fix": "Extend Test strategy #3's fail set with that one compound command (`cd docs/designs/<dir> && git diff reviews/design/<specialty>-r1c1.md` fails) — or move it to the clean set if exemption was intended — and add the prefix-less own-report spelling to §3's enumeration \"the wildcard's extra reach over prior-round and other runs' same-named reports\" so the seam names every spelling the allow admits but §1 fails."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "4e18f4f58f54dffca8fc0c2a5beab1cc6d4af345",
+        "dissents": 1,
+        "findings": []
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "4e18f4f58f54dffca8fc0c2a5beab1cc6d4af345",
+        "dissents": 2,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design §1 shell branch + Test strategy #3 — \"a prefix-less token resolves outside the attempt's design directory and fails closed\"",
+            "problem": "new: The r2 revision's fail-closed half — a prefix-less shell spelling of the own report (e.g. `git diff reviews/design/<specialty>-r1c1.md`), which §3's `*`-prefixed wildcard allow does let through the permission layer so the audit is the only thing that can stop it — is asserted in the rule text and the Revision log but has no fixture. Test strategy #3 pins the clean own-spelling and the cross-run/sibling failures but not this spelling.",
+            "fix": "Add one assertion to Test strategy #3: the prefix-less shell spelling fails the audit even though §3's wildcard permits it at the permission layer. No new mechanism."
+          }
+        ]
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "4e18f4f58f54dffca8fc0c2a5beab1cc6d4af345",
+        "dissents": 0,
+        "findings": []
+      },
+      "complexity": {
+        "verdict": "approve",
+        "stamp": "4e18f4f58f54dffca8fc0c2a5beab1cc6d4af345",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Rollout, item 2 — \"`tools/orchestration/package.json` `engines.node` rises to `>=22.23.5` for the 2026-11-11 Node security release — the only runtime prerequisite added\"",
+            "problem": "This is the one change the post-approval revisions landed that traces to no Goal or ADR-016 Decision clause: the ADR never mentions Node, and nothing this design ships (byte capture, UTF-8 replacement decode, `printable` bounding) requires 22.23.5. It sits in tension with the approved Context claim \"implements the ADR's Decision clauses 1–4 and nothing else\", and since Rollout #1 lands as one branch, hosts on 22.23.4 now fail an engines gate for a reason external to the design's features (complexity checklist #2 — moving part with no stated Goal trace).",
+            "fix": "One clause marking it as an environment chore riding the branch (\"no Decision 1–4 code requires it; it rides this branch as a chore bump\"), or drop it from Rollout and land it as a separate `chore:` change. Either keeps the \"nothing else\" scope claim true without adding a mechanism."
+          }
+        ]
+      }
+    },
+    "code": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "c2fd15eac35a89194e345161fc997c4118cacf1d",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "docs/designs/016-harness-evidence-and-read-rights/03-build-notes.md (deviation 14) vs tools/orchestration/tests/pipeline/prompts.test.ts:233–237",
+            "problem": "Deviation 14 claims the scoped browse sentence's wording is pinned by prompts.test.ts (\"It is still kept — `prompts.test.ts` pins the wording\"), but this diff removed the `expect(text).toContain('never browse to verify one')` assertion; the test now states in its own comment that \"the pre-016 phrase is therefore not pinned verbatim\" and pins only the listing/globbing/grepping sentence and `Do not open review reports or transcripts`. A build-notes claim checked against the code and found false (correctness checklist item 5). The prompt change itself correctly closes my round-2 finding 5.",
+            "fix": "Correct deviation 14's sentence to name what is actually pinned (the kept prohibition via `Do not open review reports or transcripts` plus the listing/globbing/grepping sentence), or add a `toContain` on the scoped browse sentence so the pin claim is true again."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "c2fd15eac35a89194e345161fc997c4118cacf1d",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3188-3195 (greenSummary), against 02-proposal.md A18 and Test strategy #10, and this pass's own gate record",
+            "problem": "The r2 fix for the too-long green-leg join changed which summary a green leg cites: greenSummary uses tail.lastIndexOf('test result:'). For a `cargo test --workspace --locked` leg the last target cargo reports is a doc-test target, so the citable line becomes `test result: ok. 0 passed; …` (in this pass's gate record, the `Doc-tests bindforge_transforms` summary) while the crate totals (`29 passed`, `2 passed`) sit earlier in the flattened tail. The round-2 render this seat approved emitted the 29-passed line, so the fix removed the artifact Decision 2 exists to hand a seat — \"a behavior claim has a citable `test result:` line\" — and left a line that reads as though no tests ran. gate-evidence-render.test.ts:150-165 pins the new shape only against a fixture whose last summary is the meaningful one, so the workspace ordering is the unpinned case.",
+            "fix": "Pick the first non-vacuous summary (skip a `0 passed; 0 failed` clause, lastIndexOf as fallback), or render the first summary plus a count of further ones; pin with a fixture ending in a doc-test `0 passed` target after an integration-target summary, i.e. the shape the captured gate record shows."
+          },
+          {
+            "severity": "minor",
+            "location": "README.md:24 and .opencode/skills/repo-practices/SKILL.md:65-66 (against tools/orchestration/package.json:31 and .github/workflows/check.yml:50) — carried from r2, not in this range",
+            "problem": "The Node-floor drift this seat reported in r2 is untouched by the c2 commits: two of the four statements of the orchestration gate's floor still read `22.23.4` while `engines.node` is `>=22.23.5` and the CI pin is `22.23.5`. crates/core/tests/gate_contract.rs keeps only the package.json/CI pair in lockstep, so the prose drifts silently, and the skill copy is the live trap since every coder and test-engineer stage loads it.",
+            "fix": "Change README.md:24 and SKILL.md:66 to `22.23.5` so the floor reads identically in all four places."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/gate-evidence-integration.test.ts:38-95 (new `dirty` mode of gateScript, tmpGateRepo unchanged) with 02-proposal.md:393-395 Test strategy #14 — carried and widened from r2",
+            "problem": "Test strategy #14 still claims \"the cargo legs run against the real workspace in the integration tests that need a green gate\", and the c2 range adds a third mkdtemp fixture with the same shape (package.json check script, no Cargo.toml), so hasCargoWorkspace is false there too and no cargo leg is ever spawned in any integration test; the suite's only cargo capture stubs `cargo` on PATH. A18's premise — that a real cargo tail carries and surfaces the summary — is pinned only against synthetic two-line output, which is precisely how the greenSummary regression above escaped the suite.",
+            "fix": "Add one integration leg against a fixture workspace (`[workspace] members = []` plus a trivial member, or checkGate against the repo's own workspace) asserting a real `cargo test --workspace --locked` leg with a `test result:` tail and its rendered citable line; or amend #14 to the shipped posture (cargo stubbed at unit level, real-workspace proof is the CI orchestration job) and register it under Deferred."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3133-3147 (citableCwd), against the repo idiom at runner.ts:222 / identity.ts:59 / moves.ts:175",
+            "problem": "Checklist item 3: the new relativization is hand-rolled string manipulation (`split('\\\\').join('/')`, `startsWith(root + '/')`, `slice`) rather than the shipped `relative(repoDir, target)` idiom. The comparison is case-sensitive, so on the case-insensitive hosts whose absolute-path spelling the code explicitly handles (`C:\\Work\\…` vs `c:\\work\\…`) it falls through to `'(cwd withheld)'` and every leg's package dir silently disappears from the committed record — where `path.win32.relative` would be case-insensitive. Linux, the only exercised platform, derives the dirs from `join(repoDir, …)`, so the match is guaranteed there.",
+            "fix": "Use `relative(repoDir, cwd).split(/[\\\\/]/).join('/')` and keep `'(cwd withheld)'` only when the result escapes the root (a `..` segment)."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3192-3194 (greenSummary slice), against boundedTail's stated rule in tools/orchestration/src/pipeline/gates.ts:323-370",
+            "problem": "Checklist item 5: the citable clause is cut with `tail.slice(at, stop)`, i.e. by UTF-16 units, while boundedTail in the same feature was written to bound by code points explicitly because \"slicing units can cut a surrogate pair\". A 160-unit window ending inside a surrogate pair (non-BMP character in a test name or path) puts a lone surrogate into the rendered evidence block: printable runs at write, before the slice, and neither defuseFences nor the cap re-sanitizes it.",
+            "fix": "Slice code points (`Array.from(tail).slice(a, b).join('')`) as boundedTail does, or re-apply the code-point guard after slicing."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/pipeline/gate-evidence-capture.test.ts:218-247 and :166-178 — carried from r2, unchanged in this range",
+            "problem": "The POSIX-only legs (shebang `cargo` stub written 0o755 with PATH prefixed; PATH swapped to a non-existent bin dir) still have no host guard, while the suite's established pattern for a host-specific leg is `describe.runIf(...)` (moves.test.ts:704, :753, :765). No support claim breaks — the Compatibility matrix marks macOS and Windows/WSL2 `not exercised` — but a contributor on an unclaimed host gets a red `npm run check` from a script that cannot execute there rather than a skipped-and-labelled leg.",
+            "fix": "Wrap both legs in `describe.runIf(process.platform !== 'win32')` with a one-line note pointing at the matrix's `not exercised` rows, matching moves.test.ts's spelling."
+          }
+        ]
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "c2fd15eac35a89194e345161fc997c4118cacf1d",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/gates.ts:366; tools/orchestration/src/pipeline/runner.ts:3090-3105",
+            "problem": "boundedTail concatenates the tail-cap elision note directly onto the kept span with no separator, so when the kept span begins exactly at a line-initial absolute path (rustc/cargo emit such lines), the line the citation rule sees starts `[…]` followed by `/home/...`; the POSIX branch of ABSOLUTE_PATH_LINE is anchored (`^` or `[\\s'\"(=,]` must precede the slash), so the glue hides it and one absolute host path survives into the committed checkpoint and prompts. Credential patterns are unanchored and unaffected; this is host-layout disclosure only. The dirty fixture uses short tails, so it never exercises the glue.",
+            "fix": "Separate the boundedTail note from the kept span with a newline (or strip a leading elision note in citableTail before judging each line / add `]` to ABSOLUTE_PATH_LINE's leading class), and extend the dirty fixture with a >MAX_GATE_TAIL_CHARS output whose cut lands at a line-initial absolute path, asserting it does not reach the persisted record."
+          },
+          {
+            "severity": "nit",
+            "location": ".opencode/agents/*/*.md (new run-record block, e.g. codereview/code-security.md:174-185); docs/workflows.md run-record paragraph",
+            "problem": "The transcripts/reviews pair includes a grep deny, but the new checkpoint block omits one, while the block's own comment claims the 'same coarse rule shape as the two directories above' and the revised workflows.md sentence says 'plus the matching read/glob/grep denies' — both overstate the fence for `.pipeline.json`. Per A17 a grep resource matches the requested regex, so the gap is only the regex-spelling route (path-targeted grep is still caught by the deed audit via accessValues.grep), but the config and its docs disagree.",
+            "fix": "Add `- action: grep / resource: \"*pipeline.json*\" / effect: deny` to each agent's run-record block (pinned alongside the read/glob denies in agent-shell.test.ts), or reword the agent comment and the workflows.md sentence to name only read/glob for the checkpoint."
+          }
+        ]
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "c2fd15eac35a89194e345161fc997c4118cacf1d",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/gates.ts:479-495",
+            "problem": "Carried from r2, unchanged: checkGate still records no per-leg duration, so the deliberate red-gate wall-clock cost of removing the cargo short-circuit (Decision 2 needs the test leg's tail) remains priced only by a code comment. The r2c1/c1 fixes do not touch checkGate, so nothing I approved changed — but the finding is still open. This pass measured the green path: `npm run check` Duration 7.27s (570 tests), targeted capture-budget suite 1.52s (19 tests), cargo test legs 'finished in 0.00s' per the gate record.",
+            "fix": "Accept the cost explicitly with one measured line and add a duration field to GateLeg (or timestamps in the render header) so future gate records cite real seconds for the red path. Do not re-add the short-circuit."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:412-421 (CREDENTIAL_LINE_PATTERNS / unshipped comment)",
+            "problem": "The new comment claims 'Linear patterns only ... nothing here may backtrack.' The credential-assignment pattern ([\\w.-]*(?:token|...)[\\w.-]*\\s*[:=]) does backtrack — the trailing [:=] fails at every split of a long word-char run, worst case quadratic per line. The cost is bounded by the capture caps (tail <= 2,000 chars x 32 legs, once per write and once per render -> milliseconds), so it is performance-acceptable; only the comment overstates.",
+            "fix": "Comment-only: state that no unbounded-cascade pattern is used and the worst case is bounded by the capture caps, rather than implying zero backtracking. No code change requested."
+          }
+        ]
+      },
+      "testing": {
+        "verdict": "approve",
+        "stamp": "c2fd15eac35a89194e345161fc997c4118cacf1d",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/report.ts:186 + tools/orchestration/tests/pipeline/proposal-size.test.ts:303",
+            "problem": "The c2 aggregate fix (research size records must not fold into the proposal growth line, correctness r2c0 finding 3) has no test: no fixture anywhere carries docName: RESEARCH_DOC, and the research-meter test asserts docLines but never the stamped docName. Deleting the `&& r.docName !== RESEARCH_DOC` filter — the exact mutation reproducing the accepted defect — leaves the suite green.",
+            "fix": "Add a proposalGrowth case mixing proposal-size records with one docName: RESEARCH_DOC record and assert the aggregate counts only the proposal records; assert the research stage's result carries docName."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/gates.ts:349-367 (boundedTail elision equation)",
+            "problem": "The elision-equation rewrite (correctness r2c0 finding 4: the marker must state the true elision) is not pinned by any test — no assertion in the suite greps the `characters elided by the gate tail cap` note. The old fixed-64 reservation, which overstated the elision, passes every current capture assertion (length <= 2000, contains TAIL_END, not startsWith 'xxxx').",
+            "fix": "In the `big` capture test, match /^\\[(\\d+) characters elided by the gate tail cap\\]/ and assert the stated number equals the fixture's known 4009-char output minus the kept span, so the marker and the kept span are pinned as one equation."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3188-3197 (greenSummary) vs tools/orchestration/tests/pipeline/gate-evidence-integration.test.ts:47",
+            "problem": "The single-citable-line fix selects the LAST test result summary, but every fixture (unit and the strategy-#10 integration) emits exactly one summary per leg, so the choice is never exercised against a multi-summary tail. The repo's real cargo test --workspace tail ends with the doc-tests summary (`test result: ok. 0 passed`, visible in the runner's own gate record), so the citable line a seat actually gets is the least informative one; no test distinguishes 'the summary behind the behavior claim' from 'the last summary in the flatten'.",
+            "fix": "Make the integration green script emit several per-target summaries ending with a 0-passed doc-test line as real cargo does, and assert the chosen citable clause — either knowingly pin the last-summary choice or prefer the last summary with nonzero counts."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/runner.ts:3113-3144,3193-3196",
+            "problem": "Three new helper branches ship untested: citableTail's all-lines-dropped marker-only return, citableCwd's '(cwd withheld)' result (an exported-behavior branch no test asserts), and greenSummary's fixed-window fallback when ' finished in ' is absent. Untested branches are checklist findings, not passes.",
+            "fix": "Three small unit cases in gate-evidence-render.test.ts: a tail with every line dropped, an absolute cwd with no repoDir, and a flattened tail with a test result: clause and no ' finished in ' terminator."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/gate-evidence-capture.test.ts:203 (Test strategy #14)",
+            "problem": "Still open after c2: the strategy promises the cargo legs run 'against the real workspace in the integration tests that need a green gate', but no test runs a real cargo binary — cargo is PATH-stubbed in the unit test and the green-gate integration legs are node scripts. The c2 diff added neither the probe-guarded real-workspace case nor a comment recording that the real legs live in the CI rust job and the shipped runner gate.",
+            "fix": "Add a probe-guarded integration case pointing checkGate at the repo's own cargo workspace when cargo is on PATH, or record the divergence in the fixture comment/build note."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/src/pipeline/gates.ts:401-404 (runLeg MAX_TAIL_BYTES eviction)",
+            "problem": "Still open after c2: the rolling tail buffer's eviction loop is never exercised — the largest fixture leg emits ~4 KiB against a 64 KiB window. A wrong-end drop or miscounted kept bytes would corrupt exactly the tails behavior claims cite and pass the whole suite.",
+            "fix": "Add a generator mode writing ~200 KB (fill plus a final TAIL_END line) and assert the recorded tail ends at the leg's last line and stays within MAX_GATE_TAIL_CHARS."
+          },
+          {
+            "severity": "minor",
+            "location": "tools/orchestration/tests/pipeline/agent-shell.test.ts:340-351",
+            "problem": "Partially mitigated by c2: the new checkpoint tests pin the .pipeline.json read/glob denies for all 17 shell-holding agents, but the *transcripts*/*reviews* glob/grep deny loop still covers only DOC_FAMILIES + DESIGN_SEATS (10 of 17); the two CODE_AGENTS' and five codereview seats' glob/grep run-record denies remain unpinned and could be dropped silently.",
+            "fix": "Extend the existing glob/grep deniesResource loop to CODE_AGENTS and REVIEW_AGENTS (or loop over SHELL_HOLDING) so all 17 are pinned for the transcripts/reviews denies as they now are for the checkpoint."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/gates.ts:431-447 (close/signal branch of runLeg)",
+            "problem": "Still open after c2: the proposal names two exit:null cases (spawn failure, signal kill); only the spawn-failure case has a fixture, so the 'killed by signal' tail path is untested.",
+            "fix": "Add a generator mode that self-SIGKILLs and assert exit === null with the spelled signal in the tail."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/src/pipeline/independence.ts:273",
+            "problem": "Still open after c2: the `tokens.length === 0 ||` guard in shellReachesReviews remains provably dead (any command matching REVIEWS_SEGMENT yields at least one token re-matching it) and remains uncommented, so no reader knows it is defense-against-divergence rather than an exercised branch.",
+            "fix": "Drop the guard, or comment it as defense-against-divergence between the two character classes."
+          },
+          {
+            "severity": "nit",
+            "location": "tools/orchestration/tests/pipeline/gate-evidence-render.test.ts:91-211",
+            "problem": "Still open after c2: test strategy #2 says gateEvidenceText re-applies the array bound at render, but the largest gateEvidenceText fixture uses 24 legs (below MAX_GATE_LEGS = 32); no case pushes more than 32 legs through the renderer to prove the render-time re-bound.",
+            "fix": "Pass 40 legs to gateEvidenceText and assert the rendered block names the elision note while staying within MAX_EVIDENCE_BLOCK_CHARS."
+          }
+        ]
+      }
+    }
+  },
+  "lastReviewPass": {
+    "phase": "code",
+    "round": 2,
+    "cycle": 2,
+    "seats": [
+      "compatibility",
+      "performance",
+      "testing"
+    ]
+  },
+  "reviseNoChange": false,
+  "codeCycle": 3,
+  "codeStamp": "c2fd15eac35a89194e345161fc997c4118cacf1d",
+  "gateEvidence": {
+    "at": 1794598753467,
+    "green": true,
+    "legs": [
+      {
+        "command": "npm run check",
+        "cwd": "/home/mike/repos/bindforge/tools/orchestration",
+        "exit": 0,
+        "tail": "npm notice run @bindforge/orchestration@1.0.0 check npm notice run npm run lint && npm run format:check && npm run test npm notice run @bindforge/orchestration@1.0.0 lint npm notice run eslint . npm notice run @bindforge/orchestration@1.0.0 format:check npm notice run prettier --check . Checking formatting... All matched files use Prettier code style! npm notice run @bindforge/orchestration@1.0.0 test npm notice run vitest run   RUN  v5.0.5 /home/mike/repos/bindforge/tools/orchestration  mount: /tmp/bindforge-mnt-probe-2M4GFI: must be superuser to use mount.        dmesg(1) may have more information after failed mount system call.   Test Files  51 passed (51)       Tests  570 passed | 2 skipped (572)    Start at  14:39:04    Duration  8.17s (tests 74%, import 21%, transform 4%)"
+      },
+      {
+        "command": "cargo fmt --all -- --check",
+        "cwd": "/home/mike/repos/bindforge",
+        "exit": 0,
+        "tail": ""
+      },
+      {
+        "command": "cargo clippy --workspace --all-targets -- -D warnings",
+        "cwd": "/home/mike/repos/bindforge",
+        "exit": 0,
+        "tail": "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.05s"
+      },
+      {
+        "command": "cargo test --workspace --locked",
+        "cwd": "/home/mike/repos/bindforge",
+        "exit": 0,
+        "tail": "[25063 characters elided by the gate tail cap]er_applies_a_contiguous_legal_move_pairing_by_the_match_rule ... ok test relocate_cluster_with_a_foreign_occupied_target_reports_it_by_name ... ok test relocate_cluster_with_an_unbound_matched_action_reports_it_by_name ... ok test relocate_cluster_with_disconnected_source_keys_reports_not_contiguous ... ok test relocate_cluster_with_a_match_count_that_is_not_the_target_count_reports_match_count ... ok test swap_mouse_buttons_on_a_docked_mouse_input_reports_reserved_input ... ok test swap_polarity_applied_twice_is_the_identity ... ok test swap_polarity_leaves_an_unbound_side_unbound ... ok test relocate_cluster_with_a_gamepad_bound_source_reports_not_keyboard ... ok test swap_polarity_with_a_match_that_is_not_two_ids_reports_match_count ... ok test relocate_cluster_with_a_bound_violating_move_reports_placement_illegal_with_the_check ... ok test swap_mouse_buttons_with_an_unbound_mouse_input_reports_it_by_name ... ok test the_produced_base_is_an_ordinary_profile_v2_base_document ... ok test relocate_cluster_touching_reserved_manifest_data_reports_reserved_input ... ok test swap_polarity_exchanges_a_bound_discrete_lateral_pair ... ok test swap_polarity_including_a_continuous_lateral_id_reports_axis_kind_naming_it ... ok  test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s       Running tests/zz_api_probe.rs (target/debug/deps/zz_api_probe-4459fd1d9832c5c4)  running 2 tests test the_not_applicable_reason_vocabulary_answers_the_contract_spellings ... ok test the_adr_015_names_resolve_at_the_crate_root ... ok  test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests bindforge_core  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests bindforge_transforms  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      }
+    ]
+  }
+}

@@ -15,9 +15,10 @@ import {
 // ---------------------------------------------------------------------------
 // ADR-010 flow registry: the stage list, the review seats, the budgets, the
 // document-size stages and the plan line cap become registry data, resolved
-// once through `configFor`. `full` is the untouched status quo (its config
-// partial is empty and `configFor('full', base)` is deep-equal to a complete
-// `base`), and the seat panel is caller data, so the resolver validates it:
+// once through `configFor`. `full` is the status quo (its config partial
+// carried nothing until ADR-016 added the single `docMaxLines` key, and
+// `configFor('full', base)` is deep-equal to a complete `base` carrying that
+// key), and the seat panel is caller data, so the resolver validates it:
 // known specialty names, `planMaxLines` absent-or-positive, and a non-empty
 // panel for every review phase the flow's own stages run.
 // ---------------------------------------------------------------------------
@@ -51,10 +52,19 @@ describe('flow registry shape', () => {
   });
 
   // proves: Test strategy #1 — the size meter measures `plan` for light and the
-  // three proposal stages for full (replaces `DESIGN_DOC_STAGES`).
+  // proposal stages for full (replaces `DESIGN_DOC_STAGES`).
+  // proves: ADR-016 Test strategy #6/#12 — `research` joins the full flow's
+  // metered set, so `01-research.md` gets measured like the proposal document.
   it('declares which stages the document-size meter measures', () => {
     expect(FLOWS.light.docStages).toEqual(['plan']);
-    expect(FLOWS.full.docStages).toEqual(['proposal', 'proposal-revise', 'proposal-final']);
+    // The meter only checks membership; the declaration order is behavior-
+    // irrelevant, so the pin is order-insensitive.
+    expect([...FLOWS.full.docStages].sort()).toEqual([
+      'proposal',
+      'proposal-final',
+      'proposal-revise',
+      'research',
+    ]);
   });
 
   // proves: Test strategy #1 — the regression guard on `full`: today's twelve
@@ -72,9 +82,11 @@ describe('flow registry shape', () => {
   });
 
   // proves: Test strategy #1/#3 — `full` carries an empty config partial, so
-  // `DEFAULT_CONFIG` stays the sole default authority for it.
-  it('keeps the full flow config partial empty', () => {
-    expect(FLOWS.full.config).toEqual({});
+  // `DEFAULT_CONFIG` stays the sole default authority for it — except the one
+  // key ADR-016 Decision 4 adds there (see the ADR-016 block at the foot of
+  // this file), which is why the emptiness pin is now a docMaxLines-only pin.
+  it('keeps the full flow config partial to the document ceiling alone', () => {
+    expect(FLOWS.full.config).toEqual({ docMaxLines: 900 });
     expect(FLOWS.full.name).toBe('full');
     expect(FLOWS.light.name).toBe('light');
   });
@@ -114,7 +126,9 @@ describe('configFor: the light budgets', () => {
 describe('configFor: the full flow is untouched', () => {
   // proves: Test strategy #3 — `configFor('full', base)` is deep-equal to a
   // complete `base`: the full flow's behavior cannot drift through the
-  // resolution seam.
+  // resolution seam. ADR-016 put exactly one key in the full config partial —
+  // `docMaxLines: 900` — so a base already carrying that key must come back
+  // untouched, and a base without it gains nothing but that key.
   it('returns a complete base unchanged', () => {
     const base: PipelineConfig = {
       maxRounds: 5,
@@ -127,9 +141,10 @@ describe('configFor: the full flow is untouched', () => {
       minNudgeIntervalMs: 0,
       maxParallelReviews: 2,
       reviewSeats: { design: [...DESIGN_SPECIALTIES], code: [...CODE_SPECIALTIES] },
+      docMaxLines: 900,
     };
     expect(configFor('full', base)).toEqual(base);
-    expect(configFor('full', cliConfig())).toEqual(cliConfig());
+    expect(configFor('full', cliConfig())).toEqual({ ...cliConfig(), docMaxLines: 900 });
   });
 
   // proves: Test strategy #3 (Non-goals; Risks, budget-drift row) — the full
@@ -214,7 +229,10 @@ describe('configFor: the base is a partial', () => {
   // partial and gets a complete config: `DEFAULT_CONFIG` remains the sole
   // default authority, and the flow partial applies over it.
   it('fills a partial base from DEFAULT_CONFIG', () => {
-    expect(configFor('full', {})).toEqual(DEFAULT_CONFIG);
+    // The full flow's registry partial now writes its one registry key
+    // (docMaxLines, ADR-016) over the defaults; every other knob stays
+    // DEFAULT_CONFIG's.
+    expect(configFor('full', {})).toEqual({ ...DEFAULT_CONFIG, docMaxLines: 900 });
 
     const light = configFor('light', { maxParallelReviews: 3 });
     expect(light.maxParallelReviews).toBe(3);
@@ -340,11 +358,13 @@ describe('configFor validation: the seat panel is untrusted caller data', () => 
 describe('platform surface', () => {
   // proves: Test strategy #21 — no new platform surface: the Node floor is the
   // package's existing `engines` pin and the registry adds no OS branch.
+  // proves: ADR-016 Rollout 2 — the floor rises to `>=22.23.5` for the
+  // 2026-11-11 Node security release: the only runtime prerequisite the run adds.
   it('pins the engines floor and adds no platform-specific path', () => {
     const pkg = JSON.parse(
       readFileSync(fileURLToPath(new URL('../../package.json', import.meta.url)), 'utf8'),
     ) as { engines?: { node?: string } };
-    expect(pkg.engines?.node).toBe('>=22.23.4');
+    expect(pkg.engines?.node).toBe('>=22.23.5');
 
     const registry = readFileSync(
       fileURLToPath(new URL('../../src/pipeline/flows.ts', import.meta.url)),
