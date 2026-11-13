@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import type { Flow } from './flows.js';
+
 // ---------------------------------------------------------------------------
 // Verdicts: the control signal of the pipeline. Markdown review files are
 // the human record; these JSON replies are what the state machine reads.
@@ -227,6 +229,25 @@ export interface PipelineState {
    */
   baseRef?: string;
   source: SourceRef;
+  /**
+   * ADR-010: which flow this run follows — recorded once, at run entry, from
+   * the source document's `flow:` key, and read from there by every consumer.
+   * Absent is a pre-ADR-010 checkpoint and means `full`, so nothing infers the
+   * mode downstream.
+   */
+  flow?: Flow;
+  /**
+   * ADR-010 §4: the light flow's plan stop, sticky. Recorded when the plan
+   * gate refuses, so the stop outlives the escalation the refusal minted:
+   * `decideNext`'s `case 'plan'` escalates on this record while it stands,
+   * which is what stops a plain `pipeline resume` from spending the flow's
+   * coder session on the plan the flow refused. Cleared by the next `plan`
+   * pass whose gate proceeds — the operator's in-flow repair is
+   * `pipeline resume <slug> --stage plan`, the promotion repair is a new
+   * full-flow entry. Additive-optional (ADR-006 §2): no pre-ADR-010
+   * checkpoint carries it, and its absence is "no stop standing".
+   */
+  planStop?: string;
   status: RunStatus;
   /** Last completed stage ('' before the first stage). */
   lastStage: string;

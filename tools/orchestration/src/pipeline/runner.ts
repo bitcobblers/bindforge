@@ -20,16 +20,34 @@ import { z } from 'zod';
 import { basicAuthHeader } from '../opencode-runner.js';
 import { createSemaphore } from './concurrency.js';
 import {
+  type Flow,
+  type FlowId,
+  assertStageInFlow,
+  configFor,
+  flowDef,
+  flowOf,
+  seatsFor,
+} from './flows.js';
+import {
+  type ParsedSource,
   TEST_PATH_RE,
   allReviewsApproved,
   flipAdrStatus,
   isSemanticCommit,
   lastSeatReply,
+  parseSource,
+  planOutgrewFlow,
   testsGreen as runChecks,
   sourceAdmissible,
   stagePathAllowed,
 } from './gates.js';
-import { type IdentityPin, type RunIdentity, deriveIdentity, identityClash } from './identity.js';
+import {
+  type IdentityPin,
+  type RunIdentity,
+  deriveIdentity,
+  identityClash,
+  sourceKind,
+} from './identity.js';
 import {
   type IndependenceAuditOptions,
   auditSessionIndependence,
@@ -55,14 +73,21 @@ import {
   normalizeReplyShape,
   renderTemplate,
   templateHash,
+  testOwnershipLine,
   writeTranscript,
 } from './prompts.js';
-import { escalationMarkdown, escalationPhase, proposalGrowthLine } from './report.js';
+import {
+  type RepairStep,
+  escalationMarkdown,
+  escalationPhase,
+  hasPlanStop,
+  proposalGrowthLine,
+  repairSteps,
+} from './report.js';
 import {
   DEFAULT_CONFIG,
   DEFAULT_MIN_NUDGE_INTERVAL_MS,
   DEFAULT_REQUEST_TIMEOUT_MS,
-  assertForceableStage,
   stageDef,
   stageReplySchema,
 } from './stages.js';
@@ -157,9 +182,6 @@ function git(repoDir: string, args: string[]): string {
   }
   return res.stdout;
 }
-
-/** Stages whose product is `02-proposal.md`; only they get the size meter. */
-const DESIGN_DOC_STAGES = new Set(['proposal', 'proposal-revise', 'proposal-final']);
 
 /**
  * Size meter for the design document: its line count and the worktree-vs-HEAD
@@ -276,7 +298,9 @@ export function enforceOwnership(
     }
   }
   const touched = new Set([...committed, ...dirtyFiles(repoDir)]);
-  const violations = [...touched].filter((p) => !stagePathAllowed(stage, p));
+  // ADR-010: the flow is the widening — a light `implement`/`fix` owns the test
+  // paths — so the sweep judges each path against the run's flow, not `full`.
+  const violations = [...touched].filter((p) => !stagePathAllowed(stage, p, flowOf(state)));
   const reverted: string[] = [];
   for (const p of violations) {
     // ADR-006 §1: the sweep is author-agnostic, so it pairs the reserved-name
@@ -418,6 +442,7 @@ function recordStageCommit(state: PipelineState, sha: string | null | undefined)
 
 const STAGE_COMMIT_TYPE: Record<string, string> = {
   research: 'docs',
+  plan: 'docs',
   proposal: 'docs',
   'proposal-revise': 'docs',
   'proposal-final': 'docs',
@@ -1165,6 +1190,18 @@ interface StageOutcome {
   failure?: string;
   /** The session this attempt ran in; lets a reply retry reuse its work. */
   sessionID?: string;
+  /**
+   * The stage-ok/pre-commit size meter's line count for this stage's document
+   * (`docStages`, A6): the one count the plan stop judges, so the document is
+   * measured once, at the point the meter already runs, with no second read.
+   */
+  docLines?: number;
+  /**
+   * Set when a pre-commit gate refused this stage's window: the reason it
+   * refused. No commit landed, and the reason is terminal — the run escalates
+   * on it, it is not a stage failure to retry.
+   */
+  stopped?: string;
 }
 
 interface StageHandle {
@@ -1187,6 +1224,15 @@ interface StageHandle {
   resume?: { sessionID: string; text: string };
   /** Set on a fresh-session attempt 2: why attempt 1 failed (log excerpt). */
   failureNote?: string;
+  /**
+   * The stage-ok/pre-commit gate: runs after the inference phase, before this
+   * stage's commit window, over the outcome the size meter just measured. A
+   * returned reason stops the run — the window never opens, so nothing is
+   * committed, and the reason is terminal, not a stage failure to retry
+   * (ADR-010 §4: the plan stop fires "at the same stage-ok/pre-commit point
+   * where `proposalSize` runs", because the stage cannot report its own size).
+   */
+  preCommit?: (outcome: StageOutcome) => string | null;
 }
 
 /**
@@ -1219,6 +1265,7 @@ export function stageTemplate(
  */
 function movesValidationIssue(
   opts: RunOptions,
+  state: PipelineState,
   stageName: string,
   headBefore: string | undefined,
   reply: unknown,
@@ -1231,7 +1278,7 @@ function movesValidationIssue(
     return `${stageName} declared moves without a base revision to validate them against`;
   }
   try {
-    return validateMoves(opts.repoDir, headBefore, stageName, moves);
+    return validateMoves(opts.repoDir, headBefore, stageName, moves, flowOf(state));
   } catch (error) {
     return error instanceof Error ? error.message : String(error);
   }
@@ -1581,7 +1628,7 @@ async function executeInference(
     }
     const checked = schema.safeParse(parsed);
     const movesIssue = checked.success
-      ? movesValidationIssue(opts, def.name, headBefore, checked.data)
+      ? movesValidationIssue(opts, state, def.name, headBefore, checked.data)
       : null;
     if (checked.success && movesIssue === null) {
       outcome = { ok: true, reply: checked.data };
@@ -1652,7 +1699,7 @@ async function executeInference(
   });
 
   const size =
-    outcome.ok && DESIGN_DOC_STAGES.has(def.name)
+    outcome.ok && flowDef(flowOf(state)).docStages.includes(def.name)
       ? proposalSize(opts.repoDir, designDir)
       : undefined;
   const result: StageResult = {
@@ -1682,7 +1729,10 @@ async function executeInference(
       `${size ? `, proposal ${String(size.docLines)} lines (+${String(size.added)}/-${String(size.removed)})` : ''}`,
   );
 
-  return { ...outcome, sessionID };
+  // The meter's count travels on the outcome so the plan stop judges the
+  // document at the point it was already measured (one read, no second
+  // `git` call).
+  return { ...outcome, sessionID, ...(size ? { docLines: size.docLines } : {}) };
 }
 
 // --- the finalize half of the two-phase contract ----------------------------
@@ -1720,6 +1770,27 @@ function applyOwnershipReport(
 }
 
 /**
+ * The ledger entry for an attempt is pushed when its reply validates, before
+ * the stage's window runs. When the window then refuses the stage — a failed
+ * move apply, a pre-commit gate — amend that entry: the retry decision, the
+ * gate log and the operator-facing results all key on the attempt's `failure`,
+ * and an `ok` ledger next to a refused window is a lie.
+ */
+function recordAttemptFailure(
+  state: PipelineState,
+  sessionID: string | undefined,
+  text: string,
+): void {
+  for (let i = state.results.length - 1; i >= 0; i -= 1) {
+    const entry = state.results[i];
+    if (entry !== undefined && entry.sessionID === sessionID) {
+      entry.failure = text;
+      break;
+    }
+  }
+}
+
+/**
  * One stage's window: the declared moves, then the sweep and commit. Skipped
  * when the stage failed.
  *
@@ -1753,16 +1824,8 @@ function finalizeStage(
         failure.error;
       // The ledger entry for this attempt was pushed when its reply last
       // validated — before this window ran. A move failure lands after that
-      // write, so amend the entry: the retry decision, the gate log, and the
-      // operator-facing results all key on the failed attempt's `failure`, and
-      // an `ok` ledger next to a known-damaged worktree is a lie.
-      for (let i = state.results.length - 1; i >= 0; i -= 1) {
-        const entry = state.results[i];
-        if (entry !== undefined && entry.sessionID === outcome.sessionID) {
-          entry.failure = text;
-          break;
-        }
-      }
+      // write, so amend the entry (see `recordAttemptFailure`).
+      recordAttemptFailure(state, outcome.sessionID, text);
       // No sweep, no staging, no commit — the same preserved state a failed
       // reply leaves. `dirtyFiles` lists untracked paths file by file
       // (`--untracked-files=all`), so attempt 2's sweep sees every path
@@ -1797,10 +1860,29 @@ export async function executeStage(
   state: PipelineState,
   handle: StageHandle,
   cfg: PipelineConfig,
+  templateText?: string,
 ): Promise<StageOutcome> {
   const stageName = stageDef(handle.stage, handle.specialty).name;
   const headBefore = git(opts.repoDir, ['rev-parse', 'HEAD']).trim();
-  const outcome = await executeInference(opts, state, handle, cfg, undefined, headBefore);
+  const outcome = await executeInference(opts, state, handle, cfg, templateText, headBefore);
+  const refusal = outcome.ok && handle.preCommit ? handle.preCommit(outcome) : null;
+  if (refusal !== null) {
+    // A pre-commit gate stopped the run at the stage-ok point: nothing is
+    // committed, so the stage's product reaches the branch only through the
+    // terminal commit `finalizeEscalate` mints. The sweep still runs — the
+    // escalation-path posture `finalizeReviewPass(commit: false)` already uses
+    // — so an out-of-ownership file can never ride into that commit.
+    // Record the stage the run stopped after BEFORE the stop is reported:
+    // `stopOnGate` escalates from inside this call, and `state.lastStage` is
+    // normally assigned after `runWithRetry` returns — an empty name here made
+    // `escalationPhase` answer `design` and ESCALATION.md open "Run stopped
+    // after stage `` in the **design** phase" for the light `plan` stop, the
+    // mislabel A15 exists to remove (Reporting).
+    state.lastStage = stageName;
+    recordAttemptFailure(state, outcome.sessionID, refusal);
+    finalizeReviewPass(opts.repoDir, state, headBefore, stageName, false);
+    return { ...outcome, ok: false, failure: refusal, stopped: refusal };
+  }
   return finalizeStage(opts.repoDir, state, headBefore, stageName, handle.stageKey, outcome);
 }
 
@@ -2028,6 +2110,8 @@ async function runReviewPass(args: ReviewPassArgs): Promise<string | null> {
     }
   };
 
+  const seatRank = new Map(args.seats.map((specialty, i) => [`${args.stage}:${specialty}`, i]));
+  const ledgerStart = state.results.length;
   const settled = await Promise.allSettled(args.seats.map((specialty) => runSeat(specialty)));
   // Barrier: settled seats only, then every queued checkpoint write has landed,
   // so the pass's `git add -A` cannot sweep a half-written `.pipeline.json.tmp`.
@@ -2037,6 +2121,16 @@ async function runReviewPass(args: ReviewPassArgs): Promise<string | null> {
       throw s.reason; // a runner error (template, transcript, checkpoint) ends the run, as today
     }
   }
+  // The pass's ledger entries read in the order the seats were handed, not in
+  // the order they happened to finish: the lane width is an operator knob
+  // (`--max-parallel`), and the record a run leaves behind cannot depend on
+  // which sibling's turn landed first. `sort` is stable, so a seat's own
+  // attempt-1-then-attempt-2 entries keep their order.
+  const passLedger = state.results.slice(ledgerStart);
+  passLedger.sort(
+    (a, b) => (seatRank.get(a.stage) ?? seatRank.size) - (seatRank.get(b.stage) ?? seatRank.size),
+  );
+  state.results.splice(ledgerStart, state.results.length - ledgerStart, ...passLedger);
   // Proposal: "The sweep reverts out-of-policy sibling files and escalation
   // still lands." `enforceOwnership`/`commitStage` shell out to git and throw
   // on any non-zero exit; a throw from the escalation-path sweep would escape
@@ -2065,9 +2159,44 @@ async function runReviewPass(args: ReviewPassArgs): Promise<string | null> {
 class StopDriving extends Error {}
 
 export async function runPipeline(opts: RunOptions): Promise<PipelineState['status']> {
-  const cfg = opts.cfg ?? DEFAULT_CONFIG;
   const sourceAbs = resolve(opts.repoDir, opts.sourcePath);
-  const id = deriveIdentity(opts.repoDir, sourceAbs, opts.pin);
+
+  // ADR-010: the flow is read once, pre-lock, from the source document's
+  // `flow:` key, and that one parse is the parse the post-lock gate judges —
+  // the value that cleared the pre-lock check is the value stamped and printed
+  // (Selecting the flow: one frontmatter read per entry). An unreadable file
+  // leaves `parsed` unset, so the post-lock `sourceAdmissible` denial is the
+  // gate that reads it, from its own single read; an unreadable VALUE is a
+  // usage error — a typo must never half-start a run (no lock, no design
+  // directory, no session, no checkpoint).
+  // The parse needs the document's kind, and it runs before `deriveIdentity`
+  // because the identity allocation is flow-scoped (below).
+  const kind = sourceKind(opts.repoDir, sourceAbs);
+  let parsed: ParsedSource | undefined;
+  try {
+    parsed = parseSource(readFileSync(sourceAbs, 'utf8'), kind);
+  } catch {
+    parsed = undefined;
+  }
+  const flowValue: FlowId = parsed?.flow ?? 'full';
+  if (flowValue !== 'full' && flowValue !== 'light') {
+    throw new Error(
+      `invalid flow "${flowValue}" for ${relative(opts.repoDir, sourceAbs)}: expected full or light`,
+    );
+  }
+  // The registry check above is the whole gate: only its two keys reach here.
+  const flow: Flow = flowValue as Flow;
+  // A17: `nextNnn` and `identityClash` need no change, and the full flow's
+  // allocation is exactly the one it has always had. The one flow-scoped rule
+  // is the light flow's: a brief's `NNN` is the shared counter's next free
+  // number, so a light run re-entered by its own source document must resolve
+  // the identity its checkpoint already holds (Promotion, Test strategy #22)
+  // rather than mint a second design directory beside the plan.
+  const id = deriveIdentity(opts.repoDir, sourceAbs, opts.pin, flow);
+  // The one budget-resolution point (ADR-010 §3): the flow's partial over the
+  // caller's base, validated pre-lock so an empty caller panel is a usage error
+  // here, not a post-lock read.
+  const cfg = configFor(flow, opts.cfg ?? DEFAULT_CONFIG);
 
   const clash = identityClash(opts.repoDir, id);
   if (clash.length > 0 && !opts.force) {
@@ -2082,13 +2211,20 @@ export async function runPipeline(opts: RunOptions): Promise<PipelineState['stat
 
   if (opts.forceStage) {
     // Before the lock, before ESCALATION.md, before any state: a typo used to
-    // crash deep inside stageDef with the marker already deleted.
-    assertForceableStage(opts.forceStage);
+    // crash deep inside stageDef with the marker already deleted. The flow's
+    // registry is the whole `--stage` gate (`FlowDef.stages` is documented as
+    // that gate): every name `assertForceableStage` accepts is in
+    // `FLOWS.full.stages`, and the light flow's `plan` — the stage a plan stop
+    // ends a run on — is forceable because the flow declares it.
+    assertStageInFlow(flow, opts.forceStage);
   }
 
   acquireLock(opts.repoDir, id.slug, 'start');
   try {
     const state = freshState(id, relative(opts.repoDir, sourceAbs));
+    // The flow is stamped on the entry save: a resume reads it from the
+    // checkpoint, so no flag or backfill is needed downstream.
+    state.flow = flow;
     if (opts.forceStage) {
       state.forceNext = opts.forceStage;
     }
@@ -2109,7 +2245,7 @@ export async function runPipeline(opts: RunOptions): Promise<PipelineState['stat
       }
       throw error;
     }
-    const verdict = await sourceAdmissible(sourceAbs, id.kind);
+    const verdict = await sourceAdmissible(sourceAbs, id.kind, flow, parsed);
     gateLog(state, 'sourceAdmissible', 0, verdict);
     if (!verdict.proceed) {
       await finalizeEscalate(opts.repoDir, state, `source not admissible: ${verdict.reason}`, cfg);
@@ -2123,18 +2259,27 @@ export async function runPipeline(opts: RunOptions): Promise<PipelineState['stat
 }
 
 export async function resumePipeline(opts: ResumeOptions): Promise<PipelineState['status']> {
-  const cfg = opts.cfg ?? DEFAULT_CONFIG;
   const designDirRel = join('docs', 'designs', opts.slug);
   const state = await loadState(join(opts.repoDir, designDirRel));
   if (!state) {
     throw new Error(`no pipeline checkpoint at ${designDirRel}`);
   }
+  // ADR-010: the flow is the checkpoint's, read through `flowOf` (an absent key
+  // is `full`). The config resolves from it — the effective numbers the drive
+  // loop runs — validated pre-lock so an empty caller panel is a usage error,
+  // and a forced stage is checked against the flow before the lock is taken.
+  const flow = flowOf(state);
+  const cfg = configFor(flow, opts.cfg ?? DEFAULT_CONFIG);
   // The status as persisted, before this resume flips it to `running`: the
   // split-record test below compares the marker against what the checkpoint
   // itself claimed.
   const persistedStatus = state.status;
   if (opts.forceStage) {
-    assertForceableStage(opts.forceStage);
+    // The flow's registry is the `--stage` gate at this point too: `plan` is a
+    // light run's first stage, so the operator can re-plan the run a plan stop
+    // ended; a full-flow `--stage plan` stays a usage error, because `full`
+    // does not declare it.
+    assertStageInFlow(flow, opts.forceStage);
   }
   acquireLock(opts.repoDir, state.slug, 'resume');
   try {
@@ -2147,15 +2292,14 @@ export async function resumePipeline(opts: ResumeOptions): Promise<PipelineState
       });
     }
     if (opts.extendBudget) {
+      // State-side (A27): the grant lands on the checkpoint, never on a config
+      // key, and it is *recorded* where it is *spent* — the `operatorExtension`
+      // gate log below (round entry, pass entry) names the grant it paid for
+      // and the count that remains. A grant that is never spent leaves no
+      // consent in the record, because nothing was extended: the run stopped at
+      // a cap the grant does not reach.
       state.extensionSessions = (state.extensionSessions ?? 0) + opts.extendBudget;
       state.extensionRounds = (state.extensionRounds ?? 0) + opts.extendBudget;
-      gateLog(state, 'operatorExtension', 0, {
-        proceed: true,
-        reason:
-          `operator extended the review budget by ${String(opts.extendBudget)} review session(s) ` +
-          `over the caps of ${String(cfg.maxReviews.design)}/${String(cfg.maxReviews.code)} ` +
-          `(and ${String(opts.extendBudget)} revise round(s) over the backstop of ${String(cfg.maxRounds)})`,
-      });
     }
     // A resume means the cause was addressed; drop the stale marker (the
     // record lives on in the gate log and git history). ADR-006 §3: a marker
@@ -2208,6 +2352,41 @@ export async function resumePipeline(opts: ResumeOptions): Promise<PipelineState
   }
 }
 
+/**
+ * The plan stop, recorded on the state, and returned as the refusal text.
+ * ADR-010 §4's stop is a stop, not a warning: the bytes it refuses are on the
+ * branch (the terminal escalation commit tracks them), so the run needs
+ * something on the checkpoint that survives the escalation and tells
+ * `decideNext` the stop stands. `case 'plan'` escalates on it — which is what
+ * keeps a plain `pipeline resume` from spending the flow's coder session on
+ * the plan the flow refused — and `repairSteps` prints, for that record, only
+ * the moves the state machine honours.
+ */
+function recordPlanStop(state: PipelineState, reason: string): string {
+  state.planStop = reason;
+  return reason;
+}
+
+/**
+ * A `plan` pass that clears the gate clears the stop (Selecting the flow: the
+ * gate's verdict is the whole rule, so the stop has exactly one author). This
+ * is the operator's in-flow repair: `pipeline resume <slug> --stage plan`
+ * re-plans, the new plan is metered, and the run hands a plan within the cap
+ * to `implement` — the gate log names the stop it cleared.
+ */
+function clearPlanStop(state: PipelineState, lines: number): void {
+  if (state.planStop === undefined) {
+    return;
+  }
+  gateLog(state, 'plan-size', state.codeRound, {
+    proceed: true,
+    reason:
+      `plan is ${String(lines)} lines, within the cap: cleared the standing plan stop ` +
+      '(the run goes on to implement)',
+  });
+  state.planStop = undefined;
+}
+
 async function drive(
   opts: RunOptions | ResumeOptions,
   state: PipelineState,
@@ -2231,7 +2410,38 @@ async function drive(
     }
 
     const runWithRetry = async (handle: StageHandle): Promise<StageOutcome> => {
-      let out = await executeStage(opts as RunOptions, state, { ...handle, attempt: 1 }, cfg);
+      // Load the stage's prompt template once, at stage entry, and pin it for
+      // every attempt. A stage that edits its own template mid-run (the light
+      // flow's implement stage writes the {{testOwnership}} line into
+      // implement.md before stageVars learns to supply it) would otherwise be
+      // re-rendered on the timeout retry with the half-updated template and a
+      // not-yet-complete var set, and renderTemplate throws on the unresolved
+      // placeholder — run 010's r8 escalation. The review pass already loads
+      // its template once (see runReviewPass); this closes the single-stage
+      // path to the same rule.
+      const entryDef = stageDef(handle.stage, handle.specialty);
+      const entryTemplate = stageTemplate(entryDef, handle.stage, state);
+      const entryTemplateText = entryTemplate
+        ? await loadTemplate(opts.promptsDir, entryTemplate)
+        : undefined;
+      // A pre-commit gate's refusal is terminal: its reason is the run's
+      // record, and a retry would only spend another session on the stage
+      // that outgrew the flow (ADR-010 §4's plan stop).
+      const stopOnGate = async (o: StageOutcome): Promise<void> => {
+        if (o.stopped === undefined) {
+          return;
+        }
+        await finalizeEscalate(opts.repoDir, state, o.stopped, cfg);
+        throw new StopDriving();
+      };
+      let out = await executeStage(
+        opts as RunOptions,
+        state,
+        { ...handle, attempt: 1 },
+        cfg,
+        entryTemplateText,
+      );
+      await stopOnGate(out);
       if (!out.ok) {
         state.stageFailures[handle.stageKey] = (state.stageFailures[handle.stageKey] ?? 0) + 1;
         gateLog(state, 'stageFailure', handle.round, {
@@ -2277,7 +2487,9 @@ async function drive(
               : { failureNote: brief(printable(out.failure ?? 'no reply')) }),
           },
           cfg,
+          entryTemplateText,
         );
+        await stopOnGate(out);
         if (!out.ok) {
           state.stageFailures[handle.stageKey] = (state.stageFailures[handle.stageKey] ?? 0) + 1;
           await finalizeEscalate(
@@ -2351,9 +2563,92 @@ async function drive(
         }
 
         const isDesign = phase === 'design';
+        // The round counter is the backstop on the mutating revise/fix loop,
+        // checked only when a NEW round starts: passes inside one round spend
+        // sessions and are bounded by `maxPassesPerRound`, never a round.
+        // ADR-010: the light flow's mutating loop is the `fix` loop, and the
+        // charge that counts it is the per-`fix` one (below, in both flows); a
+        // light code round is opened by the funnel, not by a mutating stage, so
+        // its entry charges no round and reads no round backstop — its bounds
+        // are the fix charges, the pass backstop inside the round, and the
+        // `codeRound` cap in `states.ts` (deviation 10).
+        const isLight = flowOf(state) === 'light';
+        if (next.round > (isDesign ? state.designRound : state.codeRound)) {
+          if (!isLight) {
+            const usedRounds = reviewBudgetUsed(state, phase);
+            if (usedRounds >= cfg.maxRounds) {
+              const left = state.extensionRounds ?? 0;
+              if (left <= 0) {
+                await finalizeEscalate(
+                  opts.repoDir,
+                  state,
+                  `${phase} revise-round backstop reached (${String(usedRounds)}/${String(
+                    cfg.maxRounds,
+                  )} rounds); ` +
+                    `this bounds the mutating loop, not review cost — sessions extend with --extend-budget`,
+                  cfg,
+                );
+                return;
+              }
+              state.extensionRounds = left - 1;
+              gateLog(state, 'operatorExtension', next.round, {
+                proceed: true,
+                reason:
+                  `extended the review budget by 1 review session(s) over the caps of ` +
+                  `${String(cfg.maxReviews.design)}/${String(cfg.maxReviews.code)}: over-cap ${phase} round ` +
+                  `entered under operator extension (${String(left - 1)} granted round(s) left)`,
+              });
+            }
+          }
+          if (isDesign) {
+            state.designCycle = 0;
+            if (!isLight) state.designBudgetUsed += 1;
+          } else {
+            state.codeCycle = 0;
+            if (!isLight) state.codeBudgetUsed += 1;
+          }
+        }
+        if (isDesign) {
+          state.designRound = next.round;
+          state.designStamp = blobStamp(opts.repoDir, `${designDirRel}/02-proposal.md`);
+        }
+        // The revision this pass's verdicts must describe. The design stamp is
+        // the proposal's BLOB id, which a pass's report commit cannot move; the
+        // code stamp is HEAD, which that commit does move. So the code stamp is
+        // refreshed only when the code itself changed since the last look — a
+        // full pass, or a dissent pass answering a `fix` — and a ratification
+        // pass keeps the stamp its round entry set: re-stamping after the report
+        // commit ages the very approvals the pass is ratifying, and buys a
+        // second ratify pass that converges nothing.
+        const plan = planPass(state, phase, cfg);
+        if (!isDesign) {
+          state.codeRound = next.round;
+          if (plan.kind === 'pass' && plan.pass !== 'ratify') {
+            state.codeStamp = git(opts.repoDir, ['rev-parse', 'HEAD']).trim();
+          }
+        }
+        if (plan.kind !== 'pass') {
+          gateLog(
+            state,
+            gateName(phase),
+            next.round,
+            plan.kind === 'converged'
+              ? { proceed: true, reason: 'all seats already approve the current revision' }
+              : { proceed: false, reason: plan.reason },
+          );
+          await checkpoint(designDir, state);
+          continue;
+        }
         // ADR-002: review cost is measured in sessions. The cap is checked at
         // pass entry, not only at the round gate — run 1's forced-round lesson
-        // survives: no entry sneaks past a cap, session or round.
+        // survives: no entry sneaks past a cap, session or round. A blocked
+        // plan never enters, so it never spends a grant; inside the first code
+        // round the pass backstop is what prints, and the phase-cumulative
+        // session cap binds at the entry of a LATER round. The grant is
+        // consumed by the entry it pays for, in every flow (A16, A27): one
+        // grant buys one over-cap pass, and the `operatorExtension` log's count
+        // is the count the checkpoint carries, so the record an operator
+        // resumes from says what is left.
         const cap = cfg.maxReviews[phase];
         const spent = reviewSessionsUsed(state, phase);
         if (spent >= cap) {
@@ -2372,65 +2667,10 @@ async function drive(
           gateLog(state, 'operatorExtension', next.round, {
             proceed: true,
             reason:
-              `over-cap ${phase} review pass entered under operator extension ` +
-              `(${String(left - 1)} session grant(s) left)`,
+              `extended the review budget by 1 review session(s) over the caps of ` +
+              `${String(cfg.maxReviews.design)}/${String(cfg.maxReviews.code)}: over-cap ${phase} review ` +
+              `pass entered under operator extension (${String(left - 1)} session grant(s) left)`,
           });
-        }
-        // The round counter is the backstop on the mutating revise/fix loop,
-        // checked only when a NEW round starts: passes inside one round spend
-        // sessions and bounded by `maxPassesPerRound`, never a round.
-        if (next.round > (isDesign ? state.designRound : state.codeRound)) {
-          const usedRounds = reviewBudgetUsed(state, phase);
-          if (usedRounds >= cfg.maxRounds) {
-            const left = state.extensionRounds ?? 0;
-            if (left <= 0) {
-              await finalizeEscalate(
-                opts.repoDir,
-                state,
-                `${phase} revise-round backstop reached (${String(usedRounds)}/${String(
-                  cfg.maxRounds,
-                )} rounds); ` +
-                  `this bounds the mutating loop, not review cost — sessions extend with --extend-budget`,
-                cfg,
-              );
-              return;
-            }
-            state.extensionRounds = left - 1;
-            gateLog(state, 'operatorExtension', next.round, {
-              proceed: true,
-              reason:
-                `over-cap ${phase} round entered under operator extension ` +
-                `(${String(left - 1)} granted round(s) left)`,
-            });
-          }
-          if (isDesign) {
-            state.designCycle = 0;
-            state.designBudgetUsed += 1;
-          } else {
-            state.codeCycle = 0;
-            state.codeBudgetUsed += 1;
-          }
-        }
-        if (isDesign) {
-          state.designRound = next.round;
-          state.designStamp = blobStamp(opts.repoDir, `${designDirRel}/02-proposal.md`);
-        } else {
-          state.codeRound = next.round;
-          state.codeStamp = git(opts.repoDir, ['rev-parse', 'HEAD']).trim();
-        }
-
-        const plan = planPass(state, phase, cfg);
-        if (plan.kind !== 'pass') {
-          gateLog(
-            state,
-            gateName(phase),
-            next.round,
-            plan.kind === 'converged'
-              ? { proceed: true, reason: 'all seats already approve the current revision' }
-              : { proceed: false, reason: plan.reason },
-          );
-          await checkpoint(designDir, state);
-          continue;
         }
         console.log(
           `review ${phase} r${String(next.round)}c${String(plan.cycle)} ` +
@@ -2512,17 +2752,69 @@ async function drive(
       // single stage
       const name = next.stage;
       if (name === 'fix') {
+        // A16: `maxRounds` counts the mutating loop, and a `fix` is one round
+        // of it, in every flow. In the light flow this charge is the whole
+        // bound on the loop — its 2-round cap (Goals, ADR-010's diagram) — and
+        // the state graph's `budgetLeft` test reads it on both entry paths,
+        // the red-tests one and the dissent one. An earlier pass skipped it
+        // for light, which left the red-tests path uncharged and unbounded.
         state.codeBudgetUsed += 1;
       }
       if (name === 'proposal-final') {
         proposalSnapshot = await readFile(join(designDir, '02-proposal.md'), 'utf8');
       }
+      // ADR-010 §4: the one plan stop, at the same stage-ok/pre-commit point
+      // the size meter runs at — before the plan is committed, and before the
+      // implement session is spent. Its input is the meter's own count, the
+      // `docStages` measurement this stage just recorded (A6), so the document
+      // is read once and no subprocess is spent re-measuring it. Over length is
+      // a scope signal on a plan written once, so the record names the flow to
+      // move to. The refusal is recorded on the state, so the stop outlives the
+      // escalation it mints and a resume cannot walk past it (deviation 25);
+      // a plan that passes the gate clears it.
+      const preCommit: StageHandle['preCommit'] =
+        name === 'plan'
+          ? (measured: StageOutcome): string | null => {
+              if (measured.docLines === undefined) {
+                // A gate that exists to be a deterministic stop is never
+                // satisfied by the absence of its own input: a `plan` stage
+                // that replies ok with no document at the proposal path has
+                // produced nothing for the flow's two seats to review, and the
+                // implement session would spend itself on an empty run.
+                const reason = `plan document not written: ${designDirRel}/02-proposal.md`;
+                gateLog(state, 'plan-size', state.codeRound, { proceed: false, reason });
+                return recordPlanStop(state, reason);
+              }
+              const gate = planOutgrewFlow(measured.docLines, cfg);
+              if (gate.proceed) {
+                clearPlanStop(state, measured.docLines);
+                return null;
+              }
+              gateLog(state, 'plan-size', state.codeRound, {
+                proceed: false,
+                reason: gate.reason,
+              });
+              // The pre-commit posture is the whole rule: this stage's commit
+              // window is skipped, so the oversized plan is never minted as the
+              // run's plan commit. The bytes stay where the stage wrote them —
+              // `plan` owns `docs/**`, so the sweep leaves them — and the
+              // operator reads the plan the stop named and promotes from it;
+              // deleting the stage's own product is not a mechanism this
+              // design has (the ownership sweep is the only revert). The
+              // refusal is recorded, so the stop outlives this escalation.
+              return recordPlanStop(
+                state,
+                `${gate.reason}: set flow: full and re-run with --force`,
+              );
+            }
+          : undefined;
       const out = await runWithRetry({
         stage: name,
         stageKey: name,
         attempt: 1,
         round: name === 'proposal-revise' ? state.designRound : state.codeRound,
         vars: stageVars(designDirRel, state, name),
+        preCommit,
       });
       state.lastStage = name;
       if (name === 'proposal-revise' && out.ok) {
@@ -2614,7 +2906,9 @@ function reviewFilesFor(
     designDirRel,
     fallbackPhase,
     fallbackRound,
-    specialtiesFor(fallbackPhase),
+    // No recorded pass (a pre-seat checkpoint): the fallback panel is the
+    // flow's, so a light resume names its two seats, not the full five.
+    specialtiesFor(fallbackPhase, configFor(flowOf(state))),
   );
 }
 
@@ -2626,6 +2920,10 @@ function stageVars(designDirRel: string, state: PipelineState, name: string): Te
       : name === 'fix' || name === 'test-update'
         ? reviewFilesFor(designDirRel, state, ['code'], 'code', state.codeRound)
         : '';
+  // ADR-010: the plan cap and the test-ownership line are flow config, rendered
+  // from the flow so the prompts never contradict the ownership matrix.
+  const cfg = configFor(flowOf(state));
+  const testOwnership = testOwnershipLine(flowOf(state));
   return {
     designDir: designDirRel,
     sourcePath: state.source.path,
@@ -2633,6 +2931,8 @@ function stageVars(designDirRel: string, state: PipelineState, name: string): Te
     specialty: '',
     scope: `git diff ${state.baseRef ?? 'main'}...HEAD`,
     reviewFiles,
+    planMaxLines: String(cfg.planMaxLines ?? ''),
+    testOwnership,
   };
 }
 
@@ -2807,6 +3107,14 @@ async function finalizeDone(
     await finalizeEscalate(repoDir, state, printable(error.message), cfg);
     return;
   }
+  // A run that escalated and later recovered to `done` carries the terminal
+  // escalation marker from a stop it did not end on. Clear it on completion so
+  // the design dir records the run that finished, not the one that paused;
+  // `commitStage`'s `stageAll` stages the deletion into the completion commit.
+  const escalationPath = join(designDir, ESCALATION_FILE);
+  if (existsSync(escalationPath)) {
+    unlinkSync(escalationPath);
+  }
   recordStageCommit(
     state,
     commitStage(repoDir, `${state.nnn}-${state.slug}`, 'done', 'docs', {
@@ -2853,8 +3161,20 @@ export async function finalizeEscalate(
   // gate log, on the operator's terminal, and in ESCALATION.md: keep it on
   // one line and free of control/escape bytes.
   const safeReason = printable(reason);
+  // ADR-010: the one promotion suffix, appended at this one site — gated on
+  // the flow and on the escalating stage, never on `escalationPhase` (which
+  // reports a light `plan` stop as `code`): the plan-size stop's own string
+  // already names the promotion, so it must not gain the suffix a second time.
+  const finalReason =
+    flowOf(state) === 'light' &&
+    (state.lastStage === 'implement' ||
+      state.lastStage === 'fix' ||
+      state.lastStage === 'code-review')
+      ? `${safeReason} — this run is on the light flow (flow: light); promote with flow: full and ` +
+        `re-run --force`
+      : safeReason;
   state.status = 'escalated';
-  gateLog(state, 'escalate', 0, { proceed: false, reason: safeReason });
+  gateLog(state, 'escalate', 0, { proceed: false, reason: finalReason });
   const designDirRel = designDirOf(state);
   const designDir = join(repoDir, designDirRel);
   mkdirSync(designDir, { recursive: true });
@@ -2912,11 +3232,16 @@ export async function finalizeEscalate(
   }
   // Nothing printed on escalation in run 1: a 47-minute resume that ended
   // escalated looked like a quiet success on the operator's terminal.
+  // The repair lines are the record's own (reporting, `repairSteps`): a
+  // sticky plan stop prints the moves that respect it, so the terminal and
+  // ESCALATION.md never point the operator at a command the state machine
+  // answers with the same escalation.
+  const repair = repairSteps(state);
   console.error(
-    `\npipeline ESCALATED (${phase} phase, after stage ${state.lastStage}): ${safeReason}\n` +
+    `\npipeline ESCALATED (${phase} phase, after stage ${state.lastStage}): ${finalReason}\n` +
       `  report: ${reportRel}\n` +
       `  status: pipeline status ${state.nnn}-${state.slug}\n` +
-      `  retry after a fix: pipeline resume ${state.nnn}-${state.slug}`,
+      repair.map((step) => `  ${step.label}: ${step.command}`).join('\n'),
   );
   if (saveFailure !== undefined) {
     // The split record is accepted, bounded, and visible: the checkpoint
@@ -2940,6 +3265,29 @@ export async function finalizeEscalate(
 }
 
 /**
+ * The `plan stop:` status line, and only while the stop stands (deviation 29):
+ * `hasPlanStop` is true exactly when the checkpoint carries the gate's refusal,
+ * so the line quotes that recorded stop and never a stand-in for one. A sticky
+ * stop is the run's standing condition, not a past event — `case 'plan'`
+ * answers a plain resume with the same escalation — so status prints it beside
+ * the moves the state machine honours, the same commands ESCALATION.md and the
+ * terminal print (both from `repairSteps`). A light run at `lastStage: 'plan'`
+ * with no record — a plan that cleared the gate, or an `implement` that failed
+ * after one — prints no line, and its repair stays the plain
+ * `pipeline resume <slug>` the state graph answers (correctness r1c3, #1).
+ */
+function planStopStatusLines(state: PipelineState, repair: RepairStep[]): string[] {
+  const stop = hasPlanStop(state) ? state.planStop : undefined;
+  if (stop === undefined) {
+    return [];
+  }
+  return [
+    `plan stop: ${printable(stop)} — a plain resume re-escalates; the moves that respect it: ` +
+      repair.map((s) => s.command).join('   or   '),
+  ];
+}
+
+/**
  * Human-facing explanation for `pipeline status`, from the gate log only.
  * `escalationMarkerPresent` (ADR-006 §3) makes the SPLIT RECORD visible: an
  * `ESCALATION.md` marker next to a checkpoint that still says `running` means
@@ -2948,18 +3296,35 @@ export async function finalizeEscalate(
  */
 export function statusLines(state: PipelineState, escalationMarkerPresent = false): string[] {
   const growth = proposalGrowthLine(state);
+  // ADR-010 §5: one flow line, rendered from the same `configFor(flowOf(state))`
+  // the drive loop uses — so a light run shows its two seats and light budgets,
+  // not the full-flow defaults the checkpoint never carried.
+  const cfg = configFor(flowOf(state));
+  const def = flowDef(flowOf(state));
+  const flowLine =
+    `flow:    ${def.name} (${def.path}, seats: ${seatsFor('code', cfg).join(', ')}; ` +
+    `rounds ${String(cfg.maxRounds)}, code reviews ${String(cfg.maxReviews.code)})`;
+  const repair = repairSteps(state);
+  // The budget record is the mutating loop's round count in every flow (A16),
+  // so the line names the same unit for both; the review sessions the run spent
+  // are the `reviews:` count on this line, which is what `maxReviews` caps.
   const lines = [
-    `run:     ${state.nnn}-${state.slug} (${state.status})`,
+    `slug:    ${state.nnn}-${state.slug} (${state.status})`,
     `source:  ${state.source.kind}: ${state.source.path}`,
     `branch:  ${state.branch}`,
+    flowLine,
     `stages:  last=${state.lastStage || '(none)'} designRound=${state.designRound} codeRound=${state.codeRound}`,
     `budgets: design ${state.designBudgetUsed} rounds, code ${state.codeBudgetUsed} rounds; ` +
       `reviews: design ${reviewSessionsUsed(state, 'design')} sessions, code ${reviewSessionsUsed(
         state,
         'code',
       )} sessions`,
-    ...(hasSeats(state, 'design') ? [seatSummary(state, 'design')] : []),
-    ...(hasSeats(state, 'code') ? [seatSummary(state, 'code')] : []),
+    // A sticky plan stop is the run's standing condition, not a past event, so
+    // it is the one state line rendered from a predicate: see
+    // `planStopStatusLines` for why the record, not the stage, decides it.
+    ...planStopStatusLines(state, repair),
+    ...(hasSeats(state, 'design') ? [seatSummary(state, 'design', cfg)] : []),
+    ...(hasSeats(state, 'code') ? [seatSummary(state, 'code', cfg)] : []),
     ...(growth === null ? [] : [growth]),
     'recent gates:',
     ...state.gateLog

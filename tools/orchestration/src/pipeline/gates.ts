@@ -3,6 +3,8 @@ import { existsSync, readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { flowDef } from './flows.js';
+import type { FlowId } from './flows.js';
 import type { PipelineConfig } from './stages.js';
 import { namesReservedSegment } from './types.js';
 import type { Finding, PipelineState, VerdictReply } from './types.js';
@@ -28,13 +30,32 @@ export interface ParsedSource {
   status: string;
   hasContext: boolean;
   hasDecision: boolean;
+  /**
+   * ADR-010: the frontmatter `flow:` key, as spelled. An absent key is `full`;
+   * anything else — `Light`, `light `, `sideways`, an empty value — is carried
+   * verbatim to the flow registry's lookup, which is the only gate, so a
+   * misspelling surfaces as a usage error instead of a silent `full` run.
+   */
+  flow: FlowId;
+  /**
+   * The document with its frontmatter block removed — the part a brief *is*.
+   * The brief gate judges this, because with ADR-010 a `flow:` key is a legal
+   * first line: a document that is only frontmatter carries no brief.
+   */
+  body: string;
 }
 
-/** Minimal frontmatter + section parsing (no YAML dependency). */
+/**
+ * Minimal frontmatter + section parsing (no YAML dependency).
+ *
+ * `flow` is deliberately not normalised: the registry lookup decides, so the
+ * comparison stays case-sensitive and whitespace-sensitive by construction.
+ */
 export function parseSource(content: string, kind: 'adr' | 'brief'): ParsedSource {
   const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(content);
   const status = /status:\s*(\w+)/.exec(front?.[1] ?? '')?.[1] ?? 'none';
   const body = front ? content.slice(front[0].length) : content;
+  const flow = /^flow:[ \t]*([^\r\n]*)/m.exec(front?.[1] ?? '')?.[1];
   const section = (name: string): boolean => {
     // The end anchor must be end-of-string, not multiline `$`: `$` matches
     // before every newline, so a section whose body starts with a blank line
@@ -43,38 +64,83 @@ export function parseSource(content: string, kind: 'adr' | 'brief'): ParsedSourc
     const m = re.exec(body);
     return m !== null && m[1]!.trim().length > 0;
   };
-  return { kind, status, hasContext: section('Context'), hasDecision: section('Decision') };
+  return {
+    kind,
+    status,
+    hasContext: section('Context'),
+    hasDecision: section('Decision'),
+    flow: flow ?? 'full',
+    body,
+  };
 }
 
 /**
  * Fail-fast gate over the source document, evaluated before any inference is
  * spent. ADRs must parse, be `proposed`, and carry non-empty Context and
- * Decision sections; briefs must be non-empty markdown.
+ * Decision sections; briefs must be non-empty markdown — the standing rules,
+ * in both flows: the frontmatter key selects the flow, never the document's
+ * shape (Compatibility matrix).
+ *
+ * The `flow` argument is validated before anything is read: this gate runs on
+ * every entry path, so an unreadable flow is a refusal here rather than a
+ * silently-full run.
+ *
+ * `parsed` is the caller's own parse of this document, so an entry path that
+ * already read the file reads it once (Selecting the flow: "one frontmatter
+ * read per entry, so the value that cleared the pre-lock check is the value
+ * stamped and printed"). Omitted, this gate does its own single read.
  */
 export async function sourceAdmissible(
   sourcePath: string,
   kind: 'adr' | 'brief',
+  flow: FlowId = 'full',
+  parsed?: ParsedSource,
 ): Promise<GateResult> {
-  let content: string;
-  try {
-    content = await readFile(sourcePath, 'utf8');
-  } catch {
-    return deny(`source document not readable: ${sourcePath}`);
+  // Validation only: the registry lookup is the whole gate.
+  flowDef(flow);
+  let doc = parsed;
+  if (doc === undefined) {
+    try {
+      doc = parseSource(await readFile(sourcePath, 'utf8'), kind);
+    } catch {
+      return deny(`source document not readable: ${sourcePath}`);
+    }
   }
-  const parsed = parseSource(content, kind);
-  if (parsed.kind === 'brief') {
-    return content.trim().length > 0 ? allow('brief is non-empty') : deny('brief is empty');
+  if (doc.kind === 'brief') {
+    // The gate judges the brief, not its frontmatter: the raw document still
+    // carries the `flow:` block, so a brief that is only frontmatter is empty.
+    return doc.body.trim().length > 0 ? allow('brief is non-empty') : deny('brief is empty');
   }
-  if (parsed.status !== 'proposed') {
-    return deny(`ADR status is "${parsed.status}", expected "proposed"`);
+  if (doc.status !== 'proposed') {
+    return deny(`ADR status is "${doc.status}", expected "proposed"`);
   }
-  if (!parsed.hasContext) {
+  if (!doc.hasContext) {
     return deny('ADR has no non-empty "## Context" section');
   }
-  if (!parsed.hasDecision) {
+  if (!doc.hasDecision) {
     return deny('ADR has no non-empty "## Decision" section');
   }
   return allow('ADR is proposed and complete');
+}
+
+/**
+ * ADR-010 §4 — the light flow's plan line ceiling, a deterministic stop at the
+ * same stage-ok/pre-commit point the size meter runs at: the runner hands it
+ * the meter's own line count for the run's `02-proposal.md`, because a stage
+ * cannot report its own size. The cap is config, so a registry change moves it
+ * and no code does; its absence is the full flow's policy of measuring and
+ * warning without gating, which is why `planMaxLines` is not in
+ * `DEFAULT_CONFIG`.
+ */
+export function planOutgrewFlow(lines: number, cfg: PipelineConfig): GateResult {
+  const cap = cfg.planMaxLines;
+  if (cap === undefined) {
+    return allow('this flow sets no plan line cap');
+  }
+  if (lines <= cap) {
+    return allow(`plan is ${String(lines)} lines, within the cap of ${String(cap)}`);
+  }
+  return deny(`plan outgrew the light flow (${String(lines)} lines, cap ${String(cap)})`);
 }
 
 // --- round-end aggregation ---------------------------------------------------
@@ -289,8 +355,23 @@ export const TEST_PATH_RE = /(^|\/)tests\/|\.test\.ts$/;
  * Which paths a stage is allowed to change. Agent-config permissions are only
  * advisory (a model can route around them via subagents), so the runner
  * enforces this matrix deterministically after every successful stage.
+ *
+ * `flow` is the ADR-010 widening: under `light` the coder owns the tests,
+ * because the flow has no test engineer. Exactly `implement` and `fix` gain
+ * `TEST_PATH_RE` — the predicate's whole test-path set, co-located `src/x.test.ts`
+ * included — so the light coder is never told it owns a file the sweep takes
+ * back. Every other rule — including the runner-reserved names, which stay
+ * first and win — is the unchanged matrix in both flows.
+ *
+ * The predicate parses no path (A28): paths reach it only as git plumbing
+ * output — repo-root-relative, POSIX separators, the real spelling — and
+ * `moves.ts` Rule 1 rejects absolute, backslash and `.`/`..` spellings as
+ * usage errors, so no spelling arrives here to be normalized.
  */
-export function stagePathAllowed(stage: string, path: string): boolean {
+export function stagePathAllowed(stage: string, path: string, flow: FlowId = 'full'): boolean {
+  // The flow is validated before any rule: an unknown flow must not fall
+  // through to `full`, whose rules are the wider ones.
+  flowDef(flow);
   // ADR-006 §1: the checkpoint, its `saveState` tmp shape, the escalation
   // marker, and the run lock are runner-reserved. This rule precedes every
   // per-stage rule, so no stage class — document, coder, or test — can own
@@ -305,12 +386,17 @@ export function stagePathAllowed(stage: string, path: string): boolean {
   const inTests = TEST_PATH_RE.test(path);
   if (stage === 'implement' || stage === 'fix') {
     // Coder may touch anything except tests; docs allowed for build notes.
+    // Under `light` it owns the tests too — no test engineer exists in the
+    // flow — so the reserved names above are its only fence.
+    if (flow === 'light') {
+      return true;
+    }
     return !inTests;
   }
   if (stage === 'test-authoring' || stage === 'test-update') {
     // Test engineer: tests plus its own design-dir artifacts, never source.
     return inDocs || inTests;
   }
-  // All document/review stages (research, proposal*, reviews, doc-sync).
+  // All document/review stages (plan, research, proposal*, reviews, doc-sync).
   return inDocs;
 }

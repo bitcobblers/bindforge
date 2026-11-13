@@ -23,6 +23,13 @@ Brief-driven runs claim the next free `NNN` number. If that work later
 becomes a real decision, write `docs/adrs/NNN-<slug>.md` with the same
 number.
 
+A source document can select the **light flow** with frontmatter
+`flow: light` (ADR-010): one `plan` stage instead of research and the design
+panel, the same coder, and a two-seat code review. The key is
+case-sensitive and validated before the lock — `flow: Light` or
+`flow: sideways` is a usage error that starts nothing (no lock, no design
+directory, no session). Without the key, every run is the full flow.
+
 ## What a run produces
 
 Everything lives under `docs/designs/NNN-<slug>/`:
@@ -49,6 +56,19 @@ source gate -> research -> proposal -> design review (funneled passes)
   -> test authoring -> implement -> test pre-check
   -> code review (funneled passes) -> doc sync -> done
 ```
+
+The **light flow** (ADR-010) is the short path beside it:
+
+```
+source gate -> plan (five sections, 80-line cap) -> implement
+  -> code review (2 seats: correctness, testing; funneled passes) -> done
+```
+
+A light run has no research, no design panel, no editor, no test engineer,
+and no doc-sync commit. Its coder owns the test files the full flow keeps for
+the test engineer, and its plan lands at the full flow's
+`02-proposal.md` path, so the revision stamps, the size meter and the
+`reviews/code/` reports all hang off it unchanged.
 
 The five review specialties — correctness, compatibility, security,
 performance, complexity — form a standing panel; each seat holds a verdict
@@ -101,6 +121,7 @@ pipeline run <source-path>        # start (or continue) a run
 pipeline resume <design-slug>     # continue from the last checkpoint
 pipeline status <design-slug>     # where it is and why it's stuck
 pipeline resume <slug> --extend-budget 5   # buy 5 more review sessions
+pipeline resume <slug> --stage plan  # light flow: re-plan a run a plan stop ended
 pipeline run <source> --max-parallel 3     # review-lane width ($OPENCODE_MAX_PARALLEL also works)
 ```
 
@@ -125,10 +146,48 @@ A run escalates when review can no longer move — the session budget is spent
 gate log), the per-round pass backstop is hit, the revise-round backstop is
 hit, or a **deadlock stop** fires: the designer replied `changed: false`
 while a seat still dissents. A stage may also fail its reply contract twice.
-It writes `ESCALATION.md` at the design directory root — assembled from the
-gate log, the seat board, and open findings — and exits non-zero. Read
-`ESCALATION.md`, fix the cause (usually the brief or the proposal), then
-`pipeline resume`.
+A light run has one more stop: a plan over the 80-line cap — or a plan stage
+that wrote no document at the proposal path — escalates at the plan stage,
+before the plan is committed and before the `implement` session is spent:
+over length is a scope signal, and the record names the promotion. That stop is
+**sticky**: it is recorded on the checkpoint, so a plain `pipeline resume`
+answers with the same record instead of handing the refused plan to
+`implement` — the refused plan is on the branch (the terminal escalation
+commit tracks it), and the flow has no stage that should build on it.
+Every escalation writes `ESCALATION.md` at the design directory root —
+assembled from the gate log, the seat board, and open findings — and exits
+non-zero. Read `ESCALATION.md` and run the repair it prints: for the stops
+above that is fixing the cause (usually the brief or the proposal) and
+`pipeline resume`; for a plan stop it is promoting the run (below) or
+re-planning with `pipeline resume <slug> --stage plan`, which clears the stop
+once the new plan passes the gate.
+
+Light-flow escalations from `implement`, `fix` or `code-review` carry the
+promotion recipe in the record: the run is on the light flow, and the way
+out is to promote it (below).
+
+### Promoting a light run to the full flow
+
+Promotion is an operator action with no state migration (ADR-010): set
+`flow: full` in the source document and re-run with `--force` on the same
+identity —
+
+```sh
+# in the source document: flow: light  ->  flow: full
+pipeline run <source-path> --force
+```
+
+The light run's branch and design directory are already "taken" by the
+clash check, so the re-run needs `--force`. The full `proposal` stage
+rewrites `02-proposal.md`, and the light plan stays recoverable in the
+branch's git history — the run's record, not a migration.
+
+The identity rule behind that is A17's: an ADR source names its own
+`NNN` from its file name, so the promoted run lands on the light run's
+identity and the clash check is what asks for `--force`. A brief carries
+no number in its name, so the shared counter hands the promoted run the
+next free `NNN` and it lands beside the light run; pin `--nnn`/`--slug`
+to promote onto the light run's identity.
 
 Only one pipeline may run at a time: the runner holds `.pipeline.lock` at
 the repo root and exits loudly if another run holds it. If the holder
@@ -176,18 +235,36 @@ docs/designs/<id>/.pipeline.json`), or start a fresh run.
 
 ## Tuning
 
+### Per-flow budgets (ADR-010)
+
+The flow selects a budget partial over the defaults below
+(`tools/orchestration/src/pipeline/flows.ts`); `pipeline status` and
+`ESCALATION.md` print the effective numbers for the run's flow:
+
+| Knob                  | `full`                                             | `light`                                        |
+| --------------------- | -------------------------------------------------- | ---------------------------------------------- |
+| Stage path            | the twelve stages above                            | plan, implement, fix, code review              |
+| Code review seats     | 5: correctness, compatibility, security, performance, testing | 2: correctness, testing |
+| `maxReviews.code`     | 20 sessions                                        | 6 sessions                                     |
+| `maxPassesPerRound`   | 6                                                  | 3 — the binding cap: 2 seats × 3 passes = 6 sessions |
+| `maxRounds`           | 5                                                  | 2 (bounds the mutating fix loop)               |
+| `planMaxLines`        | absent — the size meter warns, it does not gate    | 80 — a plan over it stops the run              |
+| `stageTimeoutMs`      | 30 min                                             | 12 min                                         |
+
 Pipeline config defaults (set in `tools/orchestration/src/pipeline/stages.ts`):
 
 - `maxReviews: { design: 40, code: 20 }` — reviewer **sessions** per phase;
   checked at every pass entry, so no pass sneaks past the cap
 - `maxParallelReviews: 1` — review-lane width per pass; the `--max-parallel`
   flag and `$OPENCODE_MAX_PARALLEL` override it (see the stages section)
-- `maxPassesPerRound: 8` — dissent/ratify passes inside one round; the
+- `maxPassesPerRound: 6` — dissent/ratify passes inside one round; the
   backstop against a seat that will not converge. It is the one budget
   `--extend-budget` cannot buy — sessions and rounds extend, passes do not —
   so a run stopped here is resumed by raising this default, not by buying
-  budget (run 010 stopped at 6 passes with all five seats reading `approve`,
-  four of them stale).
+  budget. Run 010 stopped at 6 passes with all five seats reading `approve`,
+  four of them stale: a ratify pass that re-stamped to `HEAD` aged the very
+  approvals it was ratifying. The fix is that stamp rule (a ratify pass keeps
+  the stamp its round entry set), not a higher price for every run.
 - `maxRounds: 5` — backstop on the mutating revise/fix loop only; passes
   inside a round never spend a round
 - `stageTimeoutMs: 30 min` — wall-clock cap per stage attempt; stage turns

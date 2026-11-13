@@ -1,4 +1,5 @@
-import { CODE_SPECIALTIES, DESIGN_SPECIALTIES } from './stages.js';
+import { seatsFor } from './flows.js';
+import { DEFAULT_CONFIG } from './stages.js';
 import type { PipelineConfig } from './stages.js';
 import type { Finding, PipelineState, SeatRecord, VerdictReply } from './types.js';
 
@@ -28,8 +29,11 @@ export type PassPlan =
   | { kind: 'converged' }
   | { kind: 'blocked'; reason: string };
 
-export function funnelSpecialties(phase: FunnelPhase): readonly string[] {
-  return phase === 'code' ? CODE_SPECIALTIES : DESIGN_SPECIALTIES;
+export function funnelSpecialties(
+  phase: FunnelPhase,
+  cfg: PipelineConfig = DEFAULT_CONFIG,
+): readonly string[] {
+  return seatsFor(phase, cfg);
 }
 
 function seatsOf(state: PipelineState, phase: FunnelPhase): Record<string, SeatRecord> {
@@ -52,9 +56,13 @@ export function reviewSessionsUsed(state: PipelineState, phase: FunnelPhase): nu
 }
 
 /** Seats whose latest verdict requests changes on the revision they were shown. */
-export function dissentingSeats(state: PipelineState, phase: FunnelPhase): string[] {
+export function dissentingSeats(
+  state: PipelineState,
+  phase: FunnelPhase,
+  cfg: PipelineConfig = DEFAULT_CONFIG,
+): string[] {
   const seats = seatsOf(state, phase);
-  return funnelSpecialties(phase).filter((s) => seats[s]?.verdict === 'request-changes');
+  return funnelSpecialties(phase, cfg).filter((s) => seats[s]?.verdict === 'request-changes');
 }
 
 /**
@@ -62,19 +70,27 @@ export function dissentingSeats(state: PipelineState, phase: FunnelPhase): strin
  * that has since been revised. Late catch only — staleness alone never re-runs
  * a seat while a dissent is open.
  */
-export function staleSeats(state: PipelineState, phase: FunnelPhase): string[] {
+export function staleSeats(
+  state: PipelineState,
+  phase: FunnelPhase,
+  cfg: PipelineConfig = DEFAULT_CONFIG,
+): string[] {
   const seats = seatsOf(state, phase);
   const stamp = stampOf(state, phase);
-  return funnelSpecialties(phase).filter(
+  return funnelSpecialties(phase, cfg).filter(
     (s) => seats[s] === undefined || seats[s]?.stamp !== stamp,
   );
 }
 
 /** The phase is settled: every seat has approved, on the current revision. */
-export function seatsConverged(state: PipelineState, phase: FunnelPhase): boolean {
+export function seatsConverged(
+  state: PipelineState,
+  phase: FunnelPhase,
+  cfg: PipelineConfig = DEFAULT_CONFIG,
+): boolean {
   const seats = seatsOf(state, phase);
   const stamp = stampOf(state, phase);
-  return funnelSpecialties(phase).every(
+  return funnelSpecialties(phase, cfg).every(
     (s) => seats[s]?.verdict === 'approve' && seats[s]?.stamp === stamp,
   );
 }
@@ -100,16 +116,20 @@ export function seatDecision(
 export function planPass(state: PipelineState, phase: FunnelPhase, cfg: PipelineConfig): PassPlan {
   const seats = seatsOf(state, phase);
   const cycle = cycleOf(state, phase);
-  if (funnelSpecialties(phase).every((s) => seats[s] === undefined)) {
-    return { kind: 'pass', pass: 'full', seats: [...funnelSpecialties(phase)], cycle: 0 };
+  if (funnelSpecialties(phase, cfg).every((s) => seats[s] === undefined)) {
+    return { kind: 'pass', pass: 'full', seats: [...funnelSpecialties(phase, cfg)], cycle: 0 };
   }
 
-  const open = dissentingSeats(state, phase);
-  const stale = open.length === 0 ? staleSeats(state, phase) : [];
+  const open = dissentingSeats(state, phase, cfg);
+  const stale = open.length === 0 ? staleSeats(state, phase, cfg) : [];
 
   if (open.length === 0 && stale.length === 0) {
     return { kind: 'converged' };
   }
+  // The pass backstop is the funnel's own convergence stop, and the one cap
+  // `--extend-budget` cannot buy (A16, A27: the extension is a session and
+  // round allowance, consumed at the cap checks; passes are not in its
+  // grammar). Unmodified by the light flow, which binds this cap first.
   if (cycle >= cfg.maxPassesPerRound) {
     return {
       kind: 'blocked',
@@ -178,10 +198,14 @@ export function reportPathFor(
 }
 
 /** One-line seat table for `pipeline status` and the escalation report. */
-export function seatSummary(state: PipelineState, phase: FunnelPhase): string {
+export function seatSummary(
+  state: PipelineState,
+  phase: FunnelPhase,
+  cfg: PipelineConfig = DEFAULT_CONFIG,
+): string {
   const seats = seatsOf(state, phase);
   const stamp = stampOf(state, phase);
-  const parts = funnelSpecialties(phase).map((s) => {
+  const parts = funnelSpecialties(phase, cfg).map((s) => {
     const seat = seats[s];
     const mark =
       seat === undefined ? 'pending' : seat.verdict === 'approve' ? 'approve' : 'DISSENT';

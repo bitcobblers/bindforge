@@ -92,6 +92,9 @@ interface StubOptions {
   reviseWrites: boolean;
   /** revise replies `changed: false` (the deadlock input). */
   reviseNoChange?: boolean;
+  /** `fix` sessions change the worktree, so the runner's commit moves `HEAD` —
+   * the code phase's revision stamp (A5). */
+  fixWrites?: boolean;
 }
 
 function stubClient(dir: string, opts: StubOptions) {
@@ -125,6 +128,10 @@ function stubClient(dir: string, opts: StubOptions) {
         if (s.key === 'proposal-revise' && opts.reviseWrites) {
           revisions += 1;
           writeFileSync(join(dir, DESIGN_DOC), `# proposal\n\nrevision ${String(revisions)}\n`);
+        }
+        if (s.key === 'fix' && opts.fixWrites === true) {
+          mkdirSync(join(dir, 'src'), { recursive: true });
+          writeFileSync(join(dir, 'src', 'thing.ts'), 'export const fixed = 1;\n');
         }
       },
       remove: async () => undefined,
@@ -169,8 +176,11 @@ function stubClient(dir: string, opts: StubOptions) {
     if (key === 'proposal-final') return JSON.stringify({ ambiguities: [] });
     if (key === 'test-authoring')
       return JSON.stringify({ testsAdded: 0, commitMessage: 'test: pin the contract' });
-    if (key === 'implement')
-      return JSON.stringify({ testsNeedUpdate: false, commitMessage: 'feat: implement it' });
+    if (key === 'implement' || key === 'fix')
+      return JSON.stringify({
+        testsNeedUpdate: false,
+        commitMessage: key === 'fix' ? 'fix: address the findings' : 'feat: implement it',
+      });
     if (key === 'doc-sync') return JSON.stringify({ drifted: false });
     return JSON.stringify({ summary: 'ok' });
   };
@@ -263,6 +273,32 @@ describe('funnel loop end to end', () => {
     const revise = readTranscript(dir, 'proposal-revise-r1.md');
     expect(revise).toContain('security-r1c0.md');
     expect(revise).not.toContain('correctness-r1c0.md');
+  });
+
+  it('clears a stale escalation marker on completion', async () => {
+    const dir = tmpRepo(baseState());
+    const { client } = stubClient(dir, {
+      rejects: { 'design-review:security': [0] },
+      reviseWrites: true,
+    });
+
+    // Seed the terminal marker a prior escalation left, committed on the branch.
+    const designDir = join(dir, 'docs', 'designs', '002-x');
+    writeFileSync(join(designDir, 'ESCALATION.md'), '# ESCALATED: 002-x\n\nstale record\n');
+    const git = (args: string[]) =>
+      execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], { cwd: dir });
+    git(['add', '-A']);
+    git(['commit', '-q', '-m', 'docs: 002-x pipeline escalated']);
+    expect(existsSync(join(designDir, 'ESCALATION.md'))).toBe(true);
+
+    const status = await resumePipeline(optionsFor(dir, { client }));
+    expect(status).toBe('done');
+
+    // A run that escalated and recovered must not carry the stop's marker into
+    // completion: `finalizeDone` clears it, and `stageAll` stages the deletion
+    // into the completion commit, so the tree is clean at `done`.
+    expect(existsSync(join(designDir, 'ESCALATION.md'))).toBe(false);
+    expect(git(['status', '--porcelain']).toString().trim()).toBe('');
   });
 
   it('deadlock-stops the round when the designer replies changed:false', async () => {
@@ -420,5 +456,51 @@ describe('funnel loop end to end', () => {
     const saved = savedState(dir);
     expect(saved.version).toBe(1);
     expect(saved.seats?.design?.security?.verdict).toBe('approve');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The code phase's revision stamp is `HEAD` (A5), and a review pass's own
+// finalize commit moves it. So the stamp is refreshed at the pass entries that
+// follow a mutating stage and kept across a ratification pass: re-stamping at
+// the ratify entry ages the approvals that pass is ratifying and buys a second
+// ratification pass. The rule is shared by both flows, and the light flow's
+// three-pass convergence (`light-flow.test.ts`) reads it — this is the full-flow
+// pin the rule was asked for.
+// ---------------------------------------------------------------------------
+
+describe('the code phase converges on one stamp', () => {
+  // proves: Test strategy #13's full-flow sibling (correctness r1 finding 7) —
+  // full panel c0, one dissenter at c1 after `fix` moved `HEAD`, the four stale
+  // approvers at ratification c2: three passes, ten code sessions, and every
+  // seat's approval carries the run's one `codeStamp`. A ratify pass that
+  // re-stamped splits the panel's stamps and buys a fourth pass, which stops at
+  // the pass backstop instead of converging.
+  it('runs full, dissent, fix, ratify and converges without moving the stamp', async () => {
+    const dir = tmpRepo(baseState({ lastStage: 'implement', testsGreen: true }));
+    const { client, sessionsCreated } = stubClient(dir, {
+      rejects: { 'code-review:security': [0] }, // only the first security session dissents
+      reviseWrites: false,
+      fixWrites: true,
+    });
+
+    const status = await resumePipeline(optionsFor(dir, { client }));
+    expect(status).toBe('done');
+
+    const codeSessions = sessionsCreated.filter((k) => k.startsWith('code-review:'));
+    expect(codeSessions).toHaveLength(10); // c0 5 seats, c1 the dissenter, c2 the four approvers
+    expect(codeSessions.filter((k) => k === 'code-review:security')).toHaveLength(2);
+    expect(codeSessions.filter((k) => k === 'code-review:performance')).toHaveLength(2);
+    expect(sessionsCreated.filter((k) => k === 'fix')).toHaveLength(1);
+
+    const saved = savedState(dir);
+    const stamp = saved.codeStamp;
+    expect(stamp).toBeTruthy();
+    expect(saved.codeRound).toBe(1);
+    for (const seat of Object.values(saved.seats?.code ?? {})) {
+      expect(seat.verdict).toBe('approve');
+      expect(seat.stamp, 'the ratify pass ratifies the stamp the round set').toBe(stamp);
+    }
+    expect(Object.values(saved.seats?.code ?? {})).toHaveLength(5);
   });
 });

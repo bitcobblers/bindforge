@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { configFor } from '../../src/pipeline/flows.js';
 import {
   extractJsonObject,
   loadTemplate,
@@ -408,5 +409,120 @@ describe('run-7 stage guidance', () => {
     });
     expect(update).toContain('npx prettier --write');
     expect(update).toContain('the files you touched');
+  });
+});
+
+describe('run-010 plan prompt and the flow-owned test rule', () => {
+  // The light flow replaces research/design/proposal with one `plan` stage, and
+  // replaces the hard-coded "Never edit test files" line in the coder prompts
+  // with one `{{testOwnership}}` variable rendered from the flow: one variable,
+  // one source, covering the `fix` entered from a red `testsGreen` gate too.
+  const LIGHT = configFor('light', DEFAULT_CONFIG);
+
+  const LIGHT_OWNERSHIP =
+    'This is the light flow: you own the test files, and no test engineer exists in this flow.';
+  const FULL_OWNERSHIP =
+    'Never edit test files: a test engineer owns them. If they need updating, reply with testsNeedUpdate: true.';
+
+  /** Render a template filling EVERY placeholder it declares. The test names
+   * only the variables it is about, so the pin is the template's shape, not a
+   * guessed copy of the whole `stageVars` set: anything the template asks for
+   * that the test does not know lands as `<unset>` and is visible in the
+   * `{{`-free assertion. */
+  function fill(template: string, vars: Record<string, string>): string {
+    const declared: Record<string, string> = {};
+    for (const match of template.matchAll(/\{\{(\w+)\}\}/g)) {
+      const name = match[1];
+      if (name !== undefined) declared[name] = '<unset>';
+    }
+    return renderTemplate(template, { ...declared, ...vars });
+  }
+
+  const vars = (ownership: string): Record<string, string> => ({
+    designDir: 'docs/designs/002-x',
+    sourcePath: 'docs/prompts/002-x.md',
+    planMaxLines: String(LIGHT.planMaxLines),
+    testOwnership: ownership,
+  });
+
+  // proves: Test strategy #11 — the plan template renders from stageVars with
+  // no unresolved placeholder, and its interpolated cap is the registry's, so
+  // the number a planner reads is the number the gate enforces.
+  it('renders plan.md with no unresolved placeholder and the registry cap', async () => {
+    const template = await loadTemplate(PROMPTS_DIR, 'plan.md');
+    const text = fill(template, vars(LIGHT_OWNERSHIP));
+
+    expect(text).not.toContain('{{');
+    expect(LIGHT.planMaxLines).toBe(80);
+    expect(text).toContain('80');
+
+    // The plan lands at the full flow's proposal path, which is what keeps the
+    // design stamp, the size meter and the `reviews/code/` reports working.
+    expect(text).toContain('docs/designs/002-x/02-proposal.md');
+  });
+
+  // proves: Test strategy #11 — the plan stage is wired to that template and to
+  // the planner agent, so the template this suite renders is the one the runner
+  // sends.
+  it('wires the plan stage to the plan template and the planner agent', async () => {
+    const def = stageDef('plan', undefined);
+    expect(def.template).toBe('plan.md');
+    expect(def.agent).toBe('design/planner');
+    expect(existsSync(join(PROMPTS_DIR, 'plan.md'))).toBe(true);
+    const text = await loadTemplate(PROMPTS_DIR, def.template ?? 'plan.md');
+    expect(text.length).toBeGreaterThan(0);
+  });
+
+  // proves: Test strategy #11 — the three coder-facing templates carry the
+  // variable, not the standing rule: the sentence "Never edit test files" moves
+  // into the full flow's value, so a light prompt cannot inherit it.
+  it('renders the light ownership line in implement, fix and fix-tests', async () => {
+    for (const template of ['implement.md', 'fix.md', 'fix-tests.md']) {
+      const raw = await loadTemplate(PROMPTS_DIR, template);
+      expect(raw, template).toContain('{{testOwnership}}');
+      expect(raw, template).not.toContain('Never edit test files');
+
+      const text = fill(raw, vars(LIGHT_OWNERSHIP));
+      expect(text, template).toContain('no test engineer exists in this flow');
+      expect(text, template).toContain('you own the test files');
+    }
+  });
+
+  // proves: Test strategy #11 — the same templates render the full flow's line,
+  // which keeps the standing rule and names the `testsNeedUpdate` escape: one
+  // variable, both flows, no second copy of the rule.
+  it('renders the full ownership line with the testsNeedUpdate escape', async () => {
+    for (const template of ['implement.md', 'fix.md', 'fix-tests.md']) {
+      const raw = await loadTemplate(PROMPTS_DIR, template);
+      const text = fill(raw, vars(FULL_OWNERSHIP));
+      expect(text, template).toContain('Never edit test files');
+      expect(text, template).toContain('testsNeedUpdate');
+    }
+  });
+
+  // proves: Test strategy #11 + The `plan` stage — the five sections exist
+  // exactly once, in the skill's template, and the skill states no number: the
+  // cap travels through the prompt from the registry.
+  it('keeps the plan-note template to the five sections and the cap out of it', async () => {
+    const text = await readFile(
+      fileURLToPath(
+        new URL('../../../../.opencode/skills/plan-note/references/template.md', import.meta.url),
+      ),
+      'utf8',
+    );
+    const lower = text.toLowerCase();
+    for (const section of [
+      'problem',
+      'chosen approach',
+      'files to touch',
+      'test plan',
+      'done criteria',
+    ]) {
+      expect(lower, `section: ${section}`).toContain(section);
+    }
+    // The five sections exist once: a second copy is a second source of truth.
+    expect(text.split('\n').filter((line) => line.startsWith('## '))).toHaveLength(5);
+    expect(text).not.toContain('{{planMaxLines}}');
+    expect(text).not.toMatch(/\b80\b/);
   });
 });

@@ -362,4 +362,37 @@ describe('proposalGrowth', () => {
     expect(md).toContain('## Proposal size');
     expect(md).toContain('proposal:  660 lines (+300/-41 across 1 design stage(s))');
   });
+
+  // proves: Test strategy #10 — the record names the flow that ran, with the
+  // effective light numbers from the same `configFor` the runner drives with: a
+  // light escalation must not read as a full run whose design phase vanished.
+  it('prints the light flow line with the effective numbers', () => {
+    const s = state();
+    s.status = 'escalated';
+    s.flow = 'light';
+    s.lastStage = 'code-review';
+    s.gateLog = [{ gate: 'code-review', round: 1, proceed: false, reason: 'open majors', at: 1 }];
+
+    const md = escalationMarkdown(s, 'code', ['blocker', 'major']);
+    expect(md).toContain(
+      'light (plan → implement → code review, seats: correctness, testing; rounds 2, code reviews 6)',
+    );
+    expect(md).toMatch(/\*\*code\*\* phase|code phase/);
+  });
+
+  // proves: Test strategy #10 — a full run's report gains that one line and
+  // keeps every existing section byte-for-byte, including the size section.
+  it('keeps the full report intact beside the flow line', () => {
+    const s = state();
+    s.status = 'escalated';
+    s.results = [sizedResult('proposal-revise', 300, 41, 660)];
+    s.gateLog = [
+      { gate: 'design-review-round', round: 1, proceed: false, reason: 'open majors', at: 1 },
+    ];
+
+    const md = escalationMarkdown(s, 'design', ['blocker', 'major']);
+    expect(md).toMatch(/flow:\s+full/);
+    expect(md).toContain('## Proposal size');
+    expect(md).toContain('proposal:  660 lines (+300/-41 across 1 design stage(s))');
+  });
 });

@@ -13,7 +13,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { escalationPhase, reportFindings } from '../../src/pipeline/report.js';
+import { escalationPhase, hasPlanStop, reportFindings } from '../../src/pipeline/report.js';
 import { finalizeEscalate } from '../../src/pipeline/runner.js';
 import { DEFAULT_CONFIG } from '../../src/pipeline/stages.js';
 import type { PipelineState, StageResult } from '../../src/pipeline/types.js';
@@ -89,6 +89,178 @@ describe('escalationPhase', () => {
     expect(escalationPhase({ ...stateWith(), lastStage: 'doc-sync' })).toBe('code');
     expect(escalationPhase({ ...stateWith(), lastStage: 'test-update' })).toBe('code');
     expect(escalationPhase({ ...stateWith(), lastStage: 'editorial-review' })).toBe('editorial');
+  });
+
+  // proves: Test strategy #10 — a light run stopped at `plan` reports the code
+  // phase: a light run has no design phase, so "the design phase" in
+  // ESCALATION.md would name a phase that cannot have failed. `plan` joins the
+  // reporting set for both flows, and the gate — not this function — decides
+  // which paths the stage owns.
+  it('reports a plan-stage stop as the code phase', () => {
+    expect(escalationPhase({ ...stateWith(), lastStage: 'plan', flow: 'light' })).toBe('code');
+    expect(escalationPhase({ ...stateWith(), lastStage: 'plan' })).toBe('code');
+    // The design-phase attribution the light flow must not lose: an entry-stage
+    // stop in the full flow is still design.
+    expect(escalationPhase({ ...stateWith(), lastStage: 'proposal' })).toBe('design');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Run 010, Test strategy #14 (and #8's other half): the light promotion
+// suffix is appended at exactly one site — this function — gated on the flow
+// and on the escalating **stage**, never on `escalationPhase` (which reports a
+// light `plan` stop as `code`). One append covers the pass-backstop, fix-round
+// and session-budget records; the plan-size stop's own string already names
+// the promotion, so it must not gain the suffix a second time.
+// ---------------------------------------------------------------------------
+
+describe('finalizeEscalate: the light promotion suffix', () => {
+  function lightRepo(): string {
+    const dir = mkdtempSync(join(tmpdir(), 'bindforge-escalate-light-'));
+    const git = (args: string[]) =>
+      execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], {
+        cwd: dir,
+        encoding: 'utf8',
+      });
+    mkdirSync(join(dir, 'docs', 'adrs'), { recursive: true });
+    writeFileSync(join(dir, 'docs', 'adrs', '002-x.md'), '---\nstatus: proposed\n---\n');
+    git(['init', '-q', '-b', 'main']);
+    git(['add', '-A']);
+    git(['commit', '-q', '-m', 'docs: base']);
+    return dir;
+  }
+
+  const SUFFIX = 'the light flow (flow: light); promote with flow: full and re-run --force';
+  const designDirOf = (dir: string) => join(dir, 'docs', 'designs', '002-x');
+
+  async function recordFor(partial: Partial<PipelineState>, reason: string): Promise<string> {
+    const dir = lightRepo();
+    const state = { ...stateWith(), ...partial };
+    await finalizeEscalate(dir, state, reason, DEFAULT_CONFIG);
+    return readFileSync(join(designDirOf(dir), 'ESCALATION.md'), 'utf8');
+  }
+
+  // proves: Test strategy #14 — every code-phase escalation carries the
+  // suffix, appended once.
+  it('appends the suffix once to each code-phase record', async () => {
+    for (const lastStage of ['implement', 'fix', 'code-review']) {
+      const report = await recordFor(
+        { lastStage, flow: 'light' },
+        'code review: the pass backstop (3/3 passes)',
+      );
+      expect(report, `${lastStage} escalates with the promotion recipe`).toContain(SUFFIX);
+      expect(report.match(/promote with flow: full/g)).toHaveLength(1);
+    }
+  });
+
+  // proves: Test strategy #14 — the plan-size stop is the design's one plan
+  // stop, and its string already carries the recipe: the suffix is not added.
+  it('keeps the plan-size stop recipe singular', async () => {
+    const planReason =
+      'plan outgrew the light flow (81 lines, cap 80): set flow: full and re-run with --force';
+    const report = await recordFor({ lastStage: 'plan', flow: 'light' }, planReason);
+    expect(report).toContain(planReason);
+    expect(report).not.toContain(SUFFIX);
+  });
+
+  // proves: Test strategy #14/#19 (correctness r1c2 finding A) — the plan stop's
+  // record is single-voiced: its repair line is the promotion recipe, not the
+  // generic `pipeline resume`, because the resume that footer prints lands on
+  // `case 'plan'` → `implement` and builds the plan the flow refused. Every
+  // other light stop is repaired by a resume, so its footer keeps naming one.
+  // The state carries the stop the gate records (`planStop`), which is what the
+  // repair selects on: the stage is not the stop (correctness r1c3 finding 1).
+  it('repairs a plan stop with promotion, not with a plain resume', async () => {
+    const planReason =
+      'plan outgrew the light flow (120 lines, cap 80): set flow: full and re-run with --force';
+    const report = await recordFor(
+      { lastStage: 'plan', flow: 'light', planStop: planReason },
+      planReason,
+    );
+    expect(report).toContain('set flow: full and re-run with --force');
+    expect(report).toContain('resume --stage plan');
+    expect(report).not.toContain('pipeline resume 002-x');
+
+    const budget = await recordFor(
+      { lastStage: 'code-review', flow: 'light' },
+      'code review: the pass backstop (3/3 passes)',
+    );
+    expect(budget).toContain('pipeline resume 002-x');
+  });
+
+  // proves: Test strategy #14/#19 (correctness r1c3 finding 1) — the light run
+  // with no stop recorded gets the repair the state machine honors. This is the
+  // shape a failing `implement` leaves: the plan that cleared the cap persisted
+  // `lastStage: 'plan'`, the gate cleared the stop, and the coder's own failure
+  // escalated with `lastStage` never advanced. Nothing was refused, so
+  // `case 'plan'` falls to `implement` and a plain resume retries the coder; a
+  // record that claims a plan stop sends the operator to a promotion and a
+  // wasted re-plan for a run that never reached the gate.
+  it('repairs a light stop with no plan stop recorded by a plain resume', async () => {
+    const report = await recordFor(
+      { lastStage: 'plan', flow: 'light' },
+      'implement: stage failed (2 attempts)',
+    );
+    expect(report).toContain('pipeline resume 002-x');
+    expect(report).not.toMatch(/plan stop/i);
+    expect(report).not.toMatch(/re-escalat/i);
+    expect(report).not.toContain('resume --stage plan');
+    expect(report).not.toContain('flow: full and re-run with --force');
+  });
+
+  // proves: Test strategy #14 — a full run's record gains nothing: the append
+  // is gated on the flow, and an absent flow key is full.
+  it('adds nothing to a full run', async () => {
+    const report = await recordFor(
+      { lastStage: 'code-review' },
+      'code review: the pass backstop (3/3 passes)',
+    );
+    expect(report).not.toContain('light flow');
+    expect(report).not.toContain('--force');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Run 010, correctness r1c3 finding 1: the plan-stop record is selected by the
+// stop the gate recorded, not by the stage a plan stop happens to have left.
+// The stage is not the stop — a light run that clears the cap and a light
+// `implement` that fails both stand at `lastStage: 'plan'` with nothing
+// refused, and the state's documented reading of a missing stop is "no stop
+// standing". The predicate is the one selector for the ESCALATION.md repair
+// lines and the `pipeline status` plan-stop line, so it is pinned here.
+// ---------------------------------------------------------------------------
+
+describe('hasPlanStop', () => {
+  const PLAN_STOP =
+    'plan outgrew the light flow (120 lines, cap 80): set flow: full and re-run with --force';
+
+  // proves: Test strategy #19 (correctness r1c3 finding 1) — a recorded stop
+  // reads as a stop.
+  it('reads the stop the gate recorded', () => {
+    expect(
+      hasPlanStop({ ...stateWith(), flow: 'light', lastStage: 'plan', planStop: PLAN_STOP }),
+    ).toBe(true);
+  });
+
+  // proves: Test strategy #19 (correctness r1c3 finding 1) — the stage a plan
+  // stop leaves is not the stop: a running light run past its plan and a light
+  // `implement` that failed both sit at `plan` with no stop on the state, and
+  // neither is stopped.
+  it('reads the stage alone as no stop', () => {
+    expect(hasPlanStop({ ...stateWith(), flow: 'light', lastStage: 'plan' })).toBe(false);
+    expect(
+      hasPlanStop({ ...stateWith(), flow: 'light', lastStage: 'plan', status: 'escalated' }),
+    ).toBe(false);
+  });
+
+  // proves: Test strategy #19/#5 (the plan gate is light-only: `planMaxLines`
+  // is absent in the full flow's config, so no full run has a plan stop to
+  // print) — a full run never claims the light flow's plan stop.
+  it('reads no plan stop for a full run', () => {
+    expect(hasPlanStop({ ...stateWith(), lastStage: 'plan', planStop: PLAN_STOP })).toBe(false);
+    expect(
+      hasPlanStop({ ...stateWith(), flow: 'full', lastStage: 'plan', planStop: PLAN_STOP }),
+    ).toBe(false);
   });
 });
 

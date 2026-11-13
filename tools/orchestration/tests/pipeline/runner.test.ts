@@ -17,7 +17,7 @@ import {
 } from '../../src/pipeline/runner.js';
 import type { PipelineConfig } from '../../src/pipeline/stages.js';
 import { loadState } from '../../src/pipeline/state-store.js';
-import type { PipelineState } from '../../src/pipeline/types.js';
+import type { PipelineState, StageResult } from '../../src/pipeline/types.js';
 
 // --------------------------------------------------------------------------
 // The round-4 correctness incident: the server returns messages newest-first
@@ -322,6 +322,167 @@ describe('statusLines', () => {
     expect(running).not.toMatch(/split record/i);
     const terminal = statusLines(baseState({ status: 'escalated' }), true).join('\n');
     expect(terminal).not.toMatch(/split record/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Run 010, Test strategy #10: status prints one flow line, rendered from the
+// same `configFor(flowOf(state))` the runner drives with — so the numbers an
+// operator reads for a light run are the effective light numbers, not the
+// full-flow defaults the checkpoint never carried. A full run gains that one
+// line and nothing else: every pre-existing line stays byte-equal, and an
+// explicit `flow: full` renders identically to an absent key.
+// ---------------------------------------------------------------------------
+
+describe('statusLines: the flow line', () => {
+  const linesOf = (state: PipelineState): string[] => statusLines(state, false);
+  const flowLines = (state: PipelineState): string[] =>
+    linesOf(state).filter((line) => line.trimStart().startsWith('flow:'));
+  const SEAT_CYCLE = ['correctness', 'testing'];
+
+  /** `n` code-seat sessions on the ledger — what `reviewSessionsUsed` counts. */
+  const reviewResults = (n: number): StageResult[] =>
+    Array.from({ length: n }, (_, i) => {
+      const seat = SEAT_CYCLE[i % SEAT_CYCLE.length] ?? 'correctness';
+      return {
+        stage: `code-review:${seat}`,
+        round: 1,
+        sessionID: `ses_review_${String(i)}`,
+        agent: `codereview/code-${seat}`,
+        at: i,
+        reply: { verdict: 'approve', findings: [] },
+        transcript: 't',
+      };
+    });
+
+  // proves: Test strategy #10 — the light line names the flow, its stage path,
+  // its two seats, and the effective rounds and code-review budget.
+  it('prints the light flow line with the effective numbers', () => {
+    const output = linesOf(baseState({ flow: 'light' })).join('\n');
+    expect(output).toContain(
+      'light (plan → implement → code review, seats: correctness, testing; rounds 2, code reviews 6)',
+    );
+    expect(flowLines(baseState({ flow: 'light' }))).toHaveLength(1);
+  });
+
+  // proves: Test strategy #10 — a full run gains the one line, naming the flow
+  // and the standing five-seat panel, and the rest of the block is untouched.
+  it('adds one flow line to a full run', () => {
+    const full = linesOf(baseState({}));
+    expect(flowLines(baseState({}))).toHaveLength(1);
+    expect(flowLines(baseState({}))[0]).toMatch(/flow:\s+full/);
+    expect(full.join('\n')).toContain('compatibility');
+    const rest = full.filter((line) => !flowLines(baseState({})).includes(line));
+    expect(rest.some((line) => line.includes('slug:'))).toBe(true);
+    expect(rest.some((line) => line.includes('pipeline/002-x'))).toBe(true);
+    expect(rest.join('\n')).not.toMatch(/flow:/);
+  });
+
+  // proves: Test strategy #10 (the registry's `path` field) — the full flow's
+  // line names the full flow's own stages: `plan` is a stage of the light flow
+  // in this release, so it never reads as a step of `full` in `pipeline status`
+  // or ESCALATION.md.
+  it('names no light-only stage in the full flow path', () => {
+    const line = flowLines(baseState({}))[0] ?? '';
+    expect(line).toContain('research');
+    expect(line).not.toMatch(/\bplan\b/);
+  });
+
+  // proves: Test strategy #10 (A3's additive shape) — an explicit full renders
+  // byte-equal to an absent key, and the light key is the only difference.
+  it('renders an explicit full exactly as an absent key', () => {
+    expect(linesOf(baseState({ flow: 'full' }))).toEqual(linesOf(baseState({})));
+    expect(linesOf(baseState({ flow: 'light' })).join('\n')).not.toEqual(
+      linesOf(baseState({})).join('\n'),
+    );
+  });
+
+  // proves: Test strategy #10 (the light `maxRounds` consumer, correctness r1
+  // finding 1) — the printed unit follows the record. `codeBudgetUsed` counts
+  // mutating rounds in BOTH flows, so the light budget line says `rounds` exactly
+  // as the full-flow line always did, and the session count the line carries is
+  // `reviewSessionsUsed(state, 'code')` — the number `maxReviews.code` caps.
+  // Printing the round counter under `sessions` put the same number on the line
+  // twice under two labels, which is the record an operator misread as cost.
+  it('prints the budget line with the unit the number counts', () => {
+    const budgetLine = (state: PipelineState): string =>
+      linesOf(state)
+        .filter((line) => line.includes('budgets'))
+        .join('\n');
+
+    const lightTwo = budgetLine(baseState({ flow: 'light', codeRound: 1, codeBudgetUsed: 2 }));
+    expect(lightTwo).toContain('code 2 rounds');
+    expect(lightTwo).not.toContain('code 2 sessions');
+    expect(budgetLine(baseState({ codeRound: 1, codeBudgetUsed: 2 }))).toContain('code 2 rounds');
+
+    // Four review sessions spent of the light 6: the session count rides on the
+    // line's review count, where the phase cap sits.
+    const reviewed = budgetLine(
+      baseState({ flow: 'light', codeRound: 1, codeBudgetUsed: 2, results: reviewResults(4) }),
+    );
+    expect(reviewed).toContain('code 2 rounds');
+    expect(reviewed).toContain('code 4 sessions');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Run 010, correctness r1c3 finding 1: `pipeline status` prints the plan stop
+// from the stop the gate recorded (`state.planStop`), never from the stage a
+// plan stop happens to leave. A light run in the window after a plan that
+// cleared the cap, and a light `implement` whose failure left `lastStage` on
+// `plan`, are both runs that are not stopped — and a flow whose whole point is
+// that the operator reads the run's effective standing cannot be told a plan
+// was refused when none was.
+// ---------------------------------------------------------------------------
+
+describe('statusLines: the plan stop', () => {
+  const PLAN_STOP =
+    'plan outgrew the light flow (120 lines, cap 80): set flow: full and re-run with --force';
+
+  const planStopLines = (state: PipelineState): string[] =>
+    statusLines(state, false).filter((line) => /plan stop/i.test(line));
+
+  /** The line in either rendering: the stop is checkpoint data, so no
+   * verbosity (marker on disk) is needed to print it, and it must not appear
+   * in one and hide in the other. */
+  const claimsAPlanStop = (state: PipelineState): boolean =>
+    [false, true].some((verbose) => statusLines(state, verbose).join('\n').includes('plan stop'));
+
+  // proves: Test strategy #10/#19 (correctness r1c3 finding 1) — a running
+  // light run at the plan stage with no stop recorded prints nothing about a
+  // plan stop: it is mid-flight into `implement`, not stopped.
+  it('says nothing about a plan stop for a running light run', () => {
+    expect(claimsAPlanStop(baseState({ flow: 'light', lastStage: 'plan' }))).toBe(false);
+  });
+
+  // proves: Test strategy #19 (correctness r1c3 finding 1) — the escalated
+  // shape a failed light `implement` leaves (the plan stage's own value in
+  // `lastStage`, no stop on the state) is not reported as a plan stop, and a
+  // full run never is: the plan gate is light-only, its cap absent.
+  it('says nothing about a plan stop that was never recorded', () => {
+    expect(
+      claimsAPlanStop(baseState({ flow: 'light', lastStage: 'plan', status: 'escalated' })),
+    ).toBe(false);
+    expect(claimsAPlanStop(baseState({ lastStage: 'plan', status: 'escalated' }))).toBe(false);
+    expect(
+      claimsAPlanStop(baseState({ flow: 'light', lastStage: 'implement', status: 'escalated' })),
+    ).toBe(false);
+  });
+
+  // proves: Test strategy #19/#10 (correctness r1c3 finding 1) — the stop that
+  // is recorded is printed, once, naming the refusal the gate recorded and the
+  // two moves that respect it: the promotion and the in-flow re-plan. The plain
+  // resume the run answers with no stop is the move a plan stop must not offer.
+  it('prints the recorded plan stop with the moves that respect it', () => {
+    const lines = planStopLines(
+      baseState({ flow: 'light', lastStage: 'plan', status: 'escalated', planStop: PLAN_STOP }),
+    );
+    expect(lines).toHaveLength(1);
+    const line = lines[0] ?? '';
+    expect(line).toContain('plan outgrew the light flow (120 lines, cap 80)');
+    expect(line).toContain('--force');
+    expect(line).toContain('pipeline resume --stage plan 002-x');
+    expect(line).not.toContain('pipeline resume 002-x');
   });
 });
 

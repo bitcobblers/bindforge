@@ -63,6 +63,16 @@ const StateSchema = z.object({
   branch: z.string().min(1),
   baseRef: z.string().optional(),
   source: z.object({ kind: z.enum(['adr', 'brief']), path: z.string().min(1) }),
+  // ADR-010: the flow the run follows, stamped once at entry. Additive-optional
+  // — its absence is a pre-ADR-010 checkpoint and reads as `full` — and
+  // validated, not coerced: a checkpoint is model-visible data at the resume
+  // seam, so a flow the registry does not define refuses to load.
+  flow: z.enum(['full', 'light']).optional(),
+  // ADR-010 §4: the sticky plan stop, the record the stop escalates on
+  // (`PipelineState.planStop`). Optional like every field added after run 1,
+  // and typed, not coerced: the writer refuses a shape the loader would not
+  // read back, so the stop can only ever carry the string it names.
+  planStop: z.string().optional(),
   status: z.enum(['running', 'done', 'escalated']),
   lastStage: z.string(),
   designRound: z.number().int().min(0),

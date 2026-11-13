@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { configFor } from '../../src/pipeline/flows.js';
 import { CODE_SPECIALTIES, DEFAULT_CONFIG, DESIGN_SPECIALTIES } from '../../src/pipeline/stages.js';
 import { type NextStep, type ReviewPhase, decideNext } from '../../src/pipeline/states.js';
 import type { PipelineState, VerdictReply } from '../../src/pipeline/types.js';
@@ -166,6 +167,49 @@ describe('decideNext: review loops and budgets', () => {
     expect(decideNext(s, DEFAULT_CONFIG)).toEqual({ kind: 'review', phase: 'design', round: 1 });
   });
 
+  // proves: Budget resolution — every seat-list reader takes the `cfg` its
+  // caller already holds (security r1 finding 5): the dissenter list that routes
+  // the `proposal-revise` transition is the caller's resolved panel, not the
+  // standing five. A dissent from a seat the panel does not name is dropped from
+  // the revision input, exactly as the panel says, and the design review opens
+  // as a new round.
+  it('drives the dissenter list from the caller-supplied design panel', () => {
+    const seatsDissenting = (dissenter: string): Record<string, 'approve' | 'request-changes'> => {
+      const seats: Record<string, 'approve' | 'request-changes'> = {};
+      for (const sp of DESIGN_SPECIALTIES) {
+        seats[sp] = sp === dissenter ? 'request-changes' : 'approve';
+      }
+      return seats;
+    };
+
+    const standing = configFor('full', DEFAULT_CONFIG);
+    const narrow = configFor('full', {
+      ...DEFAULT_CONFIG,
+      reviewSeats: { design: ['compatibility'], code: [...CODE_SPECIALTIES] },
+    });
+
+    // Design round 1, one dissenter: `complexity`, a design seat.
+    const atRevise = (): PipelineState => {
+      const s = freshState();
+      s.lastStage = 'proposal';
+      enterReview(s, decideNext(s, standing));
+      withVerdicts(s, 'design', reject, seatsDissenting('complexity'));
+      s.lastStage = 'proposal-revise';
+      return s;
+    };
+
+    // The standing five name the dissenter: the revision goes back to it inside
+    // round 1, at a higher pass number.
+    const inPanel = decideNext(atRevise(), standing);
+    expect(inPanel).toEqual({ kind: 'review', phase: 'design', round: 1 });
+
+    // The caller's panel names only the seat that approved: the same state
+    // resolves to no dissenter, so the design review is a NEW round.
+    const outOfPanel = decideNext(atRevise(), narrow);
+    expect(outOfPanel.kind).toBe('review');
+    expect(outOfPanel.kind === 'review' && outOfPanel.round).toBeGreaterThan(1);
+  });
+
   it('revisiting stale approvals runs a ratification pass in the same round', () => {
     const s = freshState();
     s.lastStage = 'proposal';
@@ -267,5 +311,119 @@ describe('decideNext: review loops and budgets', () => {
     const s = freshState();
     s.lastStage = 'bogus';
     expect(() => decideNext(s, DEFAULT_CONFIG)).toThrow(/no transition/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Run 010, Test strategy #8: the light flow's transitions, from a state whose
+// `flow` key says `light`. Three touch points in the graph — the entry, the
+// new `plan` case, and the converged exit — plus the `testsNeedUpdate` guard:
+// light has no test engineer, so the flag never routes to `test-update`. The
+// backstop string stays the one `decideNext` writes for both flows; the light
+// promotion suffix belongs to `finalizeEscalate` and is asserted on the record
+// (Test strategy #14), never here.
+// ---------------------------------------------------------------------------
+
+describe('decideNext: the light flow', () => {
+  const lightConfig = configFor('light', DEFAULT_CONFIG);
+
+  const lightState = (flow: 'light' | 'full' = 'light'): PipelineState => {
+    const s = freshState();
+    s.flow = flow;
+    return s;
+  };
+
+  // proves: Test strategy #8 — `''` → plan and plan → implement: the light
+  // entry replaces research, and the new `plan` case hands off to the coder.
+  it('enters at plan and hands the plan to implement', () => {
+    const s = lightState();
+    expect(stageOf(decideNext(s, lightConfig))).toBe('plan');
+    s.lastStage = 'plan';
+    expect(stageOf(decideNext(s, lightConfig))).toBe('implement');
+  });
+
+  // proves: Test strategy #8 — the new `plan` case is unreachable in the full
+  // flow: the entry there is research, and `plan` has no full-flow transition.
+  it('keeps the full flow entering at research and rejecting plan', () => {
+    const s = lightState('full');
+    expect(stageOf(decideNext(s, DEFAULT_CONFIG))).toBe('research');
+    s.lastStage = 'plan';
+    expect(() => decideNext(s, DEFAULT_CONFIG)).toThrow(/no transition/);
+  });
+
+  // proves: Test strategy #8 — green implement opens code review round 1, and
+  // a converged 2-seat panel ends the run: light has no doc-sync stage.
+  it('reviews green work and ends at convergence', () => {
+    const s = lightState();
+    s.lastStage = 'implement';
+    s.testsGreen = true;
+    const step = decideNext(s, lightConfig);
+    expect(step).toEqual({ kind: 'review', phase: 'code', round: 1 });
+    enterReview(s, step);
+    withVerdicts(s, 'code', approve);
+    expect(decideNext(s, lightConfig)).toEqual({ kind: 'done' });
+  });
+
+  // proves: Test strategy #8 — a dissent with budget left goes to `fix`, shared
+  // with the full flow.
+  it('routes a dissent with budget left to fix', () => {
+    const s = lightState();
+    s.lastStage = 'code-review';
+    s.codeRound = 1;
+    s.codeBudgetUsed = 1;
+    enterReview(s, { kind: 'review', phase: 'code', round: 1 });
+    withVerdicts(s, 'code', reject);
+    expect(stageOf(decideNext(s, lightConfig))).toBe('fix');
+  });
+
+  // proves: Test strategy #8 — the exhausted backstop escalates with the
+  // fix-round string exactly as `decideNext` writes it: byte-equal across the
+  // flows, and carrying no light suffix (that append is `finalizeEscalate's`).
+  it('escalates with the un-suffixed fix-round string', () => {
+    const reasonOf = (flow: 'light' | 'full'): string => {
+      const s = lightState(flow);
+      s.lastStage = 'code-review';
+      s.codeRound = 6;
+      s.codeBudgetUsed = 3;
+      enterReview(s, { kind: 'review', phase: 'code', round: 6 });
+      withVerdicts(s, 'code', reject);
+      const step = decideNext(s, configFor(flow, DEFAULT_CONFIG));
+      expect(step.kind).toBe('escalate');
+      return (step as { reason?: string }).reason ?? '';
+    };
+    const light = reasonOf('light');
+    expect(light).toMatch(/backstop/);
+    expect(light).not.toContain('light flow');
+    expect(light).toBe(reasonOf('full'));
+  });
+
+  // proves: Test strategy #8 — `testsNeedUpdate: true` never routes to
+  // `test-update` in light: green work goes to review and red work to `fix`,
+  // while the full flow's routing to `test-update` is unchanged.
+  it('never routes light through test-update', () => {
+    const green = lightState();
+    green.lastStage = 'implement';
+    green.testsGreen = true;
+    green.testsNeedUpdate = true;
+    expect(decideNext(green, lightConfig)).toEqual({ kind: 'review', phase: 'code', round: 1 });
+
+    const red = lightState();
+    red.lastStage = 'fix';
+    red.testsGreen = false;
+    red.testsNeedUpdate = true;
+    expect(stageOf(decideNext(red, lightConfig))).toBe('fix');
+
+    const fromPlan = lightState();
+    fromPlan.lastStage = 'plan';
+    fromPlan.testsNeedUpdate = true;
+    expect(stageOf(decideNext(fromPlan, lightConfig))).toBe('implement');
+
+    for (const lastStage of ['implement', 'fix']) {
+      const full = lightState('full');
+      full.lastStage = lastStage;
+      full.testsGreen = true;
+      full.testsNeedUpdate = true;
+      expect(stageOf(decideNext(full, DEFAULT_CONFIG))).toBe('test-update');
+    }
   });
 });

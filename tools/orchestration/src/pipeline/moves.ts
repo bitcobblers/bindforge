@@ -2,6 +2,8 @@ import { spawnSync } from 'node:child_process';
 import { lstatSync, realpathSync, renameSync } from 'node:fs';
 import { isAbsolute, join, posix, relative } from 'node:path';
 
+import { isStageInFlow } from './flows.js';
+import type { FlowId } from './flows.js';
 import { stagePathAllowed } from './gates.js';
 import { LOCK_FILE, type MovePair, STATE_FILE } from './types.js';
 
@@ -152,9 +154,16 @@ function reservedIssue(side: 'from' | 'to', pair: MovePair): string | null {
  * predicate is why the sweep needs no move-specific branch: a validated pair's
  * delete and its add are both sanctioned by construction.
  */
-function ownershipIssue(stage: string, pair: MovePair): string | null {
+function ownershipIssue(stage: string, pair: MovePair, flow: FlowId = 'full'): string | null {
+  // A move a flow never runs is not an ownership question: the stage does not
+  // exist in this flow at all, so neither endpoint is reachable. `stagePathAllowed`
+  // alone would not catch this (a light `test-update` owns `tests/**` by the
+  // shared rule), so the flow's stage list is the validator's source of truth.
+  if (!isStageInFlow(stage, flow)) {
+    return `stage ${stage} does not run in flow ${flow} (${pair.from} -> ${pair.to})`;
+  }
   for (const side of ['from', 'to'] as const) {
-    if (!stagePathAllowed(stage, pair[side])) {
+    if (!stagePathAllowed(stage, pair[side], flow)) {
       return `stage ${stage} does not own the ${side} path: ${pair[side]}`;
     }
   }
@@ -287,6 +296,7 @@ export function validateMoves(
   headBefore: string,
   stage: string,
   moves: readonly MovePair[],
+  flow: FlowId = 'full',
 ): string | null {
   const repoReal = realpathOrNull(repoDir);
   if (repoReal === null) {
@@ -300,7 +310,7 @@ export function validateMoves(
       }
     }
     const issue =
-      ownershipIssue(stage, pair) ?? endpointsIssue(repoDir, repoReal, headBefore, pair);
+      ownershipIssue(stage, pair, flow) ?? endpointsIssue(repoDir, repoReal, headBefore, pair);
     if (issue !== null) {
       return issue;
     }

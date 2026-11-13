@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import type { Flow } from './flows.js';
+
 // ---------------------------------------------------------------------------
 // Stage prompt templates: on-disk, rendered with {{placeholder}}
 // substitution; and the per-stage transcript with its provenance header.
@@ -10,6 +12,36 @@ import { join } from 'node:path';
 export interface TemplateVars {
   [key: string]: string | number;
 }
+
+/**
+ * The `{{testOwnership}}` line (ADR-010 §4): the one place the test-ownership
+ * rule is written, rendered from the flow so a light prompt cannot inherit the
+ * full flow's sentence and vice versa.
+ */
+export const TEST_OWNERSHIP_FULL =
+  'Never edit test files: a test engineer owns them. If they need updating, reply with testsNeedUpdate: true.';
+
+export const TEST_OWNERSHIP_LIGHT =
+  'This is the light flow: you own the test files, and no test engineer exists in this flow.';
+
+/**
+ * The line a flow's coder prompts carry in place of the hard-coded rule. The
+ * parameter is a `Flow`, not an open `string`: any other value would silently
+ * render the full flow's sentence, which is the failure the variable exists to
+ * remove.
+ */
+export function testOwnershipLine(flow: Flow): string {
+  return flow === 'light' ? TEST_OWNERSHIP_LIGHT : TEST_OWNERSHIP_FULL;
+}
+
+/**
+ * Values a template may ask for that are NOT flow config: the standing rule is
+ * the full flow's, so a caller that renders a coder prompt without naming a
+ * flow gets the rule every coder prompt carried before ADR-010. The runner
+ * always passes the flow's line, so this default is the fallback, never the
+ * authority.
+ */
+const TEMPLATE_DEFAULTS: TemplateVars = { testOwnership: TEST_OWNERSHIP_FULL };
 
 /**
  * Strict render: every placeholder in the TEMPLATE must be filled.
@@ -24,13 +56,14 @@ export interface TemplateVars {
  * an unfilled placeholder and threw on the next seat's prompt.
  */
 export function renderTemplate(text: string, vars: TemplateVars): string {
+  const filled: TemplateVars = { ...TEMPLATE_DEFAULTS, ...vars };
   for (const match of text.matchAll(/\{\{(\w+)\}\}/g)) {
     const key = match[1] as string;
-    if (!(key in vars)) {
+    if (!(key in filled)) {
       throw new Error(`unresolved template placeholder: {{${key}}}`);
     }
   }
-  return text.replace(/\{\{(\w+)\}\}/g, (_whole, key: string) => String(vars[key])).trim();
+  return text.replace(/\{\{(\w+)\}\}/g, (_whole, key: string) => String(filled[key])).trim();
 }
 
 export async function loadTemplate(promptsDir: string, name: string): Promise<string> {

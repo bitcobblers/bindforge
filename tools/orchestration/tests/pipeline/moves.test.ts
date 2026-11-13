@@ -424,6 +424,84 @@ describe('validateMoves — rule 3: ownership via stagePathAllowed', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Run 010, Test strategy #7: the ownership rule is flow-aware. `validateMoves`
+// takes the flow as its last argument and feeds it to the same
+// `stagePathAllowed` rule 3 the source gate uses, so the flow's stage list
+// becomes the validator's source of truth: light's `implement` owns `tests/**`
+// (it writes the tests, then moves them), a pair for a stage the light flow
+// never runs is rejected, and the full flow's verdicts are unchanged.
+// ---------------------------------------------------------------------------
+
+/** The flow-spelled validator contract: the issue text naming the pair, or null.
+ * The flow arrives as untrusted text — `moves.ts` validates it, so the parameter
+ * is open, not the registry's closed pair. */
+function flowIssueOf(
+  dir: string,
+  headBefore: string,
+  stage: string,
+  pairs: MovePair[],
+  flow: string,
+): string | null {
+  return validateMoves(dir, headBefore, stage, pairs, flow);
+}
+
+describe('validateMoves — rule 3 under the flow parameter', () => {
+  // proves: Test strategy #7 — the light widening reaches the validator:
+  // light's `implement` moving a source file into `tests/**` is admissible,
+  // where the full flow's same pair is rejected.
+  it('accepts implement moving a source file into tests under light', () => {
+    const { dir, headBefore } = movesRepo();
+    const pairs: MovePair[] = [{ from: 'src/old.ts', to: 'tests/old.test.ts' }];
+    expect(flowIssueOf(dir, headBefore, 'implement', pairs, 'light')).toBeNull();
+    expectRejectionNaming(issueOf(dir, headBefore, 'implement', pairs), 'tests/old.test.ts');
+  });
+
+  // proves: Test strategy #7 — the widening inside the validator, on the pair
+  // the light coder actually needs: a test-to-test move is admissible for its
+  // `implement`, and rejected for the same stage under `full`, where a test
+  // engineer owns those files.
+  it('accepts a test-to-test pair for the light coder and rejects it under full', () => {
+    const { dir, headBefore } = movesRepo();
+    const pairs: MovePair[] = [{ from: 'tests/x.test.ts', to: 'tests/y.test.ts' }];
+    expect(flowIssueOf(dir, headBefore, 'implement', pairs, 'light')).toBeNull();
+    expectRejectionNaming(
+      flowIssueOf(dir, headBefore, 'implement', pairs, 'full'),
+      'tests/x.test.ts',
+    );
+  });
+
+  // proves: Test strategy #7 — a pair for a stage the flow does not run is
+  // rejected by the flow, naming the pair: `test-update` exists in full and
+  // moves `tests/**`, and exists nowhere in light.
+  it('rejects a pair for a stage the light flow does not define', () => {
+    const { dir, headBefore } = movesRepo();
+    const pairs: MovePair[] = [{ from: 'tests/x.test.ts', to: 'tests/y.test.ts' }];
+    expect(flowIssueOf(dir, headBefore, 'test-update', pairs, 'full')).toBeNull();
+    const issue = flowIssueOf(dir, headBefore, 'test-update', pairs, 'light');
+    expectRejectionNaming(issue, 'tests/x.test.ts');
+  });
+
+  // proves: Test strategy #7 — the `plan` stage keeps the document-only rule
+  // inside the validator: it cannot move code, in either flow.
+  it('rejects the plan stage moving a source file in both flows', () => {
+    const { dir, headBefore } = movesRepo();
+    const pairs: MovePair[] = [{ from: 'src/old.ts', to: 'docs/designs/002-x/old.ts' }];
+    for (const flow of ['light', 'full'] as const) {
+      expectRejectionNaming(flowIssueOf(dir, headBefore, 'plan', pairs, flow), 'src/old.ts');
+    }
+  });
+
+  // proves: Test strategy #7 — the full flow's verdicts are unchanged when the
+  // flow is spelled, and an unknown flow is a thrown validation failure.
+  it('leaves the full flow unchanged and rejects an unknown flow', () => {
+    const { dir, headBefore } = movesRepo();
+    const pairs: MovePair[] = [{ from: 'src/old.ts', to: 'src/moved.ts' }];
+    expect(flowIssueOf(dir, headBefore, 'implement', pairs, 'full')).toBeNull();
+    expect(() => flowIssueOf(dir, headBefore, 'implement', pairs, 'sideways')).toThrow(/sideways/);
+  });
+});
+
 describe('validateMoves — rule 6: disjoint pairs, case-folded on every platform', () => {
   // proves: Test strategy #2 (duplicate endpoints)
   it('rejects duplicate froms and duplicate tos', () => {

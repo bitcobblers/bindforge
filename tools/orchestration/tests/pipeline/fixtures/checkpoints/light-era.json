@@ -1,0 +1,193 @@
+{
+  "version": 1,
+  "flow": "light",
+  "slug": "light-thing",
+  "nnn": "002",
+  "branch": "pipeline/002-light-thing",
+  "source": {
+    "kind": "brief",
+    "path": "docs/prompts/light-thing.md"
+  },
+  "status": "done",
+  "lastStage": "code-review",
+  "designRound": 0,
+  "codeRound": 1,
+  "designBudgetUsed": 0,
+  "codeBudgetUsed": 2,
+  "editorialDone": false,
+  "testsGreen": true,
+  "testsNeedUpdate": false,
+  "stageFailures": {},
+  "stageCommits": [
+    "4f0a5ecb3b2ca6ed6e0e3e2d3f0c3e50ce9e11f1",
+    "9a17b6d1f0e2c3d4a5b6c7d8e9f0a1b2c3d4e5f6",
+    "c2d5e8f1a4b7c0d3e6f9a2b5c8d1e4f7a0b3c6d9"
+  ],
+  "forceNext": null,
+  "results": [
+    {
+      "stage": "plan",
+      "round": 0,
+      "sessionID": "ses_light0001planff00a1b2c3d4",
+      "agent": "design/planner",
+      "at": 1794300000000,
+      "reply": {
+        "summary": "Wrote the plan: five sections, 62 lines, cap 80.",
+        "commitMessage": "docs: add the plan for the light thing"
+      },
+      "transcript": "docs/designs/002-light-thing/transcripts/plan-r0.md",
+      "durationMs": 121000,
+      "nudges": 0,
+      "docLines": 62,
+      "docLinesAdded": 62,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "implement",
+      "round": 0,
+      "sessionID": "ses_light0002implff00a1b2c3d4",
+      "agent": "code/coder",
+      "at": 1794300200000,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "feat: implement the light thing"
+      },
+      "transcript": "docs/designs/002-light-thing/transcripts/implement-r0.md",
+      "durationMs": 402000,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_light0003corrf00a1b2c3d4",
+      "agent": "codereview/code-correctness",
+      "at": 1794300400000,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "02-proposal.md > Files to touch",
+            "problem": "The plan names one module; the change touched two.",
+            "fix": "Reconcile the plan's file list with the diff, or narrow the diff."
+          }
+        ]
+      },
+      "transcript": "docs/designs/002-light-thing/reviews/code/correctness-r1c0.md",
+      "durationMs": 88000,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_light0004testff00a1b2c3d4",
+      "agent": "codereview/code-testing",
+      "at": 1794300450000,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/002-light-thing/reviews/code/testing-r1c0.md",
+      "durationMs": 61000,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_light0005fixfff00a1b2c3d4",
+      "agent": "code/coder",
+      "at": 1794300600000,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "fix: narrow the light thing to the planned module"
+      },
+      "transcript": "docs/designs/002-light-thing/transcripts/fix-r1.md",
+      "durationMs": 175000,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_light0006corrf00a1b2c3d5",
+      "agent": "codereview/code-correctness",
+      "at": 1794300800000,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/002-light-thing/reviews/code/correctness-r1c1.md",
+      "durationMs": 54000,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_light0007testff00a1b2c3d5",
+      "agent": "codereview/code-testing",
+      "at": 1794300850000,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/002-light-thing/reviews/code/testing-r1c1.md",
+      "durationMs": 47000,
+      "nudges": 0
+    }
+  ],
+  "gateLog": [
+    {
+      "gate": "sourceAdmissible",
+      "round": 0,
+      "proceed": true,
+      "reason": "brief is non-empty and its flow is light",
+      "at": 1794299900000
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: correctness",
+      "at": 1794300500000
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "both seats approve the current revision stamp",
+      "at": 1794300900000
+    },
+    {
+      "gate": "done",
+      "round": 0,
+      "proceed": true,
+      "reason": "pipeline complete",
+      "at": 1794300950000
+    }
+  ],
+  "startedAt": 1794299900000,
+  "updatedAt": 1794300950000,
+  "baseRef": "73200b44dc6ae47e18fe9aba25cd7a0e9167136e",
+  "codeCycle": 2,
+  "codeStamp": "ec6130ad241374906c3ff9955919de2d8a5edc23",
+  "seats": {
+    "code": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "ec6130ad241374906c3ff9955919de2d8a5edc23",
+        "dissents": 1
+      },
+      "testing": {
+        "verdict": "approve",
+        "stamp": "ec6130ad241374906c3ff9955919de2d8a5edc23",
+        "dissents": 0
+      }
+    }
+  },
+  "lastReviewPass": {
+    "phase": "code",
+    "round": 1,
+    "cycle": 2,
+    "seats": ["correctness", "testing"]
+  },
+  "reviseNoChange": false
+}

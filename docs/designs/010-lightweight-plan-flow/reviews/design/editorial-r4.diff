@@ -1,0 +1,81 @@
+diff --git a/tmp/bindforge-editorial-lightweight-plan-flow-r4.md b/home/mike/repos/bindforge/docs/designs/010-lightweight-plan-flow/02-proposal.md
+index 4635f0d..c1330ae 100644
+--- a/tmp/bindforge-editorial-lightweight-plan-flow-r4.md
++++ b/home/mike/repos/bindforge/docs/designs/010-lightweight-plan-flow/02-proposal.md
+@@ -6,7 +6,7 @@
+ pipeline: `light` — one `plan` stage, the existing coder, and a two-seat code review —
+ declared in a new `tools/orchestration/src/pipeline/flows.ts` and selected by `flow: light`
+ frontmatter on the source document. Today `decideNext` starts every run at `research` with no
+-branch on `source.kind` (A1), so a brief pays the same twelve-stage, five-seat path as an ADR, and
++branch on `source.kind` (A1), so a brief takes the same twelve-stage, five-seat path as an ADR, and
+ the six completed runs spent 43–96 stage sessions each (research: Performance baselines).
+ This design keeps one state machine, one runner, one ownership matrix, one checkpoint grammar,
+ and makes the **stage list, review seats, budgets, plan limits, and document-size meter**
+@@ -17,16 +17,16 @@ behaves exactly as it does today.
+ 
+ - Goals:
+   - A `light` flow that runs `plan → implement → code review (2 seats) → done`, with `fix`
+-    bounded at 2 rounds, sharing the lock, per-stage commits, checkpoint/resume, escalation,
++    bounded at 2 rounds, and sharing the lock, per-stage commits, checkpoint/resume, escalation,
+     transcripts, and reply contract unchanged.
+   - The flow chosen by `flow: light` frontmatter, validated before the lock and before any
+     inference, stamped into `.pipeline.json` so a resume needs no flag.
+   - Budgets, seats, stage list, doc-size meter stages and plan limits expressed as registry
+     data, resolved once from `state.flow`.
+-  - Light `implement`/`fix` own test paths, so the `test-update` routing loop disappears from
++  - Light `implement`/`fix` owning test paths, so the `test-update` routing loop disappears from
+     small jobs.
+   - Two deterministic stops for a too-big light run: oversized plan, budget exhaustion.
+-  - `pipeline status` and `ESCALATION.md` name the flow and the effective numbers.
++  - `pipeline status` and `ESCALATION.md` naming the flow and the effective numbers.
+ - Non-goals:
+   - No second runner, no second checkpoint grammar, no second ownership matrix.
+   - No flow auto-detection, no mid-run promotion with state migration, no docs-only flow,
+@@ -190,8 +190,9 @@ keeps a `*_SPECIALTIES` import. `states.ts:152` keeps `DESIGN_SPECIALTIES` (edit
+ are the funnel's own (State graph delta), and a dissent keeps the **same** round (`states.ts:83`),
+ so with two seats a non-converging round is at most `maxPassesPerRound` passes of one or two
+ sessions — **4–6 sessions** — and the last pass a round can enter starts with 4 sessions spent.
+-`maxPassesPerRound: 3` is the record that prints on **every** shape of the round it starts: the
+-pass-backstop string at 6 sessions (both seats dissenting), 4 (one dissenter) (`panel.ts:113-119`).
++`maxPassesPerRound: 3` is the knob that binds, and it prints the same record on **every** shape of
++the round it starts: the pass-backstop string at 6 sessions (both seats dissenting), 4 (one dissenter)
++(`panel.ts:113-119`).
+ The session cap is checked at **pass entry**, ahead of that backstop (A16), so inside the first code
+ round the backstop prints first. The cap is phase-**cumulative** — `reviewSessionsUsed` counts every
+ `code-review:` result in the run (`panel.ts:50-51`) — so it binds at the entry of a *later* code
+@@ -287,8 +288,8 @@ light `plan` stop as `code` after the Reporting change. No `states.ts` string ch
+ 
+ `stagePathAllowed(stage, path, flow = 'full')` (A8): `namesReservedSegment(path)` **stays first
+ and wins in both flows** — checkpoint, `saveState` tmp, escalation marker, lock — then light
+-`implement`/`fix` may write test paths, full keeps `!inTests`, test-engineer stages and document
+-stages are unchanged; `moves.ts`'s `ownershipIssue(stage, pair, flow)` and the sweep's call site
++`implement`/`fix` may write test paths, full keeps `!inTests`, and test-engineer stages and
++document stages are unchanged; `moves.ts`'s `ownershipIssue(stage, pair, flow)` and the sweep's call site
+ (`runner.ts:279`) thread the same value (A9, #7). The widening covers exactly `implement`/`fix`.
+ The new name `plan` is governed by the
+ **document-stage** rule unchanged — `return inDocs`, `inDocs = /^docs\//` (`gates.ts:304,315`) — so
+@@ -297,7 +298,7 @@ run-scoped branch, no new predicate. A light `plan` that rewrites `docs/adrs/**`
+ record) or a sibling run's design directory is therefore **not** reverted — that is an accepted
+ widening (Risks, Ownership row), pinned as **allowed** in #7, not a confinement this design claims.
+ Paths reach the predicate from the intake site of A28 — git plumbing output: repo-root-relative,
+-POSIX separators, no absolute and no `.`/`..` segment, shapes `moves.ts` Rule 1 rejects outright —
++POSIX separators, no absolute path and no `.`/`..` segment, shapes `moves.ts` Rule 1 rejects outright —
+ so the `flow` parameter parses no path; case is **not** normalized — as today.
+ 
+ ### Reporting
+@@ -471,7 +472,7 @@ change: a light design directory is already "taken" by both checks.
+ 6. Operate: run the first light runs on real small jobs (a flag, a test-layout chore), record
+    sessions and wall clock with the ADR's counting rule, and check them against the
+    **converging**-run bound — #12's `2 + seats × 3` = ≤ 8 sessions, ≤ 96 min at the 12-min stage
+-   bound in the serial default — against run 003's 43 sessions / 2.2 h; a run that escalates
++   bound in the serial default — and against run 003's 43 sessions / 2.2 h; a run that escalates
+    legitimately sits above it, at ≈ 9 sessions — plan 1, implement 1, the fix rounds, and at most the
+    code phase's 6 cumulative (Budget resolution) — plus 1–2 sessions for each `--extend-budget` grant
+    the operator buys. The same data settles A23/A25 and the Deferred files-spanned ceiling (A24)
+@@ -542,3 +543,6 @@ change: a light design directory is already "taken" by both checks.
+ - r1: research OQ6/OQ7 + compatibility review (shared `NNN`; the `--force` guard; the Windows row) —
+   deferred, no code change: `nextNnn`/`identityClash` already treat a light directory as taken (A17),
+   promotion overwrites the plan (A26), and Windows/macOS read `no` — linux is the tested surface.
++
++Editor notes: Budget resolution — "`states.ts:152` keeps `DESIGN_SPECIALTIES` (editorial only, Risks row 4)" is ambiguous; row 4 of the Risks table is the resume budget-drift row, while the editorial-round exposure is row 1 — author to clarify.
++Editor notes: Budget resolution — "`maxRounds: 2` bounds the mutating `fix` loop, on the runner's revise-round record" is ambiguous; author to clarify.

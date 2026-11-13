@@ -1,0 +1,122 @@
+diff --git a/tmp/bindforge-editorial-lightweight-plan-flow-r2.md b/home/mike/repos/bindforge/docs/designs/010-lightweight-plan-flow/02-proposal.md
+index c1b351d..9f6264c 100644
+--- a/tmp/bindforge-editorial-lightweight-plan-flow-r2.md
++++ b/home/mike/repos/bindforge/docs/designs/010-lightweight-plan-flow/02-proposal.md
+@@ -18,7 +18,7 @@ behaves exactly as it does today.
+ - Goals:
+   - A `light` flow that runs `plan → implement → code review (2 seats) → done`, with `fix`
+     bounded at 2 rounds, sharing the lock, per-stage commits, checkpoint/resume, escalation,
+-    transcripts and reply contract unchanged.
++    transcripts, and reply contract unchanged.
+   - The flow chosen by `flow: light` frontmatter, validated before the lock and before any
+     inference, stamped into `.pipeline.json` so a resume needs no flag.
+   - Budgets, seats, stage list, doc-size meter stages and plan limits expressed as registry
+@@ -154,7 +154,7 @@ phase the flow's `stages` runs** — `code` for every flow, since every flow run
+ `design` under `full`, whose `editorial` round reads it as `panel.ts:31-32` does today. A flow that
+ names no design stage resolves the registry's `design: []` as written — the check has no consumer
+ there, so `configFor('light', base)` resolves, and the empty panel is registry data, not a tunable.
+-A violation throws at the bad-`flow` posture. Unvalidated,
++A violation throws at the same pre-lock posture as a bad `flow` value. Unvalidated,
+ `reviewSeats.code: []` makes `seatsConverged` vacuously true (A2): `code-review` "converges" with
+ zero sessions and a board that prints no dissent, and `['corectness']` launches a seat no agent backs.
+ 
+@@ -182,22 +182,23 @@ existing config literal keeps compiling. One resolver reads the panel — `seats
+ fallback live once, in one test. Its five seat-list readers take the `cfg` their callers already hold:
+ `dissentingSeats`, `staleSeats`, `seatsConverged`, `seatSummary` (`panel.ts:55,65,74,181`) gain the
+ parameter; `planPass` (`panel.ts:100`) passes the `cfg` its signature already carries to its two
+-sites (`panel.ts:103,104`), so a light full pass launches the flow's two seats and no call site keeps
+-a `*_SPECIALTIES` import. `states.ts:152` keeps `DESIGN_SPECIALTIES` (editorial only, Risks row 4).
++sites (`panel.ts:103,104`), so a light flow's full pass launches the flow's two seats and no call site
++keeps a `*_SPECIALTIES` import. `states.ts:152` keeps `DESIGN_SPECIALTIES` (editorial only, Risks row 4).
+ 
+ **Which knob binds in the light code phase (the ADR's budget-table arithmetic).** A round's passes
+ are the funnel's own (State graph delta), and a dissent keeps the **same** round (`states.ts:83`),
+ so with two seats a non-converging round is at most `maxPassesPerRound` passes of one or two
+-sessions — **4–6 sessions** — and the last pass a round can enter starts at spent 4.
++sessions — **4–6 sessions** — and the last pass a round can enter starts with 4 sessions spent.
+ `maxPassesPerRound: 3` is the record that prints on **every** shape of the round it starts: the
+ pass-backstop string at 6 sessions (both seats dissenting), 4 (one dissenter) (`panel.ts:113-119`).
+ The session cap is checked at **pass entry**, ahead of that backstop (A16), so inside the first code
+ round the backstop prints first. The cap is phase-**cumulative** — `reviewSessionsUsed` counts every
+ `code-review:` result in the run (`panel.ts:50-51`) — so it binds at the entry of a *later* code
+-round: a `--stage code-review` force after a round died to the backstop at 6 spent escalates at
+-`runner.ts:2362-2368` with the light suffix (State graph delta). `maxRounds: 2` bounds the mutating
+-`fix` loop, on the runner's revise-round record. `maxReviews.code: 12` is not chosen: every round is
+-bounded in the 4–6 band, and 12 buys a fourth pass in a flow whose point is the fifth seat's absence.
++round: a `--stage code-review` force run after a round that died to the backstop at 6 spent sessions
++escalates at `runner.ts:2362-2368` with the light suffix (State graph delta). `maxRounds: 2` bounds
++the mutating `fix` loop, on the runner's revise-round record. `maxReviews.code: 12` is not chosen:
++every round is bounded in the 4–6 band, and 12 buys a fourth pass in a flow whose point is the fifth
++seat's absence.
+ 
+ ### Selecting the flow
+ 
+@@ -243,7 +244,7 @@ revision to the dissenters only, ratification for stale approvals. Its deadlock
+ (`reviseNoChange` with named dissenters, A2) is seat-count-agnostic and fires at 2 seats; with
+ `maxRounds: 2` it is likelier to be the terminal record, which is the reading the ADR asks for.
+ The light suffix is appended at **one** site — `finalizeEscalate` (`runner.ts:2845`) — gated on
+-`flowOf(state) === 'light'` and `state.lastStage` in `implement`/`fix`/`code-review`: one append
++`flowOf(state) === 'light'` and on `state.lastStage` in `implement`/`fix`/`code-review`: one append
+ covers every escalation those stages reach (the pass-backstop and fix-round strings as `next.reason`
+ at `runner.ts:2229`, the round-entry record `runner.ts:2387`, the session-budget escalation
+ `runner.ts:2362`). The **stage** is the discriminator, not `escalationPhase(state)`, which reports a
+@@ -253,16 +254,16 @@ light `plan` stop as `code` after the Reporting change. No `states.ts` string ch
+ 
+ - Agent `.opencode/agents/design/planner.md` (new): the `design/designer` shape (A12), one line
+   narrower (it writes no research and no revision) — `mode: primary`, edits `docs/designs/**`,
+-  denies `.pipeline.json`, reading/writing `transcripts/**`, and shell.
++  denies `.pipeline.json`, reads and writes `transcripts/**`, and allows shell.
+ - Template `tools/orchestration/prompts/plan.md` (new) is a three-line pointer in the shape of
+-  `prompts/proposal.md`, naming the output `{{designDir}}/02-proposal.md` — the heavy flow's path,
++  `prompts/proposal.md`, naming the output `{{designDir}}/02-proposal.md` — the full flow's path,
+   which keeps the design stamp, the `docLines` meter, the reviewers' faithfulness check and the
+   `reviews/code/` paths working (A5).
+ - Skill `.opencode/skills/plan-note/` (new) carries the five sections **once**, in
+   `plan-note/references/template.md`: problem, chosen approach, files to touch, test plan, done
+   criteria. It states no number — `{{planMaxLines}}` is interpolated into the prompt from the
+   registry, superseding ADR-010's "the `plan-note` skill carries the template and its length cap".
+-- `stageVars` gains `planMaxLines` and `testOwnership`, the last rendered from the flow into
++- `stageVars` gains `planMaxLines` and `testOwnership`, the latter rendered from the flow into
+   `implement.md:4`, `fix.md:4-5` and `fix-tests.md:8-10,14` in place of the hard-coded "Never edit
+   test files" (A14): light says the coder owns the test files and that no test engineer exists in
+   this flow, full repeats the standing rule and the `testsNeedUpdate` escape — one variable, one
+@@ -279,7 +280,7 @@ light `plan` stop as `code` after the Reporting change. No `states.ts` string ch
+   a **design document that grows across revise rounds**, where a hard limit buys compressed prose;
+   the plan is a fixed five-section template written once, before any code, judged by two seats that
+   are not design reviewers — over length is a scope signal, so the response is a stop naming the
+-  heavier flow, and the full flow's policy is untouched.
++  full flow, and the full flow's policy is untouched.
+ 
+ ### Ownership — the security spine, widened in one flow
+ 
+@@ -329,7 +330,7 @@ change: a light design directory is already "taken" by both checks.
+ | Ownership spine gains a flow parameter and the reserved-name precedence regresses; and `plan`'s code gate is the unchanged document-stage rule, so a light `plan` can rewrite `docs/adrs/**`, `docs/prompts/**` or a sibling run's design directory unreverted | medium | high | Precedence is the first rule in the function and the first test in the ownership matrix, asserted for every stage class in **both** flows (Test strategy #7); the `docs/**` write surface is pinned as **allowed** there and recorded here, not claimed as a confinement no code performs; ADR-010's Consequences records the widened surfaces |
+ | Budget drift on resume: a resumed light run inherits `maxRounds: 5` / `code: 20` and looks healthy (A4) | medium | high | Budgets resolve in one function, `configFor`, used by run, resume **and** status; the effective-config resume test is Test strategy #15. Residual: a light call site handed a literal that is not `configFor` output falls back to the five-seat panel, so #15 asserts the seat list, not only the numbers (Budget resolution) |
+ | Flow recorded in two places (document, checkpoint) can disagree after `--force` promotion; the seat stamp changes meaning mid-branch (A26) | low | medium | The checkpoint is authoritative for a running run (`flowOf`); promotion is a new full-flow entry save; the light plan stays recoverable from git history, and the run's transcripts name the agent each stage used |
+-| The plan cap gates where the repo's stated policy warns, so an operator reads a light stop as size-policing | medium | low | The escalation strings name the heavier flow, and the design states why the lesson does not transfer (The `plan` stage) |
++| The plan cap gates where the repo's stated policy warns, so an operator reads a light stop as size-policing | medium | low | The escalation strings name the full flow, and the design states why the lesson does not transfer (The `plan` stage) |
+ | 12-minute stage timeout is too tight for a light `implement` (A25) | medium | low | One registry value, no code change to raise; the escalation names the flow, so an operator reads it as a light-flow limit |
+ | Shared `NNN` counter grows faster; `NNN` stops encoding "this is a decision" | high | low | Accepted by ADR-010; `docs/workflows.md` records that a design directory can be a plan, not only a decision |
+ | Light coder writes tests with no test engineer, so a plan's weak test story ships unreviewed by a test specialist | medium | medium | The `testing` seat reviews the tests; the plan's `Test plan` section is what that seat checks faithfulness against |
+@@ -452,7 +453,7 @@ change: a light design directory is already "taken" by both checks.
+ 1. Land the registry and the resolution seam first: `flows.ts`, the two optional
+    `PipelineConfig` fields, `configFor` with its validation contract, `seatsFor(phase, cfg)` and
+    the `funnelSpecialties`/`specialtiesFor` delegates to it, `state.flow` in
+-   `PipelineState`/`StateSchema`, and `flowOf`. With `FLOWS.light` not yet selectable this is a no-op
++   `PipelineState`/`StateSchema`, and `flowOf`. With `FLOWS.light` not yet selectable, this is a no-op
+    for every run (#3).
+ 2. Add the light stages: `STAGE_BASES.plan`, `prompts/plan.md`,
+    `.opencode/agents/design/planner.md`, `.opencode/skills/plan-note/` with its
+@@ -471,9 +472,9 @@ change: a light design directory is already "taken" by both checks.
+    **converging**-run bound — #12's `2 + seats × 3` = ≤ 8 sessions, ≤ 96 min at the 12-min stage
+    bound in the serial default — against run 003's 43 sessions / 2.2 h; a run that escalates
+    legitimately sits above it, at ≈ 9 sessions — plan 1, implement 1, the fix rounds, and at most the
+-   code phase's 6 cumulative (Budget resolution) — plus the 1–2 sessions each `--extend-budget` grant
+-   the operator buys launches. The same data settles
+-   A23/A25 and the Deferred files-spanned ceiling (A24) — all registry values.
++   code phase's 6 cumulative (Budget resolution) — plus 1–2 sessions for each `--extend-budget` grant
++   the operator buys. The same data settles A23/A25 and the Deferred files-spanned ceiling (A24)
++   — all registry values.
+ 
+ ## Deferred / out of scope
+ 

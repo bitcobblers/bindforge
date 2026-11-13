@@ -61,6 +61,20 @@ export interface PipelineConfig {
    * cannot verify.
    */
   maxParallelReviews?: number;
+  /**
+   * Per-phase review-seat panel (ADR-010 §3). Optional, and `DEFAULT_CONFIG`
+   * deliberately leaves it absent: absent means the standing five-seat panels,
+   * so every pre-ADR-010 config keeps its exact behaviour. A flow's own partial
+   * is the only thing that narrows a panel — `configFor` applies it last, so a
+   * caller-supplied panel cannot widen a light run.
+   */
+  reviewSeats?: { design: string[]; code: string[] };
+  /**
+   * Line ceiling for the light flow's plan document (ADR-010 §4). Absent means
+   * no plan-size gate at all, which is the full flow's behaviour: the cap is
+   * flow config, not a universal document budget.
+   */
+  planMaxLines?: number;
 }
 
 /**
@@ -76,21 +90,30 @@ export const DEFAULT_CONFIG: PipelineConfig = {
   maxRounds: 5,
   maxReviews: { design: 40, code: 20 },
   /**
-   * Dissent/ratify passes inside one round. Run 010 hit 6 and stopped with
-   * every seat reading `approve` — four stale approvals and one fresh one, so
-   * the funnel was one ratify pass from converging. The cap exists to stop a
-   * seat that will not move, and it fired on a panel that had moved.
+   * Dissent/ratify passes inside one round — unchanged by ADR-010, whose
+   * Non-goals rule out any change to the full flow's budgets. Run 010 hit 6 and
+   * stopped with every seat reading `approve`, four of them stale: the funnel
+   * was one ratify pass from converging. That is a stamp rule, not a price, and
+   * this change fixes it where the cause is — a ratify pass no longer re-stamps
+   * to `HEAD` and ages the approvals it is ratifying (`runner.ts`, drive loop).
    *
-   * Note the gap this exposes: `--extend-budget` buys sessions and rounds, and
-   * `planPass` blocks at `cycle >= maxPassesPerRound` with no extension
+   * Note the gap the run exposed: `--extend-budget` buys sessions and rounds,
+   * and `planPass` blocks at `cycle >= maxPassesPerRound` with no extension
    * channel, so this number is the one budget an operator cannot buy at the
    * stop it causes — the only remedy is editing this default. Extending the
    * budget grammar to passes is a funnel change (ADR-002's accounting), not a
    * constant, and deliberately not taken here.
    */
-  maxPassesPerRound: 8,
+  maxPassesPerRound: 6,
   blockingSeverities: ['blocker', 'major'],
   pollIntervalMs: 2_000,
+  /**
+   * Wall-clock cap per stage attempt. The sole bound on a stage's turns (no
+   * step cap), so this is the cost ceiling of a wedged session: it is the
+   * full flow's 30 minutes, and the light flow's 12 (ADR-010's budget table),
+   * both as registry data — the light flow buys its shorter stage through
+   * `FLOWS.light.config`, never by moving this default.
+   */
   stageTimeoutMs: 30 * 60_000,
   // ADR-003: opt-in fan-out; 1 keeps today's serial lane on the same code path.
   maxParallelReviews: 1,
@@ -113,6 +136,11 @@ interface StageBase {
 
 const STAGE_BASES: Record<string, StageBase> = {
   research: { kind: 'research', agent: 'research/researcher', template: 'research.md' },
+  // ADR-010 §2: the light flow's single design stage. Same reply contract as
+  // `proposal` (kind `proposal`), a different agent and template, and a plan
+  // that lands at the proposal path so every downstream consumer that reads
+  // `02-proposal.md` — implement, code review, the size meter — needs no fork.
+  plan: { kind: 'proposal', agent: 'design/planner', template: 'plan.md' },
   proposal: { kind: 'proposal', agent: 'design/designer', template: 'proposal.md' },
   'proposal-revise': {
     kind: 'revise',
@@ -150,7 +178,18 @@ const STAGE_BASES: Record<string, StageBase> = {
   'doc-sync': { kind: 'doc-sync', agent: 'ops/doc-sync', template: 'doc-sync.md' },
 };
 
-export const STAGE_NAMES = Object.keys(STAGE_BASES);
+/**
+ * Registry entries that exist only in the light flow (ADR-010 §2). Excluded
+ * from `STAGE_NAMES` because that export is the full flow's stage list, which
+ * the flow registry asserts equals `FLOWS.full.stages` — the regression guard
+ * that `full` is today's twelve stages.
+ */
+const LIGHT_ONLY_STAGES = ['plan'];
+
+/** The full flow's stages, in registry order: the twelve stages ADR-010 found. */
+export const STAGE_NAMES = Object.keys(STAGE_BASES).filter(
+  (name) => !LIGHT_ONLY_STAGES.includes(name),
+);
 
 /**
  * Everything `--stage` accepts: the single stages, and a whole review round
@@ -160,7 +199,15 @@ export const STAGE_NAMES = Object.keys(STAGE_BASES);
  */
 export const REVIEW_STAGE_NAMES = ['design-review', 'editorial-review', 'code-review'];
 
-/** Validates a `--stage` value; throws a usage error listing the valid ones. */
+/**
+ * Validates a `--stage` value against the full flow's stage list; throws a
+ * usage error listing the valid ones. The production gate is
+ * `assertStageInFlow` (flows.ts), which reads the flow's own registry and so
+ * also admits the light flow's `plan`; every name accepted here is in
+ * `FLOWS.full.stages`, so the registry check subsumes this one. It stays as
+ * the `STAGE_NAMES` regression guard — a stage that leaves the registry with
+ * no flow declaring it fails here, which the per-flow check cannot see.
+ */
 export function assertForceableStage(name: string): void {
   if (STAGE_NAMES.includes(name) || REVIEW_STAGE_NAMES.includes(name)) {
     return;

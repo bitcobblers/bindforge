@@ -3,8 +3,9 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
+import { configFor } from '../../src/pipeline/flows.js';
 import {
   allReviewsApproved,
   flipAdrStatus,
@@ -12,6 +13,7 @@ import {
   nextNnn,
   packageDirs,
   parseSource,
+  planOutgrewFlow,
   sourceAdmissible,
   stagePathAllowed,
 } from '../../src/pipeline/gates.js';
@@ -65,21 +67,19 @@ function stateWith(
   };
 }
 
+/**
+ * A source document named `name` in a fresh temp dir: `sourceAdmissible` reads
+ * the file, so every case here writes the document it gates. Module scope,
+ * because the flow-key cases below gate the same shape.
+ */
+async function tempFile(name: string, content: string): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'bindforge-src-'));
+  const path = join(dir, name);
+  await writeFile(path, content, 'utf8');
+  return path;
+}
+
 describe('sourceAdmissible', () => {
-  let dir: string;
-
-  afterEach(async () => {
-    // fresh temp dir per test via mkdtemp below
-    void dir;
-  });
-
-  async function tempFile(name: string, content: string): Promise<string> {
-    dir = await mkdtemp(join(tmpdir(), 'bindforge-src-'));
-    const path = join(dir, name);
-    await writeFile(path, content, 'utf8');
-    return path;
-  }
-
   it('admits a proposed ADR with Context and Decision', async () => {
     const path = await tempFile(
       '007-thing.md',
@@ -458,3 +458,276 @@ describe('test tree mirrors src/ hierarchy', () => {
     for (const rootFile of rootTier) expect(selected).not.toContain(rootFile);
   });
 });
+
+// ---------------------------------------------------------------------------
+// ADR-010 (design 010): the light flow's two deterministic stops and its
+// widened ownership spine. (1) The plan line cap gates at the same
+// stage-ok/pre-commit point the size meter runs at, and the full flow's config
+// has no `planMaxLines`, so it gates nothing there. (2) `flow` is one
+// frontmatter key, CRLF-tolerant and case-sensitive: an absent key is `full`,
+// an unreadable value is a value that reaches the pre-lock usage error, never
+// a silently-full run. (3) `stagePathAllowed(stage, path, flow)` widens
+// exactly `implement`/`fix` to test paths, keeps the reserved-name rule first
+// and winning in both flows, and leaves `plan` on the unchanged document-stage
+// rule `docs/**` — which is the accepted widening, pinned as allowed.
+// ---------------------------------------------------------------------------
+
+/** The fixed gate shape: a denial naming the cap, or null when it proceeds. */
+function denialOf(gate: unknown): string | null {
+  if (typeof gate === 'string') {
+    return gate === '' ? null : gate;
+  }
+  if (gate && typeof gate === 'object') {
+    const g = gate as { proceed?: boolean; reason?: string };
+    if (typeof g.proceed === 'boolean') {
+      return g.proceed ? null : (g.reason ?? 'denied');
+    }
+    if (typeof g.reason === 'string' && g.reason.length > 0) {
+      return g.reason;
+    }
+  }
+  return gate ? JSON.stringify(gate) : null;
+}
+
+describe('planOutgrewFlow — the light plan line cap', () => {
+  const LIGHT = configFor('light', DEFAULT_CONFIG);
+
+  // proves: Test strategy #5 — 79 and 80 lines pass, 81 is denied with the cap
+  // number in the message, which is what ESCALATION.md prints.
+  it('denies only a plan over the cap, naming the line count and the cap', () => {
+    expect(denialOf(planOutgrewFlow(79, LIGHT))).toBeNull();
+    expect(denialOf(planOutgrewFlow(80, LIGHT))).toBeNull();
+    const denial = denialOf(planOutgrewFlow(81, LIGHT));
+    expect(denial, 'an 81-line plan outgrew the light flow').not.toBeNull();
+    expect(denial as string).toContain('plan outgrew the light flow (81 lines, cap 80)');
+  });
+
+  // proves: Test strategy #5 — the gate is the config value, so a 200-line plan
+  // moves with a registry change and no code change.
+  it('reads the cap from the config it is handed', () => {
+    const wider = { ...LIGHT, planMaxLines: 200 };
+    expect(denialOf(planOutgrewFlow(120, wider))).toBeNull();
+    expect(denialOf(planOutgrewFlow(201, wider))).toContain('(201 lines, cap 200)');
+  });
+
+  // proves: Test strategy #5 — no gate at all when `planMaxLines` is absent,
+  // which is the full flow's config: its size policy stays warn-not-gate.
+  it('gates nothing when the cap is absent', () => {
+    expect(denialOf(planOutgrewFlow(5_000, configFor('full', DEFAULT_CONFIG)))).toBeNull();
+    expect(denialOf(planOutgrewFlow(5_000, DEFAULT_CONFIG))).toBeNull();
+  });
+});
+
+describe('parseSource and sourceAdmissible learn the flow key', () => {
+  // proves: Test strategy #6 — absent means full.
+  it('defaults an absent flow key to full', () => {
+    const p = parseSource(['---', 'status: proposed', '---', '## Context', 'a'].join('\n'), 'adr');
+    expect(p.flow).toBe('full');
+  });
+
+  // proves: Test strategy #6 (Compatibility matrix, CRLF row) — the existing
+  // regex scan is CRLF-tolerant, so a Windows-authored brief selects light.
+  it('parses flow: light from a CRLF frontmatter block', () => {
+    const p = parseSource('---\r\nstatus: proposed\r\nflow: light\r\n---\r\n# x\r\n', 'adr');
+    expect(p.flow).toBe('light');
+  });
+
+  // proves: Test strategy #6 — the comparison is case-sensitive: `flow: Light`
+  // is a value that reaches the pre-lock usage error, never a silent full run.
+  it('keeps a case-variant value out of the full default', () => {
+    const p = parseSource(['---', 'flow: Light', '---', 'x'].join('\n'), 'brief');
+    expect(p.flow).not.toBe('full');
+    expect(p.flow).not.toBe('light');
+  });
+
+  // proves: Test strategy #6 — an unknown value is a value, not absence, and
+  // an empty value is read as unreadable too.
+  it('keeps an unknown value as a value', () => {
+    for (const value of ['sideways', 'Light', 'light ', '']) {
+      const p = parseSource(['---', `flow: ${value}`, '---', 'x'].join('\n'), 'brief');
+      expect(p.flow, `flow: ${JSON.stringify(value)}`).not.toBe('full');
+      expect(p.flow, `flow: ${JSON.stringify(value)}`).not.toBe('light');
+    }
+  });
+
+  // proves: Test strategy #6 (Compatibility matrix, ADR row) — the gate keys on
+  // the frontmatter value, not `source.kind`: a light ADR keeps the ADR rules.
+  it('keeps the ADR gate for a light ADR', async () => {
+    const good = await tempFile(
+      '009-light.md',
+      [
+        '---',
+        'status: proposed',
+        'flow: light',
+        '---',
+        '# ADR 009: light',
+        '## Context',
+        'why.',
+        '## Decision',
+        'what.',
+      ].join('\n'),
+    );
+    expect((await sourceAdmissible(good, 'adr')).proceed).toBe(true);
+
+    const accepted = await tempFile(
+      '010-light.md',
+      ['---', 'status: accepted', 'flow: light', '---', '## Context', 'x', '## Decision', 'y'].join(
+        '\n',
+      ),
+    );
+    expect((await sourceAdmissible(accepted, 'adr')).proceed).toBe(false);
+  });
+
+  // proves: Test strategy #6 — the brief gate stays "non-empty", and an
+  // unreadable file keeps its existing denial.
+  it('keeps the brief gate at non-empty and the unreadable-file denial', async () => {
+    const light = await tempFile('light-brief.md', '---\nflow: light\n---\n\nDo the thing.\n');
+    expect((await sourceAdmissible(light, 'brief')).proceed).toBe(true);
+
+    const empty = await tempFile('empty-light.md', '---\nflow: light\n---\n   \n');
+    expect((await sourceAdmissible(empty, 'brief')).proceed).toBe(false);
+
+    const missing = await sourceAdmissible(join(tmpdir(), 'bindforge-absent-source.md'), 'brief');
+    expect(missing.proceed).toBe(false);
+  });
+
+  // proves: Test strategy #6 (Compatibility matrix, ADR row; The `plan` stage) —
+  // the plan cap does not reach ADRs: the gate the entry path runs is
+  // `planOutgrewFlow` on the run's own plan, and the ADR gate keeps its shape
+  // rules in the light flow, so an over-plan-length ADR that satisfies them —
+  // `status: proposed` plus a non-empty Context and Decision — stays admissible,
+  // with no size reason.
+  it('keeps the ADR gate shape-only in the light flow', async () => {
+    const long = await tempFile(
+      '009-light.md',
+      [
+        '---',
+        'status: proposed',
+        'flow: light',
+        '---',
+        '# ADR 009: light',
+        '## Context',
+        ...Array.from({ length: 120 }, (_, i) => `context line ${i}`),
+        '## Decision',
+        ...Array.from({ length: 20 }, (_, i) => `decision line ${i}`),
+      ].join('\n'),
+    );
+    const gate = await sourceAdmissible(long, 'adr', 'light');
+    expect(gate.proceed).toBe(true);
+    expect(gate.reason ?? '').not.toMatch(/plan outgrew/);
+  });
+});
+
+describe('stagePathAllowed: the flow parameter (the security spine)', () => {
+  const nestedTest = 'tools/orchestration/tests/pipeline/light.test.ts';
+  const plainTest = 'tests/x.test.ts';
+
+  // proves: Test strategy #7 — the widening is exactly the coder's two stages:
+  // light `implement`/`fix` own test paths, the same call under `full` denies.
+  it('lets the light coder write tests and denies the same paths to full', () => {
+    for (const stage of ['implement', 'fix']) {
+      expect(stagePathAllowed(stage, nestedTest, 'light')).toBe(true);
+      expect(stagePathAllowed(stage, plainTest, 'light')).toBe(true);
+      expect(stagePathAllowed(stage, nestedTest)).toBe(false);
+      expect(stagePathAllowed(stage, plainTest, 'full')).toBe(false);
+      // A8's widening is by the test-path predicate, so a co-located test beside
+      // its source belongs to the light coder too — and the full flow denies it.
+      expect(stagePathAllowed(stage, 'src/x.test.ts', 'light')).toBe(true);
+      expect(stagePathAllowed(stage, 'src/x.test.ts', 'full')).toBe(false);
+      // The widening does not touch the source surface: source is already open.
+      expect(stagePathAllowed(stage, 'src/x.ts', 'light')).toBe(true);
+    }
+  });
+
+  // proves: Test strategy #7 — the accepted widening, pinned as ALLOWED: `plan`
+  // is governed by the unchanged document-stage rule `docs/**`, so its code
+  // surface is every docs path (the decision record, a sibling run's directory,
+  // docs/workflows.md) and nothing outside docs/.
+  it('confines plan to docs/ in both flows and allows every docs path', () => {
+    for (const flow of ['light', 'full'] as const) {
+      expect(stagePathAllowed('plan', 'docs/designs/002-x/02-proposal.md', flow)).toBe(true);
+      expect(stagePathAllowed('plan', 'docs/adrs/009-thing.md', flow)).toBe(true);
+      expect(stagePathAllowed('plan', 'docs/workflows.md', flow)).toBe(true);
+      expect(stagePathAllowed('plan', 'docs/designs/003-sibling/02-proposal.md', flow)).toBe(true);
+      expect(stagePathAllowed('plan', 'src/x.ts', flow)).toBe(false);
+      expect(stagePathAllowed('plan', plainTest, flow)).toBe(false);
+      expect(stagePathAllowed('plan', 'README.md', flow)).toBe(false);
+    }
+  });
+
+  // proves: Test strategy #7 — the reserved-name rule stays first and wins in
+  // both flows, for every stage class including the new `plan`.
+  it('denies every reserved name to every stage class in both flows', () => {
+    const stages = [
+      'plan',
+      'implement',
+      'fix',
+      'test-authoring',
+      'test-update',
+      'research',
+      'proposal',
+      'design-review',
+      'doc-sync',
+      'code-review',
+    ];
+    const reserved = [
+      '.pipeline.json',
+      'docs/designs/002-x/.pipeline.json',
+      'docs/designs/002-x/.pipeline.json.a1b2c3d4.tmp',
+      '.pipeline.lock',
+      'docs/designs/002-x/.pipeline.lock',
+      'ESCALATION.md',
+      'docs/designs/002-x/ESCALATION.md',
+    ];
+    for (const flow of ['light', 'full'] as const) {
+      for (const stage of stages) {
+        for (const path of reserved) {
+          expect(stagePathAllowed(stage, path, flow), `${stage} ${path} ${flow}`).toBe(false);
+        }
+      }
+    }
+  });
+
+  // proves: Test strategy #7 (A28, Ownership) — the predicate parses no path:
+  // the intake is git plumbing output, repo-root-relative with POSIX separators
+  // and already the real spelling, and `moves.ts` Rule 1 rejects every other
+  // shape as a usage error. So a spelling is judged exactly as spelled, and a
+  // light `implement`/`fix` is denied only the runner-reserved names (A8): every
+  // spelling of a test path is its own. Case is not normalized: the `docs/` and
+  // `tests/` regexes keep today's case-sensitive verdict for the stages whose
+  // rule is a regex.
+  it('judges the spelling handed to it and keeps the regex case-sensitive', () => {
+    expect(stagePathAllowed('plan', 'docs/../src/x.ts', 'light')).toBe(true);
+    expect(stagePathAllowed('plan', 'docs/../src/x.ts', 'full')).toBe(true);
+    expect(stagePathAllowed('implement', 'src/../tests/x.test.ts', 'light')).toBe(true);
+    expect(stagePathAllowed('implement', 'Tests/x.test.ts', 'light')).toBe(true);
+    expect(stagePathAllowed('implement', 'TESTS/x.test.ts', 'light')).toBe(true);
+    expect(stagePathAllowed('plan', 'Docs/designs/002-x/02-proposal.md', 'light')).toBe(false);
+    expect(stagePathAllowed('test-authoring', 'Docs/designs/002-x/01-research.md', 'light')).toBe(
+      false,
+    );
+    expect(stagePathAllowed('test-update', 'Tests/thing.ts', 'light')).toBe(false);
+  });
+
+  // proves: Test strategy #7 — the test-engineer and document stages are
+  // unchanged by the flow parameter.
+  it('leaves the test-engineer and document stages unchanged under light', () => {
+    for (const stage of ['test-authoring', 'test-update']) {
+      expect(stagePathAllowed(stage, nestedTest, 'light')).toBe(true);
+      expect(stagePathAllowed(stage, 'docs/designs/002-x/transcripts/x.md', 'light')).toBe(true);
+      expect(stagePathAllowed(stage, 'src/x.ts', 'light')).toBe(false);
+    }
+    expect(stagePathAllowed('research', 'docs/designs/002-x/01-research.md', 'light')).toBe(true);
+    expect(stagePathAllowed('code-review', 'README.md', 'light')).toBe(false);
+  });
+
+  // proves: Test strategy #7 — an unknown flow is a validation failure, not a
+  // silent fallback to full's wider rule.
+  it('rejects a flow the registry does not define', () => {
+    expect(() => stagePathAllowed('implement', nestedTest, 'sideways')).toThrow(/sideways/);
+  });
+});
+
+// The plan line cap is `planOutgrewFlow`, above, run by the runner on the size
+// meter's own count and driven end to end by `light-plan-size.test.ts`: the
+// source gate judges a source document's shape only, in both flows.
