@@ -1,0 +1,10 @@
+# Left-hand reach-class table, v2. The grades are authored BindForge data
+# (ADR-012): each of the 48 graded inputs is graded exactly once for this hand,
+# by the posture its designated home-row finger (or thumb) uses from the left
+# hand's anchor. `classes` is the shared severity order, worst last, identical
+# in both hands' tables. Retuning a grade is a reviewed PR to this file.
+format = "reach-classes"
+version = "v2"
+hand = "left"
+classes = ["home", "thumb", "stretch", "far", "off-reach"]
+keys = ["keyboard:a home", "keyboard:d home", "keyboard:f home", "keyboard:s home", "keyboard:space thumb", "keyboard:1 stretch", "keyboard:2 stretch", "keyboard:3 stretch", "keyboard:4 stretch", "keyboard:5 stretch", "keyboard:` stretch", "keyboard:c stretch", "keyboard:e stretch", "keyboard:g stretch", "keyboard:q stretch", "keyboard:r stretch", "keyboard:t stretch", "keyboard:v stretch", "keyboard:w stretch", "keyboard:x stretch", "keyboard:z stretch", "keyboard:- far", "keyboard:. far", "keyboard:6 far", "keyboard:7 far", "keyboard:8 far", "keyboard:= far", "keyboard:[ far", "keyboard:b far", "keyboard:h far", "keyboard:j far", "keyboard:, far", "keyboard:m far", "keyboard:n far", "keyboard:y far", "keyboard:' off-reach", "keyboard:; off-reach", "keyboard:0 off-reach", "keyboard:9 off-reach", "keyboard:/ off-reach", "keyboard:\\ off-reach", "keyboard:] off-reach", "keyboard:i off-reach", "keyboard:k off-reach", "keyboard:l off-reach", "keyboard:o off-reach", "keyboard:p off-reach", "keyboard:u off-reach"]

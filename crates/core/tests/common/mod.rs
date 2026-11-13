@@ -100,6 +100,21 @@ pub fn format_dirs_under(root: &Path) -> Vec<FormatDir> {
     dirs
 }
 
+/// The majors the contract tree ships for one format — the majors *that format's*
+/// reader supports. The version gate is per-format, because a major exists per
+/// format: `reach-classes` carries `v1` and `v2` (design 012's Decision One),
+/// every other shipped format carries `v1` alone. The corpus is what makes a
+/// major supported (`schemas/README.md`, design 012's A2), and the crate-wide
+/// `supported_majors()` is the union across formats, so a suite that pins a
+/// refusal "naming the supported majors" names this list, not the union.
+pub fn format_majors(format: &str) -> Vec<String> {
+    format_dirs()
+        .into_iter()
+        .filter(|dir| dir.format == format)
+        .map(|dir| dir.major)
+        .collect()
+}
+
 /// One named `schemas/<format>/<major>/` directory; fails with the tree it
 /// actually found when the version directory is missing.
 pub fn version_dir(format: &str, major: &str) -> FormatDir {
@@ -324,6 +339,60 @@ pub fn string_array(text: &str, key: &str) -> Option<Vec<String>> {
             .map(|value| value.trim().trim_matches('"').to_string())
             .collect(),
     )
+}
+
+/// The quoted elements of a one-line `key = ["a", "b"]` entry, split only on the
+/// commas that sit *outside* quotes. ADR-012's `keys` arrays need this and
+/// `string_array` cannot give it: a `reach-classes/v2` element is one
+/// `"<input-id> <class-id>"` pair, and the closed keyboard member set carries the
+/// `,` glyph, so a naive split cuts `keyboard:, far` into two elements. Same
+/// caveat as `string_entry`: this names what the contract file lists, it is not a
+/// second TOML parser. Escapes stay exactly as the file writes them — `\\` for the
+/// backslash glyph (A3) — and the caller unescapes whatever it compares.
+pub fn quoted_array(text: &str, key: &str) -> Option<Vec<String>> {
+    let prefix = format!("{key} = [");
+    let line = text
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.starts_with('#') && line.starts_with(&prefix))?;
+    let open = line.find('[')?;
+    let mut elements: Vec<String> = Vec::new();
+    let mut current = String::new();
+    let mut inside_quotes = false;
+    let mut escaped = false;
+    let mut element_open = false;
+    for ch in line[open + 1..].chars() {
+        if escaped {
+            current.push(ch);
+            escaped = false;
+            continue;
+        }
+        if inside_quotes && ch == '\\' {
+            current.push(ch);
+            escaped = true;
+            continue;
+        }
+        if ch == '"' {
+            inside_quotes = !inside_quotes;
+            element_open = true;
+            continue;
+        }
+        if inside_quotes {
+            current.push(ch);
+            continue;
+        }
+        if ch == ']' {
+            break;
+        }
+        if ch == ',' && element_open {
+            elements.push(std::mem::take(&mut current));
+            element_open = false;
+        }
+    }
+    if element_open {
+        elements.push(current);
+    }
+    Some(elements)
 }
 
 fn read_dir_sorted(path: &Path) -> Vec<PathBuf> {

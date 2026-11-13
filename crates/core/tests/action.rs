@@ -13,6 +13,13 @@
 //! across the three axis arrays, and any entry outside the entry table is a typed
 //! refusal naming the entry.
 //!
+//! The version gate is per-format: `action-ids` ships one major, so a refusal
+//! for an `action-ids` document names the majors the `action-ids` corpus carries
+//! rather than `bindforge-core`'s crate-wide union. `reach-classes` gained a
+//! `v2` (ADR-012 Decision One); that does not give `action-ids` a `v2` grammar,
+//! and reading a `v2`-declaring registry with the v1 entry set is the fail-open
+//! the gate exists to prevent.
+//!
 //! Every refusal is expected to be an existing `CoreError` variant — the model
 //! admits no new one (`InvalidValue` for a malformed id, a duplicate, an
 //! out-of-set entry or a version that disagrees with its directory; `MissingEntry`
@@ -31,7 +38,7 @@
 mod common;
 
 use bindforge_core::{ActionId, ActionRegistry, AxisKind, CoreError};
-use common::ScratchDir;
+use common::{ScratchDir, format_majors};
 
 /// The three axis-kind spellings, which are exactly the three array names the
 /// entry table defines (Chosen design: the arrays *are* the id set).
@@ -144,16 +151,18 @@ fn registry_from(doc: &str, label: &str) -> ActionRegistry {
         .unwrap_or_else(|err| panic!("a document the grammar defines must load: {err}"))
 }
 
-/// The version gate's shape, as `version_gate.rs` pins it for `profile`: a
-/// structured error naming every supported major.
-fn assert_names_the_supported_majors(err: &CoreError, document: &str) {
+/// The version gate's shape, as `version_gate.rs` pins it: a structured error
+/// naming the majors *this format* supports. `action-ids` ships `v1` only, so a
+/// refusal for an `action-ids` document names `v1`; naming the crate-wide union
+/// instead would advertise a `v2` no `action-ids` grammar exists for.
+fn assert_names_the_supported_majors(err: &CoreError, document: &str, supported: &[String]) {
     assert!(
         matches!(err, CoreError::UnsupportedVersion { .. }),
         "expected the version gate's structured error for {document}, got {err:?}"
     );
 
     let message = err.to_string();
-    for major in bindforge_core::supported_majors() {
+    for major in supported {
         assert!(
             message.contains(major.as_str()),
             "the rejection for {document} must name supported major `{major}`: `{message}`"
@@ -505,7 +514,8 @@ fn refuses_an_action_ids_document_declaring_no_version_naming_the_supported_majo
     let err = bindforge_core::parse(&document).expect_err(
         "an `action-ids` document with no `version` entry must be rejected, never defaulted to v1",
     );
-    assert_names_the_supported_majors(&err, "the versionless action-ids document");
+    let supported = format_majors("action-ids");
+    assert_names_the_supported_majors(&err, "the versionless action-ids document", &supported);
 }
 
 /// proves: Test strategy #4 — an `action-ids` document declaring a major
@@ -522,7 +532,8 @@ fn refuses_an_action_ids_document_declaring_an_unsupported_major() {
 
     let err = bindforge_core::parse(&document)
         .expect_err("an `action-ids` document declaring `v99` must be rejected, not parsed");
-    assert_names_the_supported_majors(&err, "the v99 action-ids document");
+    let supported = format_majors("action-ids");
+    assert_names_the_supported_majors(&err, "the v99 action-ids document", &supported);
 }
 
 /// proves: Test strategy #4 + Revision log — the declared `version` must equal

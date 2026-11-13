@@ -1,0 +1,7 @@
+# One key sits at one coordinate. A repeat would give one action two candidate
+# deltas, and clause (a) of the shape rule is about one delta being common to
+# every move.
+format = "keyboard-geometry"
+version = "v1"
+geometry = "duplicate-input"
+keys = ["keyboard:a 0 2", "keyboard:a 4 3"]

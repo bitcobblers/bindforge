@@ -1,0 +1,61 @@
+diff --git a/tmp/bindforge-editorial-input-vocabulary-and-reach-classes-r2.md b/home/mike/repos/bindforge/docs/designs/012-input-vocabulary-and-reach-classes/02-proposal.md
+index 92beeaa..31e528d 100644
+--- a/tmp/bindforge-editorial-input-vocabulary-and-reach-classes-r2.md
++++ b/home/mike/repos/bindforge/docs/designs/012-input-vocabulary-and-reach-classes/02-proposal.md
+@@ -11,10 +11,10 @@ preconditions its transforms on (A5). The shipped shape is the constraint:
+ `schemas/reach-classes/v1/` pins layout and load rules only, its class ids are
+ labelled placeholders, and its entry set is closed — so the mapping rides a
+ new major, `schemas/reach-classes/v2/`, exactly as Decision One states, with
+-the existing version gate what refuses a v2 document for a v1-only reader
++the existing version gate refusing a v2 document for a v1-only reader
+ (A2). The research (01-research.md) found every mature key registry names
+-physical keys from a US-ANSI reference geometry, so this design follows that
+-common denominator rather than inventing a sixth scheme (A4), and found no
++physical keys from an ANSI-US reference geometry, so this design follows that
++common denominator rather than inventing a sixth scheme (A4), and it found no
+ published key→grade data or legality encoding to reuse — the taxonomy and the
+ predicate are BindForge's own contract data (A8).
+ 
+@@ -62,12 +62,12 @@ listed under Deferred / out of scope.
+ ## Options considered
+ 
+ **Where the key→class mapping lives: widen `reach-classes/v1` in place, or
+-ship `v2`.** The ADR decided this and both alternatives it rejected stay
++ship `v2`.** The ADR decided this, and both alternatives it rejected stay
+ rejected: `v1`'s entry set is closed and its fixtures and `supported_majors`
+ pin it, so a widened `v1` breaks every v1 reader of those files (A1), while
+ `v2` rides the version gate that already refuses cleanly (A2). Symmetric reach,
+-pixel-distance grading, and physical-position naming now are rejected for the
+-reasons the ADR's Alternatives states; this design only adds that the id shape
++pixel-distance grading, and physical-position naming are now rejected for the
++reasons the ADR's Alternatives section states; this design only adds that the id shape
+ reserves the physical-position spelling (`<namespace>:<member>` with a
+ lowercase, space-free member — Chosen design).
+ 
+@@ -243,7 +243,7 @@ pins `keyboard:;` and `keyboard:'` both ways.
+ `input.rs`: `InputNamespace` (`Keyboard`, `Mouse`, `Gamepad`) and `InputId`
+ — `InputId::parse(&str) -> Result<InputId, CoreError>`, `namespace()`,
+ `as_str()` — enforcing the member grammars above; a malformed member is an
+-`InvalidValue` echoing the id escaped to printable characters, like action
++`InvalidValue` echoing the id escaped to printable characters, as action
+ ids do (A11).
+ 
+ `reach.rs`: `ReachTable` gains the grades — `grade(&InputId) ->
+@@ -262,7 +262,7 @@ ordinality's source is one rule per document).
+ `reach-classes` arm picks the entry set from the declared version, and
+ `reject_unknown_entry`'s message names that version instead of hard-coding
+ `v1`, the echoed version taking the same printable-escape-and-truncate path
+-as an echoed id (A11). `ReachClassTable` gains `keys: Vec<InputGrade>` — the
++as an echoed id does (A11). `ReachClassTable` gains `keys: Vec<InputGrade>` — the
+ parsed pair `input: InputId`, `class: ReachClass`, empty for v1 documents.
+ The `serialize` arm writes `keys` back as quoted pair strings for a v2
+ document — `quoted` already escapes `\` so the backslash glyph round-trips —
+@@ -342,7 +342,7 @@ The predicate, a pure function over loaded data:
+ Worked examples the suite pins (Test strategy #5), each with its hand pair:
+ the ADR's two named placements, WASD→IJKL and WASD→OKL, both `left`→`right`
+ — the folklore rationale the research records for the IJKL cluster
+-(01-research.md) comes out of the data here, not a special case — and
++(01-research.md) comes out of the data here, not from a special case — and
+ WASD→ESDF `left`→`left`, a same-hand cluster shift one column right; all
+ three are legal at bound 0. Moving an action from a `home` key to
+ `keyboard:;`, `off-reach` for the source hand, is illegal at bound 1, and at

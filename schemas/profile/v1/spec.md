@@ -37,8 +37,13 @@ entry being absent — quietly changing what the profile derives from.
 
 A document that declares no `version`, or a major the reader does not
 support, is rejected with an error naming the supported majors — never
-defaulted to v1. `schemas/README.md` states the rule;
-`fixtures/invalid/missing-version.toml` is the corpus case.
+defaulted to v1. The majors are the ones this **format** ships: `profile` has a
+`v1` directory and no other, so a document declaring `version = "v2"` is
+rejected here even though another format has grown a `v2`, because reading it
+with the `profile/v1` grammar is the misreading the gate exists to prevent.
+`schemas/README.md` states the rule;
+`fixtures/invalid/missing-version.toml` and
+`fixtures/invalid/major-not-shipped.toml` are the corpus cases.
 
 ## Chain guard
 

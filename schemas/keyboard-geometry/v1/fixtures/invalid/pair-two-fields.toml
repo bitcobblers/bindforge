@@ -1,0 +1,8 @@
+# The triple encoding is exactly three space-separated fields. A two-field
+# element has no row, so its shape delta cannot be computed at all: refusing it
+# here is what keeps a malformed element from reaching the predicate as a key at
+# an assumed position.
+format = "keyboard-geometry"
+version = "v1"
+geometry = "pair-two-fields"
+keys = ["keyboard:a 0"]

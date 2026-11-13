@@ -1,0 +1,1171 @@
+{
+  "version": 1,
+  "slug": "input-vocabulary-and-reach-classes",
+  "nnn": "012",
+  "branch": "pipeline/012-input-vocabulary-and-reach-classes",
+  "source": {
+    "kind": "adr",
+    "path": "docs/adrs/012-input-vocabulary-and-reach-classes.md"
+  },
+  "status": "done",
+  "lastStage": "doc-sync",
+  "designRound": 2,
+  "codeRound": 1,
+  "designBudgetUsed": 1,
+  "codeBudgetUsed": 2,
+  "editorialDone": false,
+  "testsGreen": true,
+  "testsNeedUpdate": false,
+  "stageFailures": {
+    "research": 1
+  },
+  "stageCommits": [
+    "0ceee1693c488ab759e5ca4dda804a3300fa8742",
+    "688346d9be4f56339ca4dbe851461c00ef008fa6",
+    "39adb703d030a189bd273447abb6740a47ce8590",
+    "647962ed1737fd7365e54374ab704a3aca1f7e3f",
+    "6081ddb6405605baab7c6bed84aaf7368575e0a6",
+    "43713bc0abcedb3d546b695988ce00ca62f633fd",
+    "c03e2e3a9fec44af2eaeb33a4995332515b1345b",
+    "4bac3366b4c22d793201a31a89907af884e09e19",
+    "42011e0d4c8e398334a374c9acaff0b243f13bf8",
+    "143777f1e7c29aaae3b894260eb6bfdd4cd99708",
+    "f0c9511d58198bf2f62c4914262ba42c73db6624",
+    "821d4390838ee45aed4b39ebbefd1fbaa5332adc",
+    "7dc61d82235e65b2bada5ab6ca2dbe8205793435",
+    "2682fb1f740770fdb588db1a3ff69d66e9d1f3d4",
+    "192fb722a1cb156a078febfd05ac705418b04fca",
+    "eba75fc1194419d8a307420daf63f5e297b01126",
+    "9c1f601bf2d2c1d453fe3809f748bc7729061497",
+    "cc12e72a3b7a9db0bcde98db1d9b7eecd1db1334",
+    "84bcb4ccff5efc6d2cfb2b91f5ec5c565fd9487a",
+    "f2d9658502490e1638d836af70211f7eaf2ff15d"
+  ],
+  "forceNext": null,
+  "results": [
+    {
+      "stage": "research",
+      "round": 0,
+      "sessionID": "ses_e2b5801d5ffew2CWUT6uRP6XD7",
+      "agent": "research/researcher",
+      "at": 1794569357229,
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/research-r0.md",
+      "durationMs": 215341,
+      "nudges": 0,
+      "failure": "independence violation: shell accessed run records: cd /home/mike/repos/bindforge && python3 -c \" import json d=json.load(open('docs/designs/012-input-vocabulary-and-reach-classes/.pipeline.js… (via child session ses_e2b57e43affeLXO2F4J5FaZRQz)"
+    },
+    {
+      "stage": "research",
+      "round": 0,
+      "sessionID": "ses_e2b54b834ffeCJg7NK6XjLvsKo",
+      "agent": "research/researcher",
+      "at": 1794569508709,
+      "reply": {
+        "summary": "Researched ADR-012's three obligations (per-hand reach-class taxonomy, OS-neutral input vocabulary, placement-legality predicate) and wrote docs/designs/012-input-vocabulary-and-reach-classes/01-research.md. Findings are grounded in the repo's shipped contract (v1 spec, closed entry set, version gate, reach loader) and in primary external sources: USB HID Usage Page 0x07 (the common denominator evdev, SDL, and W3C KeyboardEvent.code all derive from), Windows VK / macOS kVK_ANSI naming, Pointer Events button numbering, the W3C Gamepad API standard layout, touch-typing home-row grading and Colemak's effort counts as the only published reach-grading precedent, and WASD/ESDF/IJKL cluster history as placement-legality folklore. Every claim carries an inline source URL or repo path; three lenses applied (prior art, standards, platform notes). Key unknowns flagged: multi-finger grading rule, class ordinality for the legality bound, id spelling for punctuation glyphs, and whether cluster neighbour reach context belongs in the predicate. No run records under docs/designs/ were read; only the designated output file was written.",
+        "commitMessage": "docs: add research for ADR-012 input vocabulary and reach classes"
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/research-attempt2-r0.md",
+      "durationMs": 151415,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal",
+      "round": 0,
+      "sessionID": "ses_e2b526856ffeLAB9tat1fnTe7c",
+      "agent": "design/designer",
+      "at": 1794569803438,
+      "reply": {
+        "commitMessage": "docs: add design proposal for ADR-012 input vocabulary and reach classes"
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/proposal-r0.md",
+      "durationMs": 294629,
+      "nudges": 0,
+      "docLines": 489,
+      "docLinesAdded": 489,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2b4de8ffffee4gGsYvYj6hlBI",
+      "agent": "review/design-correctness",
+      "at": 1794569950528,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Test strategy #5 — \"a one-step degradation (`home`→`stretch`) is legal at `(1)` and illegal at `(0)`\"",
+            "problem": "The degradation is two rank steps, not one: rank is defined as the class's index in the shared classes order, and the pinned order is [\"home\", \"thumb\", \"stretch\", \"far\", \"off-reach\"], so home→stretch = 2−0 = 2 and is illegal at GradeBound(1), not legal. The pinned suite case fails as written (the claim appears to use the ADR's set-listing order instead of this design's pinned severity order).",
+            "fix": "Make the example a real one-step move — home→thumb (e.g. a home key → keyboard:space) legal at (1), illegal at (0) — or relabel and move the bounds: home→stretch legal at (2), illegal at (1)."
+          },
+          {
+            "severity": "major",
+            "location": "Chosen design, Worked examples — \"WASD→ESDF are legal at bound 0, which is the left-hander's WASD-to-the-right-hand move (the research's folklore rationale for the IJKL cluster...)\"",
+            "problem": "The hand attribution contradicts the shipped tables: left→right, A (left home, rank 0) → S (right off-reach, rank 4) degrades 4, so WASD→ESDF is illegal at bound 0 to the right hand; it is legal at bound 0 only as a same-left-hand one-column shift (E/S/D/F are left-hand keys). The folklore right-hand move is WASD→IJKL (legal at 0 to right). No single (from, to) hand pair makes all three pinned examples legal, and Test strategy #5 states no hands, so implemented from the prose it pins a failing case.",
+            "fix": "Attach the folklore clause to WASD→IJKL (from left, to right), describe WASD→ESDF as a same-hand (left→left) cluster shift one column right, and state each example's (from, to) hand pair in Test strategy #5."
+          },
+          {
+            "severity": "minor",
+            "location": "The model / reach.rs — \"load_reach_tables gains two checks for a v2 directory: the declared version must equal the loading directory's version segment\"",
+            "problem": "Scoping the version-segment check to v2 directories misses the dangerous direction: a v2 document in a v1 directory passes the version gate (v2 is now supported) and would load unchecked, while Test strategy #3 pins the general rule (\"a document whose declared version differs from its loading directory's segment is refused\").",
+            "fix": "State the version-segment equality check as running for every reach-classes table at load, v1 directories included; the v1-on-v1 case passes trivially, keeping the reach_tables.rs suite green."
+          },
+          {
+            "severity": "nit",
+            "location": "The model — \"InputGrade is the parsed pair: input: InputId, class: String\" beside \"grade(&InputId) -> Option<&ReachClass>\"",
+            "problem": "The class concept appears under two shapes (String in the parsed pair, ReachClass in the lookup); the shipped code already carries ReachClass.",
+            "fix": "Make InputGrade.class a ReachClass, or add one clause stating the loader validates the pair's class id against the canonical taxonomy and converts, so one concept has one type."
+          },
+          {
+            "severity": "nit",
+            "location": "Placement legality, rule 4 — \"The PlacementCheck result carries the shape delta and the per-action degradation\"",
+            "problem": "Singular shape delta conflicts with Test strategy #5, which pins that a non-translation move set makes \"the check report both deltas\"; the result shape for the non-uniform case is unspecified by rule 4.",
+            "fix": "Say rule 4's shape delta is reported when the moves agree and the per-move deltas when they do not — the shape #5 already pins."
+          }
+        ]
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/design-review-correctness-r1c0.md",
+      "durationMs": 146974,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2b4baaadffeYwOGhZOsIKZsT2",
+      "agent": "review/design-compatibility",
+      "at": 1794570000820,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Compatibility matrix — \"| Third-party reader, non-Rust | unknown | Corpora are language-neutral TOML; no external runner contract exists (Deferred) |\"",
+            "problem": "The compatibility checklist forbids an `unknown` support status: every platform row must commit to a decision, and `unknown` must be reported as a major. This row states an unmade decision rather than a justified one. The underlying deferral (external runner contract, same as design 011) is consistent with ADR-012's Consequences, so the finding is only about the undecided cell.",
+            "fix": "Change the status cell to a committed value that adds no mechanism, e.g. `yes (data only)` — this stage ships no code, no binary, and no runner contract for any language, and the corpora are plain TOML readable by any parser — keeping the existing note, with the runner-contract gap left in Deferred where it already lives."
+          }
+        ]
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/design-review-compatibility-r1c0.md",
+      "durationMs": 50238,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e2b4ae645ffewMdjUWPrcXMs2l",
+      "agent": "review/design-security",
+      "at": 1794570069130,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Placement legality: schemas/keyboard-geometry/v1/ and placement.rs — \"`load_geometry(dir: &Path, name: &str)` — `parse_file` on `dir.join(format!(\"{name}.toml\"))`\"",
+            "problem": "The caller-supplied `name` is interpolated into a path before any validation: the `[a-z][a-z0-9-]*` geometry grammar is enforced only on the file's `geometry` entry, after the load. A `name` containing `..` or a separator traverses out of `dir`, and `Path::join` with an absolute argument silently replaces `dir` entirely, so a caller forwarding user-selected geometry names (CLI, 015's policy layer) can read arbitrary `*.toml` files; `geometry_matches_file_name` is post-load and cannot prevent the read (security checklist 3: reject `..` and absolute paths from user-controlled input).",
+            "fix": "State that `load_geometry` validates `name` against the same `[a-z][a-z0-9-]*` grammar before the join and refuses a non-matching `name` with the existing `InvalidValue` shape (A11, no path in the message); `geometry_matches_file_name` stays as the post-load rule. The grammar already exists — it must just be applied before the path is built."
+          },
+          {
+            "severity": "minor",
+            "location": "The model: crates/core/src/input.rs and the reach edits — \"`reject_unknown_entry`'s message names that version instead of hard-coding `v1`\"",
+            "problem": "The named version becomes document-controlled text, and TOML strings can carry newlines and unbounded length; the design cites the A11 single-line, truncating, path-free message shape but never says the echoed version passes through it, unlike the explicit escape-to-printable required for echoed ids. A hostile document can inject a multi-line or megabyte-long refusal into anything that logs refusals (checklist 4).",
+            "fix": "Add one clause requiring the echoed version to go through the same printable-escape-and-truncate path as echoed ids."
+          },
+          {
+            "severity": "minor",
+            "location": "Placement legality predicate steps 2–3 — \"`coordinate(target) − coordinate(source)` is the same `(dx, dy)`\" and \"the action's degradation is `rank(class(to-hand, target)) − rank(class(from-hand, source))`\"",
+            "problem": "Subtraction over parsed values with no stated arithmetic regime: the design itself requires negative degradations (\"A negative degradation (an improvement) never blocks\") and puts no upper bound on \"non-negative integer coordinates\", so a grammatical but hostile geometry (e.g. a 300-digit coordinate) or a plain improving move can overflow/underflow and panic instead of rejecting cleanly (checklist 7: never crash).",
+            "fix": "Fix the arithmetic regime in one sentence: signed or checked comparison (legality is `rank(target) ≤ rank(source) + bound` with checked arithmetic, deltas signed) and a stated coordinate ceiling or checked integer parsing so malformed data fails closed."
+          }
+        ]
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/design-review-security-r1c0.md",
+      "durationMs": 68275,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2b49db65ffeSmDSyZiHl21l9s",
+      "agent": "review/design-performance",
+      "at": 1794570113374,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design — 'The model: crates/core/src/input.rs and the reach edits' — \"`InputGrade` is the parsed pair: `input: InputId`, `class: String`\"",
+            "problem": "The Options section settles ordinality as 'integer rank arithmetic over table data', but the parsed representation stores the class as a String, so each predicate call re-derives each endpoint's rank by scanning and string-comparing the 5-entry classes array. At 48 keys the cost is negligible (nit), but the stated integer-rank mechanism is only actually realized if the rank is computed at parse time rather than on every call.",
+            "fix": "Have the loader resolve each InputGrade's class string to its index in the pinned canonical classes list once at parse time — the list is pinned at parse level to one fixed five-id order, so the mapping is static — and have grade() hand the predicate that ordinal instead of a string; this replaces the per-call string lookup, adding no new mechanism."
+          }
+        ]
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/design-review-performance-r1c0.md",
+      "durationMs": 44203,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e2b492e9ffferBIJUEYsq3H2Bh",
+      "agent": "review/design-complexity",
+      "at": 1794570177651,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/design-review-complexity-r1c0.md",
+      "durationMs": 64252,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e2b483346ffeU1qmCFgKkr5O5p",
+      "agent": "design/designer",
+      "at": 1794570342989,
+      "reply": {
+        "changed": true,
+        "summary": "All four majors consumed by changing the design, not adding to it. Correctness #1: Test strategy #5's one-step case is now a real one-rank move (`home`→`thumb`, a home key to `keyboard:space`, legal at (1), illegal at (0)), matching the pinned severity order. Correctness #2: the Worked examples paragraph and Test strategy #5 were rewritten to state each example's `(from, to)` hands — folklore clause moved to WASD→IJKL `left`→`right`, WASD→OKL `left`→`right`, WASD→ESDF restated as a same-hand left→left one-column shift — and the paragraph's 015-scope sentence was deleted since Deferred already owns placement/region choice; all three examples check out against the shipped tables at bound 0. Compatibility major: the non-Rust matrix cell commits to `yes (data only)` with the runner contract left in Deferred. Security major: `load_geometry` validates `name` against the `[a-z][a-z0-9-]*` grammar before the join, refused as path-free `InvalidValue`, pinned by Test strategy #4. The minors fell in the same passages and cost one clause each: version-segment equality now runs for every reach table at load (Test #3 says so), echoed versions take the printable-escape-and-truncate path, coordinates are bounded `0..=999` through checked conversion with shape deltas taken in signed integers, `InputGrade.class` is a `ReachClass`, and rule 4 states the one delta shape #5 pins. To pay for these, the round deleted text: the duplicated fixture citations and the cross-file-loader restatement in the contract section, the asymmetry restatement (Test #3 is now its home), the third-party-reader duplication in Rollout, and the 015 clause in Worked examples. The diff is net +6 lines only because the empty Revision log gained its four r1 index entries; the body diff itself is net-zero.",
+        "commitMessage": "docs: address r1 design review findings in the ADR-012 proposal"
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/proposal-revise-r1.md",
+      "durationMs": 165240,
+      "nudges": 0,
+      "docLines": 495,
+      "docLinesAdded": 69,
+      "docLinesRemoved": 63
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2b45ad61ffeLboDR9fMecXckc",
+      "agent": "review/design-correctness",
+      "at": 1794570427514,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Placement legality, worked examples + Test strategy #5 — \"Moving an action from a `home` key to `keyboard:;`, `off-reach` for the source hand, is illegal at bound 1\" / \"the predicate, each case naming its `(from, to)` hands\"",
+            "problem": "The revision promises a `(from, to)` hand pair per case but this example names none, and its verdict is hand-pair dependent: rule 3 grades the target by the to hand, and `keyboard:;` is `home` for the right hand, so under `left`→`right` — the document's own motivating left-hander move — the degradation is 0 and the move is legal even at bound 0, contradicting the example. Test strategy #5's matching case (\"a source-`home` to `off-reach` move is illegal at `GradeBound(1)`\") is well-defined only if \"off-reach\" is read as the to-hand grade, while the worked example deliberately keys off the source hand.",
+            "fix": "Pin the example's hand pair (e.g. `left`→`left`) or restate it as \"`off-reach` for the placement's to hand\", and either apply the promised per-case hand pairs to the remaining #5 cases or scope the promise to the three WASD cases."
+          }
+        ]
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/design-review-correctness-r1c1.md",
+      "durationMs": 84407,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2b446375ffeWwij7qFwv85UTI",
+      "agent": "review/design-compatibility",
+      "at": 1794570475774,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Compatibility matrix — \"| Third-party reader, non-Rust | yes (data only) | This stage ships no code, binary, or runner contract for any language, and the corpora are plain TOML any parser reads; the runner contract stays Deferred |\" (with Test strategy #6)",
+            "problem": "new — the revision turns an undecided cell into a support claim, and the compatibility checklist requires a named check for every matrix row that claims support. Every other yes-row has one (#8 names the Linux CI runner and the Windows contributor leg; #2 and #6 pin the v1-only reader's refusals byte-exact). This row's claim rests on assertion: Test strategy #6 validates the corpora with BindForge's own parser, which is stricter than TOML, so a green walk proves conformance to the BindForge subset, not readability by a stock third-party parser.",
+            "fix": "Anchor the claim in one clause of Test strategy #6 (or the row's note), e.g. \"every shipped corpus file stays inside the documented TOML subset `schemas/README.md` states, which is what makes the data readable to a third-party parser\" — no new test target and no parser dependency, so the toolchain row's \"`Cargo.lock` byte-unchanged\" stays true."
+          }
+        ]
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/design-review-compatibility-r1c1.md",
+      "durationMs": 48217,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e2b43a6f6ffegA9c36zdNT5IPI",
+      "agent": "review/design-security",
+      "at": 1794570515956,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/design-review-security-r1c1.md",
+      "durationMs": 40143,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2b4309caffeqxnedsJZ6t791Q",
+      "agent": "review/design-performance",
+      "at": 1794570544183,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/design-review-performance-r1c2.md",
+      "durationMs": 28135,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e2b429bc3ffeV6hYFS3rbwvpsN",
+      "agent": "review/design-complexity",
+      "at": 1794570636626,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Placement legality: `schemas/keyboard-geometry/v1/` and `placement.rs` — predicate clause 4: \"The `PlacementCheck` result carries the shape delta when the moves agree and the per-move deltas when they do not, so a caller (ADR-015's precondition, 015's policy layer) can explain a refusal instead of seeing a bool.\"",
+            "problem": "Regression from the r1 revision: the previously approved sentence carried \"the shape delta and the per-action degradation\"; the rewrite replaced the degradation with \"the per-move deltas\". \"Delta\" is defined in clause 2 as a coordinate difference, so the shipped result type now carries only coordinates. A clause-(b) bound refusal — the refusal 015 gates on — can no longer be explained (which action, by how many ranks), which makes the sentence's own purpose clause false, and leaves the field set of a public type that 015 preconditions on undefined for the implementer. The Revision log entry (\"one `PlacementCheck` delta shape\") describes unifying the delta shape, not removing the degradation, so this is an editing loss, not a decision.",
+            "fix": "Restore the degradation in the same sentence while keeping the single delta shape: \"carries the per-move coordinate deltas, one common `(dx, dy)` when the moves agree, and each move's degradation\". This is the r1 base wording minus the two-case branching, so no mechanism is added."
+          },
+          {
+            "severity": "minor",
+            "location": "The model: `crates/core/src/input.rs` and the reach edits — \"`load_reach_tables` gains two checks, the first for **every** reach table at load, v1 directories included\" (same paragraph as \"the v1 path keep their exact shipped behavior (the existing `reach_tables.rs` suite stays green unchanged)\")",
+            "problem": "The r1 broadening of the version-segment equality check to every reach table adds a refusal to the v1 load path that shipped code did not have, so the paragraph now contradicts itself: it introduces a new v1-path refusal and in the same breath promises the v1 path keeps its exact shipped behavior. It also loosens the compatibility matrix's \"v1 refusals stay byte-exact\" and Rollout 6's \"none\" claims, which the r1 text no longer qualifies.",
+            "fix": "Keep the universal check (it is the simpler, branch-free rule) and narrow the promise to what is pinned: \"no v1 document in the corpus changes outcome — every v1 document declares `v1`, so v1-on-v1 passes trivially; the existing `reach_tables.rs` suite stays green unchanged\". Test strategy #3's existing \"v1 directories included\" clause then stands as the only changed case."
+          }
+        ]
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/design-review-complexity-r1c2.md",
+      "durationMs": 92416,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e2b413270ffekFsIrROJxkLjLh",
+      "agent": "design/designer",
+      "at": 1794570686926,
+      "reply": {
+        "changed": true,
+        "summary": "Major (Placement legality, clause 4): rewrote the sentence to carry the per-move coordinate deltas (one common (dx, dy) when the moves agree) plus each move's degradation, restoring the degradation the r1 edit dropped so the bound refusal 015 gates on is explainable — same single PlacementCheck shape, no added mechanism. Minor (The model): deleted the false 'v1 path keep their exact shipped behavior' claim and replaced it with the corpus-pinned form (every v1 document declares v1, so the check adds no corpus refusal; reach_tables.rs stays green — byte-unchanged detail stays in Test strategy #7), keeping the universal version-segment check. Revision log maintained in place: the two r1 entries the findings supersede were replaced with r2 entries, no stacked corrections. Diff is line-count-neutral (495→495).",
+        "commitMessage": "docs: restore degradation in PlacementCheck and narrow the v1 load guarantee in 012 proposal"
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/proposal-revise-r1.md",
+      "durationMs": 50208,
+      "nudges": 0,
+      "docLines": 495,
+      "docLinesAdded": 10,
+      "docLinesRemoved": 10
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e2b406de8ffePK0xDDlgCQxhqq",
+      "agent": "review/design-complexity",
+      "at": 1794570717159,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/design-review-complexity-r1c3.md",
+      "durationMs": 30132,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2b3ff7e1ffeuWLTpn2Enn72Cj",
+      "agent": "review/design-correctness",
+      "at": 1794570763401,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/design-review-correctness-r1c4.md",
+      "durationMs": 46159,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2b3f436fffemeWcB75ouq6h0E",
+      "agent": "review/design-compatibility",
+      "at": 1794570831744,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/design-review-compatibility-r1c4.md",
+      "durationMs": 68309,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e2b3e3861ffehWDo5mZTaDdmqr",
+      "agent": "review/design-security",
+      "at": 1794570867948,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/design-review-security-r1c4.md",
+      "durationMs": 36120,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2b3dab11ffeuJS4kQXpFQejiU",
+      "agent": "review/design-performance",
+      "at": 1794570890053,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/design-review-performance-r1c4.md",
+      "durationMs": 22081,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-final",
+      "round": 0,
+      "sessionID": "ses_e2b3d5481ffeZ6JgIRjkKWpzzv",
+      "agent": "design/editor",
+      "at": 1794570968496,
+      "reply": {
+        "ambiguities": [],
+        "commitMessage": "docs: language pass over the ADR-012 proposal"
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/proposal-final-r0.md",
+      "durationMs": 78357,
+      "nudges": 0,
+      "docLines": 495,
+      "docLinesAdded": 9,
+      "docLinesRemoved": 9
+    },
+    {
+      "stage": "editorial-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e2b3c2213ffezfCN17H0ZkVAC1",
+      "agent": "review/design-correctness",
+      "at": 1794571024908,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/editorial-review-correctness-r2.md",
+      "durationMs": 56324,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e2b3b45ecffexLBaDrBUb39SLh",
+      "agent": "review/design-compatibility",
+      "at": 1794571051082,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/editorial-review-compatibility-r2.md",
+      "durationMs": 26146,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:security",
+      "round": 2,
+      "sessionID": "ses_e2b3adfb3ffedFBMz0ljTLQoDk",
+      "agent": "review/design-security",
+      "at": 1794571087243,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Context / Assumption register A4 — diff hunk 1 \"physical keys from an ANSI-US reference geometry\" vs A4 \"names physical keys from a US-ANSI reference geometry\"",
+            "problem": "The editorial hunk normalises the Context to the ADR's spelling but leaves A4 with the old one, so the proposal now names its single reference geometry two ways (ANSI-US everywhere else, US-ANSI in A4). This is only security-adjacent because the design's own posture is that the reference geometry must be stated rather than inferred (\"the reason the spec states the geometry rather than inferring it (A4)\"), and the assumption citing that rule is the one that drifts; a label that wobbles inside the citing assumption invites a second spelling landing in spec.md, where glyph meaning is anchored to it.",
+            "fix": "In A4, change \"US-ANSI reference geometry\" to \"ANSI-US reference geometry\". No other text changes."
+          }
+        ]
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/editorial-review-security-r2.md",
+      "durationMs": 36136,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:performance",
+      "round": 2,
+      "sessionID": "ses_e2b3a5272ffeOzEjmBWviW3VOn",
+      "agent": "review/design-performance",
+      "at": 1794571113387,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/editorial-review-performance-r2.md",
+      "durationMs": 26120,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:complexity",
+      "round": 2,
+      "sessionID": "ses_e2b39ec45ffe4qyP6Z2TEqa51A",
+      "agent": "review/design-complexity",
+      "at": 1794571133588,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/editorial-review-complexity-r2.md",
+      "durationMs": 20162,
+      "nudges": 0
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_e2b399d3affeAVm9d2w2czeBKR",
+      "agent": "code/test-engineer",
+      "at": 1794571216237,
+      "reply": {
+        "testsAdded": 0,
+        "commitMessage": "test(core): add input-vocabulary, reach-classes-v2 and placement-legality suites (NOT COMMITTED: every write path was blocked — `write`/`edit` returned \"Permission denied: edit\" for new files under crates/core/tests, schemas/reach-classes/v2, schemas/keyboard-geometry/v1 and for a no-op edit of an existing file, and `shell` returned \"Permission denied: shell\", so no file could be created, formatted, or tested; the designed suite is described in this run's tool log)"
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/test-authoring-r0.md",
+      "durationMs": 82574,
+      "nudges": 0
+    },
+    {
+      "stage": "implement",
+      "round": 0,
+      "sessionID": "ses_e2b385a52ffe0HJuEKCLE1FaGi",
+      "agent": "code/coder",
+      "at": 1794571859782,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "feat: add ADR-012 input vocabulary, reach-classes v2 taxonomy, and placement legality",
+        "moves": []
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/implement-r0.md",
+      "durationMs": 643431,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e2b2e5e11ffeE37VCkP72rV8gI",
+      "agent": "code/test-engineer",
+      "at": 1794572406201,
+      "reply": {
+        "moves": []
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/test-update-r0.md",
+      "durationMs": 535458,
+      "nudges": 1
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2b26073effe1SZyLZFG6kqAZe",
+      "agent": "codereview/code-correctness",
+      "at": 1794572597102,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "crates/core/src/document.rs:186-213 (parse's version gate and the `profile`/`action-ids` arms; geometry guard at document.rs:531-537)",
+            "problem": "supported_majors() is now [v1, v2] but the version gate is still crate-wide and only reach-classes and keyboard-geometry are version-aware, so a document declaring `version = \"v2\"` with `format = \"profile\"` or `format = \"action-ids\"` is accepted and read with the v1 grammar (parse_profile at document.rs:379 and registry_from_entries at action.rs:179 never check the version), and serialize writes the v2 declaration back. Before this diff any v2 declaration was refused, so the diff opens a fail-open accept path on untrusted input; there is no profile/v2 or action-ids/v2 grammar, directory, or fixture. This contradicts the invariant version_gate.rs:9-12 states (a future-major document parsed with v1 semantics is exactly what the gate exists to prevent) and the versioning rule in schemas/README.md:23-30; build note #4 records the hole as an observation rather than closing it.",
+            "fix": "Make the gate per-format: a `supported_majors_for(format)` (reach-classes = [v1, v2]; profile, action-ids, keyboard-geometry = [v1]) checked in each arm, which also subsumes the geometry-only refusal at document.rs:531-537; keep supported_majors() as the union so version_gate's majors-equal-directories test still passes. Add a version_gate.rs case pinning a profile declaring v2 as UnsupportedVersion, and state the per-format rule in schemas/README.md."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/document.rs:310-316 (serialize's reach-classes arm)",
+            "problem": "The guard `if table.version == MAJOR_V1 && table.keys.is_empty()` sends a v1-versioned table with a non-empty `keys` (constructible by any consumer, since ReachClassTable's fields are public) down the `else` branch, printing `keys = [...]` under `version = \"v1\"` — a document v1's closed entry set refuses to re-parse, exactly the case reach-classes/v1/fixtures/invalid/keys-entry.toml pins and the comment above the branch says must not happen.",
+            "fix": "Branch on the version alone: `if table.version == MAJOR_V1 { head } else { format!(\"{head}keys = [{keys}]\\n\") }`, so only a v2 document writes `keys` and serialize output always re-parses."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/tests/placement.rs:693-716 (two_moves_onto_the_same_target_key_are_illegal)",
+            "problem": "The move set `a→s, d→s` has deltas (1,0) and (-1,0), so shape_ok is false on the common-delta rule and placement.rs:335-345's `targets_are_distinct` never decides the case; the doc comment's claim that the moves share one delta is untrue of them. Clause (a)'s distinct-targets half is therefore unpinned — removing that check leaves the suite green.",
+            "fix": "Pin it with a set that really carries one common delta and repeated targets, e.g. [(keyboard:a, keyboard:s), (keyboard:a, keyboard:s)] (both (1,0)), asserting `check.delta == Some((1, 0))` alongside `!check.shape_ok` so the two halves of clause (a) are separated."
+          },
+          {
+            "severity": "minor",
+            "location": "docs/designs/012-input-vocabulary-and-reach-classes/03-build-notes.md:58-116 (Gate posture, deviation #1, deviation #2's rationale)",
+            "problem": "Checklist item 5 fails against this tree: the notes say 'No test files were written or edited', that conformance.rs still hard-codes v1, that grammar_closure.rs carries only three entry lists, and that Test strategy #3/#5 are 'pinned by nothing yet' — but the diff ships tests/input.rs (6), tests/reach_v2.rs (17), tests/placement.rs (17), tests/zz_api_probe.rs (1), a conformance.rs that takes the fixture's own major and compares grades, and v2/geometry entry lists; the suite runs 119 tests green across 14 targets, not the 75 across 10 the notes quote. Deviation #2's justification (the harness loads from a `...corpus-load-*` stand-in directory) is also stale now that the harness loads from `<scratch>/v1|v2`.",
+            "fix": "Rewrite the Gate posture with the current per-target `test result:` lines and rewrite deviation #1 to list only the deviations that actually remain, so the deviation record and the merge PR's evidence leg match the shipped code."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/zz_api_probe.rs (new target) and crates/core/tests/common/mod.rs:329-382 (quoted_array)",
+            "problem": "Both are additions outside the proposal's delta inventory and undeclared in 03-build-notes.md, whose deviation #1 names only the three proposed test targets; zz_api_probe.rs is also the one new Rust target not module-mirrored the way the proposal says its three are.",
+            "fix": "Name both paths in the build notes' inventory, or fold the probe's public-surface assertions into tests/reach_v2.rs and tests/placement.rs so the inventory stays the three module-mirrored targets."
+          }
+        ]
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/code-review-correctness-r1c0.md",
+      "durationMs": 179847,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2b234884ffe9XqnOcYl6m5fNv",
+      "agent": "codereview/code-compatibility",
+      "at": 1794572778899,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "crates/core/src/document.rs:186-191 (gate fed by supported_majors() at document.rs:100); profile and action-ids arms at document.rs:194-208; parse_profile document.rs:379; registry_from_entries crates/core/src/action.rs:179",
+            "problem": "The version gate is format-blind, and only the new keyboard-geometry arm checks its own majors (parse_keyboard_geometry, document.rs:531-536). Adding MAJOR_V2 to the crate-wide supported list therefore widens two formats the diff declares untouched: a document declaring format = \"profile\" (or \"action-ids\") and version = \"v2\" now passes the gate, passes reject_unknown_entry against the v1 entry list, and parses with v1 semantics, where before this diff it was refused as UnsupportedVersion. That is the fail-open tests/version_gate.rs:8-12 says the gate exists to prevent, it contradicts ADR-012's \"extending them means a new major, never widening v1\", and it is unpinned (version_gate.rs:45 only tests v99, and no fixture declares a major its directory does not carry). Every later format major in the 012-015 series inherits the hole.",
+            "fix": "Make the gate per-format in one place: consult a format_majors(format) table (profile/action-ids/keyboard-geometry -> [\"v1\"], reach-classes -> [\"v1\",\"v2\"]) right after the format lookup and refuse with UnsupportedVersion naming that format's majors, or mirror the geometry arm's version guard in the other two arms. Then pin it in the contract and in a test: a profile document declaring v2 is refused as UnsupportedVersion."
+          },
+          {
+            "severity": "minor",
+            "location": "schemas/reach-classes/v2/spec.md:24 and fixtures/invalid/ (only uppercase-member.toml covers case); crates/core/src/input.rs:170-181; crates/core/tests/input.rs:110-144",
+            "problem": "The ASCII-only half of the id grammar exists only in Rust. The spec says \"lowercase\", which a non-Rust implementer reads as Unicode-lowercase, so a reader could accept keyboard:é while bindforge-core refuses it; the corpus that the contract calls the conformance currency never exercises the case, and no unit case does either. This is the format whose grammar every later format reuses, so the divergence is the non-US-keyboard locale risk made concrete.",
+            "fix": "Add schemas/reach-classes/v2/fixtures/invalid/non-ascii-member.toml (one fault, keys = [\"keyboard:é home\"]), a matching case in tests/input.rs::rejects_an_id_that_breaks_the_namespace_or_member_grammar, and the word ASCII in the spec line: \"a lowercase ASCII glyph of the ANSI-US set\" — the precedent is schemas/action-ids/v1/fixtures/invalid/non-ascii-id.toml."
+          },
+          {
+            "severity": "minor",
+            "location": "schemas/reach-classes/v2/spec.md:150-154 (stand-in-directory parenthetical) against crates/core/tests/conformance.rs:121-130",
+            "problem": "The spec still tells implementers that \"a stand-in directory is not named for a major, so the directory/version rule above does not apply to it\", but this diff changed load_corpus_table to write the stand-in pair as {major}/{other}.toml and load from scratch.path().join(major) precisely because check_dir_version (document.rs:623) does apply. The contract text a third-party implementer mirrors now describes the layout the reference harness no longer has.",
+            "fix": "Reword the parenthetical to the shipped behavior: the stand-in directory carries the fixture's own major segment, and the table completing the pair is taken from the same major directory, so the version/directory rule holds there too."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/document.rs:645 (new is_major_dir) beside crates/core/src/action.rs:229-238; lenient use at document.rs:623-644",
+            "problem": "The \"directory is named for a major\" rule is now defined twice, in two private helpers, with different strictness: a non-major directory is a refusal for the registry and a pass-through for reach tables and geometries. The divergence is deliberate (harness stand-ins), but nothing but two copies of the predicate carries it, so the version-gate rule can drift between loaders.",
+            "fix": "Share one pub(crate) fn major_dir_segment(dir: &Path) -> Option<&str> in document, used by load_action_registry, load_reach_tables and load_geometry, with each loader deciding what None means."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/zz_api_probe.rs (new, 107 lines) against 02-proposal.md:127-146",
+            "problem": "The delta inventory names exactly three new test targets (tests/input.rs, tests/placement.rs, tests/reach_v2.rs); the diff ships a fourth. The target is valuable to this seat — it resolves every name ADR-015 will compile against at the crate root, which is where a rename would break a consumer not yet written — but it is outside the inventory the build was measured against and outside ADR-004's module mirroring.",
+            "fix": "Record it in the delta inventory / Rollout 3 via the doc-sync leg, or fold the probe into tests/placement.rs."
+          }
+        ]
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/code-review-compatibility-r1c0.md",
+      "durationMs": 181757,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e2b20825effe5x9yqucqR5DYBr",
+      "agent": "codereview/code-security",
+      "at": 1794572893869,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/code-review-security-r1c0.md",
+      "durationMs": 114936,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2b1ec145ffeqGve15nf5P92Sv",
+      "agent": "codereview/code-performance",
+      "at": 1794572992620,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/reach.rs:107 (and crates/core/src/reach.rs:118)",
+            "problem": "The graded lookup is a linear scan — `self.grades.iter().find(|entry| entry.input == *input)` — and `placement::degradation` (placement.rs:274-281) then re-finds the class index in `classes` by string via `rank_of`, so each move costs two scans of 48 `InputId` byte-comparisons plus two scans of 5. This is the public predicate ADR-015 preconditions its transforms on (A5), so a placement search runs it per action per candidate placement. The same change indexes the identical id→value lookup with a `BTreeMap<InputId, _>` for coordinates (placement.rs:40), and the crate's other closed id set uses a map for its 'listed once' rule (action.rs:149,200). Cost today is sub-microsecond (a 4-move check is roughly 400 short byte-comparisons, bounded by the closed 48-member `keyboard:` set), so this is a cost-contract/consistency finding rather than a measured regression.",
+            "fix": "Index the grades at load — `grades: BTreeMap<InputId, ReachClass>` (`InputId` already derives `Ord`, so `grade(&InputId) -> Option<&ReachClass>` keeps its signature) — or keep the document-ordered `Vec` and store the class rank beside each `InputGrade` at parse time so a move costs one probe and no rank scan; either way state in the doc comment that the scan is bounded by the closed 48-member set."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/document.rs:502 and crates/core/src/document.rs:553",
+            "problem": "The 'each id appears once' rules are `iter().any(...)` scans inside the parse loop, making a k-element `keys` array O(k²). The closed member set caps it at ~2,300 comparisons per document, so there is no live cost; it is flagged because `registry_from_entries` (action.rs:200) enforces the same rule in O(log k) via `BTreeMap::insert(...).is_some()`, and matching that shape removes a scan class from the parser instead of re-justifying the bound at each site.",
+            "fix": "Insert into a `BTreeMap<InputId, _>`/`BTreeSet<InputId>` as elements are parsed and refuse when the insert reports a repeat, keeping the current message text."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/document.rs:186",
+            "problem": "The version gate calls `supported_majors()` just to test membership, allocating a fresh `Vec<String>` — now two heap Strings, up from one — on every `parse` call, including every fixture in the conformance walk.",
+            "fix": "Add `const MAJORS: &[&str] = &[MAJOR_V1, MAJOR_V2]` and test against it, leaving `supported_majors()` as a thin map/collect wrapper so the pinned public shape and the `supported_majors()`-equals-dirs-on-disk assertion (Test strategy #6) are unchanged."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/placement.rs:327-333",
+            "problem": "`targets_are_distinct` allocates a `Vec<&InputId>` and calls `seen.contains(&target)`, an O(m²) scan over a caller-supplied move list; for shipped tables the list cannot pass 49 moves without a repeat (closed-set bound), so no measured impact, but it is the third identity lookup in the change done as a scan next to `KeyboardGeometry`'s map. Related: `KeyboardGeometry::inputs()` (placement.rs:55-57) clones all 48 ids into a fresh `Vec` per call.",
+            "fix": "Use a `BTreeSet<&InputId>` for the distinctness check, and have `inputs()` return an iterator over `self.coordinates.keys()` instead of a cloned `Vec`."
+          }
+        ]
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/code-review-performance-r1c0.md",
+      "durationMs": 98712,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e2b1d3f73ffewlESm9ZmjyBeFN",
+      "agent": "codereview/code-testing",
+      "at": 1794573326443,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/tests/placement.rs:722 (a_move_naming_an_ungraded_or_uncoordinated_input_is_a_structured_refusal)",
+            "problem": "All four refusal cases are mouse:*/gamepad:* ids, refused by require_keyboard before the two keyboard-specific definedness branches can run; the coordinate() refusal (graded keyboard id absent from the grid) and the ungraded() refusal (keyboard id a loaded table does not grade, e.g. v1 tables) are reachable public behavior with no test exercising either, so the test name claims keyboard coverage it does not provide.",
+            "fix": "Add two cases: shipped v2 tables plus a scratch sparse geometry (basic-grid set) with move keyboard:i -> keyboard:q expecting the no-coordinate refusal, and load_reach_tables on reach-classes/v1/ fed to placement_is_legal expecting the ungraded refusal."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/document.rs:312 (serialize reach-classes arm)",
+            "problem": "The new v2 keys serializer arm and its `version == MAJOR_V1 && keys.is_empty()` guard are exercised by no test: the conformance walk skips re-serializing reach tables by contract and no unit test calls serialize on a v2 document, leaving the proposal's 'quoted already escapes \\ so the backslash glyph round-trips' claim unpinned.",
+            "fix": "Add a unit round-trip in tests/reach_v2.rs: parse a v2 table carrying \"keyboard:\\\\ off-reach\" and \"keyboard:, far\", serialize, re-parse, and assert Document equality."
+          },
+          {
+            "severity": "minor",
+            "location": "schemas/reach-classes/v2/spec.md:152",
+            "problem": "The new spec states the corpus stand-in directory 'is not named for a major, so the directory/version rule above does not apply to it', but the conformance.rs this diff edited writes the fixture pair into <scratch>/<major>/ and loads from that segment; the language-neutral contract now contradicts the reference harness it defines (behaviorally compatible, but a third-party reader gets a false statement).",
+            "fix": "Reword the parenthetical: the harness stands the pair in a directory named for the fixture's own major, so the directory/version rule applies there; a directory not named for a major simply has no segment to compare."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/placement.rs:122 (PlacementCheck::worst_degradation)",
+            "problem": "Public method with no consumer in the crate, in no test, and not part of the proposal's PlacementCheck description — a knob without consumers under testing-checklist item 7.",
+            "fix": "Pin it (assert worst_degradation() equals the max of degradations in one predicate case) or drop it until ADR-015 consumes it."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/placement.rs:55 (KeyboardGeometry::inputs)",
+            "problem": "Public accessor with no consumer and no test; the geometry tests use coordinate/name and raw file text instead.",
+            "fix": "Use it in the 48-distinct-ids test or drop it."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/document.rs:532 (parse_keyboard_geometry version arm)",
+            "problem": "The keyboard-geometry spec states the declared version must name the directory's major and load_geometry calls check_dir_version, but every geometry test loads from a non-major 'grid' directory, leaving the segment-mismatch arm and the format's v1-only UnsupportedVersion arm untested.",
+            "fix": "Add one scratch case: a v1-declaring geometry document inside a v2/ directory (segment refusal) and a version = \"v2\" geometry document (UnsupportedVersion)."
+          }
+        ]
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/code-review-testing-r1c0.md",
+      "durationMs": 333737,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e2b18273dffeXSCrvuHYOoJEZY",
+      "agent": "code/coder",
+      "at": 1794573564632,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "fix: gate contract majors per format and close the round-1 review findings",
+        "moves": []
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/fix-r1.md",
+      "durationMs": 238066,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 1,
+      "sessionID": "ses_e2b1459dfffeHitt5TqjhSlLGy",
+      "agent": "code/test-engineer",
+      "at": 1794573863111,
+      "reply": {
+        "commitMessage": "test(core): update the suite for the round-1 review fixes\n\nPer-format version gate (correctness + compatibility finding 1):\n- version_gate.rs pins a `profile`, `action-ids` and `keyboard-geometry`\n  document declaring `v2` refused as `UnsupportedVersion`, naming that\n  format's own supported majors, and pins the new corpus fixture\n  `profile/v1/fixtures/invalid/major-not-shipped.toml` by name.\n- `version_gate.rs` and `action.rs` now assert the refusal names the majors\n  the format's corpus carries (new `common::format_majors`), not the\n  crate-wide `supported_majors()` union; the equality case keeps the union.\n\nASCII member set (compatibility finding 2):\n- `input.rs` refuses `keyboard:é` — the closed set is written `{a-z}`/`{0-9}`.\n- `reach_v2.rs` pins `reach-classes/v2/fixtures/invalid/non-ascii-member.toml`\n  as refused naming the member.\n\nClause (a), targets distinct (correctness finding 3):\n- `placement.rs` runs the case on a move set that really shares one delta\n  (`a -> s` twice), asserting `delta == Some((1, 0))` beside `!shape_ok`, and\n  keeps the differing-delta set as the pin for the common-delta half.\n\nNot pinned: the serializer's version-only `keys` branch (correctness finding 2)\n— reach tables stay asserted by load, not re-serialization, and that state is\nreachable only from a hand-built model. The `zz_api_probe.rs` inventory nit is\nbookkeeping for the notes leg, not a test change.\n\nGate legs run here: `cargo fmt --all -- --check` clean, `cargo clippy\n--workspace --all-targets --locked -- -D warnings` clean, `cargo test\n--workspace --locked` green — 15 targets, 122 passed, 0 failed, 0 ignored.",
+        "moves": []
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/test-update-r1.md",
+      "durationMs": 287362,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2b0fcc25ffel7wgYpI9cFPXEj",
+      "agent": "codereview/code-correctness",
+      "at": 1794573974851,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "docs/designs/012-input-vocabulary-and-reach-classes/03-build-notes.md:98-105, 116-140",
+            "problem": "The test-update stage inside this pass's scope (9c1f601) implemented exactly the three test-side cases the notes record as 'not done here' — the version_gate.rs profile-declares-v2 case (rejects_a_document_declaring_a_major_that_only_another_format_ships), the keyboard:é case in tests/input.rs, and the shared-delta repeated-target move set in tests/placement.rs — and added two tests, so the quoted Gate posture is stale: this tree runs 122 tests green (re-run this pass), with version_gate.rs at 6 and reach_v2.rs at 18, not the quoted 119 / 4 / 17. The merge PR's evidence leg will post test result: lines that do not match the notes' quoted block (checklist item 5, same shape as the round-1 finding).",
+            "fix": "Re-run the three gate legs against the final tree and update the quoted per-target test result: lines and the 'not done here' paragraph — the three cases are now done in the test targets; only the ownership note remains accurate."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/common/mod.rs:103-115",
+            "problem": "The test-update stage added format_majors, a second outside-inventory helper shared by version_gate.rs and tests/action.rs, to the file deviation 1 names only for quoted_array — the same bookkeeping gap round 1's nit closed, one helper late.",
+            "fix": "Widen deviation 1's sentence in 03-build-notes.md to name format_majors beside quoted_array."
+          }
+        ]
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/code-review-correctness-r1c1.md",
+      "durationMs": 100674,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2b0e42b5ffeWcBN0etLlLDMWs",
+      "agent": "codereview/code-compatibility",
+      "at": 1794574085603,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "schemas/README.md:27-34 against crates/core/src/document.rs:232-237 (union gate binds before check_format_major) and crates/core/tests/action.rs:16-22",
+            "problem": "The new per-format sentences state that a document declaring a major its format does not ship is refused 'naming that format's majors', but the crate-wide union gate still binds first, so a profile or action-ids document declaring `v99` is refused naming [\"v1\", \"v2\"] — including a major that format never ships — while the same formats declaring `v2` name [\"v1\"]. The module doc (document.rs:11-19) honestly states this layering and the README's first bullet covers it, and the direction is safe (a superset message is not fail-open, and no fixture pins exact message text), but an implementer mirroring only the narrowed sentence would emit a different refusal message than the reference implementation for majors no format ships.",
+            "fix": "State the layering where the per-format rule is stated: in schemas/README.md add 'a major no format ships at all is refused naming the majors the crate declares' (the sentence document.rs's module doc already carries), and soften the action.rs test header's 'rather than the crate-wide union' claim the same way — or run check_format_major before the union gate so every version refusal for a known format names exactly that format's majors."
+          }
+        ]
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/code-review-compatibility-r1c1.md",
+      "durationMs": 110718,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e2b0c91d9ffefKZYux7HQsRiiW",
+      "agent": "codereview/code-security",
+      "at": 1794574144065,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/code-review-security-r1c2.md",
+      "durationMs": 58365,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2b0badb4ffekgI6bGDwQTLL8k",
+      "agent": "codereview/code-performance",
+      "at": 1794574230741,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "crates/core/src/document.rs:232 (with :114-116, :227, and the new gate at :125-148)",
+            "problem": "parse now checks version membership twice: `if !supported_majors().contains(&version)` (232) and `check_format_major(format, &version)` (241). The new half is allocation-free (`format_majors` returns `Option<&'static [&'static str]>`), but the old half still builds a fresh `Vec<String>` of two heap Strings per parse call just to test membership — the same site round 1 flagged, left in place while a static-list gate was added next to it. For any format `format_majors` knows, the union test is now implied by the per-format test, so it is a duplicated lookup and the only allocation on the parse happy path, paid once per fixture in the conformance walk.",
+            "fix": "Hoist the union into `const MAJORS: &[&str] = &[MAJOR_V1, MAJOR_V2]` (or derive it from `format_majors`) and test `MAJORS.contains(&version.as_str())`, keeping the union check before `check_format_major` so an unknown format naming an unshipped major still gets `UnsupportedVersion` rather than `UnknownFormat`. Leave `supported_majors()` as a thin map/collect wrapper so the public shape and the majors-equals-dirs-on-disk assertion (Test strategy #6) are unchanged."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/common/mod.rs:110-116, called at crates/core/tests/version_gate.rs:88,103,128,197 and crates/core/tests/action.rs:517,535",
+            "problem": "The new `format_majors` helper answers a two-element question by calling `format_dirs()`, i.e. a fresh two-level `fs::read_dir` walk of `schemas/` (sorted PathBuf plus String per entry) on every call. `version_gate.rs:128` calls it inside a 3-iteration loop, so one `cargo test` run performs roughly six full walks (~36 read_dir calls plus their allocations). Test-only and sub-millisecond, so no live cost, but the same suite already walks once and passes the list down (`zero_fixture_violation(dirs)` at tests/common/mod.rs:157, conformance.rs:79), and this is the only new fs cost the delta adds.",
+            "fix": "Take the walked list — `pub fn format_majors(dirs: &[FormatDir], format: &str) -> Vec<String>` — so each test calls `format_dirs()` once, or memoise the walk in a `OnceLock` inside `format_dirs()`; the assertion content is unchanged either way."
+          }
+        ]
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/code-review-performance-r1c2.md",
+      "durationMs": 86640,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e2b0a5b22ffePusOWSmPsgNRTG",
+      "agent": "codereview/code-testing",
+      "at": 1794574365644,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/tests/version_gate.rs:65 (assert_version_rejection; mirrored in tests/action.rs:158)",
+            "problem": "The new per-format gate pins only that the refusal message contains each of the format's majors; a refusal naming the crate-wide union also contains them, so nothing pins the new contract sentence 'refused naming that format's majors' (schemas/README.md, reach-classes/v2 spec.md, profile/v1 spec.md) or the tests' own claim that naming the union 'would advertise a v2 no profile grammar exists for'. The fail-open (refuse rather than parse) is pinned; the error's supported list is not.",
+            "fix": "Destructure the variant — CoreError::UnsupportedVersion { supported, .. } — and assert supported == format_majors(format) in both helpers (a message-level !contains cannot work because the refusal echoes the declared major)."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/document.rs:365 (serialize reach-classes arm)",
+            "problem": "This diff changes the writer's guard from `version == MAJOR_V1 && keys.is_empty()` to `version == MAJOR_V1` alone and asserts in the comment that 'a v2 document always carries its grades', yet no test ever calls serialize on a v2 document: the conformance walk skips reach re-serialization by contract, so the changed guard and the proposal's 'quoted already escapes \\\\ so the backslash glyph round-trips' claim remain unpinned (carried from r1 #2; re-scored because the changed line keeps it true).",
+            "fix": "Add a tests/reach_v2.rs unit round-trip: parse a v2 table carrying \"keyboard:\\\\ off-reach\" and \"keyboard:, far\", serialize, re-parse, and assert Document equality."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/document.rs:666-669 (check_dir_version doc comment)",
+            "problem": "The r1 #3 spec/harness contradiction was fixed in schemas/reach-classes/v2/spec.md, but the same false statement survives in this code comment, which the diff edits around: it says the directories 'the conformance harness loads a corpus fixture in' are 'not named for a major', while load_corpus_table writes the pair into <scratch>/<major>/ and the spec now states the stand-in carries the fixture's own major.",
+            "fix": "Mirror the spec's rewording in the comment: the harness stand-in is major-named so the segment rule holds there; a non-major directory simply has no segment to compare."
+          }
+        ]
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/code-review-testing-r1c2.md",
+      "durationMs": 134864,
+      "nudges": 0
+    },
+    {
+      "stage": "doc-sync",
+      "round": 1,
+      "sessionID": "ses_e2b084be4ffePaDoyvLOx9rWnS",
+      "agent": "ops/doc-sync",
+      "at": 1794574703220,
+      "reply": {
+        "drifted": true,
+        "commitMessage": "docs: record ADR-012 as-built drift and finish the build notes"
+      },
+      "transcript": "docs/designs/012-input-vocabulary-and-reach-classes/transcripts/doc-sync-r1.md",
+      "durationMs": 337452,
+      "nudges": 0
+    }
+  ],
+  "gateLog": [
+    {
+      "gate": "sourceAdmissible",
+      "round": 0,
+      "proceed": true,
+      "reason": "ADR is proposed and complete",
+      "at": 1794569141763
+    },
+    {
+      "gate": "stageFailure",
+      "round": 0,
+      "proceed": false,
+      "reason": "research: independence violation: shell accessed run records: cd /home/mike/repos/bindforge && python3 -c \" import json d=json.load(open('docs/designs/012-input-vocabulary-and-reach-classes/.pipeline.js… (via child session ses_e2b57e43affeLXO2F4J5FaZRQz)",
+      "at": 1794569357246
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: correctness, compatibility, security",
+      "at": 1794570177710
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c2 pending: performance, complexity",
+      "at": 1794570516012
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c3 pending: complexity",
+      "at": 1794570636679
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c4 pending: correctness, compatibility, security, performance",
+      "at": 1794570717205
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794570890104
+    },
+    {
+      "gate": "editorial-review",
+      "round": 2,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1794571133633
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1794571870687
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1794572417197
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: correctness, compatibility",
+      "at": 1794573326517
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1794573575701
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1794573874117
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c2 pending: security, performance, testing",
+      "at": 1794574085660
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794574365712
+    },
+    {
+      "gate": "done",
+      "round": 0,
+      "proceed": true,
+      "reason": "pipeline complete",
+      "at": 1794574703286
+    }
+  ],
+  "startedAt": 1794569141734,
+  "updatedAt": 1794574703286,
+  "flow": "full",
+  "baseRef": "c26bf7f02371a1535a4d956d00294479b94d5532",
+  "designCycle": 5,
+  "designStamp": "92beeaa7f1643f271998f178ab30f94d15b533dd",
+  "seats": {
+    "design": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "92beeaa7f1643f271998f178ab30f94d15b533dd",
+        "dissents": 1,
+        "findings": []
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "92beeaa7f1643f271998f178ab30f94d15b533dd",
+        "dissents": 1,
+        "findings": []
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "92beeaa7f1643f271998f178ab30f94d15b533dd",
+        "dissents": 1,
+        "findings": []
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "92beeaa7f1643f271998f178ab30f94d15b533dd",
+        "dissents": 0,
+        "findings": []
+      },
+      "complexity": {
+        "verdict": "approve",
+        "stamp": "92beeaa7f1643f271998f178ab30f94d15b533dd",
+        "dissents": 1,
+        "findings": []
+      }
+    },
+    "code": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "9c1f601bf2d2c1d453fe3809f748bc7729061497",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "docs/designs/012-input-vocabulary-and-reach-classes/03-build-notes.md:98-105, 116-140",
+            "problem": "The test-update stage inside this pass's scope (9c1f601) implemented exactly the three test-side cases the notes record as 'not done here' — the version_gate.rs profile-declares-v2 case (rejects_a_document_declaring_a_major_that_only_another_format_ships), the keyboard:é case in tests/input.rs, and the shared-delta repeated-target move set in tests/placement.rs — and added two tests, so the quoted Gate posture is stale: this tree runs 122 tests green (re-run this pass), with version_gate.rs at 6 and reach_v2.rs at 18, not the quoted 119 / 4 / 17. The merge PR's evidence leg will post test result: lines that do not match the notes' quoted block (checklist item 5, same shape as the round-1 finding).",
+            "fix": "Re-run the three gate legs against the final tree and update the quoted per-target test result: lines and the 'not done here' paragraph — the three cases are now done in the test targets; only the ownership note remains accurate."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/common/mod.rs:103-115",
+            "problem": "The test-update stage added format_majors, a second outside-inventory helper shared by version_gate.rs and tests/action.rs, to the file deviation 1 names only for quoted_array — the same bookkeeping gap round 1's nit closed, one helper late.",
+            "fix": "Widen deviation 1's sentence in 03-build-notes.md to name format_majors beside quoted_array."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "9c1f601bf2d2c1d453fe3809f748bc7729061497",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "schemas/README.md:27-34 against crates/core/src/document.rs:232-237 (union gate binds before check_format_major) and crates/core/tests/action.rs:16-22",
+            "problem": "The new per-format sentences state that a document declaring a major its format does not ship is refused 'naming that format's majors', but the crate-wide union gate still binds first, so a profile or action-ids document declaring `v99` is refused naming [\"v1\", \"v2\"] — including a major that format never ships — while the same formats declaring `v2` name [\"v1\"]. The module doc (document.rs:11-19) honestly states this layering and the README's first bullet covers it, and the direction is safe (a superset message is not fail-open, and no fixture pins exact message text), but an implementer mirroring only the narrowed sentence would emit a different refusal message than the reference implementation for majors no format ships.",
+            "fix": "State the layering where the per-format rule is stated: in schemas/README.md add 'a major no format ships at all is refused naming the majors the crate declares' (the sentence document.rs's module doc already carries), and soften the action.rs test header's 'rather than the crate-wide union' claim the same way — or run check_format_major before the union gate so every version refusal for a known format names exactly that format's majors."
+          }
+        ]
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "9c1f601bf2d2c1d453fe3809f748bc7729061497",
+        "dissents": 0,
+        "findings": []
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "9c1f601bf2d2c1d453fe3809f748bc7729061497",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "crates/core/src/document.rs:232 (with :114-116, :227, and the new gate at :125-148)",
+            "problem": "parse now checks version membership twice: `if !supported_majors().contains(&version)` (232) and `check_format_major(format, &version)` (241). The new half is allocation-free (`format_majors` returns `Option<&'static [&'static str]>`), but the old half still builds a fresh `Vec<String>` of two heap Strings per parse call just to test membership — the same site round 1 flagged, left in place while a static-list gate was added next to it. For any format `format_majors` knows, the union test is now implied by the per-format test, so it is a duplicated lookup and the only allocation on the parse happy path, paid once per fixture in the conformance walk.",
+            "fix": "Hoist the union into `const MAJORS: &[&str] = &[MAJOR_V1, MAJOR_V2]` (or derive it from `format_majors`) and test `MAJORS.contains(&version.as_str())`, keeping the union check before `check_format_major` so an unknown format naming an unshipped major still gets `UnsupportedVersion` rather than `UnknownFormat`. Leave `supported_majors()` as a thin map/collect wrapper so the public shape and the majors-equals-dirs-on-disk assertion (Test strategy #6) are unchanged."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/common/mod.rs:110-116, called at crates/core/tests/version_gate.rs:88,103,128,197 and crates/core/tests/action.rs:517,535",
+            "problem": "The new `format_majors` helper answers a two-element question by calling `format_dirs()`, i.e. a fresh two-level `fs::read_dir` walk of `schemas/` (sorted PathBuf plus String per entry) on every call. `version_gate.rs:128` calls it inside a 3-iteration loop, so one `cargo test` run performs roughly six full walks (~36 read_dir calls plus their allocations). Test-only and sub-millisecond, so no live cost, but the same suite already walks once and passes the list down (`zero_fixture_violation(dirs)` at tests/common/mod.rs:157, conformance.rs:79), and this is the only new fs cost the delta adds.",
+            "fix": "Take the walked list — `pub fn format_majors(dirs: &[FormatDir], format: &str) -> Vec<String>` — so each test calls `format_dirs()` once, or memoise the walk in a `OnceLock` inside `format_dirs()`; the assertion content is unchanged either way."
+          }
+        ]
+      },
+      "testing": {
+        "verdict": "approve",
+        "stamp": "9c1f601bf2d2c1d453fe3809f748bc7729061497",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/tests/version_gate.rs:65 (assert_version_rejection; mirrored in tests/action.rs:158)",
+            "problem": "The new per-format gate pins only that the refusal message contains each of the format's majors; a refusal naming the crate-wide union also contains them, so nothing pins the new contract sentence 'refused naming that format's majors' (schemas/README.md, reach-classes/v2 spec.md, profile/v1 spec.md) or the tests' own claim that naming the union 'would advertise a v2 no profile grammar exists for'. The fail-open (refuse rather than parse) is pinned; the error's supported list is not.",
+            "fix": "Destructure the variant — CoreError::UnsupportedVersion { supported, .. } — and assert supported == format_majors(format) in both helpers (a message-level !contains cannot work because the refusal echoes the declared major)."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/document.rs:365 (serialize reach-classes arm)",
+            "problem": "This diff changes the writer's guard from `version == MAJOR_V1 && keys.is_empty()` to `version == MAJOR_V1` alone and asserts in the comment that 'a v2 document always carries its grades', yet no test ever calls serialize on a v2 document: the conformance walk skips reach re-serialization by contract, so the changed guard and the proposal's 'quoted already escapes \\\\ so the backslash glyph round-trips' claim remain unpinned (carried from r1 #2; re-scored because the changed line keeps it true).",
+            "fix": "Add a tests/reach_v2.rs unit round-trip: parse a v2 table carrying \"keyboard:\\\\ off-reach\" and \"keyboard:, far\", serialize, re-parse, and assert Document equality."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/document.rs:666-669 (check_dir_version doc comment)",
+            "problem": "The r1 #3 spec/harness contradiction was fixed in schemas/reach-classes/v2/spec.md, but the same false statement survives in this code comment, which the diff edits around: it says the directories 'the conformance harness loads a corpus fixture in' are 'not named for a major', while load_corpus_table writes the pair into <scratch>/<major>/ and the spec now states the stand-in carries the fixture's own major.",
+            "fix": "Mirror the spec's rewording in the comment: the harness stand-in is major-named so the segment rule holds there; a non-major directory simply has no segment to compare."
+          }
+        ]
+      }
+    }
+  },
+  "lastReviewPass": {
+    "phase": "code",
+    "round": 1,
+    "cycle": 2,
+    "seats": [
+      "security",
+      "performance",
+      "testing"
+    ]
+  },
+  "reviseNoChange": false,
+  "codeCycle": 3,
+  "codeStamp": "9c1f601bf2d2c1d453fe3809f748bc7729061497"
+}

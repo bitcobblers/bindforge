@@ -1,0 +1,8 @@
+# A v2 table is valid with one graded input: the entry set and the pair
+# encoding are what close the grammar, not a minimum coverage. Coverage of all
+# 48 graded ids is a property of the shipped tables, asserted against them.
+format = "reach-classes"
+version = "v2"
+hand = "right"
+classes = ["home", "thumb", "stretch", "far", "off-reach"]
+keys = ["keyboard:; home"]

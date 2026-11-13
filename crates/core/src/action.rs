@@ -28,7 +28,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use crate::document::{Document, parse_file, string_array};
+use crate::document::{Document, major_dir_segment, parse_file, string_array};
 use crate::error::CoreError;
 use crate::toml::Value;
 
@@ -226,16 +226,12 @@ pub fn load_action_registry(dir: &Path) -> Result<ActionRegistry, CoreError> {
         });
     };
 
-    let major = dir
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or_default();
-    if !is_major_dir(major) {
+    let Some(major) = major_dir_segment(dir) else {
         return Err(CoreError::InvalidValue {
             key: "version".to_string(),
             message: "a registry directory is named for a major, like `v1`".to_string(),
         });
-    }
+    };
     if registry.version != major {
         let declared = registry.version.clone();
         return Err(CoreError::InvalidValue {
@@ -283,12 +279,4 @@ fn is_well_formed_segment(segment: &str) -> bool {
     bytes
         .iter()
         .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'-')
-}
-
-/// Whether a directory name is a major-version segment: `v` then digits.
-fn is_major_dir(name: &str) -> bool {
-    match name.strip_prefix('v') {
-        Some(digits) => !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit()),
-        None => false,
-    }
 }

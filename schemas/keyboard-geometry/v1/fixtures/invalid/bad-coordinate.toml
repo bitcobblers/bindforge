@@ -1,0 +1,7 @@
+# Coordinates are `0..=999`, read through checked conversion. An oversized
+# literal is a grammar refusal, not a coordinate that wraps into a legal one —
+# and a wrapped coordinate would quietly change a placement's shape delta.
+format = "keyboard-geometry"
+version = "v1"
+geometry = "bad-coordinate"
+keys = ["keyboard:a 1000 2"]

@@ -1,0 +1,6 @@
+# A small grid: the shape rule needs only each placed key's coordinate, so a
+# geometry may place a subset of the keyboard and stay a valid document.
+format = "keyboard-geometry"
+version = "v1"
+geometry = "basic-grid"
+keys = ["keyboard:q 0 1", "keyboard:w 1 1", "keyboard:a 0 2", "keyboard:s 1 2", "keyboard:space 3 4"]

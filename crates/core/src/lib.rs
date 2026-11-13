@@ -20,25 +20,44 @@
 //! `schemas/action-ids/v1/` by `load_action_registry`. Nothing in this crate
 //! repeats the id list.
 //!
+//! The input vocabulary and the reach taxonomy (ADR-012) are typed here and
+//! shipped as data the same way: `InputId`/`InputNamespace` hold the
+//! OS-neutral `keyboard:`/`mouse:`/`gamepad:` ids whose grammar
+//! `schemas/reach-classes/v2/spec.md` states, `ReachTable` carries each
+//! hand's grades over the five-class taxonomy loaded from
+//! `reach-classes/v2/`, and `KeyboardGeometry` carries the key grid loaded
+//! from `keyboard-geometry/v1/`. `placement_is_legal` is Decision Four's
+//! predicate — a pure function over that loaded data, which is what lets
+//! ADR-015 precondition its transforms on it. Nothing in this crate repeats
+//! the class list, the grade tables, or the grid.
+//!
 //! The public surface exercised by the conformance suites: `parse`,
 //! `parse_file`, `parse_reader`, `serialize`, `supported_majors`,
 //! `resolve_chain`, `MAX_CHAIN_DEPTH`, `MAX_DOCUMENT_BYTES`,
 //! `MAX_NESTING_DEPTH`, `load_reach_tables`, `hand_matches_file_name`,
 //! `Hand`, `ReachTables`, `load_action_registry`, `ActionId`,
-//! `ActionRegistry`, `AxisKind`, `CoreError`.
+//! `ActionRegistry`, `AxisKind`, `CoreError` — and, from ADR-012,
+//! `InputId`, `InputNamespace`, `InputGrade`, `KeyboardGeometry`,
+//! `load_geometry`, `geometry_matches_file_name`, `GradeBound`,
+//! `PlacementCheck`, and `placement_is_legal`.
 
 mod action;
 mod chain;
 mod document;
 mod error;
+mod input;
+mod placement;
 mod reach;
 mod toml;
 
 pub use action::{ActionId, ActionRegistry, AxisKind, load_action_registry};
 pub use chain::{MAX_CHAIN_DEPTH, resolve_chain};
-pub use document::{Document, Profile, ReachClassTable};
+pub use document::{Document, GeometryKey, KeyboardGeometryTable, Profile, ReachClassTable};
 pub use document::{parse, parse_file, parse_reader, serialize, supported_majors};
 pub use error::CoreError;
-pub use reach::{Hand, ReachClass, ReachTable, ReachTables};
+pub use input::{InputId, InputNamespace};
+pub use placement::{GradeBound, KeyboardGeometry, PlacementCheck};
+pub use placement::{geometry_matches_file_name, load_geometry, placement_is_legal};
+pub use reach::{Hand, InputGrade, ReachClass, ReachTable, ReachTables};
 pub use reach::{hand_matches_file_name, load_reach_tables};
 pub use toml::{MAX_DOCUMENT_BYTES, MAX_NESTING_DEPTH};

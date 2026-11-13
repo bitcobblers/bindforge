@@ -1,0 +1,9 @@
+# Declares a major the `profile` format does not ship: only `profile/v1/`
+# exists under `schemas/`, so this document is rejected naming the majors that
+# format supports. A reader that gates on one global list instead would read it
+# with the v1 grammar — the misreading the version gate exists to prevent, and
+# the reason the gate is per-format.
+format = "profile"
+version = "v2"
+id = "major-not-shipped"
+derives = []

@@ -1,0 +1,8 @@
+# The pair encoding is exactly two space-separated fields. A third field is
+# what a member carrying a space would produce, and the closed member grammars
+# are what make that impossible: the one split point has to be unambiguous.
+format = "reach-classes"
+version = "v2"
+hand = "left"
+classes = ["home", "thumb", "stretch", "far", "off-reach"]
+keys = ["keyboard:w home extra"]

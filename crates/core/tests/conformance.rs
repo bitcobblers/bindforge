@@ -9,10 +9,22 @@
 //! zero invalid fixtures fails the run.
 //!
 //! Reach-class corpus fixtures are asserted by parse *and* by load — the load
-//! half files the table's classes under the hand the document names — and they
-//! are not re-serialized, per `schemas/reach-classes/v1/spec.md`: the
-//! per-hand distinctness of the version directory's own `left.toml` /
-//! `right.toml` table data is `reach_tables.rs` (Test strategy #4).
+//! half files the table's classes under the hand the document names, and files a
+//! v2 fixture's `keys` grades under the hand too — and they are not
+//! re-serialized, per `schemas/reach-classes/v1/spec.md` and
+//! `schemas/reach-classes/v2/spec.md`: the per-hand distinctness of the version
+//! directory's own `left.toml` / `right.toml` table data is `reach_tables.rs`
+//! (design 008's Test strategy #4) and `reach_v2.rs` (design 012's Test strategy
+//! #3).
+//!
+//! proves: design 012's Test strategy #6 — the same `schemas/*/v*/` walk picks up
+//! `reach-classes/v2` and `keyboard-geometry/v1` with no harness change: every
+//! valid fixture parses and, for reach tables, loads with its grades filed under
+//! the declared hand, the completing table taken from the fixture's **own major**
+//! rather than `v1`; every invalid fixture — including
+//! `reach-classes/v1/fixtures/invalid/keys-entry.toml` — is refused with a
+//! single-line bounded message; and the zero-fixture rule and the case-unique
+//! fixture-name rule cover both new directories.
 //!
 //! Test strategy #5 (fresh-clone one-gate promise) and #6 (CI job
 //! independence) have a code-level counterpart in `gate_contract.rs`, which
@@ -37,8 +49,8 @@ use std::fs;
 
 use bindforge_core::Hand;
 use common::{
-    ScratchDir, fixture_text, fixtures, format_dirs, format_dirs_under, is_fixture_name, rejection,
-    schemas_root, string_array, string_entry, zero_fixture_violation,
+    ScratchDir, fixture_text, fixtures, format_dirs, format_dirs_under, is_fixture_name,
+    quoted_array, rejection, schemas_root, string_array, string_entry, zero_fixture_violation,
 };
 
 /// proves: Test strategy #1 — every valid fixture parses, is accepted by the
@@ -62,8 +74,9 @@ fn every_valid_fixture_re_serializes_to_a_semantically_equal_value() {
 
             if dir.format == "reach-classes" {
                 // Reach-class tables are asserted by load, not by
-                // re-serialization (`schemas/reach-classes/v1/spec.md`).
-                load_corpus_table(&label, &text);
+                // re-serialization (`schemas/reach-classes/v1/spec.md`,
+                // `schemas/reach-classes/v2/spec.md`).
+                load_corpus_table(&label, &text, &dir.major);
                 continue;
             }
 
@@ -77,15 +90,23 @@ fn every_valid_fixture_re_serializes_to_a_semantically_equal_value() {
     }
 }
 
-/// proves: Test strategy #4 + Formats contract (Harness) — the load half of the
-/// reach-class corpus: a valid corpus table loads into the model and its classes
-/// are filed under the hand its document names, in table order.
+/// proves: design 008's Test strategy #4 + design 012's Test strategy #6 +
+/// Formats contract (Harness) — the load half of the reach-class corpus: a valid
+/// corpus table loads into the model, its classes
+/// are filed under the hand its document names in table order, and a v2
+/// fixture's `keys` grades are filed under that hand as well.
 ///
-/// A stand-alone corpus fixture carries no file name of its own, so it stands
-/// in for its declared hand inside a scratch directory, with the contract tree's
-/// own table for the other hand completing the directory
-/// (`schemas/reach-classes/v1/spec.md`).
-fn load_corpus_table(label: &str, text: &str) {
+/// A stand-alone corpus fixture carries no file name of its own, so it stands in
+/// for its declared hand inside a scratch directory, with the contract tree's own
+/// table for the other hand completing the directory
+/// (`schemas/reach-classes/v1/spec.md`, `schemas/reach-classes/v2/spec.md`). The
+/// completing table is taken from the fixture's **own major**, not from `v1`: the
+/// loader refuses a document whose declared version differs from the version
+/// segment of the directory it loads from (design 012's Test strategy #3), so a
+/// v2 fixture is completed from `reach-classes/v2/` and a v1 fixture from
+/// `reach-classes/v1/`, and the scratch directory the pair sits in carries that
+/// same segment.
+fn load_corpus_table(label: &str, text: &str, major: &str) {
     let declared = string_entry(text, "hand")
         .unwrap_or_else(|| panic!("{label} is a table document: it declares a `hand` entry"));
     let classes = string_array(text, "classes")
@@ -100,12 +121,13 @@ fn load_corpus_table(label: &str, text: &str) {
     let scratch = ScratchDir::new("reach-classes-corpus-load");
     let shipped = schemas_root()
         .join("reach-classes")
-        .join("v1")
+        .join(major)
         .join(format!("{other}.toml"));
-    scratch.write(&format!("{other}.toml"), &fixture_text(&shipped));
-    scratch.write(&format!("{declared}.toml"), text);
+    scratch.write(&format!("{major}/{other}.toml"), &fixture_text(&shipped));
+    scratch.write(&format!("{major}/{declared}.toml"), text);
+    let directory = scratch.path().join(major);
 
-    let tables = bindforge_core::load_reach_tables(scratch.path())
+    let tables = bindforge_core::load_reach_tables(&directory)
         .unwrap_or_else(|err| panic!("the valid corpus table {label} must load: {err}"));
     let table = tables.hand(hand).unwrap_or_else(|| {
         panic!("{label} declares hand `{declared}`; the loader must file its classes there")
@@ -128,6 +150,33 @@ fn load_corpus_table(label: &str, text: &str) {
         loaded, classes,
         "the loader must file {label}'s classes, in table order, under the hand it declares"
     );
+
+    // A v2 document's grades ride the same load: every
+    // `"<input-id> <class-id>"` pair must answer from `grade` under the hand the
+    // fixture declares (`schemas/reach-classes/v2/spec.md`). A v1 document
+    // carries no `keys` entry at all, so the load half stops at its classes.
+    let Some(pairs) = quoted_array(text, "keys") else {
+        return;
+    };
+    for pair in &pairs {
+        let pair = pair.replace("\\\\", "\\");
+        let mut fields = pair.split(' ');
+        let (Some(input), Some(class)) = (fields.next(), fields.next()) else {
+            panic!(
+                "{label}: a `keys` element is one `\"<input-id> <class-id>\"` pair, got `{pair}`"
+            );
+        };
+        let id = bindforge_core::InputId::parse(input).unwrap_or_else(|err| {
+            panic!("{label}: `{input}` must be an id the grammar admits: {err}")
+        });
+        let graded = table.grade(&id).unwrap_or_else(|| {
+            panic!("{label}: the loader must file the grade `{input}` carries under `{declared}`")
+        });
+        assert_eq!(
+            graded.id, class,
+            "{label}: `grade({input})` must answer `{class}`, the class its own pair names"
+        );
+    }
 }
 
 /// proves: Test strategy #1 — every invalid fixture is rejected with a
@@ -315,10 +364,13 @@ fn fixture_file_names_are_lowercase_ascii_dash_separated_and_case_unique() {
     }
 }
 
-/// proves: Chosen design → Formats contract + Rollout 3 — the scaffold ships
-/// `profile/v1` and `reach-classes/v1`; the same `schemas/*/v*/` walk picks up
-/// `patch`, `manifest` and `policy` when ADR-013, ADR-014 and ADR-015 add them, with no harness
-/// change.
+/// proves: Chosen design → Formats contract + Rollout 3, and design 012's Test
+/// strategy #6 —
+/// the scaffold ships `profile/v1` and `reach-classes/v1`, ADR-011 added
+/// `action-ids/v1`, and ADR-012 adds `reach-classes/v2` and
+/// `keyboard-geometry/v1`; the same `schemas/*/v*/` walk picks up all of them with
+/// no harness change, which is also how `patch`, `manifest` and `policy` join when
+/// ADR-013, ADR-014 and ADR-015 add them.
 #[test]
 fn the_walk_picks_up_every_version_directory_the_contract_tree_ships() {
     let found: Vec<String> = format_dirs()
@@ -326,7 +378,13 @@ fn the_walk_picks_up_every_version_directory_the_contract_tree_ships() {
         .map(|dir| format!("{}/{}", dir.format, dir.major))
         .collect();
 
-    for expected in ["profile/v1", "reach-classes/v1"] {
+    for expected in [
+        "profile/v1",
+        "reach-classes/v1",
+        "action-ids/v1",
+        "reach-classes/v2",
+        "keyboard-geometry/v1",
+    ] {
         assert!(
             found.iter().any(|dir| dir == expected),
             "the harness must exercise {expected}; the walk found {found:?}"

@@ -1,0 +1,7 @@
+# `keys` is required by the v2 entry set: a document with everything else is
+# exactly the mapping ADR-012 owes, so it is a missing entry, not a v1 document
+# read as v2.
+format = "reach-classes"
+version = "v2"
+hand = "left"
+classes = ["home", "thumb", "stretch", "far", "off-reach"]

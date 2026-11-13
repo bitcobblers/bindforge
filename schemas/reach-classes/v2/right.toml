@@ -1,0 +1,9 @@
+# Right-hand reach-class table, v2. Same five classes, same severity order,
+# different grades — by definition: the asymmetry ADR-012 records is this data.
+# The right pinky's home anchor is `;` and it reaches `'` as a stretch; the left
+# hand grades both off-reach.
+format = "reach-classes"
+version = "v2"
+hand = "right"
+classes = ["home", "thumb", "stretch", "far", "off-reach"]
+keys = ["keyboard:; home", "keyboard:j home", "keyboard:k home", "keyboard:l home", "keyboard:space thumb", "keyboard:' stretch", "keyboard:- stretch", "keyboard:= stretch", "keyboard:, stretch", "keyboard:. stretch", "keyboard:/ stretch", "keyboard:0 stretch", "keyboard:6 stretch", "keyboard:7 stretch", "keyboard:8 stretch", "keyboard:9 stretch", "keyboard:g stretch", "keyboard:h stretch", "keyboard:i stretch", "keyboard:m stretch", "keyboard:n stretch", "keyboard:o stretch", "keyboard:p stretch", "keyboard:u stretch", "keyboard:y stretch", "keyboard:\\ far", "keyboard:[ far", "keyboard:] far", "keyboard:4 far", "keyboard:5 far", "keyboard:b far", "keyboard:f far", "keyboard:r far", "keyboard:t far", "keyboard:` off-reach", "keyboard:1 off-reach", "keyboard:2 off-reach", "keyboard:3 off-reach", "keyboard:a off-reach", "keyboard:c off-reach", "keyboard:d off-reach", "keyboard:e off-reach", "keyboard:q off-reach", "keyboard:s off-reach", "keyboard:v off-reach", "keyboard:w off-reach", "keyboard:x off-reach", "keyboard:z off-reach"]

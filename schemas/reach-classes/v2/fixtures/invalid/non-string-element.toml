@@ -1,0 +1,8 @@
+# `keys` is an array of strings. A non-string element is refused the same way
+# every other array entry of the grammar is, before anything is parsed as a
+# pair.
+format = "reach-classes"
+version = "v2"
+hand = "left"
+classes = ["home", "thumb", "stretch", "far", "off-reach"]
+keys = ["keyboard:w home", 2]

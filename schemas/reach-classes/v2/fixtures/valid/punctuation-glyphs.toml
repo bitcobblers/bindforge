@@ -1,0 +1,8 @@
+# The punctuation members of the closed `keyboard:` set are literal glyphs, not
+# spelled words, and the backslash glyph round-trips through the grammar's
+# closed escape table: `\\` in the document is one `\` in the id.
+format = "reach-classes"
+version = "v2"
+hand = "left"
+classes = ["home", "thumb", "stretch", "far", "off-reach"]
+keys = ["keyboard:` stretch", "keyboard:- far", "keyboard:= far", "keyboard:[ far", "keyboard:] off-reach", "keyboard:\\ off-reach", "keyboard:; off-reach", "keyboard:' off-reach", "keyboard:, far", "keyboard:. far", "keyboard:/ off-reach", "keyboard:space thumb"]

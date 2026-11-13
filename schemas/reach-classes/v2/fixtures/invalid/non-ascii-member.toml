@@ -1,0 +1,8 @@
+# The member set is ASCII and comparison is byte-exact. `é` is a lowercase
+# letter to a Unicode-aware check, but it is not one glyph of the ANSI-US set,
+# so it is a refusal naming the member — never a fold onto `keyboard:e`.
+format = "reach-classes"
+version = "v2"
+hand = "left"
+classes = ["home", "thumb", "stretch", "far", "off-reach"]
+keys = ["keyboard:é home"]

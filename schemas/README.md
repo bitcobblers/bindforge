@@ -1,17 +1,21 @@
 # BindForge formats contract
 
 `schemas/` is the single home of BindForge's on-disk format contract: one
-directory per format (`action-ids`, `profile`, `reach-classes`, and later the
-manifest and profile-chain formats of the 012-015 series), and under it one
-directory per major version (`v1`, `v2`, …). Every product component — the
-CLI, the desktop app, the hub — validates documents with these rules, and
-third-party readers can conform to them without reading Rust.
+directory per format (`action-ids`, `keyboard-geometry`, `profile`,
+`reach-classes`, and later the manifest and profile-chain formats of the
+012-015 series), and under it one directory per major version (`v1`, `v2`, …).
+Every product component — the CLI, the desktop app, the hub — validates
+documents with these rules, and third-party readers can conform to them
+without reading Rust.
 
 The scaffold of this contract tree (ADR-008 design 008) ships `profile/v1` and
 `reach-classes/v1`; ADR-011 adds `action-ids/v1`, the id set the rest of the
-011-015 series speaks through. The manifest and profile-chain formats arrive
-with the 012-015 series, and the conformance harness's `schemas/*/v*/` walk
-picks them up with no harness change.
+011-015 series speaks through. ADR-012 adds `reach-classes/v2` — the five-class
+reach taxonomy with each hand's grade for every graded input, leaving `v1` and
+its placeholder ids untouched — and `keyboard-geometry/v1`, the key grid the
+placement predicate checks its shape rule against. The manifest and
+profile-chain formats arrive with the 012-015 series, and the conformance
+harness's `schemas/*/v*/` walk picks them up with no harness change.
 
 ## Versioning rule (canonical)
 
@@ -20,6 +24,14 @@ picks them up with no harness change.
   declares no version, or a major `bindforge-core` does not support, is
   rejected with a structured error naming the supported majors. It is never
   defaulted to a version.
+- The majors a document may declare are those of **its own format**: a format
+  ships a major only when a `schemas/<format>/vN/` directory carries it, and a
+  document declaring a major its format does not ship is refused naming that
+  format's majors. `reach-classes` is the only format with two majors today, so
+  its `v2` never widens what a `profile`, `action-ids`, or `keyboard-geometry`
+  reader accepts. A reader that gates on one global list instead reads a
+  future-major document with the grammar of the major it happens to have —
+  the misreading this rule exists to prevent.
 - Minor bumps are additive only.
 - A file's presence in `vN/fixtures/valid/` is the definition of
   "supported", and the majors `bindforge-core` declares must equal the
@@ -42,6 +54,12 @@ in one implementation is not a contract.
 The fixtures are the conformance currency — following the JSON Schema Test
 Suite model, every implementer runs the same golden fixtures — and no
 machine-checkable schema language is committed.
+
+One vocabulary spans the formats: an **input id** is `<namespace>:<member>`
+(`keyboard:*`, `mouse:*`, `gamepad:*`), and its grammar — including the closed
+member sets that make an unknown member a refusal — is stated once, in
+`schemas/reach-classes/v2/spec.md`, the first format that carries ids. Every
+format that carries an id points there rather than restating it.
 
 ## Input budget and chain bound (adversarial guard)
 

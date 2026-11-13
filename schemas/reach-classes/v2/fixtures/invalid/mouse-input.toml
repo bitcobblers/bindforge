@@ -1,0 +1,8 @@
+# Reach grades attach to `keyboard:*` only. The vocabulary names mouse and
+# gamepad inputs (Decision Three) without grading them, so a pair naming one is
+# a refusal, not a grade a later reader would have to guess a posture for.
+format = "reach-classes"
+version = "v2"
+hand = "left"
+classes = ["home", "thumb", "stretch", "far", "off-reach"]
+keys = ["mouse:left home"]

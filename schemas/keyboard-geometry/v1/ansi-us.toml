@@ -1,0 +1,8 @@
+# The ANSI-US keyboard grid, v1. Column is position from the row's left, row is
+# the row index counting from the digit row. Another geometry is another file in
+# this directory — new table files, not new logic (ADR-012, Consequences).
+# The 48 ids placed here are exactly the ids `reach-classes/v2/` grades.
+format = "keyboard-geometry"
+version = "v1"
+geometry = "ansi-us"
+keys = ["keyboard:` 0 0", "keyboard:1 1 0", "keyboard:2 2 0", "keyboard:3 3 0", "keyboard:4 4 0", "keyboard:5 5 0", "keyboard:6 6 0", "keyboard:7 7 0", "keyboard:8 8 0", "keyboard:9 9 0", "keyboard:0 10 0", "keyboard:- 11 0", "keyboard:= 12 0", "keyboard:q 0 1", "keyboard:w 1 1", "keyboard:e 2 1", "keyboard:r 3 1", "keyboard:t 4 1", "keyboard:y 5 1", "keyboard:u 6 1", "keyboard:i 7 1", "keyboard:o 8 1", "keyboard:p 9 1", "keyboard:[ 10 1", "keyboard:] 11 1", "keyboard:\\ 12 1", "keyboard:a 0 2", "keyboard:s 1 2", "keyboard:d 2 2", "keyboard:f 3 2", "keyboard:g 4 2", "keyboard:h 5 2", "keyboard:j 6 2", "keyboard:k 7 2", "keyboard:l 8 2", "keyboard:; 9 2", "keyboard:' 10 2", "keyboard:z 0 3", "keyboard:x 1 3", "keyboard:c 2 3", "keyboard:v 3 3", "keyboard:b 4 3", "keyboard:n 5 3", "keyboard:m 6 3", "keyboard:, 7 3", "keyboard:. 8 3", "keyboard:/ 9 3", "keyboard:space 3 4"]

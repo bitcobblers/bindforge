@@ -1,0 +1,9 @@
+# `keys` is what v2 adds. The v1 entry set (`format`, `version`, `hand`,
+# `classes`) is closed forever, so this is a refusal naming the entry, not a v1
+# table with a mapping in it — which is why the mapping rides v2 (ADR-012,
+# Decision One).
+format = "reach-classes"
+version = "v1"
+hand = "left"
+classes = ["near", "mid", "extended"]
+keys = ["keyboard:a near"]

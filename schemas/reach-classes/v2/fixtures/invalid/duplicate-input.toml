@@ -1,0 +1,8 @@
+# One hand grades one input once. Two grades for one id would leave the table's
+# own severity order ambiguous — and a rank comparison is what a placement bound
+# is measured in.
+format = "reach-classes"
+version = "v2"
+hand = "left"
+classes = ["home", "thumb", "stretch", "far", "off-reach"]
+keys = ["keyboard:w stretch", "keyboard:w far"]

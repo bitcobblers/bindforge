@@ -1,0 +1,7 @@
+# Comparison is byte-exact and the member set is lowercase: an uppercase
+# spelling is not a second name for the same key, it is not a member at all.
+format = "reach-classes"
+version = "v2"
+hand = "left"
+classes = ["home", "thumb", "stretch", "far", "off-reach"]
+keys = ["keyboard:W home"]

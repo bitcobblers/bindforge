@@ -1,0 +1,9 @@
+# The `classes` array order *is* the severity scale, worst last, and it is
+# shared: every v2 document lists the five taxonomy ids in the one order
+# `spec.md` states. A different order would make one hand's rank mean something
+# else than the other hand's, and a bound is rank arithmetic.
+format = "reach-classes"
+version = "v2"
+hand = "left"
+classes = ["thumb", "home", "stretch", "far", "off-reach"]
+keys = ["keyboard:a home"]

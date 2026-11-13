@@ -1,0 +1,8 @@
+# A pair may name only a class this document's own `classes` entry lists. A
+# class outside the list is a grade no scale in this format defines, so the
+# refusal names it rather than inventing a rank for it.
+format = "reach-classes"
+version = "v2"
+hand = "left"
+classes = ["home", "thumb", "stretch", "far", "off-reach"]
+keys = ["keyboard:w home", "keyboard:e deep"]

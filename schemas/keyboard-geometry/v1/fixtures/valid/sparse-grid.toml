@@ -1,0 +1,7 @@
+# A sparse grid, and the backslash glyph as an id: `\\` in the document is one
+# `\` in the id, and it round-trips through the same closed escape table the
+# reach tables' pair encoding uses.
+format = "keyboard-geometry"
+version = "v1"
+geometry = "sparse-grid"
+keys = ["keyboard:a 0 2", "keyboard:\\ 12 1", "keyboard:m 6 3"]

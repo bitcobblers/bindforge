@@ -1,0 +1,8 @@
+# The entry set is closed: an entry the grammar never defined is a refusal
+# naming the entry, never an ignored key. A reader that ignored `rows` would be
+# deciding what a row count means for a grid that states its rows per key.
+format = "keyboard-geometry"
+version = "v1"
+geometry = "unknown-entry"
+keys = ["keyboard:a 0 2"]
+rows = 4

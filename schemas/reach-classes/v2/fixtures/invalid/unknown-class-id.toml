@@ -1,0 +1,7 @@
+# The taxonomy is closed at five ids. A class the taxonomy does not carry has no
+# rank, so no bound can be computed against it and the entry is refused by name.
+format = "reach-classes"
+version = "v2"
+hand = "left"
+classes = ["home", "thumb", "stretch", "far", "unreachable"]
+keys = ["keyboard:a home"]

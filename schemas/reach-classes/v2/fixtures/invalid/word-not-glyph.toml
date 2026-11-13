@@ -1,0 +1,9 @@
+# A keyboard member is a glyph, not a word. `semicolon` is a spelled-out name
+# for `;`, and the ADR's `keyboard:<key>` is the US-QWERTY glyph under ANSI
+# geometry; the one word the member set reserves is `space`, which names the key
+# with no glyph.
+format = "reach-classes"
+version = "v2"
+hand = "left"
+classes = ["home", "thumb", "stretch", "far", "off-reach"]
+keys = ["keyboard:semicolon home"]
