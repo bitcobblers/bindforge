@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -11,6 +10,7 @@ import { exitCodeFor } from '../../src/pipeline/cli.js';
 import { type ResumeOptions, resumePipeline } from '../../src/pipeline/runner.js';
 import type { PipelineConfig } from '../../src/pipeline/stages.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // ADR-020 §3 (design 020 Decision 3): the exit-code table — `done → 0`, a run
@@ -107,7 +107,7 @@ function lightState(): PipelineState {
 /** Repo with a light brief, a committed checkpoint, and a `check` gate whose
  * exit code the fixture controls (green by default, red for the 2-case). */
 function tmpRepo(checkExitCode: 0 | 1 = 0): string {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-cli-seam-'));
+  const dir = mkTmpDir('bindforge-cli-seam-');
   gitAt(dir, ['init', '-q', '-b', 'main']);
   mkdirSync(join(dir, 'docs', 'prompts'), { recursive: true });
   writeFileSync(join(dir, BRIEF), '---\nflow: light\n---\n\nBuild the thing.\n', 'utf8');
@@ -337,7 +337,7 @@ describe('the exit-code table', () => {
       throw new Error('src/pipeline/cli.ts exports no main entry point yet');
     }
     // Nothing to resume onto: an empty directory, no checkpoint, no git repo.
-    const dir = mkdtempSync(join(tmpdir(), 'bindforge-cli-error-'));
+    const dir = mkTmpDir('bindforge-cli-error-');
     const cwdBefore = process.cwd();
     const exitCodeBefore = process.exitCode;
     const exitCalls: number[] = [];

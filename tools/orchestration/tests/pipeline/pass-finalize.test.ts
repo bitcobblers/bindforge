@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { type ResumeOptions, resumePipeline } from '../../src/pipeline/runner.js';
 import { type PipelineConfig } from '../../src/pipeline/stages.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // Pass-level finalize (ADR-003 / ADR-002 ownership rule): a review pass runs
@@ -63,7 +63,7 @@ function baseState(partial: Partial<PipelineState> = {}): PipelineState {
 
 /** Temp git repo; an untracked out-of-policy file probes the ownership sweep. */
 function tmpRepo(state: PipelineState): string {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-finalize-'));
+  const dir = mkTmpDir('bindforge-finalize-');
   const git = (args: string[]) =>
     execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], { cwd: dir });
   mkdirSync(join(dir, 'docs', 'adrs'), { recursive: true });

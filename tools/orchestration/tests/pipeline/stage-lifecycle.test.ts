@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { type RunOptions, executeStage } from '../../src/pipeline/runner.js';
 import type { PipelineConfig } from '../../src/pipeline/stages.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // A timed-out stage session is never cancelled: the runner recorded the
@@ -92,7 +92,7 @@ function busyClient() {
 
 /** The runner shells out to git for every stage, so the fixture is a repo. */
 function tmpRepo(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-stage-lifecycle-'));
+  const dir = mkTmpDir('bindforge-stage-lifecycle-');
   const git = (args: string[]) =>
     execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], { cwd: dir });
   mkdirSync(join(dir, 'docs', 'designs', '002-x'), { recursive: true });

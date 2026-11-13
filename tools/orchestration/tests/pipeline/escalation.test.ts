@@ -1,14 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
@@ -17,6 +8,7 @@ import { escalationPhase, hasPlanStop, reportFindings } from '../../src/pipeline
 import { finalizeEscalate } from '../../src/pipeline/runner.js';
 import { DEFAULT_CONFIG } from '../../src/pipeline/stages.js';
 import type { PipelineState, StageResult } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // Run 1 escalated six times. Each ESCALATION.md listed every finding of the
@@ -116,7 +108,7 @@ describe('escalationPhase', () => {
 
 describe('finalizeEscalate: the light promotion suffix', () => {
   function lightRepo(): string {
-    const dir = mkdtempSync(join(tmpdir(), 'bindforge-escalate-light-'));
+    const dir = mkTmpDir('bindforge-escalate-light-');
     const git = (args: string[]) =>
       execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], {
         cwd: dir,
@@ -315,7 +307,7 @@ describe('reportFindings', () => {
 
 describe('finalizeEscalate', () => {
   function tmpRepo(): string {
-    const dir = mkdtempSync(join(tmpdir(), 'bindforge-escalate-'));
+    const dir = mkTmpDir('bindforge-escalate-');
     const git = (args: string[]) =>
       execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], {
         cwd: dir,

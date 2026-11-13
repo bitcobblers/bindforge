@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { type ResumeOptions, resumePipeline } from '../../src/pipeline/runner.js';
 import { type PipelineConfig } from '../../src/pipeline/stages.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // ADR-005, the terminal failure class (Test strategy #6): "A rollback rename
@@ -104,7 +104,7 @@ function state(): PipelineState {
 
 /** Repo with the tracked source files the injected apply failure needs. */
 function tmpRepo(s: PipelineState): { dir: string; base: string } {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-rollback-'));
+  const dir = mkTmpDir('bindforge-rollback-');
   const git = (args: string[]) =>
     execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], {
       cwd: dir,

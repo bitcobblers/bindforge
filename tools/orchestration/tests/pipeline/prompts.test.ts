@@ -1,7 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, readdir } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,6 +18,7 @@ import {
 } from '../../src/pipeline/prompts.js';
 import { DEFAULT_CONFIG, STAGE_NAMES, stageDef } from '../../src/pipeline/stages.js';
 import { StageReplySchemas } from '../../src/pipeline/types.js';
+import { mkTmpDirAsync } from './tmp-dir.js';
 
 const PROMPTS_DIR = fileURLToPath(new URL('../../prompts/', import.meta.url));
 
@@ -75,7 +75,7 @@ describe('transcripts', () => {
   });
 
   it('carry a provenance header', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'bindforge-tr-'));
+    const dir = await mkTmpDirAsync('bindforge-tr-');
     const path = await writeTranscript(dir, {
       stage: 'implement',
       round: 0,

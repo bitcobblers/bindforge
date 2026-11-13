@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { type RunOptions, executeStage, retryInSameSession } from '../../src/pipeline/runner.js';
 import { type PipelineConfig } from '../../src/pipeline/stages.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // ADR-005 end to end: an `implement` reply that carries `moves: {from, to}[]`
@@ -81,7 +81,7 @@ function state(): PipelineState {
 
 /** Repo with two tracked source files plus the design artifact; returns the base sha. */
 function tmpRepo(): { dir: string; base: string } {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-moves-stage-'));
+  const dir = mkTmpDir('bindforge-moves-stage-');
   const git = (args: string[]) =>
     execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], {
       cwd: dir,
@@ -108,7 +108,7 @@ function tmpRepo(): { dir: string; base: string } {
  * the validator's rule 3 and the ownership sweep agree on the whole list.
  */
 function tmpTestRepo(): { dir: string; base: string } {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-moves-test-update-'));
+  const dir = mkTmpDir('bindforge-moves-test-update-');
   const git = (args: string[]) =>
     execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], {
       cwd: dir,

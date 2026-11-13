@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -11,6 +10,7 @@ import { auditSessionIndependence } from '../../src/pipeline/independence.js';
 import * as runner from '../../src/pipeline/runner.js';
 import type { PipelineConfig } from '../../src/pipeline/stages.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // Design 007 §2: the deeds of children. The runner walks the attempt
@@ -304,7 +304,7 @@ function state(): PipelineState {
 }
 
 function tmpRepo(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-child-tripwire-'));
+  const dir = mkTmpDir('bindforge-child-tripwire-');
   const git = (args: string[]) =>
     execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], { cwd: dir });
   mkdirSync(join(dir, 'docs', 'adrs'), { recursive: true });

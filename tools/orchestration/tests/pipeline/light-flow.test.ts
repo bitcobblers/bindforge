@@ -1,13 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { type ResumeOptions, resumePipeline } from '../../src/pipeline/runner.js';
 import type { PipelineConfig } from '../../src/pipeline/stages.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // ADR-010's light flow end to end: `plan → implement → code-review`, a 2-seat
@@ -113,7 +106,7 @@ function fullState(partial: Partial<PipelineState> = {}): PipelineState {
  * `npm run check` gate that exits 0. The design dir holds the checkpoint only:
  * every artifact inside it has to be written by a stage to show up. */
 function tmpRepo(state: PipelineState): string {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-light-flow-'));
+  const dir = mkTmpDir('bindforge-light-flow-');
   const git = (args: string[]) =>
     execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], { cwd: dir });
   mkdirSync(join(dir, 'docs', 'prompts'), { recursive: true });

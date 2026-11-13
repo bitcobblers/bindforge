@@ -1,5 +1,4 @@
-import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,6 +9,7 @@ import { DEFAULT_CONFIG } from '../../src/pipeline/stages.js';
 import { loadState, saveState } from '../../src/pipeline/state-store.js';
 import { decideNext } from '../../src/pipeline/states.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDirAsync } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // ADR-006 §2, the load side of the cross-version resume contract: every
@@ -30,7 +30,7 @@ const FIXTURES = fileURLToPath(new URL('./fixtures/checkpoints/', import.meta.ur
 
 async function loadFixture(name: string): Promise<{ file: PipelineState; loaded: PipelineState }> {
   const raw = await readFile(join(FIXTURES, name), 'utf8');
-  const dir = await mkdtemp(join(tmpdir(), 'bindforge-compat-'));
+  const dir = await mkTmpDirAsync('bindforge-compat-');
   await writeFile(join(dir, '.pipeline.json'), raw, 'utf8');
   const loaded = await loadState(dir);
   if (loaded === null) {
@@ -133,7 +133,7 @@ describe('checkpoint compatibility fixtures', () => {
     const lightCfg = configFor('light', { ...DEFAULT_CONFIG, maxParallelReviews: 1 });
     expect(decideNext(loaded, lightCfg)).toEqual({ kind: 'done' });
 
-    const dir = await mkdtemp(join(tmpdir(), 'bindforge-light-era-'));
+    const dir = await mkTmpDirAsync('bindforge-light-era-');
     await saveState(dir, loaded);
     const roundTripped = await loadState(dir);
     expect(roundTripped).toEqual(file);
@@ -144,7 +144,7 @@ describe('checkpoint compatibility fixtures', () => {
   // rejection names the field (a checkpoint is model-visible data at the
   // resume seam, so its flow key is validated, not coerced).
   it('refuses to load a checkpoint naming an unknown flow', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'bindforge-bad-flow-'));
+    const dir = await mkTmpDirAsync('bindforge-bad-flow-');
     const { file } = await loadFixture('light-era.json');
     await writeFile(
       join(dir, '.pipeline.json'),

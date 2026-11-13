@@ -1,5 +1,4 @@
-import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { mkdir, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -11,6 +10,7 @@ import {
   saveState,
 } from '../../src/pipeline/state-store.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDirAsync } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // ADR-003 §Self-update: every checkpoint write made from inside a concurrent
@@ -47,7 +47,7 @@ function base(updatedAt: number): PipelineState {
 }
 
 async function tmpDir(): Promise<string> {
-  return mkdtemp(join(tmpdir(), 'bindforge-writer-'));
+  return mkTmpDirAsync('bindforge-writer-');
 }
 
 describe('drained checkpoint writer', () => {

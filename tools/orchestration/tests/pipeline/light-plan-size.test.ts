@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -12,6 +11,7 @@ import { type ResumeOptions, resumePipeline } from '../../src/pipeline/runner.js
 import type { PipelineConfig } from '../../src/pipeline/stages.js';
 import { decideNext } from '../../src/pipeline/states.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // The one plan stop (A7 reverses the proposal-size lesson, deliberately): a
@@ -57,7 +57,7 @@ function gitAt(dir: string, args: string[]): string {
 }
 
 function tmpRepo(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-light-plan-size-'));
+  const dir = mkTmpDir('bindforge-light-plan-size-');
   const git = (args: string[]) => gitAt(dir, args);
   mkdirSync(join(dir, 'docs', 'prompts'), { recursive: true });
   writeFileSync(join(dir, BRIEF), '---\nflow: light\n---\n\nBuild the thing.\n', 'utf8');

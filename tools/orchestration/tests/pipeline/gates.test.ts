@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -19,6 +19,7 @@ import {
 } from '../../src/pipeline/gates.js';
 import { DEFAULT_CONFIG } from '../../src/pipeline/stages.js';
 import type { PipelineState, VerdictReply } from '../../src/pipeline/types.js';
+import { mkTmpDirAsync } from './tmp-dir.js';
 
 const approve: VerdictReply = { verdict: 'approve', findings: [] };
 const rejectBlocker: VerdictReply = {
@@ -73,7 +74,7 @@ function stateWith(
  * because the flow-key cases below gate the same shape.
  */
 async function tempFile(name: string, content: string): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'bindforge-src-'));
+  const dir = await mkTmpDirAsync('bindforge-src-');
   const path = join(dir, name);
   await writeFile(path, content, 'utf8');
   return path;
@@ -280,7 +281,7 @@ describe('nextNnn', () => {
 
 describe('packageDirs', () => {
   it('finds nested tool packages and skips node_modules', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'bindforge-pkgs-'));
+    const dir = await mkTmpDirAsync('bindforge-pkgs-');
     await writeFile(join(dir, 'package.json'), '{}', 'utf8');
     const { mkdir } = await import('node:fs/promises');
     await mkdir(join(dir, 'tools', 'x'), { recursive: true });

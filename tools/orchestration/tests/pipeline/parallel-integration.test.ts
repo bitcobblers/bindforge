@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -11,6 +10,7 @@ import { type ResumeOptions, resumePipeline } from '../../src/pipeline/runner.js
 import { type PipelineConfig } from '../../src/pipeline/stages.js';
 import { loadState } from '../../src/pipeline/state-store.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // End-to-end integration (Test strategy #9): a real review pass driven over a
@@ -64,7 +64,7 @@ function baseState(): PipelineState {
 const designDirOf = (repo: string): string => join(repo, 'docs', 'designs', '002-x');
 
 function tmpRepo(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-lane-e2e-'));
+  const dir = mkTmpDir('bindforge-lane-e2e-');
   const git = (args: string[]) =>
     execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], { cwd: dir });
   mkdirSync(join(dir, 'docs', 'adrs'), { recursive: true });

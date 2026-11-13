@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { type ResumeOptions, resumePipeline } from '../../src/pipeline/runner.js';
 import type { PipelineConfig } from '../../src/pipeline/stages.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // The lane knob with a 2-seat list (Compatibility matrix, `--max-parallel`
@@ -33,7 +33,7 @@ const BASE: PipelineConfig = {
 };
 
 function tmpRepo(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-light-parallel-'));
+  const dir = mkTmpDir('bindforge-light-parallel-');
   const git = (args: string[]) =>
     execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], { cwd: dir });
   mkdirSync(join(dir, 'docs', 'prompts'), { recursive: true });

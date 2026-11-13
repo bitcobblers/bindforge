@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -15,6 +14,7 @@ import {
 } from '../../src/pipeline/stages.js';
 import { decideNext } from '../../src/pipeline/states.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // Run 1 spent nine design review rounds against a cap of five. The cap was
@@ -62,7 +62,7 @@ function exhaustedState(): PipelineState {
 }
 
 function tmpRepo(state: PipelineState): { dir: string; options: (extra: object) => ResumeOptions } {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-budget-'));
+  const dir = mkTmpDir('bindforge-budget-');
   const git = (args: string[]) =>
     execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], { cwd: dir });
   mkdirSync(join(dir, 'docs', 'adrs'), { recursive: true });

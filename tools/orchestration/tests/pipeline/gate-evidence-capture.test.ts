@@ -1,5 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -7,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 // `CARGO_GATE` is the shipped leg data; `checkGate` is this design's capture
 // seam — until it exists, every test in this file fails at the import.
 import { CARGO_GATE, checkGate } from '../../src/pipeline/gates.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // ADR-016 Decision 2, capture side (`checkGate`). The check gate used to spawn
@@ -67,7 +67,7 @@ function generatorScript(): string {
  * package's behaviour, keyed by the same relative path `packageDirs` yields.
  */
 function fixtureRepo(modes: Record<string, string>): string {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-gate-capture-'));
+  const dir = mkTmpDir('bindforge-gate-capture-');
   writeFileSync(join(dir, 'gate.mjs'), generatorScript(), 'utf8');
 
   const pkg = (rel: string, mode: string): void => {

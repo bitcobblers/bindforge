@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -16,6 +15,7 @@ import {
 } from '../../src/pipeline/runner.js';
 import { DEFAULT_CONFIG, type PipelineConfig } from '../../src/pipeline/stages.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // ADR-010 §Promotion: promotion is an operator action with no state migration.
@@ -78,7 +78,7 @@ function stateFor(partial: Partial<PipelineState> = {}): PipelineState {
  *  `flow` is the source's frontmatter: the promotion under test is exactly the
  *  edit that changes it. */
 function tmpRepo(opts: { flow: string; checkpoint?: PipelineState }): string {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-light-promotion-'));
+  const dir = mkTmpDir('bindforge-light-promotion-');
   const git = (args: string[]) =>
     execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], { cwd: dir });
   mkdirSync(join(dir, 'docs', 'adrs'), { recursive: true });
@@ -339,7 +339,7 @@ describe("identity allocation stays the full flow's (A17)", () => {
 
   /** A repo where a brief already drives `003-light-thing`, branch and all. */
   function briefRepo(): string {
-    const dir = mkdtempSync(join(tmpdir(), 'bindforge-light-identity-'));
+    const dir = mkTmpDir('bindforge-light-identity-');
     const git = (args: string[]) =>
       execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], { cwd: dir });
     mkdirSync(join(dir, 'docs', 'prompts'), { recursive: true });

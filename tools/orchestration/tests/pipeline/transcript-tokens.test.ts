@@ -1,10 +1,9 @@
-import { mkdtemp, readFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { readFile } from 'node:fs/promises';
 
 import { describe, expect, it } from 'vitest';
 
 import { sessionTokens, writeTranscript } from '../../src/pipeline/prompts.js';
+import { mkTmpDirAsync } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // ADR-016 Decision 4, measurement. `sessionTokens` sums the numeric fields of
@@ -80,7 +79,7 @@ describe('writeTranscript tokens line (ADR-016 Decision 4)', () => {
   // proves: Test strategy #8 — prints `- tokens:` when usage is present, beside
   // the parameters line which stays byte-unchanged.
   it('prints the tokens line when usage is present', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'bindforge-tokens-'));
+    const dir = await mkTmpDirAsync('bindforge-tokens-');
     const path = await writeTranscript(dir, {
       ...baseInput,
       tokens: { input: 120, output: 40 },
@@ -98,7 +97,7 @@ describe('writeTranscript tokens line (ADR-016 Decision 4)', () => {
   // line carries the flattened keys, so the cache terms reach the transcript the
   // operator re-reads (Rollout 4) instead of being summed away upstream.
   it('prints the flattened cache terms when the total carries them', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'bindforge-tokens-cache-'));
+    const dir = await mkTmpDirAsync('bindforge-tokens-cache-');
     const path = await writeTranscript(dir, {
       ...baseInput,
       tokens: { input: 120, output: 40, 'cache.read': 1_800, 'cache.write': 90 },
@@ -112,7 +111,7 @@ describe('writeTranscript tokens line (ADR-016 Decision 4)', () => {
   // proves: Test strategy #8 — omits the tokens line when no usage is present,
   // and still prints the unchanged parameters line.
   it('omits the tokens line when no usage is present', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'bindforge-tokens-absent-'));
+    const dir = await mkTmpDirAsync('bindforge-tokens-absent-');
     const path = await writeTranscript(dir, baseInput);
     const content = await readFile(path, 'utf8');
     expect(content).not.toContain('- tokens:');

@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -16,6 +15,7 @@ import {
 } from '../../src/pipeline/runner.js';
 import { type PipelineConfig, stageDef, stageReplySchema } from '../../src/pipeline/stages.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // Run 1's reply contract failed 5 times in 43 stage attempts, and each failure
@@ -101,7 +101,7 @@ function state(): PipelineState {
 }
 
 function tmpRepo(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-reply-'));
+  const dir = mkTmpDir('bindforge-reply-');
   const git = (args: string[]) =>
     execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], { cwd: dir });
   mkdirSync(join(dir, 'docs', 'adrs'), { recursive: true });
@@ -385,7 +385,7 @@ describe('a rejected moves list routes through the invalid-reply retry path', ()
   };
 
   function movesRepo(): string {
-    const dir = mkdtempSync(join(tmpdir(), 'bindforge-moves-reply-'));
+    const dir = mkTmpDir('bindforge-moves-reply-');
     const git = (args: string[]) =>
       execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], { cwd: dir });
     mkdirSync(join(dir, 'docs', 'adrs'), { recursive: true });

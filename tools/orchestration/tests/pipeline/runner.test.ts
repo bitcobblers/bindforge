@@ -1,14 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -29,6 +20,7 @@ import {
 import { DEFAULT_CONFIG, type PipelineConfig } from '../../src/pipeline/stages.js';
 import { loadState } from '../../src/pipeline/state-store.js';
 import type { PipelineState, StageResult } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // --------------------------------------------------------------------------
 // The round-4 correctness incident: the server returns messages newest-first
@@ -197,7 +189,7 @@ function baseState(partial: Partial<PipelineState> = {}): PipelineState {
 
 /** Repo with a committed checkpoint, the design doc, and a green check gate. */
 function tmpRepo(state: PipelineState): string {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-runner-adr006-'));
+  const dir = mkTmpDir('bindforge-runner-adr006-');
   const git = (args: string[]) =>
     execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], { cwd: dir });
   mkdirSync(join(dir, 'docs', 'adrs'), { recursive: true });
@@ -538,7 +530,7 @@ describe('a runner error inside the drive loop', () => {
   // every other §3 failure does: gate-log entry, marker, terminal status.
   it('escalates with a record instead of crashing with the checkpoint running', async () => {
     const dir = tmpRepo(baseState({ lastStage: 'proposal', designRound: 0 }));
-    const promptsDir = mkdtempSync(join(tmpdir(), 'bindforge-unrenderable-template-'));
+    const promptsDir = mkTmpDir('bindforge-unrenderable-template-');
     writeFileSync(join(promptsDir, 'design-review.md'), 'review {{designDir}} for {{noSuchVar}}\n');
     const { client } = approveClient(dir);
 
@@ -575,7 +567,7 @@ describe('acquireLock', () => {
   }
 
   it('blocks a second runner while the lock holder is alive', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'bindforge-lock-live-'));
+    const dir = mkTmpDir('bindforge-lock-live-');
     writeFileSync(
       join(dir, '.pipeline.lock'),
       JSON.stringify({ slug: 'other', pid: process.pid, stage: 'start', at: 0 }),
@@ -593,7 +585,7 @@ describe('acquireLock', () => {
   });
 
   it('clears a dead holder and acquires', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'bindforge-lock-dead-'));
+    const dir = mkTmpDir('bindforge-lock-dead-');
     // A pid no process can hold: liveness fails, the stale lock is cleared.
     writeFileSync(
       join(dir, '.pipeline.lock'),
@@ -606,7 +598,7 @@ describe('acquireLock', () => {
   });
 
   it('creates the lock exclusively: a refused acquisition never clobbers the holder', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'bindforge-lock-race-'));
+    const dir = mkTmpDir('bindforge-lock-race-');
     const holder = JSON.stringify({ slug: 'other', pid: process.pid, stage: 'start', at: 0 });
     writeFileSync(join(dir, '.pipeline.lock'), holder, 'utf8');
 
@@ -675,7 +667,7 @@ function gitOut(dir: string, args: string[]): string {
  * ADR-006 §3 terminal-save guard has to cover. Keep the script free of double
  * quotes and backslashes: it is spliced into the `package.json` string. */
 function lightRepo(state: PipelineState, checkScript = 'process.exit(0)'): string {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-boundary-'));
+  const dir = mkTmpDir('bindforge-boundary-');
   mkdirSync(join(dir, 'docs', 'prompts'), { recursive: true });
   writeFileSync(join(dir, 'docs', 'prompts', '002-x.md'), '---\nflow: light\n---\n\nBuild it.\n');
   mkdirSync(join(dir, DESIGN_DIR), { recursive: true });
@@ -1317,7 +1309,7 @@ describe('the per-attempt template provenance', () => {
   // template per attempt hashes the new text and fails here.
   it('carries the same template sha across attempts', async () => {
     const dir = tmpRepo(baseState());
-    const promptsDir = mkdtempSync(join(tmpdir(), 'bindforge-provenance-'));
+    const promptsDir = mkTmpDir('bindforge-provenance-');
     const templateText = 'implement the plan at {{designDir}}\n';
     writeFileSync(join(promptsDir, 'implement.md'), templateText);
 

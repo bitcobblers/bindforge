@@ -1,5 +1,4 @@
-import { mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -8,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { deriveIdentity } from '../../src/pipeline/identity.js';
 import { designDirOf, loadState, saveState } from '../../src/pipeline/state-store.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDirAsync } from './tmp-dir.js';
 
 const base: PipelineState = {
   version: 1,
@@ -34,7 +34,7 @@ const base: PipelineState = {
 
 describe('state store', () => {
   it('round-trips a checkpoint', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'bindforge-state-'));
+    const dir = await mkTmpDirAsync('bindforge-state-');
     await saveState(dir, base);
     const loaded = await loadState(dir);
     expect(loaded).not.toBeNull();
@@ -43,14 +43,14 @@ describe('state store', () => {
   });
 
   it('returns null when no checkpoint exists', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'bindforge-state-'));
+    const dir = await mkTmpDirAsync('bindforge-state-');
     expect(await loadState(dir)).toBeNull();
   });
 
   it('parses a checkpoint written before the proposal size meter', async () => {
     // Run 002-run2's own checkpoint: results with no size fields. A resume must
     // not fail on the fields the fix adds.
-    const dir = await mkdtemp(join(tmpdir(), 'bindforge-state-'));
+    const dir = await mkTmpDirAsync('bindforge-state-');
     const run2 = structuredClone(base);
     run2.results = [
       {
@@ -71,7 +71,7 @@ describe('state store', () => {
   });
 
   it('round-trips the proposal size meter', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'bindforge-state-'));
+    const dir = await mkTmpDirAsync('bindforge-state-');
     const sized = structuredClone(base);
     sized.results = [
       {
@@ -98,7 +98,7 @@ describe('state store', () => {
     // Run 003 became unresumable this way: a failed attempt has
     // `reply: undefined`, JSON.stringify drops the key, and a required
     // `reply` in the persisted schema rejected the run's own checkpoint.
-    const dir = await mkdtemp(join(tmpdir(), 'bindforge-state-'));
+    const dir = await mkTmpDirAsync('bindforge-state-');
     const failed = structuredClone(base);
     failed.results = [
       {
@@ -121,13 +121,13 @@ describe('state store', () => {
   });
 
   it('refuses unsupported state versions', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'bindforge-state-'));
+    const dir = await mkTmpDirAsync('bindforge-state-');
     await writeFile(join(dir, '.pipeline.json'), JSON.stringify({ version: 99 }), 'utf8');
     await expect(loadState(dir)).rejects.toThrow(/unsupported pipeline state version/);
   });
 
   it('leaves no temp files behind after saving', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'bindforge-state-'));
+    const dir = await mkTmpDirAsync('bindforge-state-');
     await saveState(dir, base);
     const files = await readdir(dir);
     expect(files.filter((f) => f.endsWith('.tmp'))).toEqual([]);
@@ -141,7 +141,7 @@ describe('state store', () => {
 
 describe('checkpoint validation', () => {
   async function tmpDir(): Promise<string> {
-    return mkdtemp(join(tmpdir(), 'bindforge-validate-'));
+    return mkTmpDirAsync('bindforge-validate-');
   }
 
   it('turns an interrupted write into a recoverable instruction', async () => {
@@ -203,7 +203,7 @@ describe('checkpoint validation', () => {
   it('accepts whatever the identity generator produces', async () => {
     // The compatibility finding run 1's own reviewer raised: a validator that
     // rejects a slug the generator emits makes a run unresumable.
-    const repo = await mkdtemp(join(tmpdir(), 'bindforge-gen-'));
+    const repo = await mkTmpDirAsync('bindforge-gen-');
     for (const source of ['004-Some Brief!.md', '010-.._escape.md', '011-Über.md']) {
       const id = deriveIdentity(repo, join(repo, 'docs', 'prompts', source), {
         slug: undefined,
@@ -226,7 +226,7 @@ describe('checkpoint validation', () => {
 
 describe('cross-version refusal and path repair messages', () => {
   async function tmpDir(): Promise<string> {
-    return mkdtemp(join(tmpdir(), 'bindforge-refuse-'));
+    return mkTmpDirAsync('bindforge-refuse-');
   }
 
   async function refusalMessage(dir: string): Promise<string> {
@@ -327,7 +327,7 @@ describe('the restartRequired checkpoint record', () => {
   // { stage, paths, at } writes and reads back with the record intact and
   // `status` untouched.
   it('round-trips a checkpoint carrying the restartRequired record', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'bindforge-restart-record-'));
+    const dir = await mkTmpDirAsync('bindforge-restart-record-');
     const withRecord = {
       ...base,
       restartRequired: {
@@ -351,7 +351,7 @@ describe('the restartRequired checkpoint record', () => {
   // not name still parses and loads, the unknown key inert to every consumer:
   // the known fields read exactly, and nothing else about the checkpoint moves.
   it('loads a record carrying an unrecognized sibling key with that key inert', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'bindforge-restart-record-'));
+    const dir = await mkTmpDirAsync('bindforge-restart-record-');
     await writeFile(
       join(dir, '.pipeline.json'),
       JSON.stringify({
@@ -382,7 +382,7 @@ describe('the restartRequired checkpoint record', () => {
     const names = (await readdir(CHECKPOINT_FIXTURES)).filter((f) => f.endsWith('.json')).sort();
     expect(names.length).toBeGreaterThan(0);
     for (const name of names) {
-      const dir = await mkdtemp(join(tmpdir(), 'bindforge-restart-era-'));
+      const dir = await mkTmpDirAsync('bindforge-restart-era-');
       const raw = await readFile(join(CHECKPOINT_FIXTURES, name), 'utf8');
       const file = JSON.parse(raw) as StateWithBoundary;
       expect(file.restartRequired, name).toBeUndefined();

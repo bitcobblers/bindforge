@@ -1,14 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -18,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { type ResumeOptions, resumePipeline } from '../../src/pipeline/runner.js';
 import type { PipelineConfig } from '../../src/pipeline/stages.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // ADR-006 acceptance scenarios end to end — mock client, temp git repos, the
@@ -70,7 +62,7 @@ function baseState(partial: Partial<PipelineState> = {}): PipelineState {
 
 /** Repo with a committed checkpoint, the design doc, and a green check gate. */
 function tmpRepo(state: PipelineState): string {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-adr006-'));
+  const dir = mkTmpDir('bindforge-adr006-');
   const git = (args: string[]) =>
     execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], { cwd: dir });
   mkdirSync(join(dir, 'docs', 'adrs'), { recursive: true });

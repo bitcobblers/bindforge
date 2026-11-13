@@ -3,20 +3,19 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   rmSync,
   statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
 import { type MoveApplyFailure, applyMoves, validateMoves } from '../../src/pipeline/moves.js';
 import type { MovePair } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // ADR-005 / run 004 (A12): 23 test-file moves were inexpressible to any
@@ -82,7 +81,7 @@ function gitAt(dir: string, args: string[]): string {
  * `headBefore` is the single base commit.
  */
 function movesRepo(): { dir: string; headBefore: string } {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-moves-'));
+  const dir = mkTmpDir('bindforge-moves-');
   gitAt(dir, ['init', '-q', '-b', 'main']);
   mkdirSync(join(dir, 'src'), { recursive: true });
   mkdirSync(join(dir, 'tests'), { recursive: true });
@@ -622,7 +621,7 @@ it('accepts a legal pair whose from carries uncommitted content edits', () => {
  */
 function canMountTmpfs(): boolean {
   if (process.platform !== 'linux') return false;
-  const probe = mkdtempSync(join(tmpdir(), 'bindforge-mnt-probe-'));
+  const probe = mkTmpDir('bindforge-mnt-probe-');
   try {
     execFileSync('mount', ['-t', 'tmpfs', 'tmpfs', probe]);
   } catch {
@@ -782,7 +781,7 @@ describe.runIf(process.platform === 'darwin')('case-insensitive checkout (macOS,
 // pointer stays a byte-identical regular file.
 it('applies a move inside a linked worktree and leaves the .git pointer file untouched', () => {
   const { dir, headBefore } = movesRepo();
-  const wtParent = mkdtempSync(join(tmpdir(), 'bindforge-wt-'));
+  const wtParent = mkTmpDir('bindforge-wt-');
   const wt = join(wtParent, 'linked');
   gitAt(dir, ['worktree', 'add', '-q', '--detach', wt]);
 

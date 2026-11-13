@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { OpenCodeClient, SessionMessageInfo } from '@opencode/client';
@@ -10,6 +9,7 @@ import { exitCodeFor } from '../../src/pipeline/cli.js';
 import { type ResumeOptions, resumePipeline } from '../../src/pipeline/runner.js';
 import type { PipelineConfig } from '../../src/pipeline/stages.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // ADR-020 restart boundary, integration (design 020 Test strategy #9/#10/#11):
@@ -119,7 +119,7 @@ function gitAt(dir: string, args: string[]): string {
 /** Light run whose templates live under `tools/orchestration/prompts/` — the
  * self-change run's tree. `checkExitCode` drives the red-gate sibling. */
 function tmpRepo(checkExitCode: 0 | 1 = 0): string {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-restart-e2e-'));
+  const dir = mkTmpDir('bindforge-restart-e2e-');
   mkdirSync(join(dir, 'docs', 'prompts'), { recursive: true });
   writeFileSync(join(dir, BRIEF), '---\nflow: light\n---\n\nBuild the thing.\n', 'utf8');
   mkdirSync(join(dir, DESIGN_DIR), { recursive: true });

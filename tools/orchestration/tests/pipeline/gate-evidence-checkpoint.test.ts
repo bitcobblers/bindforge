@@ -1,5 +1,4 @@
-import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -7,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { loadState, saveState } from '../../src/pipeline/state-store.js';
 import type { GateEvidence, PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDirAsync } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // ADR-016 Decision 2, checkpoint-grammar side. The run gains ONE new field,
@@ -61,7 +61,7 @@ describe('gateEvidence in the checkpoint grammar (ADR-016 Decision 2)', () => {
   // proves: Test strategy #2 — a state carrying `gateEvidence` round-trips
   // through the loader with its legs, exits and tails intact.
   it('round-trips a state carrying gateEvidence', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'bindforge-gate-evidence-'));
+    const dir = await mkTmpDirAsync('bindforge-gate-evidence-');
     const withEvidence = { ...base, gateEvidence: EVIDENCE } as PipelineState;
     await saveState(dir, withEvidence);
 
@@ -82,7 +82,7 @@ describe('gateEvidence in the checkpoint grammar (ADR-016 Decision 2)', () => {
     expect(names.length).toBeGreaterThan(0);
     for (const name of names) {
       const raw = await readFile(join(FIXTURES, name), 'utf8');
-      const dir = await mkdtemp(join(tmpdir(), 'bindforge-gate-compat-'));
+      const dir = await mkTmpDirAsync('bindforge-gate-compat-');
       await writeFile(join(dir, '.pipeline.json'), raw, 'utf8');
       const loaded = await loadState(dir);
       expect(loaded, name).not.toBeNull();
@@ -94,7 +94,7 @@ describe('gateEvidence in the checkpoint grammar (ADR-016 Decision 2)', () => {
   // no `gateEvidence`; the absence round-trips unchanged so the resume can drive
   // a stage against it. A state without the field still saves and loads.
   it('round-trips a pre-016 state with the field simply absent', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'bindforge-gate-absent-'));
+    const dir = await mkTmpDirAsync('bindforge-gate-absent-');
     await saveState(dir, base);
     const loaded = await loadState(dir);
     expect(loaded?.gateEvidence).toBeUndefined();

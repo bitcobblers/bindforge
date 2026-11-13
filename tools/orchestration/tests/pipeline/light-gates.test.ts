@@ -1,13 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -22,6 +14,7 @@ import {
 } from '../../src/pipeline/runner.js';
 import { DESIGN_SPECIALTIES, type PipelineConfig } from '../../src/pipeline/stages.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // The pre-lock posture (Selecting the flow): an unreadable `flow` value, a
@@ -65,7 +58,7 @@ function lightState(partial: Partial<PipelineState> = {}): PipelineState {
 /** Repo with briefs in `docs/prompts/`, an optional committed light checkpoint,
  * and NO design directory of its own: an entry that works creates one. */
 function tmpRepo(opts: { checkpoint?: PipelineState; briefs?: Record<string, string> }): string {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-light-gates-'));
+  const dir = mkTmpDir('bindforge-light-gates-');
   const git = (args: string[]) =>
     execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], { cwd: dir });
   mkdirSync(join(dir, 'docs', 'prompts'), { recursive: true });

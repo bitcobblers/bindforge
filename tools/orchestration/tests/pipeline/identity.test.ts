@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -13,6 +12,7 @@ import {
   slugFromSource,
 } from '../../src/pipeline/identity.js';
 import { SLUG_RE } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // A run's identity names its branch and its design directory. Run 1's branch
@@ -30,7 +30,7 @@ const ID: RunIdentity = {
 };
 
 function tmpRepo(withBranch?: string): { dir: string } {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-identity-'));
+  const dir = mkTmpDir('bindforge-identity-');
   const git = (args: string[]) =>
     execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], {
       cwd: dir,

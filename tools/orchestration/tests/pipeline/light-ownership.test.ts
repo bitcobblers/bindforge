@@ -1,12 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
 import { enforceOwnership } from '../../src/pipeline/runner.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // The security spine, in a real sweep (A8/A9/A28): the ownership sweep reads
@@ -25,7 +25,7 @@ function gitAt(dir: string, args: string[]): string {
 }
 
 function tmpRepo(): { dir: string; base: string } {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-light-ownership-'));
+  const dir = mkTmpDir('bindforge-light-ownership-');
   gitAt(dir, ['init', '-q', '-b', 'main']);
   mkdirSync(join(dir, 'docs', 'designs', '002-x'), { recursive: true });
   mkdirSync(join(dir, 'docs', 'adrs'), { recursive: true });

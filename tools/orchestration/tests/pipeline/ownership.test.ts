@@ -1,14 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -16,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { enforceOwnership, porcelainPaths } from '../../src/pipeline/runner.js';
 import { loadState, recordRunnerDelete, saveState } from '../../src/pipeline/state-store.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // Run 1, 10:31: the operator landed `78a0c8c` (a harness fix) while a review
@@ -35,7 +27,7 @@ function gitAt(dir: string, args: string[]): string {
 
 /** Repo with one base commit holding a docs artifact and an agent skill. */
 function tmpRepo(): { dir: string; base: string } {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-ownership-'));
+  const dir = mkTmpDir('bindforge-ownership-');
   gitAt(dir, ['init', '-q', '-b', 'main']);
   mkdirSync(join(dir, 'docs', 'designs', '002-x', 'reviews'), { recursive: true });
   mkdirSync(join(dir, '.opencode', 'skills', 'design-proposal'), { recursive: true });

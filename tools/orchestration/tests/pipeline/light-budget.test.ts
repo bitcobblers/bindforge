@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -12,6 +11,7 @@ import { reviewSessionsUsed } from '../../src/pipeline/panel.js';
 import { type ResumeOptions, resumePipeline } from '../../src/pipeline/runner.js';
 import { DEFAULT_CONFIG, type PipelineConfig } from '../../src/pipeline/stages.js';
 import type { PipelineState } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // The light budgets, bound in a run: maxReviews.code 6 and maxPassesPerRound 3
@@ -84,7 +84,7 @@ function lightState(partial: Partial<PipelineState> = {}): PipelineState {
 }
 
 function tmpRepo(state: PipelineState, checksGreen = true): string {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-light-budget-'));
+  const dir = mkTmpDir('bindforge-light-budget-');
   const git = (args: string[]) =>
     execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], { cwd: dir });
   mkdirSync(join(dir, 'docs', 'prompts'), { recursive: true });

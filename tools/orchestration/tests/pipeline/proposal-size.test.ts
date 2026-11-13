@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -15,6 +14,7 @@ import {
 import { type RunOptions, executeStage } from '../../src/pipeline/runner.js';
 import type { PipelineConfig } from '../../src/pipeline/stages.js';
 import type { PipelineState, StageResult } from '../../src/pipeline/types.js';
+import { mkTmpDir } from './tmp-dir.js';
 
 // ---------------------------------------------------------------------------
 // Run 002-run2 grew its design document from 401 lines to 2,696 over 8 revise
@@ -82,7 +82,7 @@ function sizedResult(stage: string, added: number, removed: number, docLines: nu
 
 /** A real repo: every stage runs git, and the meter reads git numstat. */
 function tmpRepo(committedDoc?: string): string {
-  const dir = mkdtempSync(join(tmpdir(), 'bindforge-proposal-size-'));
+  const dir = mkTmpDir('bindforge-proposal-size-');
   const git = (args: string[]) =>
     execFileSync('git', ['-c', 'user.name=f', '-c', 'user.email=f@f', ...args], { cwd: dir });
   mkdirSync(join(dir, DESIGN_DIR_REL), { recursive: true });
