@@ -292,3 +292,36 @@ The runner, not the prompts, carries these deterministic countermeasures:
   config: agent permissions proved advisory (a model delegated `git commit`
   to a subagent to route around them). After each stage, changed paths
   outside the stage's ownership are reverted, including mid-stage commits.
+
+### Stage shell rights (learned in runs 008 and 011)
+
+Because the runner enforces ownership by reverting out-of-ownership paths,
+agent permissions are a guardrail, not the enforcement — so the stage agents
+are given the shell they need to close their own loop:
+
+- `.opencode/agents/{code,codereview}/*` deny `shell *` and then allow the
+  toolchain (`cargo *`, `rustfmt *`, `npm run *`, `npm test *`, `npx vitest *`)
+  and read-only inspection (`cd`, `git status|diff|log|show`, `ls`, `cat`,
+  `head`, `tail`, `wc`, `grep`, `rg`, `find`).
+- Denied last, because the last matching rule wins: commits, branch state,
+  pushing, `rm`/`mv` (the runner owns moves — ADR-005), `tee`/`sed -i`/`dd`
+  (writes that bypass the ownership audit), and publishing. Review seats
+  additionally lose the tree-writing legs (`cargo fmt` without `--check`,
+  `cargo fix`, `npm run format`) while keeping `cargo fmt --all -- --check`.
+
+Two failure modes this posture exists to avoid:
+
+- **Compound legs.** OpenCode scans a shell command into subcommands and every
+  leg must pass, so an allowlist of narrow prefixes denies `cd crates/core &&
+  cargo test` on its `cd` leg. Prefixes must therefore cover the helper legs,
+  not just the interesting command.
+- **Self-propagating blockers.** Run 008 wrote "no stage can invoke a toolchain"
+  into its build notes; ADR-011's proposal inherited it as a `verified`
+  assumption (A16) and its stages stopped trying, spending 4 of 5 code rounds
+  on formatter complaints nothing had run. A claim that a tool is unavailable
+  is a claim about the current agent config — verify it before recording it as
+  an assumption.
+
+`tools/orchestration/tests/pipeline/agent-shell.test.ts` pins the gate
+commands against these rule sets so a future tightening cannot silently
+re-blind a stage.

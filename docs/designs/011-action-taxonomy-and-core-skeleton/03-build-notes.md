@@ -320,6 +320,9 @@ new corpus up with no harness change, as the design predicted.
   `action_ids`) still belong in `docs/designs/008-rust-for-the-product`'s
   evidence checklist. Source was written to the same rustfmt shape and lint
   posture the shipped modules use, since the gate cannot be run here.
+  *(Operator update 2026-11-13: A16 is retired — the stage shell now allows the
+  gate commands, and every leg of it was run green against this tree before the
+  merge. Later stages run the gate themselves and quote the output.)*
 - **Test strategy #7's Windows leg** (case-insensitive lookup) is a
   contributor-side rollout check and was not run. The lowercase-only ids and
   fixture names it protects are in place.

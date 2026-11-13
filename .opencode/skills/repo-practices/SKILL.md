@@ -18,6 +18,11 @@ Conventions for code landing in this repository.
 ## Commands (from each package's package.json)
 
 - `npm run check` — lint + format check + tests. This is the gate.
+- **Run the gate legs yourself, in your own shell, before you reply** —
+  `cargo fmt --all -- --check` and friends are allowed to every code stage.
+  Quote the real output in the build notes. Never assert a formatting, lint or
+  test posture you did not execute: a stage that reasons about rustfmt instead
+  of running it spends a fix round discovering the gate disagrees.
 - `npm test` — vitest; tests in `tests/**/*.test.ts`.
 - `npm run format` — run before finishing; import order is
   `node:` externals, then relative, blank line between groups.

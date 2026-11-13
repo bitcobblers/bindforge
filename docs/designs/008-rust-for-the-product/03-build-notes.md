@@ -47,6 +47,16 @@ What landed, against the Rollout list:
 
 ## Gate verification status — BLOCKED: no stage in this pipeline can run a toolchain
 
+> **Update 2026-11-13 — the blocker is closed; do not carry it forward as an
+> assumption.** It was two things: the stage agents' shell allowlist was a set
+> of narrow prefixes that a compound command fails leg-by-leg (`cd <dir> &&
+> cargo test` is denied on the `cd`), and this paragraph was quoted into later
+> runs as a `verified` assumption (ADR-011's A16), so stages stopped trying.
+> The agents now allow `cargo *`, `npm run *`, `rustfmt *` and read-only
+> inspection, and deny only what the runner owns (commits, branch state, file
+> moves) plus publishing. Run 011 paid 4 of its 5 code rounds for the old
+> posture. See `docs/workflows.md`.
+
 **This is a blocker, and it is named as one rather than footnoted** (round-1
 testing major 2, open since the first rollout check and re-opened by the
 round-1c3 dissent pass as its finding 2). Every stage that has touched this tree

@@ -268,7 +268,8 @@ export function hasCargoWorkspace(repoDir: string): boolean {
   return existsSync(join(repoDir, 'Cargo.toml'));
 }
 
-const CARGO_GATE: readonly string[][] = [
+/** The cargo gate, exactly as `testsGreen` runs it: fmt check, clippy, tests. */
+export const CARGO_GATE: readonly string[][] = [
   ['fmt', '--all', '--', '--check'],
   ['clippy', '--workspace', '--all-targets', '--', '-D', 'warnings'],
   ['test', '--workspace', '--locked'],
