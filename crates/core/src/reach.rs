@@ -2,7 +2,7 @@
 //!
 //! The reach data lives in `schemas/reach-classes/v1/`, not in Rust literals
 //! (ADR-008 clause 3): one TOML table file per hand, sitting directly in the
-//! version directory. The class *content* is ADR-009's — the loader's job,
+//! version directory. The class *content* is ADR-012's — the loader's job,
 //! pinned by Test strategy #4, is to file each table under the hand it
 //! belongs to and to keep the two hands as two distinct tables.
 //!
@@ -56,7 +56,7 @@ pub fn hand_matches_file_name(hand: Hand, file_stem: &str) -> bool {
     Hand::from_name(file_stem) == Some(hand)
 }
 
-/// One reach class: this design carries only its id; ADR-009 owns the
+/// One reach class: this design carries only its id; ADR-012 owns the
 /// taxonomy the ids name and any further fields.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ReachClass {

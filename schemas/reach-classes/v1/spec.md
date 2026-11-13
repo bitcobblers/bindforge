@@ -2,8 +2,8 @@
 
 Reach-class tables classify how far an input can reach in a binding map. The
 class *content* — which classes exist and what they mean — is owned by
-ADR-009; this spec pins the file layout and the load rules, and the current
-class ids in `left.toml` / `right.toml` are placeholders pending ADR-009.
+ADR-012; this spec pins the file layout and the load rules, and the current
+class ids in `left.toml` / `right.toml` are placeholders pending ADR-012.
 
 ## Table data
 

@@ -256,7 +256,7 @@ pub fn ancestor_chain(links: usize) -> Vec<String> {
 /// document that declares no version at all.
 ///
 /// The chain is written inline as one profile's ancestor list so a depth
-/// boundary is a single document; ADR-009 owns how chains are otherwise
+/// boundary is a single document; ADR-014 owns how chains are otherwise
 /// expressed.
 pub fn profile_doc_declaring(id: &str, version: Option<&str>, derives: &[String]) -> String {
     let list = derives

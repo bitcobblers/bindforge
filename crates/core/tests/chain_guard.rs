@@ -10,7 +10,7 @@
 //! `schemas/profile/v1/fixtures/invalid/`.
 //!
 //! The boundary is written against `bindforge_core::MAX_CHAIN_DEPTH`, never
-//! the literal 32: the proposal fixes 32 as an initial value ADR-009 may tune
+//! the literal 32: the proposal fixes 32 as an initial value ADR-014 may tune
 //! (it may not remove the bound).
 
 mod common;

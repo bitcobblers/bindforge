@@ -317,7 +317,7 @@ fn fixture_file_names_are_lowercase_ascii_dash_separated_and_case_unique() {
 
 /// proves: Chosen design → Formats contract + Rollout 3 — the scaffold ships
 /// `profile/v1` and `reach-classes/v1`; the same `schemas/*/v*/` walk picks up
-/// `patch`, `manifest` and `policy` when ADR-009 adds them, with no harness
+/// `patch`, `manifest` and `policy` when ADR-013, ADR-014 and ADR-015 add them, with no harness
 /// change.
 #[test]
 fn the_walk_picks_up_every_version_directory_the_contract_tree_ships() {

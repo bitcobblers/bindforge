@@ -1,4 +1,4 @@
-# 33 ancestor links — one past MAX_CHAIN_DEPTH (32 initially, ADR-009 may
+# 33 ancestor links — one past MAX_CHAIN_DEPTH (32 initially, ADR-014 may
 # tune the bound but not remove it; regenerate this fixture if the bound
 # moves). Every implementer must reject chain resolution for this document
 # (a reader's `ChainTooDeep` rejection).

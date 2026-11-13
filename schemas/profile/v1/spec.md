@@ -3,7 +3,7 @@
 A profile document names one binding profile and the chain of profiles it
 derives from. Content beyond what is pinned here — the taxonomy, reach
 tables referenced by profiles, and chain semantics other than the depth
-bound — is owned by ADR-009.
+bound — is owned by ADR-014.
 
 ## Grammar (a documented subset of TOML v1.1.0)
 

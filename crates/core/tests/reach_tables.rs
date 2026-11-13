@@ -6,11 +6,11 @@
 //! fixture data into the in-memory model with per-hand (left/right) tables kept
 //! distinct.
 //!
-//! The table *content* is ADR-009's (`spec.md`: the shipped class ids are
+//! The table *content* is ADR-012's (`spec.md`: the shipped class ids are
 //! placeholders pending that taxonomy), so these tests pin the load contract:
 //! each hand's table comes from its own file, filed under the hand its file name
 //! and its `hand` entry agree on, and the two hands are never one table. The
-//! exact ids below are the shipped v1 table data — if ADR-009 retunes them, the
+//! exact ids below are the shipped v1 table data — if ADR-012 retunes them, the
 //! expectation moves with the files; what must never move is that the two hands
 //! hold different classes.
 //!

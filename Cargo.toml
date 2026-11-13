@@ -7,7 +7,7 @@ resolver = "3"                    # a virtual workspace has no edition to infer 
 # Only globs that match an existing member are listed: a glob matching nothing
 # aborts every gate command at manifest load, and git tracks no empty `apps/`
 # directory. `apps/*` joins with the first app crate — `apps/cli` arrives with
-# ADR-012 — and the desktop era adds the explicit member path
+# ADR-017 — and the desktop era adds the explicit member path
 # `apps/desktop/src-tauri` (the globs match one path segment).
 members = ["crates/*"]
 
@@ -20,4 +20,4 @@ license = "Apache-2.0"    # matches the LICENSE file at the repo root
 [workspace.dependencies]
 bindforge-core = { path = "crates/core" }
 serde = { version = "1", features = ["derive"] }
-# clap, toml_edit (first consumer: ADR-012), axum, sqlx (A2, A3): enter when their consumer lands
+# clap, toml_edit (first consumer: ADR-017), axum, sqlx (A2, A3): enter when their consumer lands

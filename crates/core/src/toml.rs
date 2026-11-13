@@ -1,6 +1,6 @@
 //! A TOML reader for the grammar the `schemas/` format specs allow.
 //!
-//! Contract documents are TOML (ADR-009), and every document this reader
+//! Contract documents are TOML (ADR-011-015), and every document this reader
 //! accepts is a legal TOML v1.1.0 document (A20) — but the v1 grammar each
 //! `spec.md` ships is a documented *subset* of TOML v1.1.0: comments,
 //! `key = value` entries, basic strings, integers, booleans, and arrays
@@ -14,7 +14,7 @@
 //!
 //! Keeping the reader in-tree (rather than pulling in `toml`/`serde`) also
 //! keeps the workspace dependency-free at scaffold time; `toml_edit`'s first
-//! consumer remains ADR-012, and when it lands this grammar is what its output
+//! consumer remains ADR-017, and when it lands this grammar is what its output
 //! must be narrowed to.
 //!
 //! The adversarial parse budget (Chosen design -> Adversarial guard, budget

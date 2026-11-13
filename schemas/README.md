@@ -29,7 +29,7 @@ picks them up with no harness change.
 
 ## Formats
 
-Formats are TOML (ADR-009) in a documented subset of TOML v1.1.0 (A20): every
+Formats are TOML (ADR-011-015) in a documented subset of TOML v1.1.0 (A20): every
 valid contract document is a legal TOML v1.1.0 document, and each version
 directory's `spec.md` states exactly which TOML constructs its grammar
 admits — and which it refuses. A reader built on a standard TOML parser
