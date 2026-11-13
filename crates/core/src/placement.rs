@@ -64,12 +64,14 @@ impl KeyboardGeometry {
     }
 }
 
-/// The geometry-name grammar: `[a-z][a-z0-9-]*`. Applied twice — to a
-/// document's `geometry` entry, and to the name a caller hands `load_geometry`
-/// *before* it is joined onto a directory, which is what keeps a `..` or a
-/// separator from ever asking the filesystem for a path.
+/// The slug grammar: `[a-z][a-z0-9-]*`. Named for what it is now that three
+/// entry kinds share it — a geometry name, a manifest `id`, and a manifest
+/// `codec` or preset id (ADR-013) — and applied to a document's `geometry`
+/// entry, and to the name a caller hands `load_geometry` *before* it is
+/// joined onto a directory, which is what keeps a `..` or a separator from
+/// ever asking the filesystem for a path.
 #[must_use]
-pub(crate) fn is_geometry_name(name: &str) -> bool {
+pub(crate) fn is_slug_name(name: &str) -> bool {
     let bytes = name.as_bytes();
     let Some((first, rest)) = bytes.split_first() else {
         return false;
@@ -87,7 +89,7 @@ pub(crate) fn is_geometry_name(name: &str) -> bool {
 /// before a file is opened.
 #[must_use]
 pub fn geometry_matches_file_name(geometry: &str, file_stem: &str) -> bool {
-    is_geometry_name(geometry) && geometry == file_stem
+    is_slug_name(geometry) && geometry == file_stem
 }
 
 /// The declared bound of a placement check, in severity steps: how many ranks
@@ -134,7 +136,7 @@ impl PlacementCheck {
 /// must agree with the file stem, as a reach table's `hand` entry must agree
 /// with its own.
 pub fn load_geometry(dir: &Path, name: &str) -> Result<KeyboardGeometry, CoreError> {
-    if !is_geometry_name(name) {
+    if !is_slug_name(name) {
         return Err(CoreError::InvalidValue {
             key: "geometry".to_string(),
             message: format!("`{name}` is not a geometry name: expected `[a-z][a-z0-9-]*`"),

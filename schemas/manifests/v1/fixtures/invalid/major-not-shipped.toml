@@ -1,0 +1,11 @@
+# Declares a major the `manifests` format does not ship: only `manifests/v1/`
+# exists under `schemas/`, so this document is rejected naming the majors that
+# format supports — not the crate-wide union, which carries a `v2` that only
+# `reach-classes` ships. Reading this document with the v1 grammar is the
+# misreading the per-format version gate exists to prevent.
+format = "manifests"
+version = "v2"
+id = "major-not-shipped"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["move.steer-left Turn left"]

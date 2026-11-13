@@ -26,6 +26,16 @@
 //! single-line bounded message; and the zero-fixture rule and the case-unique
 //! fixture-name rule cover both new directories.
 //!
+//! proves: design 013's Test strategy #6 — the same walk picks up
+//! `manifests/v1` again with no harness change: every valid manifest fixture
+//! parses and re-serializes to a semantically equal value (manifests take the
+//! re-serialization path, not the `reach-classes` exemption), every invalid one is
+//! refused with a single-line, control-free, truncating message, and the
+//! zero-fixture and case-unique-name rules cover the new directory too. What the
+//! walk cannot do is the manifest's two cross-file rules — the registry join and
+//! the game-directory location rule — which refuse at `load_manifest` instead, so
+//! the manifest corpus stays registry-free (`manifest.rs` pins those).
+//!
 //! Test strategy #5 (fresh-clone one-gate promise) and #6 (CI job
 //! independence) have a code-level counterpart in `gate_contract.rs`, which
 //! pins what the workflows promise; their fresh-clone and Windows legs are
@@ -50,7 +60,8 @@ use std::fs;
 use bindforge_core::Hand;
 use common::{
     ScratchDir, fixture_text, fixtures, format_dirs, format_dirs_under, is_fixture_name,
-    quoted_array, rejection, schemas_root, string_array, string_entry, zero_fixture_violation,
+    quoted_array, rejection, schemas_root, string_array, string_entry, version_dir,
+    zero_fixture_violation,
 };
 
 /// proves: Test strategy #1 — every valid fixture parses, is accepted by the
@@ -384,10 +395,59 @@ fn the_walk_picks_up_every_version_directory_the_contract_tree_ships() {
         "action-ids/v1",
         "reach-classes/v2",
         "keyboard-geometry/v1",
+        "manifests/v1",
     ] {
         assert!(
             found.iter().any(|dir| dir == expected),
             "the harness must exercise {expected}; the walk found {found:?}"
+        );
+    }
+}
+
+/// proves: design 013's Test strategy #6 — the manifest corpus is bound by the
+/// same walk with no harness change, and `manifests` is on the re-serialization
+/// path, not the `reach-classes` exemption: every `manifests/v1` valid fixture
+/// parses and re-serializes to a semantically equal value, and every invalid one
+/// is refused at `parse` alone — which is what keeps the manifest corpus
+/// registry-free, since the join and the location rule live at load instead
+/// (Chosen design → Load-time validation).
+#[test]
+fn every_manifest_fixture_is_exercised_by_the_unchanged_walk() {
+    let manifests_v1 = version_dir("manifests", "v1");
+
+    let valid = fixtures(&manifests_v1, "valid");
+    assert!(
+        !valid.is_empty(),
+        "manifests/v1 must ship fixtures/valid/: presence there is the definition of \"supported\""
+    );
+    for path in &valid {
+        let label = path.display().to_string();
+        let text = fixture_text(path);
+        let document = bindforge_core::parse(&text).unwrap_or_else(|err| {
+            panic!("{label} is a valid manifest fixture and must parse: {err}")
+        });
+        let round_tripped = bindforge_core::parse(&bindforge_core::serialize(&document))
+            .unwrap_or_else(|err| panic!("{label} does not re-parse after serializing: {err}"));
+        assert_eq!(
+            round_tripped, document,
+            "{label} must re-serialize to a semantically equal value: manifests take the same \
+             round-trip obligation as every format except `reach-classes`"
+        );
+    }
+
+    let invalid = fixtures(&manifests_v1, "invalid");
+    assert!(
+        !invalid.is_empty(),
+        "manifests/v1 must ship fixtures/invalid/: the invalid corpus is the contract for \
+         rejection behavior"
+    );
+    for path in &invalid {
+        let label = path.display().to_string();
+        let text = fixture_text(path);
+        assert!(
+            bindforge_core::parse(&text).is_err(),
+            "{label} is an invalid manifest fixture and must refuse at `parse` alone — the \
+             manifest corpus carries no registry"
         );
     }
 }

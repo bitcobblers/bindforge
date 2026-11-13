@@ -1,0 +1,10 @@
+# The digest body must be standard base64: a character outside the alphabet
+# is refused rather than decoded through a permissive fallback, which would
+# let two spellings claim one digest. `!` is outside `A-Za-z0-9+/`.
+format = "manifests"
+version = "v1"
+id = "fingerprint-not-base64"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["move.steer-left Turn left"]
+fingerprint = "sha256-not!base64=="

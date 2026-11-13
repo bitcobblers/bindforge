@@ -1,0 +1,10 @@
+# The required entries and nothing else: a manifest never read against a
+# config has no fingerprint to record, and a game with no docked UI and no
+# built-in presets has no constraint to state. `actions` is required and may be
+# empty — the empty array names no rows, it is not a missing entry.
+format = "manifests"
+version = "v1"
+id = "minimal-game"
+revision = 1
+codec = "unreal-engine-5"
+actions = []

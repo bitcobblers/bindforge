@@ -1,0 +1,9 @@
+# A native name longer than the 128-octet budget (`MAX_NATIVE_NAME_OCTETS`)
+# is refused: the cap is what bounds a refusal that has to echo the name, so
+# one hostile row cannot inflate log volume.
+format = "manifests"
+version = "v1"
+id = "name-past-cap"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["aim.camera NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN"]

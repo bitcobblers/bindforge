@@ -1,9 +1,9 @@
 # BindForge formats contract
 
 `schemas/` is the single home of BindForge's on-disk format contract: one
-directory per format (`action-ids`, `keyboard-geometry`, `profile`,
-`reach-classes`, and later the manifest and profile-chain formats of the
-012-015 series), and under it one directory per major version (`v1`, `v2`, …).
+directory per format (`action-ids`, `keyboard-geometry`, `manifests`,
+`profile`, `reach-classes`, and later the profile-chain format of the 012-015
+series), and under it one directory per major version (`v1`, `v2`, …).
 Every product component — the CLI, the desktop app, the hub — validates
 documents with these rules, and third-party readers can conform to them
 without reading Rust.
@@ -13,9 +13,13 @@ The scaffold of this contract tree (ADR-008 design 008) ships `profile/v1` and
 011-015 series speaks through. ADR-012 adds `reach-classes/v2` — the five-class
 reach taxonomy with each hand's grade for every graded input, leaving `v1` and
 its placeholder ids untouched — and `keyboard-geometry/v1`, the key grid the
-placement predicate checks its shape rule against. The manifest and
-profile-chain formats arrive with the 012-015 series, and the conformance
-harness's `schemas/*/v*/` walk picks them up with no harness change.
+placement predicate checks its shape rule against. ADR-013 adds
+`manifests/v1`, the game manifest — game id and data revision, codec family
+id, action table, constraints, and preset ids — read from `data/manifests/`
+through `load_manifest`, whose registry join and location rule are load-time
+rules. The profile-chain format arrives with the rest of the 012-015 series,
+and the conformance harness's `schemas/*/v*/` walk picks every new directory
+up with no harness change.
 
 ## Versioning rule (canonical)
 
@@ -79,9 +83,18 @@ can reach a writer:
 - A chain deriving from itself is rejected (`Cycle`); a chain longer than
   `MAX_CHAIN_DEPTH = 32` links is rejected (`ChainTooDeep`) instead of
   recursed into. 32 is an initial value ADR-014 may tune but not remove.
+- ADR-013 adds four budgets for the manifest's set-shaped data, named beside
+  these: `MAX_MANIFEST_ROWS = 256` bounds each array-shaped manifest entry
+  (`actions`, `dead-keys`, `docked-actions`, `presets`),
+  `MAX_CONSTRAINT_GROUPS = 64` the `exclusive-groups` array,
+  `MAX_GROUP_MEMBERS = 16` one group's members, and
+  `MAX_NATIVE_NAME_OCTETS = 128` one game-native action name. Each cap sits
+  well above the baselines it was surveyed for, and the shared 1 MiB /
+  16-deep budgets still bind first.
 
-The three constants are the reference implementation's public names for these
-limits, so an implementer never has to guess which number a rejection names.
+The reference implementation exports all seven constants as the public names
+for these limits, so an implementer never has to guess which number a
+rejection names.
 
 Rejections are structured errors that say what is wrong, in a single bounded
 line: a message quoting part of the document — a declared `format`, a declared

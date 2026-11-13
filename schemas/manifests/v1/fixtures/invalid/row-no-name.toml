@@ -1,0 +1,10 @@
+# An `actions` element splits at its first space; with no space at all there is
+# no name. An action whose game name is silently dropped is the fact
+# `seeded-from` and a transform's explanations depend on, so the refusal names
+# the element.
+format = "manifests"
+version = "v1"
+id = "row-no-name"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["move.steer-left"]

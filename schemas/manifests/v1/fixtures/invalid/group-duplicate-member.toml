@@ -1,0 +1,10 @@
+# A group's members are distinct: `keyboard:w keyboard:w keyboard:s` claims
+# one key is exclusive with itself, which is not a constraint but a document
+# that means nothing. The refusal names the repeated member.
+format = "manifests"
+version = "v1"
+id = "group-duplicate-member"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["move.steer-left Turn left"]
+exclusive-groups = ["keyboard:w keyboard:w keyboard:s"]

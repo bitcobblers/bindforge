@@ -1,0 +1,10 @@
+# The `id` is the game directory's name and the left half of every profile's
+# manifest pin, so it rides the slug grammar `[a-z][a-z0-9-]*`: an uppercase
+# spelling merely looks like the same name on a case-insensitive filesystem,
+# and it is the collision the rule exists to refuse.
+format = "manifests"
+version = "v1"
+id = "Remnant-2"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["move.steer-left Turn left"]

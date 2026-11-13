@@ -1,0 +1,12 @@
+# Every element of `dead-keys` is an input id from the closed vocabulary
+# (`schemas/reach-classes/v2/spec.md`). `keyboard:tab` is not a member — the
+# v1 vocabulary carries no named keys or modifiers — so the constraint a real
+# game would state is refused at the grammar until the vocabulary major that
+# widens the set, and the refusal names the id.
+format = "manifests"
+version = "v1"
+id = "unknown-input-id"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["move.steer-left Turn left"]
+dead-keys = ["keyboard:tab"]

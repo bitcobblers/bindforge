@@ -1,0 +1,10 @@
+# Exclusivity is a relation between at least two keys, so a one-member group
+# is a malformed claim, not an empty constraint: `2..=16` members, and the
+# refusal names the element.
+format = "manifests"
+version = "v1"
+id = "group-one-member"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["move.steer-left Turn left"]
+exclusive-groups = ["keyboard:w"]

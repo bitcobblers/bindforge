@@ -1,0 +1,10 @@
+# An ASCII control character is refused even where the escape table decodes it
+# (`\u0007` is a legal escape): a hostile manifest must not carry a control
+# character into a displayed native name. The refusal escapes what it echoes
+# rather than emitting it.
+format = "manifests"
+version = "v1"
+id = "name-control-char"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["move.forward Bell\u0007Name"]

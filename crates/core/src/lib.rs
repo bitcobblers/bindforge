@@ -31,6 +31,14 @@
 //! ADR-015 precondition its transforms on it. Nothing in this crate repeats
 //! the class list, the grade tables, or the grid.
 //!
+//! The game manifests of ADR-013 are typed here as `Manifest`,
+//! `ManifestAction`, `ExclusivityGroup`, and `DockedAction`, loaded by
+//! `load_manifest` against a `load_action_registry`ed registry; the row
+//! encoding, the one-fact-per-entry rules, the fingerprint grammar, and the
+//! four budget constants — `MAX_MANIFEST_ROWS`, `MAX_CONSTRAINT_GROUPS`,
+//! `MAX_GROUP_MEMBERS`, `MAX_NATIVE_NAME_OCTETS` — ride `manifest` beside the
+//! existing budget family.
+//!
 //! The public surface exercised by the conformance suites: `parse`,
 //! `parse_file`, `parse_reader`, `serialize`, `supported_majors`,
 //! `resolve_chain`, `MAX_CHAIN_DEPTH`, `MAX_DOCUMENT_BYTES`,
@@ -39,13 +47,16 @@
 //! `ActionRegistry`, `AxisKind`, `CoreError` — and, from ADR-012,
 //! `InputId`, `InputNamespace`, `InputGrade`, `KeyboardGeometry`,
 //! `load_geometry`, `geometry_matches_file_name`, `GradeBound`,
-//! `PlacementCheck`, and `placement_is_legal`.
+//! `PlacementCheck`, and `placement_is_legal` — and, from ADR-013, `Manifest`,
+//! `ManifestAction`, `ExclusivityGroup`, `DockedAction`, `load_manifest`, and
+//! the four manifest budget constants named above.
 
 mod action;
 mod chain;
 mod document;
 mod error;
 mod input;
+mod manifest;
 mod placement;
 mod reach;
 mod toml;
@@ -56,6 +67,10 @@ pub use document::{Document, GeometryKey, KeyboardGeometryTable, Profile, ReachC
 pub use document::{parse, parse_file, parse_reader, serialize, supported_majors};
 pub use error::CoreError;
 pub use input::{InputId, InputNamespace};
+pub use manifest::{
+    DockedAction, ExclusivityGroup, MAX_CONSTRAINT_GROUPS, MAX_GROUP_MEMBERS, MAX_MANIFEST_ROWS,
+    MAX_NATIVE_NAME_OCTETS, Manifest, ManifestAction, load_manifest,
+};
 pub use placement::{GradeBound, KeyboardGeometry, PlacementCheck};
 pub use placement::{geometry_matches_file_name, load_geometry, placement_is_legal};
 pub use reach::{Hand, InputGrade, ReachClass, ReachTable, ReachTables};

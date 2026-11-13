@@ -1,0 +1,11 @@
+# `dead-keys` and `docked-actions` are disjoint: a key the game both will not
+# honour at all and hard-docks to an action is two answers to one fact about
+# one key — exactly the disagreement the constraint entries exist to refuse.
+format = "manifests"
+version = "v1"
+id = "dead-key-docked"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["move.steer-left Turn left"]
+dead-keys = ["keyboard:z"]
+docked-actions = ["ui.menu keyboard:z"]

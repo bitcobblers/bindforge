@@ -1,0 +1,9 @@
+# Each action id appears once in `actions`: two rows under one id are two
+# native names for one action, the two-answers-to-one-fact drift the closed
+# sets exist to refuse. The refusal names the repeated id.
+format = "manifests"
+version = "v1"
+id = "duplicate-action-id"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["move.steer-left Turn left", "move.steer-left Wheel left"]

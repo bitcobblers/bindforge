@@ -1,0 +1,17 @@
+# A manifest carrying exactly the eleven entries the entry table defines, in
+# the fixed order `serialize` writes them: the identity group (`id`,
+# `revision`), the codec family id, the optional fingerprint, the action table,
+# the three constraint entries, and the preset ids. Rows split at their first
+# space; every constraint element names a closed-vocabulary input id, and
+# `dead-keys` and `docked-actions` are disjoint.
+format = "manifests"
+version = "v1"
+id = "remnant-2"
+revision = 3
+codec = "unreal-engine-5"
+fingerprint = "sha256-2Z7Gx9m0YU3bJ8kT4sQw1n7dC6vH0pL2xR5yB8aN3eM="
+actions = ["move.steer-left Turn Left", "aim.camera Mouse Camera", "combat.fire Primary Attack"]
+exclusive-groups = ["keyboard:w keyboard:s"]
+dead-keys = ["keyboard:x"]
+docked-actions = ["ui.menu keyboard:y"]
+presets = ["default", "southpaw"]

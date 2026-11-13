@@ -1,0 +1,11 @@
+# The fingerprint algorithm set is closed at `sha256-`: algorithm agility
+# rides a new format major, and a reader that accepted both spellings would
+# record a digest it cannot compare. The body here is well-formed base64; only
+# the algorithm is wrong.
+format = "manifests"
+version = "v1"
+id = "fingerprint-bad-algorithm"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["move.steer-left Turn left"]
+fingerprint = "sha512-2Z7Gx9m0YU3bJ8kT4sQw1n7dC6vH0pL2xR5yB8aN3eM="

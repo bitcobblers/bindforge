@@ -14,12 +14,15 @@
 //! The gate is per-format, because a major exists per format: `reach-classes`
 //! carries `v1` and `v2` (Decision One: the key→class mapping rides a new major)
 //! and no other shipped format carries anything else, so a `profile`,
-//! `action-ids` or `keyboard-geometry` document declaring `v2` names a major that
-//! format never shipped and is refused. A gate reading one crate-wide list
-//! accepts those documents the moment any one format gains a major — the same
+//! `action-ids`, `keyboard-geometry` or `manifests` document declaring `v2` names a
+//! major that format never shipped and is refused. A gate reading one crate-wide
+//! list accepts those documents the moment any one format gains a major — the same
 //! fail-open, arriving from the other side. `bindforge-core`'s `supported_majors`
 //! stays the union across formats, which is what the majors-equality case below
-//! compares against the tree.
+//! compares against the tree: adding `schemas/manifests/v1/` (ADR-013, design 013's
+//! Test strategy #3 and #7) grows only the *per-format* list, because the union
+//! already carries `v1` — that proposal's A2, and the reason the invariant the last
+//! case pins needs no change.
 
 mod common;
 
@@ -39,6 +42,17 @@ version = "v1"
 discrete-lateral = ["move.steer-left", "move.steer-right"]
 continuous-lateral = ["aim.camera"]
 none = ["move.forward", "combat.fire"]
+"#;
+
+/// A well-formed `manifests` document: exactly the required entries
+/// `schemas/manifests/v1/spec.md` defines, in the shape its valid corpus fixtures
+/// ship, so the version line is the document's only fault.
+const MANIFEST_DOC: &str = r#"format = "manifests"
+version = "v1"
+id = "remnant-2"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["move.steer-left Turn left"]
 "#;
 
 /// A well-formed `keyboard-geometry` document: exactly the entries
@@ -196,6 +210,65 @@ fn the_invalid_corpus_ships_a_fixture_for_a_major_the_format_does_not_ship() {
     };
     let supported = format_majors("profile");
     assert_version_rejection(err, "the profile major-not-shipped fixture", &supported);
+}
+
+/// proves: design 013's Test strategy #3, #7 + A2 — the gate is per-format for the
+/// manifest format too: a `manifests` document declaring `v2` names a major
+/// `manifests` never shipped, so it is refused as the version gate's structured
+/// error naming *manifests*' majors. `reach-classes` already ships a `v2`, and a
+/// gate reading one crate-wide list would read this document with a grammar that
+/// does not exist for it; the union `supported_majors()` returns is unchanged by
+/// adding `manifests/v1`, which is the majors-equality case at the end of this file
+/// keeping its word.
+#[test]
+fn rejects_a_manifest_document_declaring_a_major_the_manifests_format_does_not_ship() {
+    let document = declaring(MANIFEST_DOC, "v2");
+    let supported = format_majors("manifests");
+
+    assert!(
+        !supported.is_empty(),
+        "the walk must find `manifests` in the contract tree to name its majors"
+    );
+    assert!(
+        !supported.iter().any(|major| major == "v2"),
+        "this case needs `manifests` to ship no `v2`; the tree carries {supported:?}"
+    );
+
+    let Err(err) = bindforge_core::parse(&document) else {
+        panic!("a `manifests` document declaring `v2` must be refused, not parsed");
+    };
+    assert_version_rejection(err, "the manifests v2 document", &supported);
+}
+
+/// proves: design 013's Test strategy #7 — the manifest corpus carries its own
+/// half of the per-format gate: `schemas/manifests/v1/fixtures/invalid/major-not-shipped.toml`
+/// declares a major no `manifests` directory ships, so a third-party reader is
+/// held to the same refusal `bindforge-core` gives, naming the majors *that
+/// format* supports.
+#[test]
+fn the_invalid_corpus_ships_a_manifest_fixture_for_a_major_the_format_does_not_ship() {
+    let manifests_v1 = version_dir("manifests", "v1");
+    let path = manifests_v1
+        .path
+        .join("fixtures")
+        .join("invalid")
+        .join("major-not-shipped.toml");
+
+    assert!(
+        path.is_file(),
+        "manifests/v1 must ship `fixtures/invalid/major-not-shipped.toml`: the per-format gate is \
+         part of the language-neutral contract, and the invalid-fixture corpus is the contract for \
+         it (missing at {})",
+        path.display()
+    );
+    let Err(err) = bindforge_core::parse(&fixture_text(&path)) else {
+        panic!(
+            "{} is an invalid fixture and must be refused",
+            path.display()
+        );
+    };
+    let supported = format_majors("manifests");
+    assert_version_rejection(err, "the manifests major-not-shipped fixture", &supported);
 }
 
 /// proves: Test strategy #2 — the majors `bindforge-core` declares equal the

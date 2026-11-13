@@ -1,0 +1,11 @@
+# The remainder-split encoding at its limit: the row splits at its first space
+# and every space after it is name. A `#` inside a quoted array element is
+# data, never a comment, and `"` and `\` ride the closed escape table (`\"`
+# and `\\`), so each of these names round-trips byte-exactly through the
+# reference reader and its writer.
+format = "manifests"
+version = "v1"
+id = "spaced-names"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["aim.camera Say \"turn\" \\ left # look", "move.steer-left Turn   Left", "combat.fire Secondary fire (alt #2)"]

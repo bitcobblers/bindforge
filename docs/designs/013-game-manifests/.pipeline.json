@@ -1,0 +1,959 @@
+{
+  "version": 1,
+  "slug": "game-manifests",
+  "nnn": "013",
+  "branch": "pipeline/013-game-manifests",
+  "source": {
+    "kind": "adr",
+    "path": "docs/adrs/013-game-manifests.md"
+  },
+  "status": "done",
+  "lastStage": "doc-sync",
+  "designRound": 2,
+  "codeRound": 1,
+  "designBudgetUsed": 1,
+  "codeBudgetUsed": 1,
+  "editorialDone": false,
+  "testsGreen": true,
+  "testsNeedUpdate": false,
+  "stageFailures": {
+    "design-review:compatibility": 1
+  },
+  "stageCommits": [
+    "ce2fcab5464e8609626d2f55eee0ed3e25b46560",
+    "9f9902f5058d06492b6e172e701425b956a5c8b5",
+    "9e705b4471229f0d9bbf327401acf526ce5e54a4",
+    "3e5ab56e78ad579c23878fd0636a0299c212ba93",
+    "15e33d538df70c08b9fa0fbbf773e4435fa43a17",
+    "f44fef38c0aea1734fa332f6dcf85c4cd66a80fc",
+    "448d5a34e248e6e95f8c7d8bbfee27e1543c2134",
+    "08c79066c6d2e6d3494fc20840ab35139dc35e5f",
+    "756a40bae1d08de955083748fbcfbf5e81193f18",
+    "500e9e4cd720708ae296d7806c2c03ad627fb94a",
+    "34dab65b3ad3e1fbcc4b0a95da748a5b89f6a0c8",
+    "1ba715a530fa26392d43d3fa005fc08b5db62ea8"
+  ],
+  "forceNext": null,
+  "results": [
+    {
+      "stage": "research",
+      "round": 0,
+      "sessionID": "ses_e2b02f94effeWGCfwSwzIS4VNC",
+      "agent": "research/researcher",
+      "at": 1794575055444,
+      "reply": {
+        "summary": "Wrote docs/designs/013-game-manifests/01-research.md for ADR-013, scoped to the ADR's question (manifest as the game-facts contract, not codecs, presets, or authoring UX). Closest prior art is Valve's Steam Input IGA file and Action Manifest File (game id in the file name, closed action-kind vocabulary, major/minor revisions whose major flags breaking action-set changes), with SDL's GUID mapping line as prior art for a reserved codec family id, Unity's rename-surviving action id, Source-engine cfg structure, and Elite Dangerous .binds as the cautionary case; no surveyed system encodes exclusivity or docked-key facts as data. Repo findings pin what a manifests/v1 format inherits: one new Document arm plus SUPPORTED_FORMATS/format_majors entries (supported_majors() already declares v1 and v2, so the ADR's consequence overstates that change), automatic conformance-corpus pickup with a mandatory serialize round-trip, the flat one-line-array grammar that forces space-joined encodings against game-native names that contain spaces, the axis-kind duplication against registry.toml (40 ids), the 48-member keyboard: vocabulary that cannot name the keys a 'dead key' constraint is about, and no existing machinery for cross-file re-validation of dependents. Three lenses applied (Prior art, Standards, Security landscape); every external claim was fetched and verified, and claims whose sources could not be verified (Valve Developer Community, PCGamingWiki, a Steam Workshop item, steaminputdb.com) were dropped or re-sourced rather than cited.",
+        "commitMessage": "docs: add research for ADR-013 game manifests"
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/research-r0.md",
+      "durationMs": 340852,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal",
+      "round": 0,
+      "sessionID": "ses_e2afdc548ffeTYhM8E4e1LiOQP",
+      "agent": "design/designer",
+      "at": 1794575271769,
+      "reply": {
+        "commitMessage": "docs: add ADR-013 game-manifest design proposal (schemas/manifests/v1 contract)"
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/proposal-r0.md",
+      "durationMs": 216190,
+      "nudges": 0,
+      "docLines": 505,
+      "docLinesAdded": 505,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2afa785dffeZr0suFDq91IWDe",
+      "agent": "review/design-correctness",
+      "at": 1794575350486,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → Delta inventory — Edited list: \"`crates/core/src/placement.rs` and both `is_geometry_name` call sites\" vs Unchanged list: \"`placement.rs`'s predicate\"",
+            "problem": "The same rename is listed as both edited and unchanged in adjacent lists; an implementer reading only the Unchanged list could skip the `is_geometry_name` → `is_slug_name` rename that the Edited list, Rollout 2, and Test strategy #7 require.",
+            "fix": "Qualify the Unchanged entry: \"`placement.rs`'s predicate *logic* (name change only, per the Edited list)\"."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Identity, revision, and the series pins — \"the loader enforces monotonicity forward: a PR whose `revision` did not move while its facts did is a review refusal\"",
+            "problem": "The sentence attributes enforcement to the loader while conceding in the same paragraph that \"core cannot pin a file's history\"; no shipped or planned code reads file history, and a facts-changed/revision-static document loads cleanly, so the stated enforcement does not exist.",
+            "fix": "Attribute the rule to review alone: \"review enforces monotonicity forward; the loader enforces only the parse rules above.\""
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Identity, revision, and the series pins — \"the load-time join otherwise fails the workspace test\" (mitigation repeated in the Risks row \"the load-time join fails any manifest naming an id the registry does not back\")",
+            "problem": "No artifact this design ships or names loads `data/manifests/` in CI: the conformance walk covers `schemas/*/v*/` fixtures only, Rollout 6 ships no game data, and the cross-file matrix is deferred to ADR-014; the join fires only where a caller invokes `load_manifest`, so the claimed automatic failure for real manifests is unbacked.",
+            "fix": "State the enforcement owner: extend Rollout 6 with \"the first manifest PR adds a `load_manifest` test over its `data/manifests/` entry\" and qualify the Risks mitigation identically."
+          },
+          {
+            "severity": "minor",
+            "location": "Goals / Non-goals and Chosen design → Identity — the pin ADR-014 spells for the ADR's \"manifest id and version\", alongside the entry table's `version` row: \"the grammar major this document is written against (`v1`)\"",
+            "problem": "The word \"version\" names two different values in the same design: the document's `version` entry (grammar major) and the ADR's \"id and version\" pin half, which this design defines as `revision`; a pin author could spell `remnant-2@v1` instead of `remnant-2@3`.",
+            "fix": "Add one sentence in Identity: \"the ADR's 'version' in 'id and version pin' is this document's `revision`, not its `version` entry (the grammar major).\""
+          },
+          {
+            "severity": "nit",
+            "location": "Options considered — \"(`#` comment-stripping happens outside quotes, A19)\"",
+            "problem": "A19's pinned basis is that the reader strips `#` only at line start or after a complete entry; neither statement carries the operative fact that a `#` inside a quoted array element is data, which is what the Rules' \"Names may contain spaces, `#`\" relies on.",
+            "fix": "Align the parenthetical with the A19 wording: comment-stripping happens at line start or after a complete entry, never inside a quoted element."
+          },
+          {
+            "severity": "nit",
+            "location": "The contract: `schemas/manifests/v1/` — example row `docked-actions = [\"ui.inventory Tab\"]`",
+            "problem": "The row cannot parse or load under the design's own rules today (`Tab` is outside the closed vocabulary; `ui.inventory` is not yet in the registry); the passage is annotated as not shippable, but the document's one full illustrative manifest is one `load_manifest` would refuse twice.",
+            "fix": "Make the example loadable with current-vocabulary rows and keep the deferred-vocabulary illustration in the parenthetical."
+          }
+        ]
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/design-review-correctness-r1c0.md",
+      "durationMs": 78615,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2af94514ffe1kMHjm9g6tJTU0",
+      "agent": "review/design-compatibility",
+      "at": 1794575420842,
+      "transcript": "docs/designs/013-game-manifests/transcripts/design-review-compatibility-r1c0.md",
+      "durationMs": 70307,
+      "nudges": 0,
+      "failure": "independence violation: read a review report: /home/mike/repos/bindforge/docs/designs/013-game-manifests/reviews"
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2af8324affeO3cgcaDwDOyMGF",
+      "agent": "review/design-compatibility",
+      "at": 1794575479118,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → Row encoding (with schemas/manifests/v1/ fixture list and Test strategy #1) — \"a native name of 1–128 octets with no ASCII control character\"",
+            "problem": "The contract never pins whether raw non-ASCII native names (accented Latin, CJK) are legal, even though A13's own basis is localized display text. The octet-based cap and ASCII-only control-char exclusion imply tolerance, but the corpus — which per A3 is what makes a format supported — has no non-ASCII name fixture, and Test strategy #1 exercises only spaces, #, \" and \\. Two readers can diverge on raw-UTF-8 passthrough vs escape-only, and pinning the answer after v1 freezes would ride a manifests/v2.",
+            "fix": "Extend the Row encoding rule with one clause (names are any UTF-8 text except the refused characters), add fixtures/valid/localized-native-name.toml, and extend Test strategy #1 to parse-and-round-trip it; if non-ASCII control/format characters are also refused, pin that with an invalid fixture."
+          }
+        ]
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/design-review-compatibility-attempt2-r1c0.md",
+      "durationMs": 58232,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e2af74ea4ffedyWD0rCmDETHNF",
+      "agent": "review/design-security",
+      "at": 1794575553485,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → The contract — entry table row `presets` and the **Budgets** bullet: \"`MAX_MANIFEST_ROWS = 256` bounds each of `actions`, `dead-keys`, and `docked-actions`\"",
+            "problem": "New. `presets` is the only array in the format with no cardinality cap: the entry table gives it none, the Budgets bullet omits it, and the Risk row's mitigation (\"The four named budgets refuse before any join\") therefore does not cover it. Under A14 it is untrusted input, and the \"each preset id appears once\" rule is a global uniqueness pass over it, so one hostile document inside the 1 MiB budget carries on the order of 10^5 slug strings that get uniqueness-checked, stored, and re-serialized by every consumer.",
+            "fix": "Add the cap in the same sentence as the others — \"`MAX_PRESET_IDS = 64` bounds `presets`\" — mirror it inline in the entry table the way `exclusive-groups` already states \"at most 64 groups\", and extend the invalid corpus (`presets-past-cap.toml`) plus the Test strategy #4 budget cases."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → The contract → **Row encoding** — \"a native name of 1–128 octets with no ASCII control character\"",
+            "problem": "New. The ban is ASCII-only, so C1 controls (U+0080–U+009F) and Unicode format characters (U+202E RIGHT-TO-LEFT OVERRIDE, U+200B, U+FEFF) are legal native names under the spec's own wording. Native names are exactly the design's declared echo payload (\"every echoed native name goes through the escape-and-truncate error path\") and the content shown in the manifest PR diff that is this design's only review gate, so a hostile manifest can reorder or mask what a reviewer's terminal displays. Since `spec.md` + fixtures are the third-party contract, an out-of-repo reader implements the ASCII-only ban verbatim.",
+            "fix": "Change the one clause to \"no Unicode control or format character (`Cc`/`Cf`)\" and pin it with one invalid fixture (e.g. `name-format-char.toml` carrying U+202E) beside `name-control-char.toml`."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Load-time validation: the registry join — \"the two cross-file rules (join, location) live at load, where the registry and the directory are in hand\"",
+            "problem": "New. The design splits validation across two levels but never states what makes the split safe for consumers. The `document.rs` edit adds a public `Document::Manifest(Manifest)` arm to the existing generic `parse`, and `Manifest`'s fields are `pub`, so a consumer can obtain and act on a `Manifest` whose `actions[].action` / `docked_actions[].action` never went through `registry.contains`. ADR-013's Decision requirement (\"ids are validated against the loaded registry, so a manifest cannot invent an action the taxonomy does not name\") and ADR-015's target refusals then rest on a value that skipped the only guard, and nothing in the design forbids that path.",
+            "fix": "Name the invariant once in this section: a `Manifest` not produced by `load_manifest` is not contract-valid and is not a legal input to `seeded-from` or to 015's refusals — and say where it is enforced. If enforcement rather than convention is intended, keep the constructor crate-internal (`Manifest` fields `pub(crate)`, `pub` accessors) so the generic arm cannot hand out a consumable unjoined value."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Load-time validation, step 1 — \"`parse_file(game_dir.join(\"manifest.toml\"))` — size budget before the read\"",
+            "problem": "New. A14 classifies the whole `data/manifests/` tree as arriving from elsewhere, so it can carry `manifest.toml` as a symlink or a FIFO/character device; such an entry reports a small or zero size, so the pre-read size budget that every other hostile-shape mitigation depends on is bypassed and the read is unbounded or never-ending.",
+            "fix": "In step 1 require a regular file: refuse a symlink or non-regular entry as `InvalidValue` naming `manifest.toml` (never the resolved path, per the existing \"never echoes a local path\" rule), and pin it in Test strategy #4 beside the directory-segment case."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → The contract — entry table `revision`: \"the data revision, `>= 1`, monotone per game\"",
+            "problem": "New. The field has a stated lower bound and no stated upper bound, and the enumerated integer edge cases are \"`revision = 0`, a negative revision, and a string revision\"; an out-of-range decimal (`revision = 99999999999999999999`) against an `i64` field has neither a rule nor a fixture, unlike every other shape in the section.",
+            "fix": "State the upper bound (\"must fit `i64`\", or narrow the field to `u32`) and add one invalid fixture so third-party readers refuse the same documents this reader does."
+          }
+        ]
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/design-review-security-r1c0.md",
+      "durationMs": 74332,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2af62c27ffe3MpbExt4L5x3uR",
+      "agent": "review/design-performance",
+      "at": 1794575589642,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design → The contract → Rules → Budgets — \"`MAX_MANIFEST_ROWS = 256` bounds each of `actions`, `dead-keys`, and `docked-actions`\" (and the `presets` entry-table row)",
+            "problem": "`presets` is the one string-array in the closed entry set with no count cap; it is bounded only by the shared 1 MiB budget, so a hostile manifest can carry ~10⁴ preset ids. The per-element slug check and the \"each preset id appears once\" uniqueness rule then run superlinear in that count, contradicting the Risks table's mitigation that \"the four named budgets refuse before any join\" for the many-rows abuse. The fixture list and Test strategy #4 pin budgets that omit it.",
+            "fix": "Bring `presets` under the named budget family by reusing `MAX_MANIFEST_ROWS` (no new constant), add a `presets-past-cap.toml` invalid fixture, and extend the Test strategy #4 budgets case to \"257 `actions` rows, 257 presets, a 65th group — refuse\"."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → The contract → Rules → Budgets — \"Named constants in `manifest.rs`, exported like the existing budget family (A6)\"",
+            "problem": "The four cap values (256 / 64 / 16 / 128) carry no derivation, while the adjacent Identity grammar bullet derives its 63-octet slug bound from RFC 1035. The values sit safely above the cited research baseline (40-id taxonomy, A7; TF2-scale bind lists, A9), so there is no contradiction, but the checklist's baseline-quoting item wants the caps tied to an observation rather than asserted.",
+            "fix": "Add one sentence after the constants stating the baseline each cap sits above (e.g. 256 rows ≈ several TF2-sized bind lists; 128 octets ≥ the longest surveyed multi-word native name)."
+          }
+        ]
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/design-review-performance-r1c0.md",
+      "durationMs": 36122,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e2af59ef0ffePxgIPByF9hGr57",
+      "agent": "review/design-complexity",
+      "at": 1794575627847,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/design-review-complexity-r1c0.md",
+      "durationMs": 38175,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e2af50970ffejpxlqibV4rz7DY",
+      "agent": "design/designer",
+      "at": 1794575712469,
+      "reply": {
+        "changed": true,
+        "summary": "Major (perf r1): the Budgets bullet now states `MAX_MANIFEST_ROWS = 256` bounds each array-shaped entry — `actions`, `dead-keys`, `docked-actions`, `presets` — reusing the existing constant rather than adding one, so `presets` is bounded before the O(n²)-shaped slug check and duplicate rule run, and the Risks mitigation sentence ('The four named budgets cap every array in the entry table before any join') is now true of every shape; the invalid fixture list gains `presets-past-cap.toml` (packed into the existing 8-line block, no line cost) and Test strategy #4 gains a 257th-preset-id case. Nit (perf r1): the same bullet now ties each cap to the surveyed baseline it sits above (40 registry ids A7; TF2-scale bind lists and multi-word native names A9, A13), so cap disputes are data-driven. Offsetting deletions: the Goals budget enumeration and the example's duplicated registry/vocabulary-major parenthetical were narrowed into cross-references (−3 lines). The diff is net +2 lines only because the Revision log rule requires two entries where the r0 placeholder line stood; no other text was added.",
+        "commitMessage": "docs: bring preset ids under the manifest row budget"
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/proposal-revise-r1.md",
+      "durationMs": 84519,
+      "nudges": 0,
+      "docLines": 507,
+      "docLinesAdded": 20,
+      "docLinesRemoved": 18
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2af3bed8ffen93W1qVEc4Y2jH",
+      "agent": "review/design-performance",
+      "at": 1794575758796,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design → Rules → Budgets — \"Each cap sits well above the baselines surveyed for it (40 registry ids, A7; TF2-scale bind lists and multi-word native names, A9, A13)\"",
+            "problem": "re-raised (partially closed). The sentence claims a derivation for each cap but names baselines for only two of the four: MAX_CONSTRAINT_GROUPS = 64 and MAX_GROUP_MEMBERS = 16 carry no stated observation, and the baselines offered describe bind lists and display names, not group counts. The claim is reconstructible from A9 (the surveyed TF2 key set is roughly 30 named inputs, so 64 groups × 16 members sits above any surveyed geometry), but the reader has to do it — which is exactly the derivation the checklist item asks the design to quote. Additionally, A13 is marked unverified in the assumption register, so naming it in the baseline list anchors the 128-octet native-name cap on an unconfirmed observation.",
+            "fix": "Extend the same sentence with the fact the group caps sit above (e.g. \"no surveyed game constrains more than ~30 named keys (A9), so 64 groups × 16 members is above any surveyed geometry\") and either drop A13 from the baseline list or qualify it (\"plus the unverified A13 survey\"), so no cap's strength rests on an unverified row. No change to any constant or fixture."
+          }
+        ]
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/design-review-performance-r1c1.md",
+      "durationMs": 46211,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2af309f5ffe05EV0ZdWO5Ediv",
+      "agent": "review/design-correctness",
+      "at": 1794575849464,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → Rules → Budgets — \"Each cap sits well above the baselines surveyed for it (40 registry ids, A7; TF2-scale bind lists and multi-word native names, A9, A13)\"",
+            "problem": "The new justification claims all four caps and supports two. The assumption register surveys a baseline for the row cap (A7, 40 ids) and, loosely, for the native-name cap, but no register row surveys a group-count or group-size baseline, so nothing backs \"each cap\" for `MAX_CONSTRAINT_GROUPS = 64` and `MAX_GROUP_MEMBERS = 16`; the only constraint-shape size the document states, A8's closed vocabulary (48 keyboard + 7 mouse + 18 gamepad = 73 nameable input ids), sits above the 64-group cap, so the sentence's own direction of comparison is unavailable for it. The \"multi-word native names\" half also rests on A13, which the register itself marks unverified, while the verified A9 survey names keybinds, not multi-word display names (its source page is live and lists ESC/F-keys/Tab/arrows/MOUSE1–5, not display names).",
+            "fix": "Scope the sentence to the caps with a surveyed baseline: \"The row and native-name caps sit well above the baselines surveyed for them (40 registry ids, A7; TF2-scale bind lists, A9); the two group caps are review ceilings over A8's 73-member closed vocabulary, not survey-derived.\" Alternatively drop \"each\" and name which caps the citation covers; do not cite A13's unverified row as a surveyed baseline."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Rules → Budgets — \"`MAX_MANIFEST_ROWS = 256` bounds each array-shaped entry (`actions`, `dead-keys`, `docked-actions`, `presets`)\"",
+            "problem": "`exclusive-groups` is also an array-shaped entry in the entry table (\"2..=16 members; at most 64 groups\"), so the category phrase \"each array-shaped entry\" is contradicted by its own enumeration: the fifth array rides `MAX_CONSTRAINT_GROUPS`/`MAX_GROUP_MEMBERS`, not 256. Low blast radius (Test strategy #4 pins \"a 65th group\"), but this is the sentence `spec.md` inherits per Rollout 1.",
+            "fix": "\"`MAX_MANIFEST_ROWS = 256` bounds each flat row array (`actions`, `dead-keys`, `docked-actions`, `presets`); `exclusive-groups` is bounded by `MAX_CONSTRAINT_GROUPS` and `MAX_GROUP_MEMBERS`.\""
+          }
+        ]
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/design-review-correctness-r1c2.md",
+      "durationMs": 90573,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2af1a7f6ffedS5CuI2uc3a5Ps",
+      "agent": "review/design-compatibility",
+      "at": 1794575891693,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/design-review-compatibility-r1c2.md",
+      "durationMs": 42190,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e2af1030bffeRExXLoB2oa4jFX",
+      "agent": "review/design-security",
+      "at": 1794575939982,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design → **Budgets** — \"`MAX_MANIFEST_ROWS = 256` bounds each array-shaped entry (`actions`, `dead-keys`, `docked-actions`, `presets`)\"",
+            "problem": "new (introduced by the r1 revision of the sentence this seat cited). The r1 wording was a closed list, \"bounds each of `actions`, `dead-keys`, and `docked-actions`\"; the replacement generalizes it to a category, \"each array-shaped entry\", which in this entry table also contains `exclusive-groups`, whose intended cap is 64 groups × 16 members, not 256. Because `spec.md` + fixtures are the third-party contract for this format, an out-of-repo reader who takes the category literally implements a 4x weaker group cap on untrusted input (fail-open on a budget), and the parenthetical reads as exhaustive only if the reader already knows why `exclusive-groups` was left out. The cap itself is not lost — the entry table still states \"at most 64 groups\" and `MAX_CONSTRAINT_GROUPS = 64` follows one clause later — so this is a precision regression in revised text, not an opened hole. Separately confirmed as closed: `presets` is now capped (with `presets-past-cap.toml` and the 257th-preset case in Test strategy #4), and the Risk row's \"The four named budgets cap every array in the entry table before any join\" is now true for all five array entries, so this seat's r1 cardinality finding is resolved.",
+            "fix": "Revert to the closed list and name the other cap's owner in the same sentence: \"`MAX_MANIFEST_ROWS = 256` bounds each of `actions`, `dead-keys`, `docked-actions`, and `presets`; `exclusive-groups` is bounded by `MAX_CONSTRAINT_GROUPS`\". This replaces the loose category phrase; it adds no new constant, mechanism, or fixture."
+          }
+        ]
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/design-review-security-r1c2.md",
+      "durationMs": 48256,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e2af0465fffekV1h6Zxpc05lXW",
+      "agent": "review/design-complexity",
+      "at": 1794575972153,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design → Budgets — \"`MAX_MANIFEST_ROWS = 256` bounds each array-shaped entry (`actions`, `dead-keys`, `docked-actions`, `presets`)\"",
+            "problem": "new: `exclusive-groups` is also an array-shaped entry, bounded by `MAX_CONSTRAINT_GROUPS = 64` rather than by this constant, so \"each array-shaped entry\" overstates the sentence and the parenthetical list reads as if that array were uncapped. The r1 wording (\"bounds each of `actions`, `dead-keys`, and `docked-actions`\") did not have this ambiguity.",
+            "fix": "Reword to \"`MAX_MANIFEST_ROWS = 256` bounds `actions`, `dead-keys`, `docked-actions`, and `presets`; `MAX_CONSTRAINT_GROUPS = 64` bounds `exclusive-groups`\" — same constants, no new mechanism."
+          }
+        ]
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/design-review-complexity-r1c2.md",
+      "durationMs": 32126,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-final",
+      "round": 0,
+      "sessionID": "ses_e2aefc88bffebJtyFxxyupiIql",
+      "agent": "design/editor",
+      "at": 1794576056645,
+      "reply": {
+        "ambiguities": [],
+        "commitMessage": "docs: language-only pass on the ADR-013 game-manifests proposal"
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/proposal-final-r0.md",
+      "durationMs": 84407,
+      "nudges": 0,
+      "docLines": 507,
+      "docLinesAdded": 11,
+      "docLinesRemoved": 11
+    },
+    {
+      "stage": "editorial-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e2aee7e74ffeBchJLIxaZIb7i7",
+      "agent": "review/design-correctness",
+      "at": 1794576119119,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/editorial-review-correctness-r2.md",
+      "durationMs": 62370,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e2aed8aaaffeJgq1EOcT3xdVgH",
+      "agent": "review/design-compatibility",
+      "at": 1794576157320,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/editorial-review-compatibility-r2.md",
+      "durationMs": 38169,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:security",
+      "round": 2,
+      "sessionID": "ses_e2aecf567ffeIgFIOM65zfUAHQ",
+      "agent": "review/design-security",
+      "at": 1794576181445,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/editorial-review-security-r2.md",
+      "durationMs": 24082,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:performance",
+      "round": 2,
+      "sessionID": "ses_e2aec972affeBpG3lUH9oIe43p",
+      "agent": "review/design-performance",
+      "at": 1794576199540,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/editorial-review-performance-r2.md",
+      "durationMs": 18056,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:complexity",
+      "round": 2,
+      "sessionID": "ses_e2aec5089ffeysxgGXHbqZCUIx",
+      "agent": "review/design-complexity",
+      "at": 1794576231739,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/editorial-review-complexity-r2.md",
+      "durationMs": 32173,
+      "nudges": 0
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_e2aebd27cffegQ2xCI3OcWqPRt",
+      "agent": "code/test-engineer",
+      "at": 1794576665462,
+      "reply": {
+        "testsAdded": 56
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/test-authoring-r0.md",
+      "durationMs": 433628,
+      "nudges": 0
+    },
+    {
+      "stage": "implement",
+      "round": 0,
+      "sessionID": "ses_e2ae53444ffeTqJlik84QkenvB",
+      "agent": "code/coder",
+      "at": 1794576992245,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "feat: add the game manifest format, loader, and registry join (ADR-013)",
+        "moves": []
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/implement-r0.md",
+      "durationMs": 326661,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2ae00d46ffeshxITCUWPqnFao",
+      "agent": "codereview/code-correctness",
+      "at": 1794577132482,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/manifest.rs:52-55",
+            "problem": "The module header still asserts that the tests are written \"while crates/core/src/manifest.rs does not exist, so they fail until the design is implemented\"; manifest.rs now exists and the suite passes, so the sentence describes a superseded repository state and reads as stale provenance.",
+            "fix": "Reword to past tense: the tests were written from the proposal before manifest.rs existed and pin the implemented design unchanged."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/manifest.rs:582-585",
+            "problem": "The decode_base64 doc claims its strictness prevents \"two spellings claim one digest\", but non-zero padding bits are not rejected, so e.g. AA== and AB== both decode to the same octet. The proposal only requires standard base64 decoding to 32 octets (RFC 4648 ignores pad bits), and the fingerprint is stored and re-emitted verbatim, so only the comment overstates the decoder.",
+            "fix": "Either reject quartets whose unused low bits are non-zero (canonical-only spelling) or soften the comment to \"characters outside the alphabet never decode through a permissive fallback\"."
+          }
+        ]
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/code-review-correctness-r1c0.md",
+      "durationMs": 129245,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e2ade1431ffe9Zr69b1tFjLo79",
+      "agent": "codereview/code-compatibility",
+      "at": 1794577308094,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/tests/manifest.rs:428 and schemas/manifests/v1/fixtures/valid/",
+            "problem": "The format's only free-text column is pinned exclusively with ASCII names. The proposal's basis for the remainder-split row encoding is localized, multi-word game names (A13), yet no valid fixture and none of the 49 new tests carry a non-ASCII native name — grep for non-ASCII over the new corpus, manifest.rs and tests/manifest.rs finds only prose. The two locale-visible properties therefore go unproven against a second implementation: a multi-byte name round-trips byte-exactly only because `quoted` (document.rs:863-881) writes non-control chars raw rather than as \\uXXXX, and MAX_NATIVE_NAME_OCTETS is an octet cap (name.len()), so a 60-character CJK name (180 octets) refuses while a character-counting implementer accepts it. reach-classes/v2 set the precedent of pinning the non-ASCII posture in the corpus; manifests, the format whose whole point is the game's own spelling, ships none.",
+            "fix": "Add a tests/manifest.rs case beside the punctuation test parsing a row whose name is multi-byte (e.g. `aim.camera Caméra \\\"retour\\\"`), asserting the value byte-for-byte and parse(serialize(parse(text))) == parse(text); add a boundary case whose name is under 128 characters but over 128 octets, refused for the octet budget. Preferably also add one fixtures/valid/ document with a localized name, with a line added to the proposal's fixture list and to spec.md's 'Spaces, `#`, and every glyph…' sentence so the language-neutral contract states that non-ASCII is data."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/manifest.rs:237-245; asserted at crates/core/tests/manifest.rs:1058-1061",
+            "problem": "The location-rule refusal interpolates {segment}, a component of the caller's local path, into the rendered message, while the proposal states the mismatch 'never echoes a local path (the error contract's channel for paths is source_path)' and error.rs upholds that elsewhere by never rendering CoreError::Io { path }. Today it is bounded by one_line and is the only actionable spelling, but the test that claims the promise asserts only that the full scratch path is absent, so a future edit echoing a parent segment or a truncated display() would keep the suite green while contradicting the contract sentence.",
+            "fix": "Either name only the document's own `id` in the message (the caller supplied the directory), or keep the segment and strengthen the assertion to reject any path separator or display() suffix in the rendered line, so the contract sentence is pinned rather than one scratch root."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/manifest.rs:787",
+            "problem": "The slug-grammar case loop's own doc comment says the rule exists to catch 'a spelling that merely looks lowercase', but the loop tests only an uppercase ASCII spelling, a dot, a leading hyphen and a 64-octet id. A non-ASCII lookalike id (Cyrillic `е`, an accented `joueur-2`, a U+2011 hyphen) is the realistic non-English-contributor mistake, and it is exactly where a directory name and an `id` look equal in a file browser while being unequal byte-for-byte — the name↔location collision the loader's location rule exists to make visible.",
+            "fix": "Add one non-ASCII spelling and one Unicode-hyphen spelling to the loop's list; the byte-based is_slug_name already refuses them, so this pins the claim the comment makes at no behavioral cost."
+          }
+        ]
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/code-review-compatibility-r1c0.md",
+      "durationMs": 175569,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e2adb662cffeOgPd5V3Cnl10VB",
+      "agent": "codereview/code-security",
+      "at": 1794577463404,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/manifest.rs:360 (check_native_name control check) with crates/core/src/error.rs:155 (one_line)",
+            "problem": "The format's one free-text column can carry an unescaped line terminator into a refusal message and into every serialized copy of the manifest. check_native_name bans only ASCII controls (bytes().any(|b| b.is_ascii_control())), while one_line's escaper is category-based (c.is_control() = Cc), so the two guards do not meet: U+2028/U+2029 are neither ASCII control nor Cc, so such a name parses, is stored, is re-serialized raw by quoted (document.rs:875 has the same Cc blind spot), and is echoed raw by the escape-and-truncate path the design names as its own mitigation against hostile echoed names. error.rs:11-16 states the property being protected (\"one hostile upload cannot forge extra log lines\"), and JS/JSON-adjacent log pipelines and some shippers/terminals break on U+2028. This is a new surface: every earlier format's echoed strings are grammar-constrained ids (PROFILE_ENTRIES, ACTION_IDS_ENTRIES, GEOMETRY_ENTRIES carry no free text). It also undercuts the trailing-space rationale, since U+00A0/U+200B differ invisibly and pass.",
+            "fix": "Tighten the clause to the printable set: refuse name.chars().any(|c| c != ' ' && (c.is_control() || c.is_whitespace())) — that covers U+0085, U+2028, U+2029, NBSP — and refuse the Cf format range that reorders a reviewer's terminal (U+200B..=U+200F, U+2060..=U+2064, U+2066..=U+206F, U+FEFF); add fixtures/invalid/name-format-char.toml and mirror the one clause in schemas/manifests/v1/spec.md:79 so a third-party reader refuses the same documents."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/manifest.rs:586-627 (decode_base64, via check_fingerprint:559)",
+            "problem": "The decoder accepts non-canonical base64, contradicting its own doc comment at manifest.rs:582-585 (\"A body outside this never decodes through a permissive fallback, which would let two spellings claim one digest\") and the fingerprint-not-base64.toml fixture comment. In the final quartet the decoder takes significant from the trailing '=' and pushes only the high bits, so the unused low bits of the last data sextet are discarded silently: a 32-octet digest's 44-char body has 16 spellings decoding identically (AA== and AB== both yield 0x00). RFC 4648 §3.5 requires those bits be zero, and spec.md:116-117 does not say which side a reader takes, so the corpus pins neither and a reader written to RFC 4648 refuses documents this one accepts. Contained today (nothing consumes the digest in this run), but 017/018's use of the field is comparing it, where two spellings of one digest become byte-different fingerprints a string comparison calls a mismatch.",
+            "fix": "In the final quartet reject non-zero discarded bits (significant == 2 -> sextets[1] & 0x0f == 0; significant == 3 -> sextets[2] & 0x03 == 0), state \"canonical spelling per RFC 4648 §3.5\" in spec.md's Fingerprint grammar, and pin it with fixtures/invalid/fingerprint-non-canonical.toml plus a unit case beside tests/manifest.rs:894."
+          },
+          {
+            "severity": "minor",
+            "location": "schemas/manifests/v1/spec.md:129 with crates/core/src/manifest.rs:221-273 (load_manifest)",
+            "problem": "The shipped language-neutral contract claims a guard the reference implementation does not have: \"The loader enforces monotonicity forward\". load_manifest applies exactly two cross-file rules (location, registry join) and has no prior state to compare a revision against; nothing in the diff reads history, and the proposal itself says core cannot pin a file's history (A10) and puts the bump rule in manifest-PR review plus ADR-014's deferred pin matrix. Because an out-of-repo implementer implements the spec verbatim, the sentence invites invented history-dependent behavior and lets a consumer treat revision as rollback/tamper evidence on the strength of a loader check that does not exist.",
+            "fix": "Reword to match the design: monotonicity is enforced in manifest review, and by the dependent-pin matrix once ADR-014 ships; load_manifest enforces only the location rule and the registry join."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/manifest.rs:559-579 (check_fingerprint) and manifest.rs:592 (decode_base64 allocation)",
+            "problem": "The fingerprint is the one entry-table string with no named size bound: a legal value is at most 51 characters, but nothing states or checks it, and the body is fully allocated and decoded (Vec::with_capacity(quartets * 3)) before the 32-octet length refusal, so a 1 MiB fingerprint element buys ~0.75 MB of allocation and a full scan before it is refused. Every other shape in this format has its cap named in the budgets table.",
+            "fix": "Reject a body whose length is not 44 before decoding (which also settles the canonical-shape question), or name the bound in spec.md's budgets table."
+          }
+        ]
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/code-review-security-r1c0.md",
+      "durationMs": 155254,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e2ad90783ffeRZjOdNpCO6EF4W",
+      "agent": "codereview/code-performance",
+      "at": 1794577588319,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/manifest.rs:385 (cap applied at :394)",
+            "problem": "The MAX_GROUP_MEMBERS budget is checked after the group element is fully split: `let fields: Vec<&str> = raw.split(' ').collect();` materializes one entry per space before the refusal. A single `exclusive-groups` element is bounded only by MAX_DOCUMENT_BYTES (the toml reader has no per-value or per-element bound, toml.rs:314-345), so `exclusive-groups = [\"<1 MiB of spaces>\"]` transiently allocates ~1,048,576 &str entries (~16.8 MB) before refusing — a ~16x amplification of the input budget on the untrusted-input path the design itself names (A14, hostile-manifest risk row). `parse_docked` (:470-475) already avoids this pattern with split_once + contains.",
+            "fix": "Bound the split lazily before collecting: `if raw.split(' ').take(MAX_GROUP_MEMBERS + 1).count() > MAX_GROUP_MEMBERS { …refuse… }`, and derive the `< 2` check from `raw.matches(' ').count() + 1`; collect only after both caps pass. The existing 17-member case (tests/manifest.rs:750-760) keeps covering the refusal."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/manifest.rs:283-284, 374-375, 435-436, 462-463, 504-505",
+            "problem": "For every array-shaped entry the length budget is checked on the already-cloned array: string_array (document.rs:840-857) allocates a fresh String per element, and only then does check_row_count compare the length against MAX_MANIFEST_ROWS / MAX_CONSTRAINT_GROUPS. A hostile `actions = [\"\", \"\", …]` under the 1 MiB budget materializes ~350k elements twice (~8 MB of clone on top of the reader's own ~8 MB) before the O(1)-knowable fault refuses. The budget is therefore a model-level bound, not the allocation bound its doc comment advertises (manifest.rs:40-44: \"what stops a hostile manifest driving the load-time join over an unbounded table\").",
+            "fix": "Check the borrowed array's length before cloning it: the length is already on `Value::Array(items)`. Add a small helper (e.g. `array_items(key, value, cap) -> Result<&[Value], CoreError>`) or an inline `if let Value::Array(items) = value { if items.len() > cap { … } }` ahead of `string_array` in each of the five parse functions, keeping the refusal message byte-identical."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/manifest.rs:171-180, 288, 296, 406, 413, 441, 480, 509",
+            "problem": "Every one-fact-per-entry rule is a linear scan over the values collected so far (two `iter().any(…)` per actions row, `dead_keys.contains(…)` per docked row, nested `groups.iter().any(|g| g.inputs.contains(…))`), i.e. quadratic in entry length. All are bounded because the cap check precedes each loop — worst case ~65k predicate calls for a max-size `actions` array, ≤ 256×73 for the dead/docked disjointness scan, ~2.6k contains calls for groups — so this costs sub-millisecond once per load and needs no change today. The exposure is the design's own growth path (registry grows in batches, so MAX_MANIFEST_ROWS may ride a future major) where nothing marks these scans as the cost.",
+            "fix": "State the bound in a comment beside each scan, or use a BTreeSet<ActionId>/BTreeSet<String> sidecar for the id and name uniqueness checks — which also matches the set-membership posture ADR-015's precondition checks are described as needing."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/manifest.rs:344, 562-578 (decode_base64 at 586-627)",
+            "problem": "Two comments overstate what the budgets buy. (a) MAX_NATIVE_NAME_OCTETS is documented as \"what bounds a refusal that has to echo the name\" (:54-57), but the bound is the render-time 80-char cut in one_line (error.rs:132-134, 155-169): the refusal String is built with the whole value first, so an oversized name allocates up to the document budget before being truncated (same for the duplicate/slug echoes at :290, 301, 442, 482, 510, 539, 546). (b) check_fingerprint decodes the entire base64 body before checking the digest length, so a hostile 1 MiB body drives Vec::with_capacity(786432) and ~786k pushes before the \"32 octets\" refusal; the fingerprint is the only new shape with no length budget at all.",
+            "fix": "Reword the two comments to name the render-time bound, and in check_fingerprint reject a body whose length is not the 44 chars a 32-octet digest encodes to before calling decode_base64 — or export a fingerprint length budget so the format matches the proposal's \"named parse budgets for every new shape\"."
+          }
+        ]
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/code-review-performance-r1c0.md",
+      "durationMs": 124872,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e2ad71f8cffefvrPqC7dH0rhYa",
+      "agent": "codereview/code-testing",
+      "at": 1794577685208,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/manifest.rs:223-228",
+            "problem": "The non-manifest-document branch of load_manifest (a manifest.toml holding a valid document of another format, e.g. `format = \"profile\"`) refuses with `InvalidValue(\"`manifest.toml` must hold a manifests document\")`, but no test drives it, so a regression removing the guard would pass the suite.",
+            "fix": "Add a case in tests/manifest.rs's load block: write a profile-format document into a correctly-named scratch game directory and assert the InvalidValue refusal naming `format`."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/manifest.rs:586-627",
+            "problem": "The hand-rolled strict-base64 decoder's strictness branches — body length not a multiple of four (line 588), `=` inside a quartet (lines 606-608), significant-quartet edge (lines 597-602), empty body after `sha256-` — carry no test or fixture; the doc-comment's contract claim (\"never decodes through a permissive fallback\") is unpinned and no external decoder guards it.",
+            "fix": "Extend refuses_a_fingerprint_whose_body_is_not_base64_naming_the_offender with bodies whose length is not a multiple of 4, with '=' mid-quartet, and with an empty body after the `sha256-` prefix."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/manifest.rs:230-235",
+            "problem": "The non-UTF-8 game-directory-segment branch of load_manifest is untested; it is reachable on Linux by building an OsString from non-UTF-8 bytes.",
+            "fix": "Optionally add one load_manifest case with a scratch directory whose name is a non-UTF-8 OsString, asserting the InvalidValue refusal."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/manifest.rs:52-55",
+            "problem": "The suite header still claims the tests are written \"while `crates/core/src/manifest.rs` does not exist, so they fail until the design is implemented\" — a test-authoring-stage artifact that is now false.",
+            "fix": "Drop or rewrite that sentence at the suite's next touch."
+          }
+        ]
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/code-review-testing-r1c0.md",
+      "durationMs": 96839,
+      "nudges": 0
+    },
+    {
+      "stage": "doc-sync",
+      "round": 1,
+      "sessionID": "ses_e2ad5a4dcffetFINETeJ141Fvf",
+      "agent": "ops/doc-sync",
+      "at": 1794577866824,
+      "reply": {
+        "drifted": true,
+        "commitMessage": "docs: record 013-game-manifests as-built drift and complete build notes"
+      },
+      "transcript": "docs/designs/013-game-manifests/transcripts/doc-sync-r1.md",
+      "durationMs": 181513,
+      "nudges": 0
+    }
+  ],
+  "gateLog": [
+    {
+      "gate": "sourceAdmissible",
+      "round": 0,
+      "proceed": true,
+      "reason": "ADR is proposed and complete",
+      "at": 1794574714512
+    },
+    {
+      "gate": "stageFailure",
+      "round": 1,
+      "proceed": false,
+      "reason": "design-review:compatibility: independence violation: read a review report: /home/mike/repos/bindforge/docs/designs/013-game-manifests/reviews",
+      "at": 1794575420844
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: performance",
+      "at": 1794575627912
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c2 pending: correctness, compatibility, security, complexity",
+      "at": 1794575758847
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794575972204
+    },
+    {
+      "gate": "editorial-review",
+      "round": 2,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1794576231804
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1794577003182
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794577685274
+    },
+    {
+      "gate": "done",
+      "round": 0,
+      "proceed": true,
+      "reason": "pipeline complete",
+      "at": 1794577866877
+    }
+  ],
+  "startedAt": 1794574714495,
+  "updatedAt": 1794577866877,
+  "flow": "full",
+  "baseRef": "fc71ff96f1143ecc21e01ad20faf22da45360ad2",
+  "designCycle": 3,
+  "designStamp": "fe5671de333bc6ea39d1122f819d0a0310564b8e",
+  "seats": {
+    "design": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "fe5671de333bc6ea39d1122f819d0a0310564b8e",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → Rules → Budgets — \"Each cap sits well above the baselines surveyed for it (40 registry ids, A7; TF2-scale bind lists and multi-word native names, A9, A13)\"",
+            "problem": "The new justification claims all four caps and supports two. The assumption register surveys a baseline for the row cap (A7, 40 ids) and, loosely, for the native-name cap, but no register row surveys a group-count or group-size baseline, so nothing backs \"each cap\" for `MAX_CONSTRAINT_GROUPS = 64` and `MAX_GROUP_MEMBERS = 16`; the only constraint-shape size the document states, A8's closed vocabulary (48 keyboard + 7 mouse + 18 gamepad = 73 nameable input ids), sits above the 64-group cap, so the sentence's own direction of comparison is unavailable for it. The \"multi-word native names\" half also rests on A13, which the register itself marks unverified, while the verified A9 survey names keybinds, not multi-word display names (its source page is live and lists ESC/F-keys/Tab/arrows/MOUSE1–5, not display names).",
+            "fix": "Scope the sentence to the caps with a surveyed baseline: \"The row and native-name caps sit well above the baselines surveyed for them (40 registry ids, A7; TF2-scale bind lists, A9); the two group caps are review ceilings over A8's 73-member closed vocabulary, not survey-derived.\" Alternatively drop \"each\" and name which caps the citation covers; do not cite A13's unverified row as a surveyed baseline."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Rules → Budgets — \"`MAX_MANIFEST_ROWS = 256` bounds each array-shaped entry (`actions`, `dead-keys`, `docked-actions`, `presets`)\"",
+            "problem": "`exclusive-groups` is also an array-shaped entry in the entry table (\"2..=16 members; at most 64 groups\"), so the category phrase \"each array-shaped entry\" is contradicted by its own enumeration: the fifth array rides `MAX_CONSTRAINT_GROUPS`/`MAX_GROUP_MEMBERS`, not 256. Low blast radius (Test strategy #4 pins \"a 65th group\"), but this is the sentence `spec.md` inherits per Rollout 1.",
+            "fix": "\"`MAX_MANIFEST_ROWS = 256` bounds each flat row array (`actions`, `dead-keys`, `docked-actions`, `presets`); `exclusive-groups` is bounded by `MAX_CONSTRAINT_GROUPS` and `MAX_GROUP_MEMBERS`.\""
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "fe5671de333bc6ea39d1122f819d0a0310564b8e",
+        "dissents": 0,
+        "findings": []
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "fe5671de333bc6ea39d1122f819d0a0310564b8e",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design → **Budgets** — \"`MAX_MANIFEST_ROWS = 256` bounds each array-shaped entry (`actions`, `dead-keys`, `docked-actions`, `presets`)\"",
+            "problem": "new (introduced by the r1 revision of the sentence this seat cited). The r1 wording was a closed list, \"bounds each of `actions`, `dead-keys`, and `docked-actions`\"; the replacement generalizes it to a category, \"each array-shaped entry\", which in this entry table also contains `exclusive-groups`, whose intended cap is 64 groups × 16 members, not 256. Because `spec.md` + fixtures are the third-party contract for this format, an out-of-repo reader who takes the category literally implements a 4x weaker group cap on untrusted input (fail-open on a budget), and the parenthetical reads as exhaustive only if the reader already knows why `exclusive-groups` was left out. The cap itself is not lost — the entry table still states \"at most 64 groups\" and `MAX_CONSTRAINT_GROUPS = 64` follows one clause later — so this is a precision regression in revised text, not an opened hole. Separately confirmed as closed: `presets` is now capped (with `presets-past-cap.toml` and the 257th-preset case in Tes… [elided by the checkpoint cap]",
+            "fix": "Revert to the closed list and name the other cap's owner in the same sentence: \"`MAX_MANIFEST_ROWS = 256` bounds each of `actions`, `dead-keys`, `docked-actions`, and `presets`; `exclusive-groups` is bounded by `MAX_CONSTRAINT_GROUPS`\". This replaces the loose category phrase; it adds no new constant, mechanism, or fixture."
+          }
+        ]
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "fe5671de333bc6ea39d1122f819d0a0310564b8e",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design → Rules → Budgets — \"Each cap sits well above the baselines surveyed for it (40 registry ids, A7; TF2-scale bind lists and multi-word native names, A9, A13)\"",
+            "problem": "re-raised (partially closed). The sentence claims a derivation for each cap but names baselines for only two of the four: MAX_CONSTRAINT_GROUPS = 64 and MAX_GROUP_MEMBERS = 16 carry no stated observation, and the baselines offered describe bind lists and display names, not group counts. The claim is reconstructible from A9 (the surveyed TF2 key set is roughly 30 named inputs, so 64 groups × 16 members sits above any surveyed geometry), but the reader has to do it — which is exactly the derivation the checklist item asks the design to quote. Additionally, A13 is marked unverified in the assumption register, so naming it in the baseline list anchors the 128-octet native-name cap on an unconfirmed observation.",
+            "fix": "Extend the same sentence with the fact the group caps sit above (e.g. \"no surveyed game constrains more than ~30 named keys (A9), so 64 groups × 16 members is above any surveyed geometry\") and either drop A13 from the baseline list or qualify it (\"plus the unverified A13 survey\"), so no cap's strength rests on an unverified row. No change to any constant or fixture."
+          }
+        ]
+      },
+      "complexity": {
+        "verdict": "approve",
+        "stamp": "fe5671de333bc6ea39d1122f819d0a0310564b8e",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design → Budgets — \"`MAX_MANIFEST_ROWS = 256` bounds each array-shaped entry (`actions`, `dead-keys`, `docked-actions`, `presets`)\"",
+            "problem": "new: `exclusive-groups` is also an array-shaped entry, bounded by `MAX_CONSTRAINT_GROUPS = 64` rather than by this constant, so \"each array-shaped entry\" overstates the sentence and the parenthetical list reads as if that array were uncapped. The r1 wording (\"bounds each of `actions`, `dead-keys`, and `docked-actions`\") did not have this ambiguity.",
+            "fix": "Reword to \"`MAX_MANIFEST_ROWS = 256` bounds `actions`, `dead-keys`, `docked-actions`, and `presets`; `MAX_CONSTRAINT_GROUPS = 64` bounds `exclusive-groups`\" — same constants, no new mechanism."
+          }
+        ]
+      }
+    },
+    "code": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "500e9e4cd720708ae296d7806c2c03ad627fb94a",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/manifest.rs:52-55",
+            "problem": "The module header still asserts that the tests are written \"while crates/core/src/manifest.rs does not exist, so they fail until the design is implemented\"; manifest.rs now exists and the suite passes, so the sentence describes a superseded repository state and reads as stale provenance.",
+            "fix": "Reword to past tense: the tests were written from the proposal before manifest.rs existed and pin the implemented design unchanged."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/manifest.rs:582-585",
+            "problem": "The decode_base64 doc claims its strictness prevents \"two spellings claim one digest\", but non-zero padding bits are not rejected, so e.g. AA== and AB== both decode to the same octet. The proposal only requires standard base64 decoding to 32 octets (RFC 4648 ignores pad bits), and the fingerprint is stored and re-emitted verbatim, so only the comment overstates the decoder.",
+            "fix": "Either reject quartets whose unused low bits are non-zero (canonical-only spelling) or soften the comment to \"characters outside the alphabet never decode through a permissive fallback\"."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "500e9e4cd720708ae296d7806c2c03ad627fb94a",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/tests/manifest.rs:428 and schemas/manifests/v1/fixtures/valid/",
+            "problem": "The format's only free-text column is pinned exclusively with ASCII names. The proposal's basis for the remainder-split row encoding is localized, multi-word game names (A13), yet no valid fixture and none of the 49 new tests carry a non-ASCII native name — grep for non-ASCII over the new corpus, manifest.rs and tests/manifest.rs finds only prose. The two locale-visible properties therefore go unproven against a second implementation: a multi-byte name round-trips byte-exactly only because `quoted` (document.rs:863-881) writes non-control chars raw rather than as \\uXXXX, and MAX_NATIVE_NAME_OCTETS is an octet cap (name.len()), so a 60-character CJK name (180 octets) refuses while a character-counting implementer accepts it. reach-classes/v2 set the precedent of pinning the non-ASCII posture in the corpus; manifests, the format whose whole point is the game's own spelling, ships none.",
+            "fix": "Add a tests/manifest.rs case beside the punctuation test parsing a row whose name is multi-byte (e.g. `aim.camera Caméra \\\"retour\\\"`), asserting the value byte-for-byte and parse(serialize(parse(text))) == parse(text); add a boundary case whose name is under 128 characters but over 128 octets, refused for the octet budget. Preferably also add one fixtures/valid/ document with a localized name, with a line added to the proposal's fixture list and to spec.md's 'Spaces, `#`, and every glyph…' sentence so the language-neutral contract states that non-ASCII is data."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/manifest.rs:237-245; asserted at crates/core/tests/manifest.rs:1058-1061",
+            "problem": "The location-rule refusal interpolates {segment}, a component of the caller's local path, into the rendered message, while the proposal states the mismatch 'never echoes a local path (the error contract's channel for paths is source_path)' and error.rs upholds that elsewhere by never rendering CoreError::Io { path }. Today it is bounded by one_line and is the only actionable spelling, but the test that claims the promise asserts only that the full scratch path is absent, so a future edit echoing a parent segment or a truncated display() would keep the suite green while contradicting the contract sentence.",
+            "fix": "Either name only the document's own `id` in the message (the caller supplied the directory), or keep the segment and strengthen the assertion to reject any path separator or display() suffix in the rendered line, so the contract sentence is pinned rather than one scratch root."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/manifest.rs:787",
+            "problem": "The slug-grammar case loop's own doc comment says the rule exists to catch 'a spelling that merely looks lowercase', but the loop tests only an uppercase ASCII spelling, a dot, a leading hyphen and a 64-octet id. A non-ASCII lookalike id (Cyrillic `е`, an accented `joueur-2`, a U+2011 hyphen) is the realistic non-English-contributor mistake, and it is exactly where a directory name and an `id` look equal in a file browser while being unequal byte-for-byte — the name↔location collision the loader's location rule exists to make visible.",
+            "fix": "Add one non-ASCII spelling and one Unicode-hyphen spelling to the loop's list; the byte-based is_slug_name already refuses them, so this pins the claim the comment makes at no behavioral cost."
+          }
+        ]
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "500e9e4cd720708ae296d7806c2c03ad627fb94a",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/manifest.rs:360 (check_native_name control check) with crates/core/src/error.rs:155 (one_line)",
+            "problem": "The format's one free-text column can carry an unescaped line terminator into a refusal message and into every serialized copy of the manifest. check_native_name bans only ASCII controls (bytes().any(|b| b.is_ascii_control())), while one_line's escaper is category-based (c.is_control() = Cc), so the two guards do not meet: U+2028/U+2029 are neither ASCII control nor Cc, so such a name parses, is stored, is re-serialized raw by quoted (document.rs:875 has the same Cc blind spot), and is echoed raw by the escape-and-truncate path the design names as its own mitigation against hostile echoed names. error.rs:11-16 states the property being protected (\"one hostile upload cannot forge extra log lines\"), and JS/JSON-adjacent log pipelines and some shippers/terminals break on U+2028. This is a new surface: every earlier format's echoed strings are grammar-constrained ids (PROFILE_ENTRIES, ACTION_IDS_ENTRIES, GEOMETRY_ENTRIES carry no free text). It also undercuts the trailing-space rationale, … [elided by the checkpoint cap]",
+            "fix": "Tighten the clause to the printable set: refuse name.chars().any(|c| c != ' ' && (c.is_control() || c.is_whitespace())) — that covers U+0085, U+2028, U+2029, NBSP — and refuse the Cf format range that reorders a reviewer's terminal (U+200B..=U+200F, U+2060..=U+2064, U+2066..=U+206F, U+FEFF); add fixtures/invalid/name-format-char.toml and mirror the one clause in schemas/manifests/v1/spec.md:79 so a third-party reader refuses the same documents."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/manifest.rs:586-627 (decode_base64, via check_fingerprint:559)",
+            "problem": "The decoder accepts non-canonical base64, contradicting its own doc comment at manifest.rs:582-585 (\"A body outside this never decodes through a permissive fallback, which would let two spellings claim one digest\") and the fingerprint-not-base64.toml fixture comment. In the final quartet the decoder takes significant from the trailing '=' and pushes only the high bits, so the unused low bits of the last data sextet are discarded silently: a 32-octet digest's 44-char body has 16 spellings decoding identically (AA== and AB== both yield 0x00). RFC 4648 §3.5 requires those bits be zero, and spec.md:116-117 does not say which side a reader takes, so the corpus pins neither and a reader written to RFC 4648 refuses documents this one accepts. Contained today (nothing consumes the digest in this run), but 017/018's use of the field is comparing it, where two spellings of one digest become byte-different fingerprints a string comparison calls a mismatch.",
+            "fix": "In the final quartet reject non-zero discarded bits (significant == 2 -> sextets[1] & 0x0f == 0; significant == 3 -> sextets[2] & 0x03 == 0), state \"canonical spelling per RFC 4648 §3.5\" in spec.md's Fingerprint grammar, and pin it with fixtures/invalid/fingerprint-non-canonical.toml plus a unit case beside tests/manifest.rs:894."
+          },
+          {
+            "severity": "minor",
+            "location": "schemas/manifests/v1/spec.md:129 with crates/core/src/manifest.rs:221-273 (load_manifest)",
+            "problem": "The shipped language-neutral contract claims a guard the reference implementation does not have: \"The loader enforces monotonicity forward\". load_manifest applies exactly two cross-file rules (location, registry join) and has no prior state to compare a revision against; nothing in the diff reads history, and the proposal itself says core cannot pin a file's history (A10) and puts the bump rule in manifest-PR review plus ADR-014's deferred pin matrix. Because an out-of-repo implementer implements the spec verbatim, the sentence invites invented history-dependent behavior and lets a consumer treat revision as rollback/tamper evidence on the strength of a loader check that does not exist.",
+            "fix": "Reword to match the design: monotonicity is enforced in manifest review, and by the dependent-pin matrix once ADR-014 ships; load_manifest enforces only the location rule and the registry join."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/manifest.rs:559-579 (check_fingerprint) and manifest.rs:592 (decode_base64 allocation)",
+            "problem": "The fingerprint is the one entry-table string with no named size bound: a legal value is at most 51 characters, but nothing states or checks it, and the body is fully allocated and decoded (Vec::with_capacity(quartets * 3)) before the 32-octet length refusal, so a 1 MiB fingerprint element buys ~0.75 MB of allocation and a full scan before it is refused. Every other shape in this format has its cap named in the budgets table.",
+            "fix": "Reject a body whose length is not 44 before decoding (which also settles the canonical-shape question), or name the bound in spec.md's budgets table."
+          }
+        ]
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "500e9e4cd720708ae296d7806c2c03ad627fb94a",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/manifest.rs:385 (cap applied at :394)",
+            "problem": "The MAX_GROUP_MEMBERS budget is checked after the group element is fully split: `let fields: Vec<&str> = raw.split(' ').collect();` materializes one entry per space before the refusal. A single `exclusive-groups` element is bounded only by MAX_DOCUMENT_BYTES (the toml reader has no per-value or per-element bound, toml.rs:314-345), so `exclusive-groups = [\"<1 MiB of spaces>\"]` transiently allocates ~1,048,576 &str entries (~16.8 MB) before refusing — a ~16x amplification of the input budget on the untrusted-input path the design itself names (A14, hostile-manifest risk row). `parse_docked` (:470-475) already avoids this pattern with split_once + contains.",
+            "fix": "Bound the split lazily before collecting: `if raw.split(' ').take(MAX_GROUP_MEMBERS + 1).count() > MAX_GROUP_MEMBERS { …refuse… }`, and derive the `< 2` check from `raw.matches(' ').count() + 1`; collect only after both caps pass. The existing 17-member case (tests/manifest.rs:750-760) keeps covering the refusal."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/manifest.rs:283-284, 374-375, 435-436, 462-463, 504-505",
+            "problem": "For every array-shaped entry the length budget is checked on the already-cloned array: string_array (document.rs:840-857) allocates a fresh String per element, and only then does check_row_count compare the length against MAX_MANIFEST_ROWS / MAX_CONSTRAINT_GROUPS. A hostile `actions = [\"\", \"\", …]` under the 1 MiB budget materializes ~350k elements twice (~8 MB of clone on top of the reader's own ~8 MB) before the O(1)-knowable fault refuses. The budget is therefore a model-level bound, not the allocation bound its doc comment advertises (manifest.rs:40-44: \"what stops a hostile manifest driving the load-time join over an unbounded table\").",
+            "fix": "Check the borrowed array's length before cloning it: the length is already on `Value::Array(items)`. Add a small helper (e.g. `array_items(key, value, cap) -> Result<&[Value], CoreError>`) or an inline `if let Value::Array(items) = value { if items.len() > cap { … } }` ahead of `string_array` in each of the five parse functions, keeping the refusal message byte-identical."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/manifest.rs:171-180, 288, 296, 406, 413, 441, 480, 509",
+            "problem": "Every one-fact-per-entry rule is a linear scan over the values collected so far (two `iter().any(…)` per actions row, `dead_keys.contains(…)` per docked row, nested `groups.iter().any(|g| g.inputs.contains(…))`), i.e. quadratic in entry length. All are bounded because the cap check precedes each loop — worst case ~65k predicate calls for a max-size `actions` array, ≤ 256×73 for the dead/docked disjointness scan, ~2.6k contains calls for groups — so this costs sub-millisecond once per load and needs no change today. The exposure is the design's own growth path (registry grows in batches, so MAX_MANIFEST_ROWS may ride a future major) where nothing marks these scans as the cost.",
+            "fix": "State the bound in a comment beside each scan, or use a BTreeSet<ActionId>/BTreeSet<String> sidecar for the id and name uniqueness checks — which also matches the set-membership posture ADR-015's precondition checks are described as needing."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/manifest.rs:344, 562-578 (decode_base64 at 586-627)",
+            "problem": "Two comments overstate what the budgets buy. (a) MAX_NATIVE_NAME_OCTETS is documented as \"what bounds a refusal that has to echo the name\" (:54-57), but the bound is the render-time 80-char cut in one_line (error.rs:132-134, 155-169): the refusal String is built with the whole value first, so an oversized name allocates up to the document budget before being truncated (same for the duplicate/slug echoes at :290, 301, 442, 482, 510, 539, 546). (b) check_fingerprint decodes the entire base64 body before checking the digest length, so a hostile 1 MiB body drives Vec::with_capacity(786432) and ~786k pushes before the \"32 octets\" refusal; the fingerprint is the only new shape with no length budget at all.",
+            "fix": "Reword the two comments to name the render-time bound, and in check_fingerprint reject a body whose length is not the 44 chars a 32-octet digest encodes to before calling decode_base64 — or export a fingerprint length budget so the format matches the proposal's \"named parse budgets for every new shape\"."
+          }
+        ]
+      },
+      "testing": {
+        "verdict": "approve",
+        "stamp": "500e9e4cd720708ae296d7806c2c03ad627fb94a",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/manifest.rs:223-228",
+            "problem": "The non-manifest-document branch of load_manifest (a manifest.toml holding a valid document of another format, e.g. `format = \"profile\"`) refuses with `InvalidValue(\"`manifest.toml` must hold a manifests document\")`, but no test drives it, so a regression removing the guard would pass the suite.",
+            "fix": "Add a case in tests/manifest.rs's load block: write a profile-format document into a correctly-named scratch game directory and assert the InvalidValue refusal naming `format`."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/manifest.rs:586-627",
+            "problem": "The hand-rolled strict-base64 decoder's strictness branches — body length not a multiple of four (line 588), `=` inside a quartet (lines 606-608), significant-quartet edge (lines 597-602), empty body after `sha256-` — carry no test or fixture; the doc-comment's contract claim (\"never decodes through a permissive fallback\") is unpinned and no external decoder guards it.",
+            "fix": "Extend refuses_a_fingerprint_whose_body_is_not_base64_naming_the_offender with bodies whose length is not a multiple of 4, with '=' mid-quartet, and with an empty body after the `sha256-` prefix."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/src/manifest.rs:230-235",
+            "problem": "The non-UTF-8 game-directory-segment branch of load_manifest is untested; it is reachable on Linux by building an OsString from non-UTF-8 bytes.",
+            "fix": "Optionally add one load_manifest case with a scratch directory whose name is a non-UTF-8 OsString, asserting the InvalidValue refusal."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/manifest.rs:52-55",
+            "problem": "The suite header still claims the tests are written \"while `crates/core/src/manifest.rs` does not exist, so they fail until the design is implemented\" — a test-authoring-stage artifact that is now false.",
+            "fix": "Drop or rewrite that sentence at the suite's next touch."
+          }
+        ]
+      }
+    }
+  },
+  "lastReviewPass": {
+    "phase": "code",
+    "round": 1,
+    "cycle": 0,
+    "seats": [
+      "correctness",
+      "compatibility",
+      "security",
+      "performance",
+      "testing"
+    ]
+  },
+  "reviseNoChange": false,
+  "codeCycle": 1,
+  "codeStamp": "500e9e4cd720708ae296d7806c2c03ad627fb94a"
+}

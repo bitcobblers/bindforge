@@ -15,16 +15,22 @@
 //! `input.rs` (#1), `reach_v2.rs` (#2, #3), `placement.rs` (#4, #5) — so this file
 //! adds no rule of its own; it keeps the surface the rule-bearing suites are
 //! written through honest.
+//!
+//! proves: design 013's Test strategy #7 + its Delta inventory (`lib.rs` "re-exports
+//! `Manifest`, `ManifestAction`, `ExclusivityGroup`, `DockedAction`, `load_manifest`,
+//! and the four budget constants") — the same probe for ADR-013's manifest names,
+//! whose behavior `manifest.rs` pins (#1–#5).
 
 mod common;
 
 use std::path::PathBuf;
 
 use bindforge_core::{
-    CoreError, GradeBound, Hand, InputGrade, InputId, InputNamespace, KeyboardGeometry,
-    PlacementCheck, ReachClass, ReachTable, ReachTables,
+    ActionRegistry, CoreError, DockedAction, ExclusivityGroup, GradeBound, Hand, InputGrade,
+    InputId, InputNamespace, KeyboardGeometry, Manifest, ManifestAction, PlacementCheck,
+    ReachClass, ReachTable, ReachTables,
 };
-use common::schemas_root;
+use common::{ScratchDir, schemas_root};
 
 /// `InputGrade` is the parsed `keys` pair — input id plus class id — that a v2
 /// document's `keys` array carries (A11, r2: `InputGrade.class` typed). It reaches
@@ -103,5 +109,97 @@ fn the_adr_012_names_resolve_at_the_crate_root() {
     assert!(
         refused.is_err(),
         "an ungraded input is a structured refusal, not a verdict"
+    );
+}
+
+/// The four manifest budgets, taken as arguments so the exported names are read in
+/// value position — the shape `manifest.rs` asserts them through.
+fn manifest_budgets(rows: usize, groups: usize, members: usize, octets: usize) -> [usize; 4] {
+    [rows, groups, members, octets]
+}
+
+/// proves: design 013's Test strategy #7 + its Delta inventory (`lib.rs`
+/// re-exports) — every name ADR-013 promises resolves at the crate root and
+/// connects to the next one: budgets → registry → load → model. The behavior is
+/// `manifest.rs`'s (#1–#5); this target only keeps the names honest, which is what
+/// a consumer that has not been written yet compiles against.
+#[test]
+fn the_adr_013_names_resolve_at_the_crate_root() {
+    // The budget family, exported beside `MAX_DOCUMENT_BYTES` and `MAX_NESTING_DEPTH`.
+    let budgets = manifest_budgets(
+        bindforge_core::MAX_MANIFEST_ROWS,
+        bindforge_core::MAX_CONSTRAINT_GROUPS,
+        bindforge_core::MAX_GROUP_MEMBERS,
+        bindforge_core::MAX_NATIVE_NAME_OCTETS,
+    );
+    assert!(
+        budgets.iter().all(|limit| *limit > 0),
+        "the four manifest budgets are the public names for the caps: {budgets:?}"
+    );
+
+    // `load_manifest` over a `load_action_registry`ed registry: the join in call
+    // position, answering with the typed model.
+    let scratch = ScratchDir::new("api-probe-manifest");
+    scratch.write(
+        "v1/registry.toml",
+        r#"format = "action-ids"
+version = "v1"
+discrete-lateral = ["move.steer-left"]
+continuous-lateral = ["aim.camera"]
+none = ["combat.fire", "ui.menu"]
+"#,
+    );
+    let registry: ActionRegistry = bindforge_core::load_action_registry(&scratch.path().join("v1"))
+        .expect("the scratch registry loads");
+
+    let manifest_text = r#"format = "manifests"
+version = "v1"
+id = "probe-game"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["move.steer-left Turn left", "aim.camera Mouse camera"]
+exclusive-groups = ["keyboard:w keyboard:s"]
+dead-keys = ["keyboard:x"]
+docked-actions = ["ui.menu keyboard:y"]
+presets = ["default"]
+"#;
+    scratch.write("probe-game/manifest.toml", manifest_text);
+    let manifest: Manifest =
+        bindforge_core::load_manifest(&scratch.path().join("probe-game"), &registry)
+            .expect("a manifest the registry backs must load");
+    // `Manifest`, `ManifestAction`, `ExclusivityGroup`, `DockedAction`: the model a
+    // consumer reads the game facts through.
+    let first_row: &ManifestAction = manifest
+        .actions
+        .first()
+        .expect("the probe manifest names one row");
+    assert_eq!(first_row.action.as_str(), "move.steer-left");
+    assert_eq!(first_row.native_name, "Turn left");
+    let group: &ExclusivityGroup = manifest
+        .exclusive_groups
+        .first()
+        .expect("the probe manifest names one group");
+    assert_eq!(group.inputs.len(), 2, "a group names its members");
+    let docked: &DockedAction = manifest
+        .docked_actions
+        .first()
+        .expect("the probe manifest names one docked row");
+    assert_eq!(docked.input.as_str(), "keyboard:y");
+    assert_eq!(
+        manifest.dead_keys.first().map(|id| id.as_str()),
+        Some("keyboard:x"),
+        "`dead_keys` is the typed input-id list ADR-015 looks up"
+    );
+    assert_eq!(manifest.presets, vec!["default".to_string()]);
+
+    // `CoreError` is still the only refusal type: the location rule refuses the same
+    // document sitting in a directory whose name contradicts its `id`, and no new
+    // variant is promised.
+    scratch.write("not-the-id/manifest.toml", manifest_text);
+    let refused: Result<Manifest, CoreError> =
+        bindforge_core::load_manifest(&scratch.path().join("not-the-id"), &registry);
+    assert!(
+        refused.is_err(),
+        "a game directory whose name is not the manifest's id is a structured refusal"
     );
 }

@@ -1,0 +1,86 @@
+diff --git a/tmp/bindforge-editorial-game-manifests-r2.md b/home/mike/repos/bindforge/docs/designs/013-game-manifests/02-proposal.md
+index fe5671d..be7b2a6 100644
+--- a/tmp/bindforge-editorial-game-manifests-r2.md
++++ b/home/mike/repos/bindforge/docs/designs/013-game-manifests/02-proposal.md
+@@ -29,8 +29,8 @@ Chosen design or listed under Deferred / out of scope.
+   - A closed entry set recording exactly the five fact groups the ADR names:
+     identity + fingerprint, codec family id, action table, constraints,
+     presets.
+-  - A row encoding inside the one-line string-array grammar that is
+-    unambiguous even when a game-native name contains spaces (A5, A13).
++  - A row encoding that is unambiguous inside the one-line string-array
++    grammar, even when a game-native name contains spaces (A5, A13).
+   - Taxonomy ids validated against the loaded registry at load, so a manifest
+     cannot name an action the taxonomy does not own — and axis kind stays a
+     one-source fact answered by `ActionRegistry::axis_kind` (A7).
+@@ -76,12 +76,12 @@ Chosen design or listed under Deferred / out of scope.
+ axis kind left to the registry, or a new nested structure.** The grammar
+ admits no tables, so nesting is out before it starts (A4). A third column
+ would restate a fact `registry.toml` already owns per id — two answers to one
+-fact, the drift channel the research flags, and the contract's own
++fact, the drift channel the research flags; the contract's own
+ "presence in `fixtures/valid/` is the definition of supported" posture is
+ built to refuse exactly that (A7). Chosen: each `actions` element is
+ `"<action-id> <native-name>"`; axis kind is answered at load by
+ `ActionRegistry::axis_kind`, the registry is the single source, and the ADR's
+-"+ axis kind" clause is honored by the *answer*, not a copy.
++"+ axis kind" clause is honoured by the *answer*, not a copy.
+ 
+ **Where the split point is, when names carry spaces: split on every space, a
+ dedicated separator, quoting, or remainder-splitting.** Every-space splitting
+@@ -97,7 +97,7 @@ its own grammar (length cap, no control characters, no leading or trailing
+ space) so the encoding round-trips byte-exactly.
+ 
+ **Manifest identity: reuse the two-segment action-id grammar, carry a store
+-id (Steam AppID precedent), or a lowercase slug equal to the data directory
++id (Steam AppID precedent), or use a lowercase slug equal to the data directory
+ name.** The two-segment dotted grammar collides with the `@`-joined pin
+ ADR-014 will spell and buys nothing for a single game name (A12); a
+ store-assigned id covers only store games, and config/store discovery is
+@@ -267,7 +267,7 @@ presets = ["default", "southpaw"]
+ ```
+ 
+ (`ui.inventory` is not yet in `registry.toml` and `Tab` is not yet in the
+-closed vocabulary (A8): see Registry growth order, and Deferred.)
++closed vocabulary (A8): see Registry growth order and Deferred.)
+ 
+ ### The model: `crates/core/src/manifest.rs` and the `document.rs` edits
+ 
+@@ -321,8 +321,8 @@ Result<Manifest, CoreError>` — the `load_action_registry` pattern (A7):
+    case-insensitive contributor filesystem — the same platform posture as
+    fixture names.
+ 3. **Registry join:** every taxonomy id the document names — each
+-   `actions[].action` and each `docked_actions[].action` — must be
+-   `registry.contains`; one that is not is refused naming the id. (Group and
++   `actions[].action` and each `docked_actions[].action` — must pass
++   `registry.contains`; one that does not is refused, naming the id. (Group and
+    dead-key members are input ids, closed at parse by `InputId::parse` (A8),
+    so they have no registry side to join.) Axis kind is never read from the
+    document: a consumer that wants it asks `registry.axis_kind(id)` (A7).
+@@ -363,7 +363,7 @@ game fact that motivated it are reviewed together.
+ ADR-014 reads the pin halves (`id`, `revision`) and, for `seeded-from`, the
+ `presets` ids (A11). ADR-015's precondition checks consult the loaded
+ manifest: a transform's proposed target input is refused if it appears in
+-`dead_keys`, in any `exclusive_groups` member, or on the input side of any
++`dead_keys`, as any `exclusive_groups` member, or on the input side of any
+ `docked_actions` row — "a hard-docked or exclusive-group key is never a
+ target" is a set-membership lookup over loaded data, no new logic surface
+ (A11). The action side of `docked_actions` names *why* the key is docked, so
+@@ -415,7 +415,7 @@ failure.
+    a `fingerprint` with an unknown algorithm prefix, a non-base64 body, or a
+    body decoding to 31 octets is refused; the version gate refuses a
+    `manifests` document declaring `v2`, naming only `manifests`' majors (A2).
+-4. Unit — load-time validation: `load_manifest` files a
++4. Unit — load-time validation: `load_manifest` reports a
+    grammar-valid-but-unregistered action id as a refusal naming the id, and
+    accepts it once a registry built from entries lists it; the directory
+    segment must equal `id` (a scratch `Remnant-2/` or `other/` directory is
+@@ -438,7 +438,7 @@ failure.
+    per-format loop and accepts a document using exactly the defined entries;
+    `version_gate.rs` refuses a `manifests` document declaring `v2`; every
+    pre-existing fixture, loader test, and refusal stays byte-unchanged,
+-   including the `is_slug_name` rename's behavior.
++   including the `is_slug_name` rename's behaviour.
+ 8. Platform — the three gate commands (`fmt`, `clippy -D warnings`, `test
+    --workspace --locked`) are green on the Linux CI runner (the merge PR's
+    job is the leg), and the suite runs once on a Windows contributor machine,

@@ -1,0 +1,12 @@
+# The entry set is closed. `axis-kinds` is the alternative the design
+# considered and refused: it would restate, per row, the axis kind
+# `schemas/action-ids/v1/registry.toml` already owns per id — one fact with
+# two answers and a drift channel. An entry the grammar never defined is a
+# refusal naming the entry, never an ignored key.
+format = "manifests"
+version = "v1"
+id = "unknown-entry"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["move.steer-left Turn left"]
+axis-kinds = ["move.steer-left none"]

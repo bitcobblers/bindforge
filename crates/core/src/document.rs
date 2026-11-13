@@ -30,12 +30,14 @@
 //! from the *declared* version and a refusal names that version.
 //!
 //! The scaffold ships the `profile/v1` and `reach-classes/v1` documents,
-//! ADR-011 adds `action-ids/v1`, and ADR-012 adds `reach-classes/v2` — the
+//! ADR-011 adds `action-ids/v1`, ADR-012 adds `reach-classes/v2` — the
 //! five-class taxonomy with each hand's grade for every graded input — and
 //! `keyboard-geometry/v1` — the key grid the placement predicate in
-//! `placement` checks its shape rule against. The manifest and profile-chain
-//! formats arrive with the rest of the 012-015 series and the same harness
-//! walk picks them up with no harness change.
+//! `placement` checks its shape rule against — and ADR-013 adds `manifests/v1`
+//! — the game facts of `manifest`, whose two cross-file rules (the registry
+//! join and the location rule) live in `manifest::load_manifest`, not here.
+//! The profile-chain format arrives with the rest of the 012-015 series and
+//! the same harness walk picks it up with no harness change.
 
 use std::collections::BTreeMap;
 use std::io::Read;
@@ -44,7 +46,8 @@ use std::path::Path;
 use crate::action::{ActionRegistry, AxisKind, registry_from_entries};
 use crate::error::CoreError;
 use crate::input::{InputId, InputNamespace};
-use crate::placement::is_geometry_name;
+use crate::manifest::{Manifest, manifest_from_entries};
+use crate::placement::is_slug_name;
 use crate::reach::{Hand, InputGrade, ReachClass};
 use crate::toml::{self, Value};
 
@@ -57,6 +60,7 @@ const MAJOR_V2: &str = "v2";
 const SUPPORTED_FORMATS: &[&str] = &[
     "action-ids",
     "keyboard-geometry",
+    "manifests",
     "profile",
     "reach-classes",
 ];
@@ -87,6 +91,27 @@ const ACTION_IDS_ENTRIES: &[&str] = &[
     "discrete-lateral",
     "format",
     "none",
+    "version",
+];
+
+/// Every entry the `manifests/v1` grammar defines, and the only ones it
+/// admits: the identity group (`id`, `revision`), the codec family id, the
+/// optional fingerprint, the action table, the three constraint entries, and
+/// the preset ids. The set is closed the same way as every other format's,
+/// and the refused alternative it exists to refuse is `axis-kinds`: axis kind
+/// is a fact `schemas/action-ids/v1/registry.toml` already owns per id, and a
+/// manifest restating it per row is the second answer to one fact (ADR-013).
+const MANIFEST_ENTRIES: &[&str] = &[
+    "actions",
+    "codec",
+    "dead-keys",
+    "docked-actions",
+    "exclusive-groups",
+    "fingerprint",
+    "format",
+    "id",
+    "presets",
+    "revision",
     "version",
 ];
 
@@ -124,7 +149,7 @@ pub fn supported_majors() -> Vec<String> {
 /// `parse`, whatever its version line says.
 fn format_majors(format: &str) -> Option<&'static [&'static str]> {
     match format {
-        "action-ids" | "keyboard-geometry" | "profile" => Some(&[MAJOR_V1]),
+        "action-ids" | "keyboard-geometry" | "manifests" | "profile" => Some(&[MAJOR_V1]),
         "reach-classes" => Some(&[MAJOR_V1, MAJOR_V2]),
         _ => None,
     }
@@ -194,6 +219,7 @@ pub enum Document {
     ReachClasses(ReachClassTable),
     ActionIds(ActionRegistry),
     KeyboardGeometry(KeyboardGeometryTable),
+    Manifest(Manifest),
 }
 
 impl Document {
@@ -260,6 +286,11 @@ pub fn parse(text: &str) -> Result<Document, CoreError> {
             reject_unknown_entry(&entries, "keyboard-geometry", &version, GEOMETRY_ENTRIES)?;
             let geometry = parse_keyboard_geometry(&entries, version)?;
             Ok(Document::KeyboardGeometry(geometry))
+        }
+        "manifests" => {
+            reject_unknown_entry(&entries, "manifests", &version, MANIFEST_ENTRIES)?;
+            let manifest = manifest_from_entries(&entries, version)?;
+            Ok(Document::Manifest(manifest))
         }
         other => Err(CoreError::UnknownFormat {
             declared: other.to_string(),
@@ -399,6 +430,68 @@ pub fn serialize(document: &Document) -> String {
                 quoted(&table.geometry)
             )
         }
+        Document::Manifest(manifest) => {
+            // The entries go out in the fixed order the entry table defines
+            // them, and every array keeps its document order: row, group, and
+            // member order is data, so the harness's re-parse comparison is
+            // equality, not luck. `quoted` writes the native names back
+            // through the same closed escape table the reader decodes.
+            let actions = manifest
+                .actions
+                .iter()
+                .map(|row| quoted(&manifest_row(row)))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let groups = manifest
+                .exclusive_groups
+                .iter()
+                .map(|group| quoted(&group_members(group)))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let dead_keys = manifest
+                .dead_keys
+                .iter()
+                .map(|id| quoted(id.as_str()))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let docked = manifest
+                .docked_actions
+                .iter()
+                .map(|row| quoted(&docked_row(row)))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let presets = manifest
+                .presets
+                .iter()
+                .map(|id| quoted(id))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let mut lines = vec![
+                "format = \"manifests\"".to_string(),
+                format!("version = {}", quoted(&manifest.version)),
+                format!("id = {}", quoted(&manifest.id)),
+                format!("revision = {}", manifest.revision),
+                format!("codec = {}", quoted(&manifest.codec)),
+            ];
+            // An absent fingerprint stays absent: it means never read against
+            // a config, and writing one would invent a provenance claim.
+            if let Some(fingerprint) = &manifest.fingerprint {
+                lines.push(format!("fingerprint = {}", quoted(fingerprint)));
+            }
+            lines.extend([
+                format!("actions = [{actions}]"),
+                format!("exclusive-groups = [{groups}]"),
+                format!("dead-keys = [{dead_keys}]"),
+                format!("docked-actions = [{docked}]"),
+                format!("presets = [{presets}]"),
+            ]);
+            let mut text = String::new();
+            for line in lines {
+                text.push_str(&line);
+                text.push('\n');
+            }
+            text
+        }
     }
 }
 
@@ -413,6 +506,30 @@ fn input_grade_pair(entry: &InputGrade) -> String {
 /// and the row, one space between.
 fn geometry_pair(key: &GeometryKey) -> String {
     format!("{} {} {}", key.input.as_str(), key.column, key.row)
+}
+
+/// One manifest row back into the grammar's two-field encoding: the action id
+/// and the native name, split at the first space going in and out. `quoted`
+/// escapes what the reader's closed escape table decodes, so a name carrying
+/// `#`, `"`, or `\` round-trips byte-exactly.
+fn manifest_row(row: &crate::manifest::ManifestAction) -> String {
+    format!("{} {}", row.action.as_str(), row.native_name)
+}
+
+/// One exclusivity group back into its element: the members, space-separated,
+/// in the order the document wrote them.
+fn group_members(group: &crate::manifest::ExclusivityGroup) -> String {
+    group
+        .inputs
+        .iter()
+        .map(|id| id.as_str())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// One docked row back into its element: the action id and the input id.
+fn docked_row(row: &crate::manifest::DockedAction) -> String {
+    format!("{} {}", row.action.as_str(), row.input.as_str())
 }
 
 /// The ids one axis array lists, quoted into the grammar's one-line array
@@ -583,7 +700,7 @@ fn parse_keyboard_geometry(
     version: String,
 ) -> Result<KeyboardGeometryTable, CoreError> {
     let geometry = string_entry(entries, "geometry")?;
-    if !is_geometry_name(&geometry) {
+    if !is_slug_name(&geometry) {
         return Err(CoreError::InvalidValue {
             key: "geometry".to_string(),
             message: format!("`{geometry}` is not a geometry name: {GEOMETRY_NAME_RULE}"),
@@ -698,7 +815,10 @@ pub(crate) fn major_dir_segment(dir: &Path) -> Option<&str> {
     Some(segment)
 }
 
-fn string_entry(entries: &BTreeMap<String, Value>, key: &str) -> Result<String, CoreError> {
+pub(crate) fn string_entry(
+    entries: &BTreeMap<String, Value>,
+    key: &str,
+) -> Result<String, CoreError> {
     match entries.get(key) {
         None => Err(CoreError::MissingEntry {
             key: key.to_string(),
@@ -707,7 +827,7 @@ fn string_entry(entries: &BTreeMap<String, Value>, key: &str) -> Result<String, 
     }
 }
 
-fn string_value(key: &str, value: &Value) -> Result<String, CoreError> {
+pub(crate) fn string_value(key: &str, value: &Value) -> Result<String, CoreError> {
     match value {
         Value::String(text) => Ok(text.clone()),
         _ => Err(CoreError::InvalidValue {

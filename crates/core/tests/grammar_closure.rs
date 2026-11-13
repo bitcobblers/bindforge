@@ -2,8 +2,9 @@
 //! formats contract.
 //!
 //! proves: Chosen design → Formats contract + `schemas/profile/v1/spec.md`,
-//! `schemas/reach-classes/v1/spec.md`, `schemas/reach-classes/v2/spec.md` and
-//! `schemas/keyboard-geometry/v1/spec.md` — each format's entry set is closed, so
+//! `schemas/reach-classes/v1/spec.md`, `schemas/reach-classes/v2/spec.md`,
+//! `schemas/keyboard-geometry/v1/spec.md` and `schemas/manifests/v1/spec.md` —
+//! each format's entry set is closed, so
 //! an entry the grammar does not define is a typed refusal naming the entry, never
 //! an ignored key: an alias of a known entry (`derives_`) read as *that entry
 //! being absent* would quietly change what a profile derives from, and an
@@ -90,6 +91,46 @@ keys = ["keyboard:a 0 2"]
 row-height = "1u"
 "#;
 
+/// A `manifests/v1` document using every entry `schemas/manifests/v1/spec.md`
+/// defines: the identity group (`id`, `revision`), the codec family id, the
+/// optional fingerprint, the action table, the three constraint entries, and the
+/// preset ids — the eleven the entry table lists, no more.
+const MANIFEST_USING_DEFINED_ENTRIES: &str = r#"format = "manifests"
+version = "v1"
+id = "remnant-2"
+revision = 3
+codec = "unreal-engine-5"
+fingerprint = "sha256-2Z7Gx9m0YU3bJ8kT4sQw1n7dC6vH0pL2xR5yB8aN3eM="
+actions = ["move.steer-left Turn left", "aim.camera Mouse camera"]
+exclusive-groups = ["keyboard:w keyboard:s"]
+dead-keys = ["keyboard:x"]
+docked-actions = ["ui.menu keyboard:y"]
+presets = ["default", "southpaw"]
+"#;
+
+/// A `manifests/v1` document carrying the entry the design considered and
+/// refused: an `axis-kinds` array restating, per row, the axis kind
+/// `schemas/action-ids/v1/registry.toml` already owns per id — the second answer
+/// to one fact, and the drift channel the closed set exists to refuse (A7).
+const MANIFEST_WITH_AN_UNDEFINED_ENTRY: &str = r#"format = "manifests"
+version = "v1"
+id = "remnant-2"
+revision = 3
+codec = "unreal-engine-5"
+actions = ["move.steer-left Turn left"]
+axis-kinds = ["move.steer-left none"]
+"#;
+
+/// A `keyboard-geometry/v1` document whose `geometry` name breaks the slug
+/// grammar `[a-z][a-z0-9-]*` — the same grammar a manifest `id`, `codec` and
+/// preset id ride, defined once and renamed `is_slug_name` when the third entry
+/// kind arrived (A18).
+const GEOMETRY_WITH_AN_UPPERCASE_NAME: &str = r#"format = "keyboard-geometry"
+version = "v1"
+geometry = "ANSI-US"
+keys = ["keyboard:a 0 2"]
+"#;
+
 /// The TOML constructs the contract's grammar excludes, each with its corpus
 /// fixture named after it (`spec.md`: "each is rejected, and each has a fixture
 /// under `fixtures/invalid/` pinning it").
@@ -141,7 +182,8 @@ fn rejects_a_reach_classes_table_carrying_an_entry_outside_the_grammar() {
 /// its own `emphasis` fixture (Test strategy #5): ADR-011 says emphasis is not in
 /// the taxonomy, so an `emphasis` entry is a refusal naming the entry.
 /// `keyboard-geometry/v1` joins it the same way (ADR-012, design 012's Test
-/// strategy #7).
+/// strategy #7), and `manifests/v1` joins it the same way again (ADR-013, design
+/// 013's Test strategy #7).
 /// `reach-classes/v2` is the one directory whose closed set this suite pins
 /// directly rather than through a fixture: the approved v2 corpus names its
 /// invalid fixtures and no `unknown-entry.toml` among them, and
@@ -154,6 +196,7 @@ fn the_invalid_corpus_ships_an_unknown_entry_fixture_for_every_format() {
         ("reach-classes", "v1"),
         ("action-ids", "v1"),
         ("keyboard-geometry", "v1"),
+        ("manifests", "v1"),
     ] {
         let dir = version_dir(format, major);
         let path = dir
@@ -277,5 +320,61 @@ fn rejects_a_keyboard_geometry_document_carrying_an_entry_outside_the_grammar() 
     assert!(
         detail.contains("row-height"),
         "the refusal must name the entry it refused, got `{detail}`"
+    );
+}
+
+/// proves: design 013's Test strategy #7 + ADR-013 (The contract, closed entry
+/// set) — closing the set is not shrinking the grammar for the manifest format
+/// either: a document using exactly the eleven entries its entry table defines
+/// parses, `actions` rows that split at their first space and the optional
+/// fingerprint included.
+#[test]
+fn accepts_every_entry_the_manifest_grammar_defines() {
+    if let Err(err) = bindforge_core::parse(MANIFEST_USING_DEFINED_ENTRIES) {
+        panic!(
+            "a manifest using only the entries its entry table defines must parse; it was \
+             refused: {err}"
+        );
+    }
+}
+
+/// proves: design 013's Test strategy #7 + Chosen design (Options considered: the
+/// action row) — the manifest entry set is closed the same way, and the case this
+/// suite pins is the dangerous one: an `axis-kinds` entry would restate per row a
+/// fact `schemas/action-ids/v1/registry.toml` already owns per id, giving one fact
+/// two answers and a drift channel (A7). It is a refusal naming the entry, never
+/// an ignored key.
+#[test]
+fn rejects_a_manifest_document_carrying_an_entry_outside_the_grammar() {
+    let err = bindforge_core::parse(MANIFEST_WITH_AN_UNDEFINED_ENTRY)
+        .expect_err("a manifest carrying `axis-kinds` must be refused, not ignored");
+
+    let detail = err.to_string();
+    assert!(
+        detail.contains("axis-kinds"),
+        "the refusal must name the entry it refused, got `{detail}`"
+    );
+}
+
+/// proves: design 013's Test strategy #7 + A18 — the slug-name predicate is one
+/// definition now that three entry kinds share its grammar (a geometry name, a
+/// manifest `id`, `codec`, and a preset id), and renaming it
+/// `is_geometry_name` → `is_slug_name` may not move the grammar it defines: a
+/// geometry name outside `[a-z][a-z0-9-]*` is refused exactly as it was before the
+/// rename, in the one-line message that names what it refused.
+#[test]
+fn rejects_a_keyboard_geometry_name_outside_the_slug_grammar() {
+    let err = bindforge_core::parse(GEOMETRY_WITH_AN_UPPERCASE_NAME).expect_err(
+        "an uppercase geometry name is outside the slug grammar, before the rename and after it",
+    );
+
+    let detail = err.to_string();
+    assert!(
+        detail.contains("ANSI-US") || detail.contains("geometry"),
+        "the refusal must name the name or the entry it refused, got `{detail}`"
+    );
+    assert!(
+        !detail.contains('\n') && !detail.contains('\r'),
+        "the refusal stays one bounded line: {detail:?}"
     );
 }

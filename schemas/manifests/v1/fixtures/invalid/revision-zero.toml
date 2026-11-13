@@ -1,0 +1,8 @@
+# `revision` is a decimal integer at least 1: a pin of `"<id>@0"` names a
+# revision no bump rule can reach, so zero is a refusal, not a default.
+format = "manifests"
+version = "v1"
+id = "revision-zero"
+revision = 0
+codec = "unreal-engine-5"
+actions = ["move.steer-left Turn left"]

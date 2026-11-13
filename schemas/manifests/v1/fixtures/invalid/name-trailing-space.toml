@@ -1,0 +1,9 @@
+# The name must round-trip byte-exactly: two documents differing only by a
+# trailing space would be two different facts about one game's label, so the
+# native-name grammar refuses the trailing space.
+format = "manifests"
+version = "v1"
+id = "name-trailing-space"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["aim.camera Mouse camera "]

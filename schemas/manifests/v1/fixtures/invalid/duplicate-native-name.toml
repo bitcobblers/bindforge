@@ -1,0 +1,9 @@
+# Each native name appears once: one name on two ids is a game answering one
+# of its own labels with two actions, and a manifest that claims it cannot be
+# trusted for its other facts. The refusal names the repeated name.
+format = "manifests"
+version = "v1"
+id = "duplicate-native-name"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["move.steer-left Turn Left", "move.steer-right Turn Left"]

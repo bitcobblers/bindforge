@@ -1,0 +1,10 @@
+# One group names at most 16 members (`MAX_GROUP_MEMBERS`): the bound is what
+# stops a hostile group building an unbounded membership set. This one names
+# seventeen distinct keys.
+format = "manifests"
+version = "v1"
+id = "group-past-member-cap"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["move.steer-left Turn left"]
+exclusive-groups = ["keyboard:a keyboard:b keyboard:c keyboard:d keyboard:e keyboard:f keyboard:g keyboard:h keyboard:i keyboard:j keyboard:k keyboard:l keyboard:m keyboard:n keyboard:o keyboard:p keyboard:q"]
