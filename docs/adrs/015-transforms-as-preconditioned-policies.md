@@ -2,22 +2,22 @@
 status: proposed
 date: 2026-11-12
 supersedes: 009
-series: 009
-depends-on: [009a, 009b, 009d]
+series: 011-015
+depends-on: [011, 012, 014]
 ---
 
-# ADR 009e: Define transforms as named, preconditioned policies
+# ADR 015: Define transforms as named, preconditioned policies
 
-Fifth and final installment of the 009 series. We will define the
+Fifth and final installment of the 011-015 series. We will define the
 **transform/policy** layer in `crates/transforms`: an ordered stack of named,
 preconditioned transforms that produce bases. A transform never overwrites a
 player's personal patch — it operates on a base, and the personal patch sits
-above it in the chain (009d) untouched.
+above it in the chain (014) untouched.
 
 ## Context
 
 "Lefty" is not one transform. The useful move for locomotion is relocating
-the WASD cluster to the right hand with its shape preserved (009b), not a
+the WASD cluster to the right hand with its shape preserved (012), not a
 geometric mirror; mouse-button swap is a separate decision many left-handed
 players decline; camera inversion is a game option, not a binding. So
 handedness is a *stack of independent, named decisions*, and accessibility
@@ -34,16 +34,16 @@ A **policy** is an ordered stack of named transforms
 
 Each transform declares:
 
-- the **tags it touches** (taxonomy ids, 009a), and
+- the **tags it touches** (taxonomy ids, 011), and
 - **preconditions** — e.g. "the locomotion cluster is contiguous and
-  left-handed in this base," checked against reach legality (009b).
+  left-handed in this base," checked against reach legality (012).
 
 An inapplicable transform **reports and no-ops; it never mangles**.
-`swap-polarity` may act only on `discrete-lateral` actions (009a); camera
+`swap-polarity` may act only on `discrete-lateral` actions (011); camera
 (`continuous-lateral`) is never a key swap.
 
 Transforms apply **only to bases** (game defaults, presets). A personal
-patch (009d) sits above them in the chain and survives base regeneration
+patch (014) sits above them in the chain and survives base regeneration
 untouched — the "produce bases, never overwrite players" rule.
 
 `schemas/` carries the policy/transform format with conformance fixtures;
@@ -56,12 +56,12 @@ that do not move together (the cluster is not the neighbourhood), and it
 forces a button swap that many left-handed players keep as-is.
 
 **An AI-generated layout as the primary artifact.** Generation bootstraps
-games with no profiles, but placement stays deterministic (009b reach,
+games with no profiles, but placement stays deterministic (012 reach,
 placement legality) so drafts are auditable; generated bases enter the chain
 like any other, gated by validation, not trusted by provenance.
 
 **Transforms that patch a player's personal layout.** Rejected: it destroys
-the base/patch separation (009d). Transforms produce bases only.
+the base/patch separation (014). Transforms produce bases only.
 
 ## Consequences
 
@@ -71,7 +71,7 @@ that does not fit degrades visibly and harmlessly.
 
 Accepted costs: every transform is a named, preconditioned, tested unit
 (preconditions are real logic, not a flag); the seed preset set is a curated
-collection to maintain (ADR-011).
+collection to maintain (ADR-016).
 
-Not decided here: which policies ship as the seed preset set (ADR-011); the
-CLI to author/apply policies (ADR-012); the hub and voting (ADR-014).
+Not decided here: which policies ship as the seed preset set (ADR-016); the
+CLI to author/apply policies (ADR-017); the hub and voting (ADR-018).

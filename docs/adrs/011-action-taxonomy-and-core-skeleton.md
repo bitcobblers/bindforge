@@ -2,14 +2,14 @@
 status: proposed
 date: 2026-11-12
 supersedes: 009
-series: 009
+series: 011-015
 depends-on: []
 ---
 
-# ADR 009a: Define the action taxonomy and the `crates/core` skeleton
+# ADR 011: Define the action taxonomy and the `crates/core` skeleton
 
-The first product-model ADR, and the first installment of the 009 series
-(009a–009e, superseding the oversized ADR 009). We will define BindForge's
+The first product-model ADR, and the first installment of the 011-015 series
+(011–015, superseding the oversized ADR 009). We will define BindForge's
 **action taxonomy** as the identity layer the whole product speaks through,
 and stand up the shared spine the rest of the series extends: the `crates/`
 workspace, the `schemas/` directory with a golden-fixture conformance
@@ -25,7 +25,7 @@ input vocabulary, profiles, transforms, and manifests into one decision; that
 scope is a single stage's work, and the 010 run showed how badly the harness
 degrades when one `implement` stage carries a contract that large. The 009
 series splits the same decisions into five contracts in dependency order;
-009a is the root and carries the one-time bootstrap so 009b–009e only add.
+011 is the root and carries the one-time bootstrap so 012–015 only add.
 
 The product is greenfield: the repo holds only the orchestration harness.
 
@@ -40,7 +40,7 @@ The product is greenfield: the repo holds only the orchestration harness.
   plus golden fixtures (valid + invalid) that CI runs. This ADR creates the
   harness; later ADRs add schema/fixture pairs to it.
 - `data/manifests/` and `data/profiles/` — created empty with a README,
-  populated by 009c/009d.
+  populated by 013/014.
 
 **Two:** the action taxonomy. Each bindable action is identified by a dotted
 lowercase id from a shared namespace: `move.steer-left`, `move.strafe-left`,
@@ -50,10 +50,10 @@ lowercase id from a shared namespace: `move.steer-left`, `move.strafe-left`,
 - **Axis kind** — `discrete-lateral` (strafe: a mirrorable binary),
   `continuous-lateral` (camera look: never a key swap; mouse-x inversion is
   a game option, not a binding), or `none`. Only `discrete-lateral` actions
-  may have polarity flipped by a transform (009e); this ADR records the
+  may have polarity flipped by a transform (015); this ADR records the
   attribute, it does not act on it.
 - **Emphasis is *not* in the taxonomy.** Where a game places `combat.melee`
-  is a game fact, recorded in the manifest (009c). The taxonomy identifies
+  is a game fact, recorded in the manifest (013). The taxonomy identifies
   actions across games; it never claims a natural position.
 
 The id set starts small (~40 ids covering a third-person shooter / ARPG,
@@ -85,6 +85,6 @@ Accepted costs: the taxonomy is a compatibility promise — ids in the wild
 cannot churn, so extension runs through manifest review; the id set is ARPG
 scoped at first.
 
-Not decided here: input naming and reach tables (009b), manifests (009c),
-profile chains (009d), transform policies (009e), codecs and the CLI
-(ADR-012).
+Not decided here: input naming and reach tables (012), manifests (013),
+profile chains (014), transform policies (015), codecs and the CLI
+(ADR-017).

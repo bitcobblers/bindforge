@@ -2,14 +2,14 @@
 status: superseded
 date: 2026-11-11
 supersedes: —
-superseded-by: [009a, 009b, 009c, 009d, 009e]
+superseded-by: [011, 012, 013, 014, 015]
 ---
 
 # ADR 009: Define the canonical profile, transform, and manifest model
 
-> **Superseded** 2026-11-12 by the 009 series — 009a (action taxonomy +
-> `crates/core` skeleton), 009b (input vocabulary + reach classes), 009c
-> (game manifests), 009d (profiles as chains), 009e (transforms as policies).
+> **Superseded** 2026-11-12 by the 011-015 series — 011 (action taxonomy +
+> `crates/core` skeleton), 012 (input vocabulary + reach classes), 013
+> (game manifests), 014 (profiles as chains), 015 (transforms as policies).
 > The single ADR bundled five independently-testable contracts into one
 > stage; the series splits the same decisions in dependency order.
 
@@ -144,7 +144,7 @@ a visible failure instead of a mid-game surprise.
 types — the reference implementation of `schemas/`) and `crates/transforms`
 (policy stacks) are created in ADR-008's workspace shape. `schemas/`,
 `data/manifests/`, and `data/profiles/` are created with the first entries.
-`apps/cli` lands in ADR-012, not here.
+`apps/cli` lands in ADR-017, not here.
 
 ## Alternatives considered
 
@@ -182,6 +182,6 @@ unmodeled in v1 (controllers are ambidextrous; the itch is keyboard+mouse).
 TOML file formats plus schema validation double the validation surface vs.
 a JSON-only design.
 
-Not decided here: codec implementations and config path discovery (ADR-012),
-which policies ship as the seed preset set (ADR-011), the hub service and
-voting (ADR-014), and where a user's personal policy document lives.
+Not decided here: codec implementations and config path discovery (ADR-017),
+which policies ship as the seed preset set (ADR-016), the hub service and
+voting (ADR-018), and where a user's personal policy document lives.

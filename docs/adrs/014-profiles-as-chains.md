@@ -2,13 +2,13 @@
 status: proposed
 date: 2026-11-12
 supersedes: 009
-series: 009
-depends-on: [009a, 009c]
+series: 011-015
+depends-on: [011, 013]
 ---
 
-# ADR 009d: Express profiles as chains of base and patch
+# ADR 014: Express profiles as chains of base and patch
 
-Fourth installment of the 009 series. We will express a player's binding
+Fourth installment of the 011-015 series. We will express a player's binding
 layout as a **chain**: a base (a game default, a preset, a shared profile)
 plus ordered patches of deltas on top. The artifact a player actually owns
 forever is a personal layout built on someone else's base; chains make that
@@ -29,7 +29,7 @@ A profile file (`*.bindprofile`, TOML — human-editable, diff-friendly) is
 either a **base** or a **patch**, and references what it derives from:
 
 ```toml
-for = "remnant2@0.1"            # manifest id + version pin (009c)
+for = "remnant2@0.1"            # manifest id + version pin (013)
 based-on = "profiles/lefty-r2.bindprofile"   # a base, game-default, or preset id
 generated-by = "policy:lefty-mouse-relocate" # recorded, never trusted
 version = "1.0.0"
@@ -41,9 +41,9 @@ chain order. `bindforge` operations `diff`, `fork`, and `merge` operate on
 chains; an adopter mounts at any rung — take the chain whole, or take its
 base and patch independently.
 
-Provenance fields record `seeded-from` (a game built-in preset, 009c),
+Provenance fields record `seeded-from` (a game built-in preset, 013),
 `generated-by`, or hand authorship. Provenance labels the chain; it is
-**never** the trust mechanism — validation (009c) and explicit adoption are.
+**never** the trust mechanism — validation (013) and explicit adoption are.
 
 `schemas/` carries the profile/patch format with conformance fixtures;
 `crates/core` implements resolution.
@@ -69,5 +69,5 @@ Accepted costs: chain resolution must be deterministic and stable (a
 compatibility surface); `diff`/`fork`/`merge` are real operations to build
 and keep correct.
 
-Not decided here: the transforms that produce bases (009e); the CLI surface
-for the chain operations (ADR-012).
+Not decided here: the transforms that produce bases (015); the CLI surface
+for the chain operations (ADR-017).

@@ -2,17 +2,17 @@
 status: proposed
 date: 2026-11-12
 supersedes: 009
-series: 009
-depends-on: [009a]
+series: 011-015
+depends-on: [011]
 ---
 
-# ADR 009b: Define the input vocabulary and per-hand reach classes
+# ADR 012: Define the input vocabulary and per-hand reach classes
 
-Second installment of the 009 series. We will name physical inputs
+Second installment of the 011-015 series. We will name physical inputs
 OS-neutrally and grade every key by **reach class** for each hand, as data
 in `schemas/` loaded by `crates/core`. This is the placement mathematics the
 product needs: it decides which key a player can comfortably reach, and it
-makes cluster placement (009d/009e) a checkable property rather than an
+makes cluster placement (014/015) a checkable property rather than an
 opinion.
 
 ## Context
@@ -44,7 +44,7 @@ movement cluster to a target region — IJKL and OKL; are two legal placements
 of the WASD shape. A placement is legal when (a) the cluster's internal
 shape is preserved and (b) no action's reach class is degraded beyond a
 declared bound. This ADR defines the legality predicate over the reach
-tables; 009e is the transform that uses it.
+tables; 015 is the transform that uses it.
 
 `schemas/` carries the reach-table format and the input-id spec, with
 conformance fixtures.
@@ -63,7 +63,7 @@ have; the id shape reserves it and v1 ships glyph naming.
 
 ## Consequences
 
-Becomes possible: placement legality (009e) is computed from data; adding a
+Becomes possible: placement legality (015) is computed from data; adding a
 keyboard geometry is a new table, not new logic; reach claims are auditable
 against the table.
 
@@ -71,5 +71,5 @@ Accepted costs: tables are ANSI-US at first; non-US layouts and
 physical-position key naming are deferred; gamepad inputs are named
 (`gamepad:*`) but not reach-graded in v1 (controllers are ambidextrous).
 
-Not decided here: the transforms that consume reach classes (009e); cluster
+Not decided here: the transforms that consume reach classes (015); cluster
 *placement as a policy* lives with the transforms, not with the vocabulary.
