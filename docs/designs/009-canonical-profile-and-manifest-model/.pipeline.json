@@ -1,0 +1,1393 @@
+{
+  "version": 1,
+  "slug": "canonical-profile-and-manifest-model",
+  "nnn": "009",
+  "branch": "pipeline/009-canonical-profile-and-manifest-model",
+  "source": {
+    "kind": "adr",
+    "path": "docs/adrs/009-canonical-profile-and-manifest-model.md"
+  },
+  "status": "escalated",
+  "lastStage": "test-authoring",
+  "designRound": 4,
+  "codeRound": 0,
+  "designBudgetUsed": 2,
+  "codeBudgetUsed": 0,
+  "editorialDone": false,
+  "testsGreen": false,
+  "testsNeedUpdate": false,
+  "stageFailures": {
+    "design-review:compatibility": 1,
+    "implement": 2
+  },
+  "stageCommits": [
+    "c05e13aad9e821a5c155a9c73f97d763fa7468a7",
+    "c83cb7360a07385218b0485eb52b874d6d9c3395",
+    "cc87308ef3ec85f847bad4e4d80b6b6cf4b1463c",
+    "31d7e71154abb44dd28c9f04659e08903f3da068",
+    "6d690fd5b23c59c3d20b34c9a8d57193265100ab",
+    "e34ee72bc665fedc61cde10c2697b8ee1f2c44fc",
+    "ac4e35d85de8bbc27ca27ab8b82d741a38424a68",
+    "f9eb3e80029f434752f7d731b90fa242049c38b3",
+    "827f46a87e53bb765ce9661f80ed3202ace7be41",
+    "4d2723c195f2ec09ee804700b80a8f7c4881bf35",
+    "678caacae8f2d5ae82d3e5c2ee5292687fd62bc4",
+    "91f2ae4067d282b577551de0acae9675238332f4",
+    "0bfe8d20534adfa168eba4ff11d9c35d1bc0a0a2",
+    "573dfe6500cc9d933f71c917dcc35e4a3700a5c9",
+    "cc96a0c22c4c88d7002963bd4ab64fd078fb11e1",
+    "17224714332fd4b0c24dbe7a19944e68aa75e46a",
+    "410538069e077bcdafdeef9b7a0b8f35c79cea7e"
+  ],
+  "forceNext": null,
+  "results": [
+    {
+      "stage": "research",
+      "round": 0,
+      "sessionID": "ses_e33497305ffea4KTpv0fDx3ZxT",
+      "agent": "research/researcher",
+      "at": 1794436101411,
+      "reply": {
+        "summary": "Researched ADR-009's five-contract model (action taxonomy, reach classes, profile chains, transform policies, game manifests) and wrote docs/designs/009-canonical-profile-and-manifest-model/01-research.md using three lenses: Prior art (Unity/Unreal/Godot named actions, QMK + Steam Input layer overlaying, Lutris declarative manifests, SDL_GameControllerDB, kanata/xremap, Returnal's handedness presets — no incumbent cross-game binding format exists, so schemas/ fills a gap), Standards (HID usage page 0x07, SDL3 scancodes as the layout-independent naming axis vs the ADR's layout-dependent glyph naming, evdev/X11 keysyms/Windows VK, W3C standard gamepad, TOML v1.1.0 + SemVer), and Security landscape (untrusted-deserialization DoS advisories RUSTSEC-2019-0025/-2024-0012 vs the repo's existing MAX_NESTING_DEPTH/MAX_DOCUMENT_BYTES/MAX_CHAIN_DEPTH guards, path traversal via path-like based-on refs, SLSA provenance-is-not-trust). Key findings for the designer: dotted action ids collide with TOML dotted keys and the repo's v1 grammar refuses dotted keys (format decision needed); reach-class tables have no external standard dataset and become an authored compatibility promise; the 'IJKL breaks the home-row anchor' claim is contestable and belongs to the reach tables; merge semantics over RFC 6902-style op chains are unspecified.",
+        "commitMessage": "docs: add research for canonical profile and manifest model"
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/research-r0.md",
+      "durationMs": 223237,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal",
+      "round": 0,
+      "sessionID": "ses_e33460aa6ffenM9JEl6drv2aPH",
+      "agent": "design/designer",
+      "at": 1794436434927,
+      "reply": {
+        "commitMessage": "docs: propose the canonical profile, transform, and manifest model (ADR-009)"
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/proposal-r0.md",
+      "durationMs": 333440,
+      "nudges": 0,
+      "docLines": 314,
+      "docLinesAdded": 314,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e3340f3c9ffe64k9Ib6RugFabS",
+      "agent": "review/design-performance",
+      "at": 1794436677308,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design → Profiles are chains, \"Id → file, never id → path\"; also Adversarial posture and Rollout step 2 — \"walks `data/profiles/` (bounded depth and entry count, each file size-checked by the shipped budget)\", \"Chain and id resolution add no new budget: they reuse `MAX_CHAIN_DEPTH` and the tree-walk bounds\", \"No new dependency, no budget change\"",
+            "problem": "There is no shipped tree-walk bound to reuse. The baseline the research and the proposal quote is per-document only — MAX_DOCUMENT_BYTES = 1 MiB pre-allocation, MAX_NESTING_DEPTH = 16, MAX_CHAIN_DEPTH = 32 (01-research Chains/patches/transforms; schemas/README.md \"Input budget and chain bound\"; the three public constants in crates/core/src/lib.rs). So the index's aggregate exposure is the 1 MiB per-file cap times an unnumbered entry count: total parse time and resident bytes at load are bounded by nothing the design pins, which is exactly the checklist's bounded-memory item (the Index is the one table with no bound) and startup-cost item (unbounded file reads at boot). The claim that the design \"add[s] no new budget\" and Rollout's \"no budget change\" are also false as written, since depth/entry-count limits are new budget that implementation must invent mid-coding.",
+            "fix": "Name the walk bounds as public constants in index.rs beside the shipped ones (MAX_INDEX_ENTRIES, MAX_INDEX_DEPTH, re-exported from lib.rs like MAX_DOCUMENT_BYTES) with seed-scale headroom stated in A24's voice (the seed is one base + one patch chain). Correct the two claims: Adversarial posture becomes \"no change to the per-document budget; the tree walk adds MAX_INDEX_ENTRIES/MAX_INDEX_DEPTH\", Rollout 2 drops \"no budget change\" there, and Test strategy #1 pins an over-entry-count and over-depth walk case beside the over-size and over-nesting cases."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Action taxonomy, API line — \"`Taxonomy::load(dir: &Path) -> Result<Taxonomy, CoreError>`\", with data at `schemas/taxonomy/v1/actions.toml` and \"the refused-TOML-construct cases\" in the same directory",
+            "problem": "A directory-taking loader has no stated file-selection rule, and that directory also ships spec.md and a fixtures/ tree that Rollout 1 requires to carry a valid+invalid pair per format plus the refused-construct cases. The boot read set is therefore undefined: a discover-every-*.toml implementation reads fixture files on every load and folds fixture ids into the taxonomy. placement is the mirror case — its format dir ships no data file at all (content is data/placements/*.toml), so a dir-shaped loader has nothing pinned to find. This is the checklist's startup-cost item: unscoped file reads at boot.",
+            "fix": "Take the document path, not the directory: Taxonomy::load(path: &Path) pinned to actions.toml, mirroring the shipped load_reach_tables, which names its per-hand file and needs no discovery. State in taxonomy/v1/spec.md that fixtures/ is harness input and never load input."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Manifests state game facts, \"Drift mechanism\" (with Test strategy #13 and Rollout 5) — \"The `cargo test` gate resolves every profile in `data/profiles/` against the manifest revision it pins and re-runs `validate`\"",
+            "problem": "Resolution requires an Index, and an Index is a full parse of every document under data/profiles/. The gate then costs (index-building tests) x (parse of every file), because model_walk.rs, manifest_drift.rs and the conformance walk are separate test binaries and each test function that builds its own Index reparses the whole tree. The API already supports build-once — resolve(index: &Index, root, rung) — so the repeated cost is unstated, not forced, and the design never says the gate's cost is linear in files.",
+            "fix": "One sentence in Rollout 5: the drift and model-walk suites share a single Index built once per test binary (a shared fixture), so the gate stays linear in the number of files rather than in the number of tests."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-performance-r1c0.md",
+      "durationMs": 242250,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e3340f3caffcefSgIdKcsuB6RX",
+      "agent": "review/design-security",
+      "at": 1794436796570,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design → Manifests state game facts / Profiles are chains — \"content `data/manifests/<game>/manifest.toml` (fixture-name rule for `<game>`)\" and \"its halves validated against the game-id grammar and a dotted `<major>.<minor>` revision, else `BadPin`\" and \"Ids never appear in a path\"",
+            "problem": "The canonical path rule is scoped to profile ids (the id→file index over `data/profiles/`), and manifest resolution is left unspecified while the manifest layout puts a game id in a path component. The drift mechanism resolves a pin to a manifest with no stated lookup path, so the natural implementation joins the pin's game half — a string from a shared, untrusted profile — into `data/manifests/{game}/manifest.toml`, the path-interpolation class A18 exists to stop. The check the design leans on to prevent that is \"the game-id grammar\", which is defined nowhere: Encoding rules state only the taxonomy-id and input-id shapes, so BadPin's acceptance set cannot be tested. This does not re-open the Revision log's rejected charset narrowing of profile ids; the escape-carrying id fixture stays valid.",
+            "fix": "Name the game-id grammar as the shipped fixture-name rule (lowercase ASCII words joined by `-`; never a dot, `/`, `\\`, or leading `.`) in Encoding rules, and state in the Manifests section that a pin resolves through the same bounded walked index over `data/manifests/`, keyed by the document's declared `game` and `revision` — no path is built from a pin. Add a `..` pin and an absolute-path pin to Test strategy #10."
+          },
+          {
+            "severity": "major",
+            "location": "Chosen design → Transforms produce bases — \"each is a non-empty array of strings, first element the transform name\"; Test strategy #11 \"an unknown transform name is rejected\"",
+            "problem": "The policy `stack` is validated by transform name only. Nothing pins invocation arity or argument grammar, so `[\"relocate-cluster\", \"move.steer-*\"]` (missing hand and placement id), `[\"swap-mouse-buttons\", \"extra\"]`, a hand outside `left|right`, a non-placement-shaped placement id, and a `*` in a non-trailing position all reach the registry, where reading `invocation[1]`/`invocation[2]` panics — against the shipped contract that every refusal is a typed variant, \"never a panic, never a bare string\", for documents that are untrusted at every entry point.",
+            "fix": "State in `policy/v1/spec.md` that each invocation must match its registry entry's declared arity and the grammars of its arguments (hand ∈ `left|right`, placement id, trailing-`*` action pattern), rejected as the shipped `InvalidValue { key, message }` (no new variant), one `fixtures/invalid/` case per shape, and extend Test strategy #11 to assert each is rejected before `apply_policy` runs."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Profiles are chains (index walk) — \"walks `data/profiles/` (bounded depth and entry count, each file size-checked by the shipped budget)\"",
+            "problem": "The shipped budget check is metadata-based (`fs::metadata(path).len()` compared to `MAX_DOCUMENT_BYTES`, then read), and metadata follows symlinks. A tree entry that is a symlink to `/dev/zero` (metadata length 0) or a FIFO passes the pre-read cap and then reads unbounded, so the walk's size guard fails open as a hang/OOM rather than rejecting cleanly. Here the walked tree is reviewed repo content, so this hardens the guard the model contributes to the hub path rather than fixing a live exposure.",
+            "fix": "One clause: the walk takes a directory entry's own type (`DirEntry::file_type().is_file()`, symlinks not followed) and rejects non-regular entries, and the cap applies to bytes read from the opened file (the `read_reader` take-N shape), not to metadata length."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Profiles are chains — \"`generated-by` (free-form string id, e.g. `policy:lefty-mouse-relocate`)\"",
+            "problem": "`generated-by` is the only profile field with no grammar, and a profile is the artifact that leaves the machine when bindings are shared, so free-form is where an author's name, handle, or email gets published in a shared/hub listing. The phrase itself is self-contradictory (free-form vs id).",
+            "fix": "Constrain the value to the existing `<namespace>:<part>` shape the example already follows, state it in `profile/v1/spec.md`, and reject a non-id-shaped value as `InvalidValue`."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Encoding rules / Transforms — \"`*` appears only in a policy action pattern, as a trailing suffix (`move.steer-*`)\"",
+            "problem": "A bare `*` is a trailing suffix on an empty prefix, so a shared policy can address the entire taxonomy; only each transform's precondition limits the blast radius, and a pattern that matches nothing is a quiet no-op.",
+            "fix": "Require a non-empty literal prefix before `*`, and record a zero-match pattern as a named `Skipped` entry so an adopter sees the policy did nothing."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-security-r1c0.md",
+      "durationMs": 361512,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e3340f3caffdtG5YM7z3HngPHp",
+      "agent": "review/design-compatibility",
+      "at": 1794436818836,
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-compatibility-r1c0.md",
+      "durationMs": 383778,
+      "nudges": 0,
+      "failure": "independence violation: read a review report: /home/mike/repos/bindforge/docs/designs/009-canonical-profile-and-manifest-model/reviews/design/compatibility-r1c0.md"
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e3340f3caffemTzQG5eGIZ8uq1",
+      "agent": "review/design-correctness",
+      "at": 1794436933751,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design → Encoding rules (Round-trip split); Test strategy #1 — \"pure lookup data (`taxonomy`, `reach-classes`, `placement`) is asserted by load, using the exemption `reach-classes/v1/spec.md` already states\"",
+            "problem": "The shipped harness grants the load-asserted exemption only to format \"reach-classes\" (crates/core/tests/conformance.rs:63 gates it on dir.format == \"reach-classes\"); every other format's valid fixtures are re-serialized to an equal value by the unmodified harness (conformance.rs:47-78, exactly as verified assumption A8 states). Taxonomy and placement fixtures authored under the exemption the rule claims for them will fail the harness, contradicting Goals (\"machine-checkable by the existing harness with no harness change\") and Test strategy #14 (\"requires no change to crates/core/tests/conformance.rs\"). The split also leaves `policy` in neither half, though the harness round-trips it and it is a person-edited document.",
+            "fix": "State in the Encoding rules and Test strategy #1 that taxonomy, placement, and policy fixtures must re-serialize to an equal value (as the harness enforces today for every format except reach-classes), and reserve \"asserted by load\" for the seed data files (actions.toml, left.toml/right.toml), which live outside fixtures/ and are load-checked by the model tests. This replaces the claimed exemption mechanism; it adds nothing."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Manifests (validate); Test strategy #9 — \"`validate(manifest, &Taxonomy)` enforces: … a profile's `seeded-from` names a declared preset\"",
+            "problem": "The rule is a cross-document check (profile's seeded-from against the manifest's presets), but validate's declared inputs are the manifest and the taxonomy only, so it cannot evaluate this condition. Test strategy #9 repeats the mismatch by folding the seeded-from case into \"manifest validation\" with its own fixture.",
+            "fix": "Move that condition out of validate(manifest, &Taxonomy) into the chain-resolution/drift step: \"`resolve` rejects a `seeded-from` the pinned manifest does not declare, naming the profile id\" — resolve already loads the pinned manifest, so no new mechanism; mirror the sentence in Test #9."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Encoding rules (`version` bullet) vs Profiles are chains / Manifests — \"a document's own revision is a dotted `<major>.<minor>[.<patch>]` string\"",
+            "problem": "The profile section defines revision as \"a `<major>.<minor>` string\" and the `for` pin validates its revision half as \"a dotted `<major>.<minor>`\". A manifest declaring the encoding-rule-permitted patch component (revision = \"0.1.2\") can never be named by a game@revision pin: the same fact appears in two shapes and one is unpinnable.",
+            "fix": "Drop the `[.<patch>]` option from the Encoding rule: the v1 revision grammar is `<major>.<minor>` for every document that can be pinned. This replaces the current revision sentence."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Transforms (relocate-cluster) — \"the matched actions' current inputs form a contiguous cluster for `<hand>` in `base`\"",
+            "problem": "\"Contiguous cluster\" is a predicate no section defines over the data the design ships (reach tables carry class+row/col; placement::validate computes isometry and reach bound), and it decides apply-vs-Skipped. The design's own Options argument rejects review-only legality claims because \"two implementations could disagree\" — an undefined precondition predicate has the same defect.",
+            "fix": "Define the precondition in existing data: the matched actions' current input set must be isometric (same offset vectors) to the named placement's source-key set, else Skipped — replacing the word \"contiguous\"."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Profiles are chains (Chain guard) and Risks row — \"32 links is a base plus 31 patches\"",
+            "problem": "The shipped resolve_chain rejects only when derives.len() > MAX_CHAIN_DEPTH (crates/core/src/chain.rs:27), so the accepted maximum chain is 32 derives links = 33 documents — a base plus 32 patches. Test strategy #5's boundary (\"a chain of exactly MAX_CHAIN_DEPTH links resolves and one link deeper is ChainTooDeep\") is only true when links means derives entries, which makes the \"base plus 31\" phrasing off by one.",
+            "fix": "State the unit once — MAX_CHAIN_DEPTH counts derives links; the maximum chain is a base plus 32 patches (33 documents) — and carry it into the Risks row."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-correctness-r1c0.md",
+      "durationMs": 498694,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e333d4131ffeFGass8TXLYYQ9i",
+      "agent": "review/design-complexity",
+      "at": 1794436992092,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design → Transforms produce bases, `schemas/policy/v1/` entries — \"`hand` (`left`/`right`, required)\"",
+            "problem": "Configuration knob with no consumer (checklist #6). No rule, transform, `Ctx` field, or Test strategy reads the policy's `hand`: `relocate-cluster` takes `<hand>` in its own invocation, `swap-polarity` and `swap-mouse-buttons` take no hand, `Ctx { taxonomy, reach, placements }` carries none, and Test strategy #11 never exercises it. ADR-009 Decision 4 puts the hand inside the invocation, not on the policy. Because a format's entry set is closed and minor bumps are additive only (schemas/README.md), a required unreadable entry shipped in v1 costs a major bump to remove, and is ambiguous for a policy with two relocate invocations on opposite hands.",
+            "fix": "Delete `hand` from the policy/v1 entry table and the example; the `<hand>` invocation argument on `relocate-cluster` is the only spelling the registry reads."
+          },
+          {
+            "severity": "major",
+            "location": "Chosen design → Manifests state game facts — \"then role-qualified quoted keys: `action:<id>` = the game-native action name (the join), `default:<id>` = …, `exclusive:<group>` = id array\"",
+            "problem": "This is the design's one relaxation of the shipped closed-entry-set invariant into an open prefix rule (the Risks row concedes it), and it has no recorded alternative in Options considered. The shipped mechanism is a flat allow-list (`PROFILE_ENTRIES` + `reject_unknown_entry`, crates/core/src/document.rs:39-43,156-170); the prefix form forces new machinery in the manifest reader — enumerated prefixes, a distinct unknown-prefix rejection, its fixture, a spec clause, and Test #1's unknown-prefix case — i.e. permanent complexity to keep a published entry set open (checklist #3/#6).",
+            "fix": "Encode the three roles as nested arrays, which the design already accepts at nesting level 2 (A13; `stack` and `swap` use it): `action = [[\"move.steer-left\", \"Steer Left\"]]`, `default = [[\"combat.melee\", \"keyboard:f\"]]`, `exclusive = [[\"ui\", \"ui.map\", \"ui.inventory\"]]`. Every row is `[id, value…]`, the entry set stays closed, `validate`'s checks are unchanged, and the prefix enumeration, unknown-prefix error path, its fixture and the Risk row all go away."
+          },
+          {
+            "severity": "major",
+            "location": "Chosen design → Reach classes and placements (Authoring bar) and Test strategy #3 — \"both hands graded over the full admitted keyboard name set\" / \"every admitted keyboard name is graded in both hands\"",
+            "problem": "The largest authored artifact in the design has consumers only for a fraction of it. The reach bound reads grades for cluster source/target keys, the emphasis reading reads the grade of a game's `default:` input, and the asymmetry claim needs a few mirrored keys; function/navigation/lock keys are graded only to satisfy the coverage rule, and each added row must also clear the \"grades non-decreasing in grid distance from that hand's home-graded keys\" check, so CI surface grows with corpus size. Because \"a key absent from the hand's table is `UnknownInput`\", absence is illegal, which forces exhaustive 2×N authoring in the first seed slice (Rollout 4a) — a design ~30-50% larger on the data side than the goals require (checklist #2/#3/#5).",
+            "fix": "State a graded set (the keys the shipped placements and manifest defaults reference, extended by review) and treat a key absent from a hand's table as `off-reach` for that hand instead of `UnknownInput` — which also makes the emphasis reading total for any game default. Drop the full-set coverage clause from the authoring bar and Test #3, keeping coordinate-agreement and monotonicity checks over the graded subset. This keeps the authored-grading methodology the r0 log defends and shrinks only its volume."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Transforms produce bases — \"`mouse-swap` (boolean, default **false** — the ADR's opt-in)\" with \"accepted in a stack only when the policy declares `mouse-swap = true`, else the document is rejected (`MouseSwapNotOptedIn`)\"",
+            "problem": "A knob whose only consumer is the gate on its own transform: a policy that lists `swap-mouse-buttons()` has already declared the intent, in the same document, explicitly. The ADR's \"default off\" is satisfied by stack membership. The knob therefore buys nothing and costs an entry, a `CoreError` variant, a fixture and a Test #11 clause (checklist #6).",
+            "fix": "Drop `mouse-swap` and `MouseSwapNotOptedIn`; state in policy/v1/spec.md that a policy opts in by listing `swap-mouse-buttons()` in `stack`."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Profiles are chains — \"`revision` (a `<major>.<minor>` string)\" as an entry on `profile` and `patch`",
+            "problem": "No consumer. Chain identity is `id` + `derives`; the pin's revision half names the manifest's `revision` (that one is consumed by the drift mechanism); nothing compares a profile's own revision. The Rollout defaults line \"`revision` absent = unpinned\" describes `for`, not this entry, so the knob's meaning is unstated as well as unread (checklist #6).",
+            "fix": "Keep `revision` on manifest/v1 only; drop it from profile/v1 and patch/v1 (it is additive, so a minor bump can add it when a consumer exists) and correct the defaults line to \"`for` absent = not bound to a game\"."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Profiles are chains + Rollout step 5 — \"`fork(index, root, rung) -> PatchDoc`\" and \"`merge(base: &Resolved, a: &PatchDoc, b: &PatchDoc)` … overlap is `MergeConflict`\", shipped with Test strategy #8",
+            "problem": "Checklist #5: the merge/fork surface has no v1 caller — the CLI front end for diff/fork/merge is Deferred to ADR-012 — so the first merged slice carries multi-document algebra plus its suite ahead of need. Chain resolution and `diff` do have consumers (drift CI, the model walk).",
+            "fix": "State the merge rule in patch/v1/spec.md (chain order, per-action single touch, disjointness for a legal merge) so the contract stays complete, ship `resolve` + `diff` in the first slice, and land `fork`/`merge` with Test #8 in the ADR-012 slice that has the caller."
+          },
+          {
+            "severity": "nit",
+            "location": "Files created by this design — `schemas/taxonomy/v1/actions.toml` and `schemas/reach-classes/v1/{left,right}.toml` vs `data/{manifests,profiles,policies,placements}/`",
+            "problem": "Two homes for reviewed data with no stated rule (lookup tables in the contract tree, curated content under `data/`), which Rollout 6 then has to justify in a repo-practices line.",
+            "fix": "One sentence in schemas/README.md: the contract tree holds lookup tables a loader reads at a fixed path; `data/` holds content discovered by walking."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-complexity-r1c0.md",
+      "durationMs": 314729,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e333b1864ffeEGFjZsyuo2Dxgu",
+      "agent": "review/design-compatibility",
+      "at": 1794437034407,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Compatibility matrix — \"Hub upload path (wire budget, server-side chain pre-resolution) | unknown\"",
+            "problem": "The row's status is `unknown`, so the matrix is not a decidable support record; the checklist requires every platform row to carry a status and treats `unknown` as a finding. This is matrix vocabulary only — the ADR-014 hub deferral itself is consistent with the ADR's \"Not decided here: … the hub service and voting\" and is not re-opened.",
+            "fix": "Change that status cell to `no (v1) — out of scope` and keep the existing note (\"ADR-014 owns it (A23); the client-side guards and the id-index rule are the model's contribution\"). One-cell change, no new mechanism."
+          },
+          {
+            "severity": "major",
+            "location": "Chosen design → Encoding rules → Round-trip split (with Goals \"machine-checkable by the existing harness with no harness change\", Test strategy #1 \"`taxonomy`, `reach-classes`, `placement` are asserted by load\", and Test strategy #14 \"requires no change to `crates/core/tests/conformance.rs`\") — \"pure lookup data (`taxonomy`, `reach-classes`, `placement`) is asserted by load, using the exemption `reach-classes/v1/spec.md` already states\"",
+            "problem": "That exemption is not a harness policy keyed on format kind: it is a hardcoded format-name equality test at crates/core/tests/conformance.rs:63 (`if dir.format == \"reach-classes\"`). Every other format directory's fixtures/valid/ is subjected to parse → serialize → re-parse → equality. So load-asserting `taxonomy` and `placement` requires editing conformance.rs, which contradicts Goals' \"no harness change\" and Test strategy #14's \"no change to conformance.rs\"; the three claims cannot all hold. A8's cited basis (conformance.rs:322-335) supports directory discovery only, not the exemption.",
+            "fix": "Make all six formats round-trip (add serialize arms in Rollout 2's `Document` extension) and reserve the load-assert exemption for `reach-classes`, whose loader consumes a per-hand directory pair rather than one document. Replace \"taxonomy, reach-classes, placement are asserted by load\" in Test strategy #1 and the quoted sentence in Round-trip split accordingly. (If the exemption is widened instead, Goals' \"no harness change\" and Test strategy #14 must name that harness edit; round-tripping all six is the smaller change and keeps the harness frozen.)"
+          },
+          {
+            "severity": "major",
+            "location": "Chosen design → Profiles are chains §3 + Manifests §5 — \"its halves validated against the game-id grammar\" and \"content `data/manifests/<game>/manifest.toml` (fixture-name rule for `<game>`)\"",
+            "problem": "The game-id grammar is the only gate between an untrusted `for` pin and a filesystem path component, and it is never defined: Encoding rules enumerate exactly two id shapes (taxonomy ids, input ids) and the quoted-key id list omits game ids. The rule leaned on exists only as a test helper, crates/core/tests/common/mod.rs:352 `is_fixture_name` (which strips a `.toml` suffix), so no shipped `crates/core` code can enforce it and `BadPin` has no specified predicate. This leaves open the same path-traversal class the design closes for profile ids under A18 (\"Ids never appear in a path\").",
+            "fix": "Add the game-id shape to the canonical Encoding rules as `[a-z0-9-]+` (lowercase, no dots, no `@` — the fixture-name stem rule), and state that manifest resolution looks the pin's game half up in a walked index keyed on each manifest's declared `game` entry, replacing construction of `data/manifests/<game>/manifest.toml` from the pin."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Input vocabulary — \"it arrives as a *new* prefix (`pos:<part>`), leaving `keyboard:` meaning 'US-ANSI glyph' permanently\"",
+            "problem": "The canonical grammar closes the namespace set (`<namespace>` ∈ `keyboard|mouse|gamepad`), so minting `pos` is a widening of a closed set in every format that carries input ids (profile, patch, manifest's `default:`/`dead-keys`, policy), not only in the reach tables. Deferred names only a `reach-classes/v2`, and the ADR's \"the id shape reserves it\" covers shape, not the version gate, so implementers must guess whether a v1 reader accepts `pos:a`.",
+            "fix": "One sentence in Input vocabulary (canonical): `pos` joins the `<namespace>` set only in a v2 of every format that carries input ids, and a v1 document naming a `pos:` input is `UnknownInput`."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Profiles are chains §3 — \"File names follow the shipped fixture-name rule (lowercase ASCII, `-`-joined)\"",
+            "problem": "The shipped rule as implemented requires a `.toml` suffix (is_fixture_name returns false for any other name), while profile content is `data/profiles/**/*.bindprofile` per this same section and ADR-009 Decision 3. The cited rule cannot be satisfied by the files it governs, and the Windows matrix row leans on it for its case-uniqueness claim.",
+            "fix": "Cite the stem rule — \"lowercase ASCII, `-`-joined stem\" — and state the extension separately: `.bindprofile` for profile/patch content, `.toml` for `schemas/` fixtures."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Input vocabulary + Files created by this design — \"`schemas/README.md` lists the keyboard names v1 admits\" (README row: \"format list, the canonical encoding rules, `version`/`revision` split\")",
+            "problem": "README is designated the single canonical enumeration of the v1 keyboard surface, and both the authoring bar (\"both hands graded over the full admitted keyboard name set\") and Test strategy #3 (\"every admitted keyboard name is graded in both hands\") iterate it, but the inventory row for README and Rollout 1 omit that list, and schemas/README.md contains no key-name enumeration today. The set the US-ANSI support claim is tested against has no named source.",
+            "fix": "Add the admitted keyboard-name list to that Files-created row's contents and name it as the enumeration Test strategy #3 iterates."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-compatibility-attempt2-r1c0.md",
+      "durationMs": 215530,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e3337ce1cffeDtSb7M4QUF020j",
+      "agent": "design/designer",
+      "at": 1794437378498,
+      "reply": {
+        "changed": true,
+        "summary": "All 5 majors + 11 minors/nits consumed by subtraction and rewording, net-zero (314 → 314 lines). Round-trip split: the exemption is a hardcoded `format == \"reach-classes\"` branch, so all six formats now round-trip (`serialize` arms in Rollout 2) and only reach-classes is load-asserted; seed files outside fixtures/ are load-checked. Manifest role prefixes became nested-array `action`/`default`/`exclusive` rows, deleting the closed-entry-set relaxation, its prefix machinery, fixture and Risk row. Deleted with no consumer: the policy's required `hand`, the `mouse-swap` knob + `MouseSwapNotOptedIn`, `revision` on profile/patch, and fork/merge (+ old Test #8) handed to ADR-012 with the rule kept in `patch/v1/spec.md` (list renumbered). Game-id shape added to the canonical Encoding rules and manifests resolved by a walked index keyed on declared `game`+`revision`, so no path is built from a pin, with `..`/absolute pins pinned in Test #9; walk bounds named as public `MAX_INDEX_ENTRIES`/`MAX_INDEX_DEPTH` + `IndexTooLarge`/`IndexTooDeep` (new A25) replacing the false \"no new budget\" claim, and entries taken by `DirEntry::file_type()` with the cap on bytes read. Narrowed in place: revision grammar `<major>.<minor>` (manifest only), `pos:` admitted only at v2, fixture-name stem rule with the extension stated separately, graded set + `off-reach` fallback replacing full-keyboard grading, `Taxonomy::load(path)`, policy invocation arity/argument grammars as `InvalidValue`, `relocate-cluster` precondition as isometry, `generated-by` id-shaped, `*` needs a non-empty prefix with a zero-match `Skipped`, `seeded-from` moved to `resolve`, chain unit (base + 32 patches), hub matrix row `no (v1) — out of scope`, README gains the keyboard-name list and the data-homes rule (dropping the repo-practices line). Net-zero is exact, so no justification needed; the Revision log was maintained in place, superseding the r0 entries for the decisions that changed.",
+        "commitMessage": "docs: revise ADR-009 proposal for round 1 design review"
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/proposal-revise-r1.md",
+      "durationMs": 344007,
+      "nudges": 0,
+      "docLines": 314,
+      "docLinesAdded": 79,
+      "docLinesRemoved": 79
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e33328de5ffc689lQ9qDOXal75",
+      "agent": "review/design-performance",
+      "at": 1794437649593,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → Manifests state game facts (with Test strategy #8) — \"`validate(manifest, &Taxonomy)` enforces: … every `exclusive` and `docked` member appears in the `action` rows\"",
+            "problem": "The r1 rewrite replaced the role-qualified quoted keys (\"action:<id>\", a keyed map) with the nested-array rows `action = [[id, name]]`, so the action table is a list rather than a lookup. \"Appears in the `action` rows\" is therefore a scan per `exclusive`/`docked` member, and the only bound on the row count is the shipped per-file 1 MiB cap (A24, A25): an adversarial manifest with thousands of `action` rows and thousands of `exclusive` members makes validation quadratic (≈10⁹ comparisons) inside a document the budget accepts. Nothing in the design pins the indexing, so the cost is decided mid-coding. New in this revision, because the row encoding is the changed text.",
+            "fix": "One clause in §5, echoed in Test #8's voice: `validate` builds the `action`-row id set once as a `BTreeSet` and does membership lookups, so validation is `O(rows log rows)` in the document."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Transforms → `relocate-cluster` — \"the matched actions' current inputs in `base` are isometric to the named placement's source-key set (same offset vectors, per `placement::validate`'s shape rule over `<hand>`'s table)\"",
+            "problem": "\"Same offset vectors\" between two sets, read as the shape rule it cites states it (\"the offset vectors between source keys equal the offset vectors between the target keys\"), is an all-pairs comparison: O(k²) per `apply_policy` invocation, with a reach-table lookup per pair. For a placement document k is the pair count (4 in the shipped example) and the cost is trivial; this new call site sets k to every action matching `<action-prefix>`, bounded only by the base's entry count under the 1 MiB cap. Not the keystroke path (no event API in scope), so bounded-input cost, not per-event.",
+            "fix": "State the linear form in the shape rule both call sites reference — compare one anchor's offset plus the sorted coordinate multiset of the two key sets, O(k log k) — so the precondition's cost is pinned in the text `validate` and `relocate-cluster` both cite."
+          },
+          {
+            "severity": "minor",
+            "location": "Files created → `schemas/README.md` row and Rollout 1 (the data-homes rule), read against Chosen design → Profiles are chains → \"Id → file, never id → path\" — \"`data/` holds content discovered by walking\"",
+            "problem": "The newly added data-homes rule makes every `data/` tree walked content, but `MAX_INDEX_ENTRIES` / `MAX_INDEX_DEPTH` are scoped to the two walks that name them (`data/profiles/`, `data/manifests/`). `data/placements/*.toml`, which is what the transforms' `Ctx { … placements: &Placements }` is built from, and `data/policies/` are discovered by a walk with no entry-count bound named and no pinned loader signature — the same aggregate-exposure plus unscoped-read shape that round 1 closed for the other two trees, now in text this revision introduced.",
+            "fix": "Extend §3's bound clause to name every walked `data/` tree (placements, policies) under the same `MAX_INDEX_ENTRIES` / `MAX_INDEX_DEPTH`, and name the placements loader (`Placements::load(dir)`) beside `Taxonomy::load` and `load_reach_tables`, so the read set behind `Ctx` is a pinned path rule rather than an implementation choice."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-performance-r1c1.md",
+      "durationMs": 270953,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e33328de5ffd3RdRXvx9mlnmtW",
+      "agent": "review/design-security",
+      "at": 1794437728531,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design → Transforms produce bases / Adversarial posture / Test strategy #1 / Rollout 3 — \"Each invocation must match its registry entry's declared arity and the grammars of its arguments (hand ∈ `left|right`, a placement id, a trailing-`*` action pattern); a mismatch is the shipped `InvalidValue { key, message }`, one `fixtures/invalid/` case per shape\"",
+            "problem": "The invocation guard my r1 finding asked for is fully specified in content (every shape enumerated, shipped InvalidValue reused, one fixture per shape, asserted \"before `apply_policy` runs\") but its enforcing component is unnamed, and the two candidate crates cannot both satisfy it as written. `schemas/policy/v1/spec.md` is \"parsed by `bindforge-core`, because the harness requires a reader for every format directory\", and Test #1 requires \"each `fixtures/invalid/` case is rejected with the pinned `CoreError` variant\" — which the shipped harness performs through core's reader (crates/core/tests/conformance.rs:138-150, :223-232). So the arity/grammar fixtures must be refused by core. Yet the knowledge needed to refuse them (transform names, arity, per-argument grammars) is stated to live only in bindforge-transforms' registry (§4 \"The v1 registry holds exactly\"; Rollout 3 \"the registry — each entry carrying its declared arity and argument grammars\"), and policy/v1/spec.md is never told to carry that table, so core's reader gains an undeclared dependency on a table in a crate that depends on it. Outcome as written: the arity fixtures are untestable through the harness path (Test #1 cannot pass), or the table is duplicated in two crates and drifts. For this checklist, the fail-closed boundary for untrusted policy documents has no stated owner.",
+            "fix": "State the closed invocation table (transform name, arity, per-argument grammar) in schemas/policy/v1/spec.md as part of the format contract, enforced by core's policy reader, and add one clause that bindforge-transforms' registry carries exactly that table, with a test asserting registry == spec table. One canonical statement, no new CoreError variant, no new mechanism; Rollout 1 lists the table as spec content."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Profiles are chains (index walk) / Manifests state game facts — \"`data/manifests/` gets the same treatment keyed on each document's declared `game` + `revision`, so a `for` pin is an index lookup and no path is ever built from a document string\"",
+            "problem": "The new manifest index's key is declared content, and no collision rule is named for it. Profile ids have DuplicateId; a manifest carries no `id` (entry set is format, version, game, revision, …), so nothing rejects two documents under data/manifests/ declaring one game + revision. A `for` pin then resolves to one of them by walk order — exactly the manifest the drift gate (contract 5), the axis-kind cross-check, and the seeded-from check run against. A shadowing manifest is a determinism and pin-integrity gap, and the fail-closed checklist item wants a rejection, not an iteration order.",
+            "fix": "One clause: the manifest index rejects two documents declaring one `game` + `revision` as DuplicateId on that declared key (no new variant), and Test strategy #9 adds a shadowing-manifest case beside \"a valid pin resolves to a manifest by index lookup on declared `game` + `revision`\"."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Profiles are chains — \"`generated-by` (an id in the `<namespace>:<part>` shape … a value outside the shape is `InvalidValue`, so a shared profile publishes no author name, handle, or email)\"",
+            "problem": "The mechanism adopted my r1 fix and free-text attribution is gone, but the justification added with it is stronger than the shape enforces. generated-by's namespace is explicitly open (\"there the namespace is a producer label, never an input namespace\") and `<part>` is any lowercase hyphen-joined token, so `author:alice-smith`, `mike:handle`, `studio:alicegmail-com` are in-shape and InvalidValue cannot refuse them. That is the \"what leaves the machine when bindings are shared\" case, and a profile is the artifact that travels, so the absolute claim in the revised sentence is false as written.",
+            "fix": "Make the producer namespace a closed list in profile/v1/spec.md (e.g. `policy|preset|generator`), mirroring the closed input-namespace set, and soften the sentence to what the shape enforces (\"publishes no free-text attribution\"); ADR-014 keeps identity bound to a key (Deferred, A22)."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-security-r1c1.md",
+      "durationMs": 349890,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e33328de5ffeztksMt5MAqF3Hk",
+      "agent": "review/design-compatibility",
+      "at": 1794437781160,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Compatibility matrix — Windows 10/11 contributor machine row: \"exercised leg (Test strategy #13)\"",
+            "problem": "The r1 renumbering moved the platform leg to Test strategy #14; #13 is now \"Integration — harness pickup and the version gate\", which tests nothing about a case-insensitive filesystem. Checklist item 7 requires the matrix row for each supported platform to name its platform test, and Rollout 7 already cites #14, so the matrix cell is the stale one. Fix: that one cell.",
+            "fix": "Change \"exercised leg (Test strategy #13)\" to \"exercised leg (Test strategy #14)\"."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Input vocabulary + Files created (README row) — \"`schemas/README.md` carries the admitted keyboard-name list — the single enumeration the graded set below and Test strategy #3 iterate\" and the README row's \"(the enumeration Test strategy #3 iterates)\"",
+            "problem": "The same revision rewrote Test strategy #3 to iterate the graded set, which the Authoring bar defines by a different rule (\"every key the shipped placements and the seed manifest's `default` rows reference, extended only by review\"). No CI check any longer enumerates README's admitted keyboard-name list, so the list's role is unstated and the US-ANSI `yes (v1)` matrix row's evidence trail points at a sentence that no longer matches the test it cites. The narrowing itself is the Revision log's r1 decision and is not re-opened; the dangling cross-reference is what the closure introduced.",
+            "fix": "Name README's list as the admissible-name namespace and the graded set as its reviewed subset: drop \"and Test strategy #3 iterate\" from Input vocabulary and the parenthetical from the README row (leaving Test #3 to state it iterates the graded set). If the README list is meant to be graded in full, instead restore in Test #3 a clause that every admitted keyboard name is graded in both hands."
+          },
+          {
+            "severity": "minor",
+            "location": "Adversarial posture — \"New `CoreError` variants, each pinned by a fixture: … `DuplicateId`, `UnresolvedAncestor`, `MergeConflict`, `BadPin`, `IndexTooLarge`, `IndexTooDeep`\"",
+            "problem": "A fixture is one document under `vN/fixtures/{valid,invalid}` (schemas/README.md:23,41-42; crates/core/tests/conformance.rs:47-78), which cannot carry these conditions. `IndexTooLarge`/`IndexTooDeep` (added by this revision) are tree-shape conditions, not document conditions; and `MergeConflict`'s implementation and suite moved to the ADR-012 slice in this revision, so it has no v1 code path and no v1 pin. Rollout 1's \"a valid+invalid fixture pair per format\" cannot ship those cases as the sentence claims.",
+            "fix": "Split the sentence: variants a single document pins are pinned by an `fixtures/invalid/` case; `DuplicateId`, `UnresolvedAncestor`, `IndexTooLarge`, `IndexTooDeep` are pinned by the multi-document / scratch-tree unit tests Test strategy #1 and #9 name; `MergeConflict` ships and is pinned in the ADR-012 slice with its rule in `patch/v1/spec.md`."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Manifests §5 (Entries) — \"`default` = `[id, input]` (the emphasis fact, contract 1)\"",
+            "problem": "Contract 1 is the action taxonomy, from which ADR-009 Decision 1 and this proposal's own §1 (\"the game fact is the action's default input, recorded as a manifest `default` row (contract 5)\") both exclude emphasis. The rewritten entry sentence cites the wrong contract.",
+            "fix": "Cite contract 5 for that row."
+          },
+          {
+            "severity": "nit",
+            "location": "Compatibility matrix — Windows row: \"tree file names follow the shipped case-unique stem rule\"",
+            "problem": "The shipped case-uniqueness check runs over `schemas/*/v*/fixtures/{valid,invalid}` only (crates/core/tests/conformance.rs:277-292); `data/profiles/` and `data/manifests/` file names are unenforced. Harmless in substance, exactly because ids never become path components, but the row's wording claims coverage the shipped test does not have.",
+            "fix": "Scope the wording to fixture names and state that `data/` file names are hygiene, not load-bearing."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-compatibility-r1c1.md",
+      "durationMs": 402519,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e33328de6ffentdLrK5kWQgUQ0",
+      "agent": "review/design-correctness",
+      "at": 1794437807349,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design → Transforms (policy entry set) + Rollout 3 + Test strategy #10 — \"Each invocation must match its registry entry's declared arity and the grammars of its arguments (hand ∈ `left|right`, a placement id, a trailing-`*` action pattern); a mismatch is the shipped `InvalidValue { key, message }`, one `fixtures/invalid/` case per shape\" / \"is rejected at parse (`InvalidValue`), before `apply_policy` runs\"",
+            "problem": "The parse-time check requires the registry table, and the design places that table on the far side of the one-way dependency edge: Rollout 3 creates the \"registry — each entry carrying its declared arity and argument grammars\" in crates/transforms (src/registry.rs, §4 file list), whose only edge is bindforge-transforms → bindforge-core. The rejections are pinned as schemas/policy/v1/fixtures/invalid/ cases, and the harness rejects fixture text through bindforge_core::parse alone (crates/core/tests/common/mod.rs:237-243, crates/core/tests/conformance.rs:138-144). So bindforge-core's reader must decide arity and the left|right grammar without the registry: as written the rule is unimplementable, and implementing it duplicates the registry in core, creating two sources for one fact.",
+            "fix": "Declare the v1 registry table (the three transform names, their arity, and their argument grammars) in bindforge-core — crates/core/src/registry.rs, added to the Files-created row's core list and to Rollout 2 — with bindforge-transforms implementing the entries against it. The per-shape fixtures, the InvalidValue reuse, and Test #10's parse clause then need no change, and the registry keeps one home."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Input vocabulary — \"`schemas/README.md` carries the admitted keyboard-name list — the single enumeration the graded set below and Test strategy #3 iterate\"",
+            "problem": "Test strategy #3 as revised iterates the graded set (\"every key in the graded set is graded in both hands, and a key outside a hand's table reads as that hand's `off-reach`\"), and the graded set is defined the other way round: \"every key the shipped placements and the seed manifest's `default` rows reference, extended only by review\". Nothing consumes the admitted keyboard-name list any more — input-id validity is grammar-only (`<part>` = lowercase words joined by `-`) and an ungraded key reads as off-reach, so `keyboard:banana` is a valid, total, ungraded input. The r0 clause that checked the list (\"every admitted keyboard name is graded in both hands\") was replaced, leaving a claim about a test that does not exist and an enumeration that gates nothing.",
+            "fix": "State the list's enforcement in the reach-classes loader rules — \"a `keyboard:` key outside the admitted list is `InvalidValue`\" — and describe the list as the finite set the graded set draws from, dropping the Test strategy #3 attribution (Files-created row's parenthetical too)."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Adversarial posture — \"New `CoreError` variants, each pinned by a fixture: … `MergeConflict` … `IndexTooLarge`, `IndexTooDeep`\"",
+            "problem": "Two of the listed variants have no fixture that pins them. MergeConflict's rule ships as patch/v1/spec.md text only: §3 defers fork/merge to the ADR-012 slice and Test strategy #7 defers their suite, so no v1 fixture or test produces it. IndexTooLarge/IndexTooDeep are tree-walk conditions; the harness walks fixtures one file at a time (conformance.rs:48-78), so an over-wide/over-deep walk cannot be a fixture document, and Test strategy #1 exercises them from a synthetic tree. The claim over-promises coverage the rollout does not ship.",
+            "fix": "Qualify the sentence: \"each pinned by a fixture, except `MergeConflict` (its suite lands with `fork`/`merge` in the ADR-012 slice) and the two index limits (pinned by Test strategy #1's walk)\"."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Profiles are chains → Id → file — \"`data/manifests/` gets the same treatment keyed on each document's declared `game` + `revision`, so a `for` pin is an index lookup\"",
+            "problem": "The collision case for the new manifest key is unstated. Two manifest documents declaring the same `game` + `revision` (their `id` values are free to differ) leave the pin lookup ambiguous, and the drift gate (§5, Test strategy #12) resolves every profile against exactly that key, so an ambiguous key makes the gate's verdict non-deterministic. The id case has a rule (\"`DuplicateId` fires on two documents declaring one id\"); the manifest key has none.",
+            "fix": "One clause mirroring the id rule — \"two documents declaring one `game` + `revision` is `DuplicateId`\" — plus a fixture in Test strategy #9. No new error variant."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Profiles are chains (`resolve`) and Manifests — \"`resolve` also rejects a `seeded-from` the pinned manifest does not declare, naming the profile id\"",
+            "problem": "The check runs against a pin that may be absent: \"`for` … absent = a profile not bound to a game\", `Resolved { …, manifest: Option<ManifestPin> }`, and the drift gate resolves each profile \"against the manifest revision it pins\". An unpinned profile carrying `seeded-from` names a preset that no manifest is ever consulted against, so a dangling `seeded-from` passes CI silently — the residual hole left by moving the rule out of validate.",
+            "fix": "State the precondition at parse where the entries are declared: \"`seeded-from` requires `for`; a `seeded-from` with no `for` is `InvalidValue`\", and mirror it in Test strategy #6. No new mechanism."
+          },
+          {
+            "severity": "minor",
+            "location": "Files created (`schemas/README.md` row) + Adversarial posture — \"`MAX_INDEX_ENTRIES`, `MAX_INDEX_DEPTH` in `index.rs`, re-exported from `lib.rs`\" vs the README row listing only \"format list, the canonical encoding rules, the admitted keyboard-name list …, `version`/`revision`, and the data-homes rule\"",
+            "problem": "The design adds two public limit constants and two new rejection variants, but no contract location states them. The shipped guard section those limits live in reads \"The three constants are the reference implementation's public names for these limits\" and \"The `fixtures/invalid/` corpora are the contract for which condition produces which rejection\" (schemas/README.md:64,72-73); after this design there are five limit constants and two rejections whose condition has no contract home (they are not fixture-expressible).",
+            "fix": "Extend the Files-created README row (and Rollout 1) to add the two limits and the two rejections to schemas/README.md's \"Input budget and chain bound\" section, replacing the \"three constants\" sentence's scope."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Manifests — \"then the three nested-array rows of the Encoding rules: `default` = `[id, input]` (the emphasis fact, contract 1)\" and \"The entry set stays the shipped closed allow-list — no prefix rule (Risks)\"",
+            "problem": "Two pointers are stale. §1's canonical emphasis statement cites the same row as \"a manifest `default` row (contract 5)\" and states that the taxonomy (contract 1) carries no emphasis — so labeling the emphasis fact contract 1 points at the contract that disclaims it. And the prefix-rule Risk row that \"(Risks)\" cites was deleted in this revision.",
+            "fix": "Cite contract 5 (or §1) for the emphasis row, and drop \"(Risks)\"."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Profiles are chains → Id → file — \"the extension stated separately (`.bindprofile` for profile/patch content, `.toml` for `schemas/` fixtures)\"",
+            "problem": "The extension enumeration omits the data/ documents that use .toml: data/manifests/<game>/manifest.toml (§5), data/placements/*.toml (§2), and data/policies/ (§4), so the file-name rule under-covers the seed tree it governs.",
+            "fix": "\"`.toml` for `schemas/` fixtures and for the `data/` manifest, placement, and policy documents\"."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-correctness-r1c1.md",
+      "durationMs": 428709,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e332e6b20ffe1QLZ2KiRR5mkH5",
+      "agent": "review/design-complexity",
+      "at": 1794437831516,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design → Transforms produce bases — \"Each invocation must match its registry entry's declared arity and the grammars of its arguments … a mismatch is the shipped `InvalidValue { key, message }`, one `fixtures/invalid/` case per shape\" + Test strategy #10 \"an unknown transform name is rejected at parse (`InvalidValue`), before `apply_policy` runs\"",
+            "problem": "new (r1). The new invocation-validation rule is placed in two crates at once. Policy documents are parsed by `bindforge-core` (the section states it, because the harness needs a reader per format directory), the malformed cases are `schemas/policy/v1/fixtures/invalid/` files rejected with a `CoreError` variant (Test #1), `InvalidValue` is a shipped core variant, and Adversarial posture says \"no registry entry is reached with a bad argument\" — so the arity/hand/placement-id/pattern/transform-name checks run in core, ahead of the registry. Rollout 3 puts \"the registry — each entry carrying its declared arity and argument grammars\" in `bindforge-transforms`. The text therefore implies one of two permanent costs: core hard-codes the v1 transform vocabulary (a closed list in the wrong crate, widened every time transforms grow, dissolving ADR-009's split where transforms owns policy machinery), or core grows a registry-driven validation hook — an abstraction layer with one implementation (checklist #6).",
+            "fix": "State that core's policy reader validates only the shape it owns (`stack` = array of non-empty arrays of strings, first element the transform name) and that `apply_policy` validates each invocation against its registry entry's arity and argument grammars. Reword §4's \"a mismatch is the shipped `InvalidValue`\" as an `apply_policy` outcome and Test #10's \"rejected at parse … before `apply_policy` runs\" as rejected by `apply_policy` before any transform runs; the per-shape cases move to `crates/transforms/tests/policy_semantics.rs`, and `schemas/policy/v1/fixtures/invalid/` keeps the refused-TOML and bad-shape cases core can see. This replaces the parse-time clause rather than adding to it."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Input vocabulary + Files created — \"`schemas/README.md` carries the admitted keyboard-name list — the single enumeration the graded set below and Test strategy #3 iterate\" / \"the admitted keyboard-name list (the enumeration Test strategy #3 iterates)\"",
+            "problem": "regression (partial closure of my r0 coverage finding). The r1 closure names two different enumerations for one test. The Authoring bar defines the graded set as content-derived — \"every key the shipped placements and the seed manifest's `default` rows reference, extended only by review\" — and Test #3 reads \"every key in the graded set is graded in both hands\"; the README list is the admitted US-ANSI name set, i.e. the whole keyboard. Read as written, Test #3 iterates the full admitted list, which is the coverage obligation the Revision log records as removed (\"the full-keyboard coverage clause is gone from the authoring bar and Test #3\"), so authored corpus and CI surface grow back with the name list and the new `off-reach` default loses its point.",
+            "fix": "One clause in both places: the README list is the admitted vocabulary (the grammar domain for `keyboard:<name>`) and carries no grading obligation; Test #3's enumeration is the graded set, derived from the loaded `data/placements/` keys plus the seed manifest's `default` rows."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Adversarial posture — \"New `CoreError` variants, each pinned by a fixture: … `MergeConflict`\", with the r1 line \"`fork` … and `merge` … land with their suite in the ADR-012 slice\"",
+            "problem": "new residue of the accepted deferral. The variant list is the first slice's, and `MergeConflict` is its only entry with no producer in that slice: a merge conflict comes from `merge()`, not from a document reader, so no `fixtures/invalid/` case can pin it — the \"each pinned by a fixture\" claim and Test #1's per-fixture rejection clause are unsatisfiable for it, and the shipped variant is constructed by nothing until ADR-012 (checklist #6).",
+            "fix": "Split the sentence: the shipped variants (the list minus `MergeConflict`) ship with fixtures in this slice; `MergeConflict` lands with `fork`/`merge` in the ADR-012 slice, next to the `patch/v1/spec.md` rule that already names it."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Manifests state game facts + Test strategy #8 — \"`docked` (hard-docked actions a binding move cannot escape)\" / \"every `exclusive` and `docked` member appears in the `action` rows\"",
+            "problem": "new in the changed text. r1 widened `validate` to `docked`, so its only v1 consumer is a membership check; the stated rule — a binding move cannot escape a docked action — is read by nothing. `relocate-cluster` matches by action pattern plus an isometry precondition and `swap-polarity` is taxonomy-gated, so a policy can relocate an action the manifest declares unmovable (checklist #6: a documented invariant with no consumer).",
+            "fix": "One clause naming the honored owner: either add `docked` matches to `relocate-cluster`'s precondition (→ `Skipped`, naming the action), or state that `docked` is enforced at apply time, gate that with ADR-012, and demote the \"cannot escape\" claim in §5 to a reference to that owner."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-complexity-r1c1.md",
+      "durationMs": 181820,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e332ba46bffexuY4mHnDm3pVK0",
+      "agent": "design/designer",
+      "at": 1794438017412,
+      "reply": {
+        "changed": true,
+        "summary": "Round 1 consumed by changing the design, not appending. (1) All three majors are the same node — the policy invocation guard: the parse-time arity/grammar clause is deleted, the closed invocation table (name, arity, per-argument grammar) is stated once as the `policy/v1/spec.md` format contract, core's reader owns only `stack`'s shape (so `fixtures/invalid/` covers exactly what it can see), and `apply_policy` in `bindforge-transforms` refuses a mismatch as `InvalidValue` before any transform runs, with Test #10 asserting registry == spec; Test #1/#10 and Rollout 1/3 follow. (2) The README's admitted keyboard-name list now has an enforcer (reach loader: a `keyboard:` key outside it is `InvalidValue`) and is described as the vocabulary, not the enumeration Test #3 iterates — Test #3 and the Files row now name the content-derived graded set, killing the two-enumerations-for-one-name drift and restoring the r0 coverage clause's removal. (3) `MergeConflict` and the two index limits are excluded from the 'each pinned by a fixture' claim (ADR-012 suite / Test #1's walk), and the README guard section gains the two constants and rejections in the Files row and Rollout 1. (4) Two documents declaring one `game` + `revision` are `DuplicateId` (§3 + Test #9). (5) `seeded-from` requires `for` at parse (`InvalidValue`), Test #6 mirrors it, and the duplicated §5 sentence about that check was deleted in favour of §3's canonical one. (6) `generated-by`'s namespace is a closed producer list and the privacy claim is narrowed to 'no free-text attribution'. (7) `docked` keeps only its membership check, with honoring it handed to Deferred/ADR-012. Nits: emphasis row cites §1, stale '(Risks)' dropped, `.toml` extension covers the `data/` documents, compat matrix cites Test #14, and the reach loader states file-name/`hand` agreement. Line count is net-zero (314 → 314): every move is a replacement inside existing lines, and two duplicate sentences (the §5 seeded-from restatement, the registry-table restatement in §4) were removed.",
+        "commitMessage": "docs: revise ADR-009 proposal for round-1 design review findings"
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/proposal-revise-r1.md",
+      "durationMs": 185815,
+      "nudges": 0,
+      "docLines": 314,
+      "docLinesAdded": 27,
+      "docLinesRemoved": 27
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e3328ce2effdKes7tGLDVfemMw",
+      "agent": "review/design-complexity",
+      "at": 1794438237610,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → 4. Transforms produce bases — \"`apply_policy(base: &Resolved, policy: &PolicyDoc, ctx: &Ctx) -> PolicyOutcome` with `PolicyOutcome { base: Resolved, skipped: Vec<Skipped> }`\" + \"`apply_policy` validates every invocation against the table … and a mismatch is the shipped `InvalidValue { key, message }` naming the invocation, raised before any transform runs\"",
+            "problem": "new (residue of my accepted r1 closure). Moving the invocation check out of core's reader left the pinned signature unable to carry the pinned rejection: `apply_policy` returns a bare `PolicyOutcome`, which has no error channel, so the `CoreError::InvalidValue` that §4, Adversarial posture (\"the invocation table's arity and grammars in `apply_policy`\") and Test strategy #10 all require has nowhere to go. The Goals pin function signatures as the deliverable, so an implementer hits a contradiction between two statements of the same section. The r1 theme (validation split across crates) is closed; this is only the return channel.",
+            "fix": "Make the return type `Result<PolicyOutcome, CoreError>` in that one signature (replacing `-> PolicyOutcome`), and state that the whole-`stack` table check runs first, so its `InvalidValue` arrives as `Err` while inapplicable transforms keep returning `Ok(PolicyOutcome)` with `skipped` populated. One signature, no new type."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → 2. Input vocabulary + Reach classes loader rules + Test strategy #3 — \"`schemas/README.md` carries the admitted keyboard-name list: the admitted `keyboard:` vocabulary the reach tables draw from, enforced by the reach loader (a key outside it is `InvalidValue`)\" / \"every key is a `keyboard:` id in the admitted list, else `InvalidValue`\"",
+            "problem": "new. The admitted list gained its first consumer this round, which makes true a duplication the same paragraph denies. The list is prose in `schemas/README.md`, and no machine-readable admitted-name table exists anywhere in the repo (nothing under `crates/` or `schemas/` names a `keyboard:` key today), so `reach.rs` must carry a hard-coded US-ANSI name set of its own — a second key-name table kept in step with the README by eye. Test strategy #3 pins only the behavior of one out-of-list key, never the list's contents, so README and code can drift in either direction, and \"No second key-name table is invented here\" is false as the text stands.",
+            "fix": "One clause naming where the machine-readable admitted list lives (a public constant in the crate that owns input ids, e.g. `keyboard_names()`, which `reach.rs` and every input-id reader consults), replacing the prose-list-only reading, with the README pointing at it so \"no second table\" stays true. Extend Test #3's existing clause to assert the loader's admitted set equals the README enumeration, so the pair is pinned."
+          },
+          {
+            "severity": "nit",
+            "location": "Rollout 2 vs Chosen design → Adversarial posture — \"the entry sets and the `CoreError` variants named in Adversarial posture\"",
+            "problem": "new. The Adversarial-posture sentence now excludes one variant from this slice (\"each pinned by a fixture in this slice except `MergeConflict` — it lands with `fork`/`merge` in the ADR-012 slice\"), while Rollout 2's blanket phrase names all thirteen variants as shipping in the core step, so the r2 carve-out reads as a contradiction at the rollout step.",
+            "fix": "Two words in Rollout 2: \"the `CoreError` variants named in Adversarial posture, except the ones it defers to ADR-012\"."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-complexity-r1c2.md",
+      "durationMs": 220067,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e3328ce2effeFFjCEJj09vWJ59",
+      "agent": "review/design-security",
+      "at": 1794438271951,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design → Profiles are chains (Resolution, `resolve` bullet) / Profiles are chains → Id → file / Test strategy #9 — \"`resolve` also rejects a `seeded-from` the pinned manifest does not declare, naming the profile id … `for` is required at parse, so the check always has a manifest.\"",
+            "problem": "The new clause is true of the pin, not of the manifest. `for` required at parse guarantees a well-formed `game` + `revision` string; the manifest itself is found by index lookup, and no rejection is named for a lookup miss. `UnresolvedAncestor` is scoped to \"a `derives` entry with no document\", `BadPin` is a grammar failure, and Test #9's pin cases cover only malformed halves (`BadPin`) and a valid lookup. A profile pinning a deleted, renamed, or never-authored manifest revision is an unruled state, and `Resolved { manifest: Option<ManifestPin> }` offers the silent reading — proceed with `manifest: None`, preset check skipped — which re-opens one level up the vacuously-green condition the r2 revision says it closed (\"unpinned, the check was vacuously green\"), and lets the drift gate's \"resolves every profile … against the manifest revision it pins\" pass on a pin nothing satisfies.",
+            "fix": "One clause in §3: a `for` pin with no manifest document in the index is `UnresolvedAncestor`, that variant's rule stated once as \"a document reference with no document\" (no new `CoreError` variant, no new mechanism; the choice cannot be left to implementation because the variant list is the shipped compatibility promise), plus one Test #9 case beside the valid-pin lookup: a well-formed pin naming no manifest is rejected, so `resolve`'s `seeded-from` check and the drift gate are never vacuous."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Profiles are chains → Id → file — \"`crates/core/src/index.rs` walks `data/profiles/` and parses every document, indexing by its **declared** `id`; `data/manifests/` gets the same treatment keyed on each document's declared `game` + `revision`\"",
+            "problem": "The keying presumes every document in a walked tree declares the format that tree holds, and no such rule appears anywhere in the proposal. Readers dispatch on the document's own `format` (the shipped `UnknownFormat` covers only formats the crate does not parse), so a document under `data/manifests/` declaring `format = \"policy\"`, or one under `data/profiles/` declaring `format = \"manifest\"`, parses cleanly and reaches the index with the key entry the tree needs absent (`id`, or `game` + `revision`). The behavior on hostile or misfiled content is left to the implementer — the same fail-closed family as the manifest-key collision closed this round.",
+            "fix": "One clause: each walked tree accepts only the format(s) it holds (`data/profiles/` → `profile`/`patch`, `data/manifests/` → `manifest`), a document declaring another is refused at index time; add a Test #9 case planting a manifest-format document in `data/profiles/`."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Adversarial posture — \"New `CoreError` variants, each pinned by a fixture in this slice except `MergeConflict` … and the two index limits, pinned by Test strategy #1's synthetic walk, not by a fixture document: … `DuplicateDelta`, `DuplicateId`, …\"",
+            "problem": "The exception list is one variant short. `DuplicateId` is an index-level, two-document rejection, and the shipped harness asserts per fixture file (crates/core/tests/conformance.rs:138-154), so no single `fixtures/invalid/` document can pin it; Test strategy #9 is what pins it, as the two sentences rewritten this round already acknowledge for `MergeConflict` and the index limits.",
+            "fix": "Add `DuplicateId` to the same exception clause, naming Test strategy #9 as its pin."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-security-r1c2.md",
+      "durationMs": 254408,
+      "nudges": 1
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e3328ce2ffferjlrRsALGMd46k",
+      "agent": "review/design-correctness",
+      "at": 1794438326506,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design → Transforms (§4) — \"`apply_policy(base: &Resolved, policy: &PolicyDoc, ctx: &Ctx) -> PolicyOutcome` with `PolicyOutcome { base: Resolved, skipped: Vec<Skipped> }`\" + \"`apply_policy` validates every invocation against the table — its registry carries exactly that table — and a mismatch is the shipped `InvalidValue { key, message }` naming the invocation, raised before any transform runs\" (Test strategy #10: \"rejected by `apply_policy` (`InvalidValue`)\")",
+            "problem": "new — the r2 closure moved the invocation-table check out of core's parse and into `apply_policy`, but left `apply_policy`'s declared signature unchanged, returning `PolicyOutcome`, whose only field is `skipped: Vec<Skipped>`. There is no error channel: the `InvalidValue` the design now requires `apply_policy` to raise (Adversarial posture, §4, Test #10) has nowhere to go, and `skipped`'s stated semantics are the report of an *inapplicable* transform that no-ops, not a typed refusal. As written, a signature the design's own Goals promise as concrete Rust cannot express a rejection three sections pin, and a caller cannot distinguish \"stack rejected\" from \"stack applied with skips\". This is the defect the closure of my r1 #1 introduced: the parse-time check needed no error channel, the apply-time one does.",
+            "fix": "Make the return `Result<PolicyOutcome, CoreError>` (`bindforge-transforms` already depends on `bindforge-core`, so `CoreError` is in scope), keep `skipped` for the inapplicable-transform no-op, and state that the whole `stack` is validated against the invocation table before the first invocation runs. Test #10's wording then holds unchanged."
+          },
+          {
+            "severity": "major",
+            "location": "Chosen design → Profiles are chains (`resolve`) — \"`resolve` also rejects a `seeded-from` the pinned manifest does not declare, naming the profile id — a profile fact read against a manifest, so not `validate`'s; `for` is required at parse, so the check always has a manifest.\"",
+            "problem": "new — `for` being required at parse guarantees a pin, not a manifest: the pin's halves are grammar-checked only (`BadPin`), and §3, §5, Test #9 and Test #12 state nothing about a grammatical `game` + `revision` that names no document in the manifest index. Under the design's own shapes that case is silently green: `Resolved { …, manifest: Option<ManifestPin> }` is documented as `None` for \"a profile not bound to a game\", so an unresolvable pin answers `None` as well — one shape carrying two facts — and both `resolve`'s `seeded-from` check and the drift gate (\"resolves every profile … against the manifest revision it pins — a read of the manifest index\") have no manifest to check against, so a dangling `seeded-from` on a profile pinning a manifest the seed does not ship passes CI, which is the residual hole the r2 closure states it closed. The claim as written is simply false: a pin is not a manifest."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Adversarial posture + Authoring bar (§2) — \"New `CoreError` variants, each pinned by a fixture in this slice except `MergeConflict` … and the two index limits\" and \"one invalid fixture per rejected condition\"",
+            "problem": "re-raised (narrowed from my r1 #3) — the exception list carves out only `MergeConflict` and the walk limits, but the shipped harness pins an invalid fixture by refusing its text through `bindforge_core::parse` (plus `resolve_chain` for a profile), one file at a time (`crates/core/tests/conformance.rs:137-154`, `crates/core/tests/common/mod.rs:237-243`). The remaining listed conditions are invisible to `parse`: `GeometryConflict` (needs both hand tables), the r2-added admitted-list `InvalidValue` and the class-vocabulary rule (reach loader, not parse), `DuplicateId` (two documents), `UnresolvedAncestor` (document + index), `AxisKindConflict`/`UnknownAction`/`UnknownInput` (manifest vs taxonomy), `PlacementNotIsometric`/`PlacementDegraded` (placement vs reach tables), `DuplicateDelta` (patch application). Worse, the authoring bar's \"one invalid fixture per rejected condition\" now applies to reach-classes loader conditions r2 added: an author who puts a `keyboard:banana` reach table in `schemas/reach-classes/v1/fixtures/invalid/` produces a parse-clean document and the shipped harness panics \"{label} is an invalid fixture and must be rejected\".",
+            "fix": "Qualify the posture sentence once: \"pinned by a fixture document where `parse` can see the condition; `GeometryConflict`, `DuplicateId`, `UnresolvedAncestor`, `AxisKindConflict`, `PlacementNotIsometric`, `PlacementDegraded`, `UnknownAction`, `UnknownInput`, `DuplicateDelta` are pinned over fixture data by the model suites that call the loader, index and validators (#3, #4, #6, #8, #9, #10)\" — and in the authoring bar state that reach-classes' rejected conditions are pinned by Test #3's model tests, `fixtures/invalid/` carrying only parse-refusable cases (Rollout 1's refused-TOML-construct cases). No new mechanism, no harness change."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-correctness-r1c2.md",
+      "durationMs": 308965,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e332416d8ffeRa64kfw76rqFvO",
+      "agent": "design/designer",
+      "at": 1794438485977,
+      "reply": {
+        "changed": true,
+        "summary": "All five open findings were consumed by changing the design, not by appending to it. Correctness major 1 (Transforms): `apply_policy` is now `Result<PolicyOutcome, CoreError>` with the whole `stack` validated against the invocation table before the first invocation, `skipped` narrowed to the inapplicable-transform report, and §4's duplicated consequence clause plus Test #10's fixture-scope parenthetical deleted (the fact stays in §4 and Test #1). Correctness major 2 / security major (dangling `for` pin): one rule states `UnresolvedAncestor` canonically as \"a document reference with no document\" — a `derives` entry **or** a pin naming no manifest in the index — with `Resolved.manifest` `Some` whenever `for` is declared, so `resolve`'s `seeded-from` check and the drift gate cannot be vacuous, mirrored by a Test #9 case; the r2 log entry's \"the check always has a manifest\" claim is superseded in place. Security minor (walked-tree formats): each tree accepts only the formats it holds (`data/profiles/` → profile/patch, `data/manifests/` → manifest), a document declaring another is the shipped `InvalidValue` at index time (no new variant), plus a Test #9 planting case. Correctness minor / security nit (fixture pinning): the posture clause is rewritten so a fixture document pins only parse-visible conditions and the multi-document/loader-level ones (`GeometryConflict`, `PlacementNotIsometric`, `PlacementDegraded`, `DuplicateDelta`, `AxisKindConflict`, `UnknownAction`, `UnknownInput`, `DuplicateId`, `UnresolvedAncestor`, the index limits, `MergeConflict`) name the suite that calls their producer, `DuplicateId` included; the authoring bar's \"one invalid fixture per rejected condition\" is replaced by Test #3 model tests over fixture data, and the Risks row, Test #1 and Test #3's loose \"fixture\" wording were narrowed with it. FYI items are left as FYI (no severity), except the Test #10 duplication, which the deletion resolved. Diff is line-for-line net-zero (314 lines before and after; every change is in-place inside an existing paragraph), with four Revision-log entries amended where they stand and anchored by section name.",
+        "commitMessage": "docs: revise proposal for apply_policy error channel, manifest pin resolution, and index format rule"
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/proposal-revise-r1.md",
+      "durationMs": 159385,
+      "nudges": 0,
+      "docLines": 314,
+      "docLinesAdded": 16,
+      "docLinesRemoved": 16
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e3321a7e6ffe8HDYJXyqhIF8KJ",
+      "agent": "review/design-security",
+      "at": 1794438645213,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → Profiles are chains → Resolution (`resolve` bullet) — \"`Resolved { bindings: …, chain: Vec<String>, manifest: Option<ManifestPin> }`, whose `manifest` is `Some` whenever the profile declares `for`\" / \"`resolve` also rejects a `seeded-from` the pinned manifest does not declare\"",
+            "problem": "The r3 closure made the pin's existence total (a dangling `for` is `UnresolvedAncestor`) but left *which* manifest a chain pins unruled, so the check can run against the wrong manifest. `for` is an optional entry on every chain document (§3: `patch/v1` \"carries the same optional chain entries\"), while a chain has one `manifest` field and one \"pinned manifest\" (§5: \"resolves every profile … against the manifest revision it pins\"). A shared chain whose base pins `remnant2@0.1` and whose tip pins an existing `remnant2@0.2` is a fully valid-document state with no stated rule: `resolve(root, 1)` (base alone) and `resolve(root, chain.len())` then evaluate `seeded-from` against different manifests, and the drift gate's verdict for one profile id becomes implementation/chain-order dependent — the same \"walk-order dependent\" determinism loss the adjacent `DuplicateId` clause exists to prevent, on the mechanism the design names as the only trust mechanism (validation, not provenance). This is the residue of my r1 major at the same location, not the vacuity it described.",
+            "fix": "One clause in §3: the pin is a chain fact — a chain's documents declare one `for`, and a document whose `for` differs from the chain's is `InvalidValue` (no new `CoreError` variant, no new mechanism) — plus one Test #9 case beside the existing pin lookups, so `Resolved.manifest` has exactly one referent."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Profiles are chains → Id → file — \"Each tree accepts only the formats it holds — `data/profiles/` `profile`/`patch`, `data/manifests/` `manifest`\"",
+            "problem": "The new format gate is stated as \"each tree\" but enumerates only the two indexed trees, while the design ships four walked `data/` trees: `data/placements/*.toml` is loaded content (Test #3, #4) and `data/policies/` carries the policy content Test #11 applies, and `schemas/README.md`'s data-homes rule says all of `data/` \"holds content discovered by walking\". A misfiled document in those two trees is again dispatched on the document's own declared `format`, with no gate named — the fail-closed family this clause closed for the indexed trees.",
+            "fix": "Extend the parenthetical to `data/placements/` → `placement` and `data/policies/` → `policy`, same shipped `InvalidValue` at load; no new mechanism, and Test #9's planted-document sentence already covers the cases."
+          },
+          {
+            "severity": "nit",
+            "location": "Test strategy #8 (with Adversarial posture) — \"a manifest naming an unknown action id, an axis kind that disagrees with the taxonomy (`AxisKindConflict`), … is rejected, each with its own fixture\"",
+            "problem": "The r3 pinning rule says such conditions are not carried by a `fixtures/invalid/` document (parse cannot see the taxonomy, and the shipped harness asserts that every file under `fixtures/invalid/` is rejected through `parse` — crates/core/tests/conformance.rs:138-154), yet #8's untouched \"each with its own fixture\" reads as if they live there. A reader who places #8's cases under `schemas/manifest/v1/fixtures/invalid/` makes the harness walk fail on documents that parse cleanly, instead of exercising the `validate` check intended.",
+            "fix": "One phrase in #8: its cases are data under the model suite (as the posture's \"over fixture data\" already says), never under `schemas/*/v1/fixtures/invalid/`."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-security-r1c3.md",
+      "durationMs": 159135,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e3321a7e7ffel1zHX1lm6oEi8k",
+      "agent": "review/design-correctness",
+      "at": 1794438673447,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → Reach classes and placements → Authoring bar (§2) — \"CI enforces what it can: the graded set … is graded in both hands, coordinates agree across hands, grades are non-decreasing in grid distance from that hand's home-graded keys, every rejected condition pinned by Test strategy #3's model tests\"",
+            "problem": "new — the r3 closure makes Test #3 the sole pin for \"every rejected condition\", and two items in that same CI-enforced list break it. (a) Grid-distance monotonicity appears in no test anywhere: Test #3's clauses are per-hand distinctness, row grammar + class vocabulary, cross-hand coordinates, mirrored asymmetry, graded-set coverage, off-reach default, admitted-list InvalidValue — monotonicity is not among them, and no other Test strategy item names it, so the condition the bar says CI enforces is exactly the un-pinned one r1 #3 was about. (b) The bar governs both placement/v1/spec.md and reach-classes/v1/spec.md, and Adversarial posture maps PlacementNotIsometric/PlacementDegraded to #4, so naming only #3 contradicts the posture's own mapping. Fix: write \"every rejected condition pinned by Test strategy #3 and #4's model tests\", and add the monotonicity clause to Test #3 — or drop it from the CI-enforced list to review-only, which \"extended only by review\" already implies for the graded set.",
+            "fix": "Add \"and #4\" to the authoring bar's pinning clause, and add \"grades are non-decreasing in grid distance from that hand's home-graded keys\" as a Test #3 clause (or demote the condition to review-only)."
+          },
+          {
+            "severity": "minor",
+            "location": "Test strategy #4 and #8 — \"a non-isometric fixture is rejected `PlacementNotIsometric`; a fixture exceeding `max-degrade` is rejected `PlacementDegraded`\" / \"… is rejected, each with its own fixture\"",
+            "problem": "new — the closure fixed this wording for reach-classes only (Test #3's new \"in the loader, not in a fixture document\"); #4's and #8's conditions are produced by `validate`, which `parse` cannot see, so the bare word \"fixture\" points an implementer at `schemas/{placement,manifest}/v1/fixtures/invalid/`. A document placed there is asserted by the shipped fixture-walking harness (Test #1: \"each `fixtures/invalid/` case is rejected with the pinned `CoreError` variant\"; Test #13: \"requires no change to `crates/core/tests/conformance.rs`\") — it parses clean, so the harness assertion fails and the no-harness-change claim breaks. Adversarial posture's general rule (\"only where `parse` can see the condition … otherwise, over fixture data, by the model suite\") already forbids it; only these two test-strategy lines are loose.",
+            "fix": "Carry #3's clause across once per site: in #4, \"a non-isometric placement pair is rejected PlacementNotIsometric by `validate`, not in a fixture document\" (same for the degraded and ungraded-key cases); in #8, \"each over its own manifest data, not in `fixtures/invalid/`\"."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Profiles are chains (`resolve`) — \"`Resolved { …, manifest: Option<ManifestPin> }`, whose `manifest` is `Some` whenever the profile declares `for`\" + \"`for` is required at parse and a `for` naming no manifest document in the index is `UnresolvedAncestor` …, so the check never runs against nothing\"",
+            "problem": "new — the `Some`-whenever claim is stated of one document, while a chain carries the entry on every rung: §3 gives `patch/v1` \"the same optional chain entries\", so a base can pin `remnant2@0.1` (with `seeded-from` beside it) under a leaf patch that pins nothing, or pins `0.2`. `Resolved.manifest` is one slot for N pins, and the guarantee \"never runs against nothing\" follows only if the `seeded-from` check is read per-document against that document's own `for`; read against the rooted document's pin — the natural reading of \"the profile\" in `resolve(index, root, …)`, and the value the drift gate hands to `validate` (\"resolves every profile … against the manifest revision it pins\") — a chain whose base carries `seeded-from` and whose leaf carries no `for` answers `manifest: None`, and the dangling-preset case r1 #2 raised is vacuously green again for chains.",
+            "fix": "One clause: `Resolved.manifest` is the rooted document's pin; the `seeded-from` check runs per-document against that document's own `for` (parse already pairs them); a chain document whose `for` is present and differs from the rooted document's is a rejection naming both document ids."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-correctness-r1c3.md",
+      "durationMs": 187369,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e331ecb97ffeVECSqXaX8KgoeO",
+      "agent": "review/design-performance",
+      "at": 1794438828811,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Files created → `schemas/README.md` row, read against Chosen design → Profiles are chains → Id → file — \"the guard section's two new index limits and their rejections, and the data-homes rule: the contract tree holds lookup tables a loader reads at a fixed path, `data/` holds content discovered by walking\" / \"`.toml` for `schemas/` fixtures and for the `data/` manifest, placement, and policy documents\"",
+            "problem": "re-raised, not closed, and widened by the text this revision touched. The new README cell pairs the two index limits with the data-homes rule, and the rewritten §3 clause newly names the `data/` placement and policy documents as walked content, while the bound sentence those edits live in is scoped to exactly two walks (`MAX_INDEX_ENTRIES` / `MAX_INDEX_DEPTH` on `data/profiles/` and `data/manifests/`). The guard text now states a bound for `data/` as a whole that covers two of its four trees, and A25's \"their product is the only aggregate bound on bytes read at load\" no longer names every tree read at load: `Ctx { … placements: &Placements }` is built from `data/placements/`, and policies from `data/policies/`, by a walk with no entry-count bound named and no pinned loader signature beside `Taxonomy::load(path)` / `load_reach_tables`. Bounded-input memory/read-volume cost, not a keystroke path (no event API in scope).",
+            "fix": "Extend §3's bound clause to name every walked `data/` tree — \"`placements` and `policies` included, under `MAX_INDEX_ENTRIES` / `MAX_INDEX_DEPTH`\" — and name `Placements::load(dir)` beside the two pinned loaders, so the README guard cell and A25's aggregate-bytes claim cover the read set behind `Ctx`. No new mechanism: one clause, one signature."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-performance-r1c4.md",
+      "durationMs": 155251,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e331ecb96ffeIQdatYcQrbDoga",
+      "agent": "review/design-complexity",
+      "at": 1794438887326,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → Reach classes and placements → Authoring bar — \"grades are non-decreasing in grid distance from that hand's home-graded keys, every rejected condition pinned by Test strategy #3's model tests\"",
+            "problem": "new (defect of this round's closure). The replacement for the deleted \"one invalid fixture per rejected condition\" names Test strategy #3 as the pin for every rejected condition, but Test #3's stated enumeration (per-hand distinctness, `<class> <row> <col>` parse, cross-hand coordinate agreement, mirrored-key asymmetry, graded-set coverage, `off-reach` default, admitted-list `InvalidValue`) has no monotonicity clause; \"non-decreasing in grid distance\" appears exactly once in the document, in this sentence. With the fixture obligation removed this round — r3's own reason is that a non-parse-visible condition cannot be pinned by a fixture — that CI-enforced grading condition now names no consumer at all. The clause also covers the `placement/v1/spec.md` half of the authoring checklist, whose conditions are Test #4's, not #3's. The theme (pinning claims naming no check) is closed everywhere else; this is the residue the closure left.",
+            "fix": "Extend Test #3's existing enumeration with the monotonicity assertion (grades non-decreasing in grid distance from that hand's home-graded keys), and scope the clause to \"every reach-table condition pinned by Test strategy #3's model tests, every placement condition by #4\" — the same two tests, no new suite."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → 2. Input vocabulary + Reach classes loader rules + Test strategy #3 — \"`schemas/README.md` carries the admitted keyboard-name list: the admitted `keyboard:` vocabulary the reach tables draw from, enforced by the reach loader (a key outside it is `InvalidValue`) … No second key-name table is invented here.\"",
+            "problem": "re-raised (my r1c3 finding 2; text unchanged this round, and the Revision log's r2 entry for that section records only the list's grading obligation, not a rebuttal of this point). The loader rule is a machine check, and the list's only stated home is prose in `schemas/README.md`; no `keyboard:` key name exists anywhere under `crates/` or `schemas/`, so `reach.rs` must carry its own US-ANSI name set to enforce it — a second key-name table kept in step with the README by eye, which the sentence denies. Test #3 pins only the behavior of one out-of-list key, never the list's contents, so README and code can drift in either direction.",
+            "fix": "One clause naming the machine-readable home (a public constant in the crate that owns input ids, e.g. `keyboard_names()`, consulted by `reach.rs` and every input-id reader), with the README pointing at it so \"no second table\" stays true, and extend Test #3's existing admitted-list clause to assert the loader's set equals the README enumeration."
+          },
+          {
+            "severity": "nit",
+            "location": "Rollout 2 vs Chosen design → Adversarial posture — \"the entry sets and the `CoreError` variants named in Adversarial posture\"",
+            "problem": "re-raised. The rewritten Adversarial-posture sentence still defers one variant (\"`MergeConflict` lands with `fork`/`merge` in the ADR-012 slice, which is where its producer is\"), while Rollout 2's blanket phrase names all thirteen variants as landing in the core step, so the carve-out reads as a contradiction at the rollout step.",
+            "fix": "Two words in Rollout 2: \"the `CoreError` variants named in Adversarial posture, except the ones it defers to ADR-012\"."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-complexity-r1c4.md",
+      "durationMs": 213766,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e331ecb98ffeMQCj7vRmrFdjkg",
+      "agent": "review/design-compatibility",
+      "at": 1794438909523,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Compatibility matrix — Windows 10/11 contributor machine row: \"tree file names follow the shipped case-unique stem rule\"",
+            "problem": "re-raised. The shipped case-uniqueness assertion runs over fixture-directory names only (crates/core/tests/conformance.rs:277-311, \"fixtures/{kind} of {} holds names that differ only by case\"), and schemas/README.md:26-27 scopes the rule to \"fixture file names\". This revision widened the sentence the row rests on: §3 now states the extension rule for \"the `data/` manifest, placement, and policy documents\", so the row claims case-uniqueness coverage over trees no shipped test enforces. Harmless in substance — ids never become path components, the design's own reason — so it stays a nit.",
+            "fix": "In that one cell, scope the claim: \"fixture names follow the shipped case-unique stem rule; `data/` file names follow the stem rule as hygiene, not a load-bearing check\"."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Adversarial posture (final sentence) + Files created → `schemas/README.md` row: \"`schemas/README.md`'s guard section gains those two constants and their rejections beside the shipped three, so its 'public names for these limits' claim stays true\"",
+            "problem": "The README's canonical sentence is \"The three constants are the reference implementation's public names for these limits\" (schemas/README.md:64-65). Adding MAX_INDEX_ENTRIES / MAX_INDEX_DEPTH and their rejections to that section leaves \"the three constants\" naming three of five limits, so the claim stays true only if that sentence is amended — and the design nowhere says it is (Rollout 1 and the Files created cell record only the addition).",
+            "fix": "Name the edit: record in Rollout 1 and the Files created cell that the guard section's \"three constants\" sentence becomes a five-constant sentence."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Profiles are chains → Resolution, API bullet: \"`for` is required at parse and a `for` naming no manifest document in the index is `UnresolvedAncestor`\"",
+            "problem": "As written this reads as making `for` a required entry, which contradicts the same section's \"`profile/v1` entry set grows by **optional** entries only, so the shipped valid fixtures stay valid (no narrowing)\", its \"absent = a profile not bound to a game\" (the ADR's accessibility and alternative-controller case), and Rollout's Defaults line \"`for` absent = not bound to a game\". The rule actually being added is the parse-time one from §3's entry list (`seeded-from` requires `for`).",
+            "fix": "Write \"`seeded-from` requires `for` at parse\" (or \"`for`'s grammar is checked at parse\"), leaving `for` optional."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-compatibility-r1c4.md",
+      "durationMs": 235964,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-final",
+      "round": 0,
+      "sessionID": "ses_e331b316affeY4ld6WpNq29C0h",
+      "agent": "design/editor",
+      "at": 1794439058648,
+      "reply": {
+        "ambiguities": [
+          "Chosen design → Profiles are chains: \"`for` is required at parse\" reads as contradicting the same section's \"absent = a profile not bound to a game\" and the Rollout default \"`for` absent = not bound to a game\"; the intended scope (required only when `seeded-from` is present) is not stated. Kept verbatim and flagged with an Editor notes line at the bottom.",
+          "Seed taxonomy size: \"The seed ships ~40 ids\" (Chosen design → Action taxonomy) and \"the ~40 taxonomy ids\" (Rollout 4) versus assumption A24's estimate of \"≈ 45 ids\". Numbers left untouched per the language-only rule; author to reconcile.",
+          "Chosen design → Action taxonomy: \"Emphasis is not in the taxonomy, and is not authored in the manifest either\" sits next to \"the game fact is the action's default input, recorded as a manifest `default` row (contract 5)\". The intended claim (emphasis is not an authored manifest field, only a reading of the default row) is inferable but the wording invites the opposite reading; left as written.",
+          "Chosen design → Manifests: \"That membership check is `docked`'s only v1 consumer\" states the consumer/consumed relation in reverse of the surrounding text (the check consumes `docked`); left unchanged as a wording question for the author."
+        ],
+        "commitMessage": "docs: language pass on the ADR-009 design proposal"
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/proposal-final-r0.md",
+      "durationMs": 149035,
+      "nudges": 0,
+      "docLines": 316,
+      "docLinesAdded": 18,
+      "docLinesRemoved": 16
+    },
+    {
+      "stage": "editorial-review:performance",
+      "round": 2,
+      "sessionID": "ses_e3318eaeeffeODVADdwj44kURw",
+      "agent": "review/design-performance",
+      "at": 1794439232354,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/editorial-review-performance-r2.md",
+      "durationMs": 173594,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e3318eaefffeVfsRg1wMmserRC",
+      "agent": "review/design-compatibility",
+      "at": 1794439440499,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/editorial-review-compatibility-r2.md",
+      "durationMs": 381740,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:security",
+      "round": 2,
+      "sessionID": "ses_e3318eaefffdHKqw1TijyYsQ0i",
+      "agent": "review/design-security",
+      "at": 1794439472777,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → Profiles are chains / Editor notes — \"`for` is required at parse\" is ambiguous; author to clarify.\"",
+            "problem": "The diff's one net-new line leaves an unresolved ambiguity in the clause that is the fail-closed gate for pins. In the same paragraph the body says `for` … \"absent = a profile not bound to a game\", so \"required at parse\" reads either as presence mandatory (which rejects the unbound profile that same paragraph and the Migrations default \"`for` absent = not bound to a game\" exist to serve) or as grammar-validated-when-present (what Test strategy #6's \"a malformed `for` pin is `BadPin`\" already asserts). Both readings fail closed, so no data path is unsafe; what is unsettled is the enforcement coverage of the guard the r3 revision log credits with making resolve's `seeded-from` check and the drift gate non-vacuous (\"one rule closes both\"), and the proposal ships carrying an open editor question about it. Label: new text in this diff.",
+            "fix": "Replace \"`for` is required at parse\" with the rule the suite already pins: \"`for`, when present, is grammar-checked at parse (a malformed pin is `BadPin`) and its `game` + `revision` must name a manifest document in the index (`UnresolvedAncestor`); a profile with no `for` is unbound\" — then delete the Editor notes line. No mechanism added: it swaps an ambiguous clause for text Test strategy #6 and #9 already assert."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/editorial-review-security-r2.md",
+      "durationMs": 414018,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:complexity",
+      "round": 2,
+      "sessionID": "ses_e33164491ffeVCKuPP47XCWcMF",
+      "agent": "review/design-complexity",
+      "at": 1794439512964,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design → Profiles are chains (resolution bullet, `resolve` API) — \"`for` is required at parse\" — the clause named by the `Editor notes:` trailer added in editorial-r2.diff",
+            "problem": "The added editor flag is sound: this clause is a surplus global constraint that contradicts its own section. The same entry list says the set \"grows by **optional** entries only, so the shipped valid fixtures stay valid (no narrowing)\" and defines `for` as \"absent = a profile not bound to a game\"; under the literal required-at-parse reading the shipped valid fixture `schemas/profile/v1/fixtures/valid/basic-profile.toml` (no `for`) stops parsing, falsifying that claim, the Goals' \"no harness change\" claim, and Migrations' \"the `profile/v1` entry additions are optional, so every shipped fixture resolves unchanged\". No consumer needs the global rule — its stated consumer is the `seeded-from` check (\"so the check never runs against nothing\"), and the Revision log's recorded r3 decision is already the local rule (\"`seeded-from` requires `for` at parse, and a `for` naming no manifest in the index is `UnresolvedAncestor`\"). Strictly read, every profile is pinned to one game revision, working against the accessibility/alternative-controller case the clause itself cites (ADR-009 Consequences: \"authoring a personal handedness/accessibility policy once and re-applying it to every game BindForge supports\"). Test strategy #6/#9 pin `BadPin` and valid-pin resolution only, so the suite gives no signal and the ambiguity lands directly in the `profile/v1` implementation.",
+            "fix": "Delete \"`for` is required at parse\" and state the rule once, locally, in the bullet it governs: \"`for` is optional (`absent` = not bound to a game); a present `for` must be grammatical (`BadPin`) and name a manifest document in the index (`UnresolvedAncestor`), and a `seeded-from` requires `for` (`InvalidValue`)\". This replaces the global requirement with the already-recorded r3 rule, keeps the preset check and drift gate from running against nothing, and restores the unbound-profile case; then remove the `Editor notes:` trailer whose flag this closes."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/editorial-review-complexity-r2.md",
+      "durationMs": 280579,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e3318eaf0ffeB1yOdhIsUMQ3FY",
+      "agent": "review/design-correctness",
+      "at": 1794439517129,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Assumption register → A16 (basis column) — \"https://en.wikipedia.org/wiki/Cursor_home_key\"; cited by the Revision-log line this diff rewrote: \"the \\\"OKL; keeps the home-row anchor\\\" claim demoted to a `validate` verdict (A16)\"",
+            "problem": "The row's cited basis is a dead source: the URL returns 404, and the MediaWiki query API reports \"title\":\"Cursor home key\",\"missing\" (the live article is \"Home key\"). A16 is therefore marked `verified` on a link that resolves to nothing, so the anti-hallucination gate (checklist items 1 and 2) cannot be satisfied for a row that the diff's changed text invokes; the placement-verdict paragraph in Reach classes and placements leans on the same row. Every other spot-checked citation in the touched text held up (toml.io v1.1.0 for A12/A13, RFC 6902 for A14, PubMed 25029899 for A15, W3C gamepad for A20), so this is an isolated broken link, not a fabricated claim — and the design's substance is intact because the claim is already demoted to \"whatever `validate` and the graded tables report\", which is why this is major rather than blocker.",
+            "fix": "Swap the dead URL for live evidence in the A16 basis only: https://en.wikipedia.org/wiki/Home_key for the home-row anchor, plus the repo-internal statement of the practice split, ADR-009 Context observation 1 (\"Community practice disagrees on placement even for one cluster: IJKL and Returnal's built-in southpaw OKL; are both common, and IJKL breaks the home-row anchor while OKL; does not\"). No design text, rule, or decision changes; keep the row `verified`. This is a citation-only edit, so it belongs in this editorial pass's lane."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/editorial-review-correctness-r2.md",
+      "durationMs": 458370,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 2,
+      "sessionID": "ses_e3311ebf9ffe9qmcfzapAj3T95",
+      "agent": "design/designer",
+      "at": 1794439607882,
+      "reply": {
+        "changed": true,
+        "summary": "Complexity (major, Profiles are chains): deleted the surplus global constraint \"`for` is required at parse\" from the `resolve` bullet; the rule it needed already lives locally and canonically — `for` optional (`absent` = unbound, the ADR accessibility case), a present `for` grammar-checked as `BadPin`, `seeded-from` requires `for` → `InvalidValue` (entry-set paragraph), and a dangling pin → `UnresolvedAncestor` (Id → file) — so the bullet now only cross-references Id → file. The `Editor notes:` trailer was deleted with the flag it carried. Correctness (major, A16): replaced the 404 `Cursor_home_key` basis with the live https://en.wikipedia.org/wiki/Home_row (QWERTY home keys are `ASDF` / `JKL;`) plus `docs/adrs/009-canonical-profile-and-manifest-model.md:28-31` for the practice split, keeping the row's `verified` status checkable. FYIs consumed: Context now says the five contracts are \"contracts 1–5, in the order listed\", making every `contract N` reference self-resolving, and the Manifests sentence splits the citation as \"game-id grammar (Encoding rules) and the stem rule (contract 3)\". Revision log maintained in place: the Context, Profiles-are-chains, and register entries were amended where they stand (r4), with no stacked corrections. Diff is net -2 lines (the Editor-notes line and its blank), plus intra-line deletions; the only additions are short inline cross-references and the A16 basis.",
+        "commitMessage": "docs: resolve round-2 design review findings on ADR-009 proposal"
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/proposal-revise-r2.md",
+      "durationMs": 90663,
+      "nudges": 0,
+      "docLines": 314,
+      "docLinesAdded": 7,
+      "docLinesRemoved": 9
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 3,
+      "sessionID": "ses_e33108971ffcMJAkPNx7A8Gvk0",
+      "agent": "review/design-performance",
+      "at": 1794439769540,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-performance-r3c0.md",
+      "durationMs": 161535,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 3,
+      "sessionID": "ses_e33108971ffejWAU0lLPvgVLh3",
+      "agent": "review/design-compatibility",
+      "at": 1794439868542,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Compatibility matrix — Windows 10/11 contributor machine row: \"tree file names follow the shipped case-unique stem rule\"",
+            "problem": "re-raised, unchanged by this diff (the row and §3's stem-rule sentence are byte-identical to what round 3 approved). The shipped case-uniqueness assertion walks format_dirs() and asserts over fixtures/{valid,invalid} only (crates/core/tests/conformance.rs:277-315, \"fixtures/{kind} of {} holds names that differ only by case\"), and schemas/README.md:26-27 scopes the rule to \"Fixture file names ... case-unique within a fixture directory\". The row claims case-uniqueness coverage over data/ trees that no shipped test enforces. Harmless in substance — ids never become path components, the design's own reason — so it stays a nit.",
+            "fix": "In that one cell, scope the claim: \"fixture names follow the shipped case-unique stem rule; `data/` file names follow the stem rule as hygiene, not a load-bearing check\"."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Adversarial posture (final sentence) + Files created → `schemas/README.md` row + Rollout 1: \"`schemas/README.md`'s guard section gains those two constants and their rejections beside the shipped three, so its 'public names for these limits' claim stays true\"",
+            "problem": "re-raised, unchanged in substance by this diff (only \"§4\" → \"contract 4\" and \"valid+invalid\" → \"valid/invalid\"). The README's canonical sentence is \"The three constants are the reference implementation's public names for these limits\" (schemas/README.md:64-65). Adding MAX_INDEX_ENTRIES / MAX_INDEX_DEPTH and their rejections leaves \"the three constants\" naming three of five limits, so the claim stays true only if that sentence is amended, and Rollout 1 and the Files created cell record only the addition. The Revision log's r2 reason (\"the README's 'three constants' claim needed the new limits in it\") states the intent, not the edit.",
+            "fix": "Name the edit in Rollout 1 and the Files created cell: the guard section's \"three constants\" sentence becomes a five-constant sentence."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-compatibility-r3c0.md",
+      "durationMs": 260538,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 3,
+      "sessionID": "ses_e33108972ffeHgmygkT1xKxCa4",
+      "agent": "review/design-correctness",
+      "at": 1794439904916,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → Manifests state game facts (Drift mechanism), with the same wording in Risks — \"The `cargo test` gate resolves every profile in `data/profiles/` against the manifest revision it pins\" / \"The canonical drift mechanism (contract 5) resolves every `data/profiles/` chain against its pinned revision inside `cargo test`\"",
+            "problem": "new — r4's narrowing made these two universals refer to nothing for part of their domain. r4 withdrew r3's \"`for` is required at parse\" and restored `for` as an optional entry (line 143: \"absent = a profile not bound to a game, which is what serves the ADR's accessibility and alternative-controller case\"; Revision log: \"a rule local to `seeded-from`, since `for` stays optional\"; Defaults: \"`for` absent = not bound to a game\"). These two sentences were written while every profile pinned a manifest and were not amended with the change: a profile/patch in `data/profiles/` with no `for` pins no revision, so \"the manifest revision it pins\" has no referent for exactly the case r4 says the model serves. The gate's behaviour for an unbound profile (resolve + `validate` with `manifest: None`, and no `seeded-from` possible per line 143) is inferable from §3, so the mechanism is not blocking, but the drift suite's scope is now set by inference in the one place that defines it — Test strategy #12 already carries the scoped form (\"for every profile that pins it\"), leaving §5 and the Risks row as the only unscoped statements.",
+            "fix": "Scope both by the key the lookup reads: §5 — \"resolves every profile in `data/profiles/` that declares `for` against the manifest revision it pins (a profile with no `for` is resolved and `validate`d with `manifest: None`, and cannot carry `seeded-from`)\"; Risks — \"resolves every `data/profiles/` chain that pins `for` against its pinned revision\". Replaces the universal quantifier with the one the gate uses; adds no mechanism."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-correctness-r3c0.md",
+      "durationMs": 296911,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 3,
+      "sessionID": "ses_e33108971ffdbzZvTyOOSInyAo",
+      "agent": "review/design-security",
+      "at": 1794439919042,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → Profiles are chains → Resolution (`resolve` bullet) + entry-set paragraph — \"whose `manifest` is `Some` whenever the profile declares `for`\" / \"`patch/v1` … carries the same optional chain entries\" / Revision log (r4): \"a rule local to `seeded-from`, since `for` stays optional\"",
+            "problem": "re-raised (open since r3, not a regression). The pin's existence is total, but which manifest a chain pins is unruled, and r4 makes that state plainly legal: `for` is an optional entry on every chain document (base and patch), while `Resolved` carries one `manifest` field and the design speaks of one \"pinned manifest\" (§5, \"the manifest revision it pins\"). A chain whose base declares `for = \"remnant2@0.1\"` and whose tip declares a valid `for = \"remnant2@0.2\"` is a fully valid document set with no stated rule, so `resolve(root, 1)` and `resolve(root, chain.len())` evaluate the `seeded-from` check against different manifests, and the drift gate reports a different revision for one profile id depending on which document's pin the implementation reads. That is the walk-order/implementation-dependent determinism loss the adjacent `DuplicateId` clause exists to prevent (\"an ambiguous pin key would make the drift gate's verdict walk-order dependent\"), on the mechanism ADR-009 names as the only trust mechanism (\"Provenance labels the chain; it never substitutes for validation\").",
+            "fix": "One clause in the §3 entry-set paragraph: the pin is a chain fact — a document whose `for` differs from the `for` of the document its `derives[0]` names is the shipped `InvalidValue` (no new `CoreError` variant, no new mechanism; an unbound chain declares `for` in neither place, so the accessibility case is untouched) — plus one Test strategy #9 case beside the existing pin-lookup sentences, so `Resolved.manifest` has exactly one referent."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Profiles are chains → Id → file — \"Each tree accepts only the formats it holds — `data/profiles/` `profile`/`patch`, `data/manifests/` `manifest`\"",
+            "problem": "re-raised, unchanged by r4. The gate is stated per tree and enumerates two of the four `data/` trees the design walks and loads (`data/{manifests,profiles,policies,placements}/`, Files created; `data/placements/` is load input for Test #3/#4, `data/policies/` for #10/#11), while `schemas/README.md`'s data-homes rule says `data/` \"holds content discovered by walking\". A document misfiled in the two unlisted trees is dispatched on its own declared `format` with no gate named — the fail-closed family this clause closed for the indexed trees.",
+            "fix": "Extend the parenthetical to `data/placements/` → `placement` and `data/policies/` → `policy`, same shipped `InvalidValue` at load; Test #9's planted-document sentence already covers the cases."
+          },
+          {
+            "severity": "nit",
+            "location": "Test strategy #8 — \"a manifest naming an unknown action id, an axis kind that disagrees with the taxonomy (`AxisKindConflict`), … is rejected, each with its own fixture\"",
+            "problem": "re-raised, unchanged by r4. The r3 posture rule (\"pinned by a `fixtures/invalid/` document **only where `parse` can see the condition** … and otherwise, over fixture data, by the model suite\") excludes these conditions from a fixtures directory, and #8's `AxisKindConflict`/`UnknownAction`/`UnknownInput` cases are exactly the ones Adversarial posture routes to #8 as model-suite cases; the untouched \"each with its own fixture\" reads as `schemas/*/v1/fixtures/invalid/` placement, where the shipped harness asserts every file is refused through `parse` — the walk then fails on documents that parse cleanly, instead of exercising the intended `validate` check.",
+            "fix": "One phrase in #8: \"each with its own case in the model suite over fixture data\", never under `schemas/*/v1/fixtures/invalid/`."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-security-r3c0.md",
+      "durationMs": 311037,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 3,
+      "sessionID": "ses_e330e122bffeo1wNE3DSHgL27h",
+      "agent": "review/design-complexity",
+      "at": 1794439943226,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/design-review-complexity-r3c0.md",
+      "durationMs": 173649,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-final",
+      "round": 0,
+      "sessionID": "ses_e330b6b8effecm1fjkyMB2v8G4",
+      "agent": "design/editor",
+      "at": 1794440118678,
+      "reply": {
+        "ambiguities": [
+          "Chosen design → Encoding rules → Nested arrays for structured lists: \"`stack`, `swap`, and the manifest's `action`/`default`/`exclusive` rows are each a leading id (action, group) followed by its values\" — the \"(action, group)\" parenthetical does not obviously cover `stack`'s leading element (a transform name) or `swap`'s (an action id), so what a leading element must be is left to inference. Kept as written and recorded as an Editor notes line at the bottom.",
+          "Options considered → Id encoding in TOML: \"the v1 grammar already refuses with a fixture\" does not say which fixture owns the refusal (the shipped `profile/v1` dotted-key fixture vs the per-format replicas that Risks says every new format carries); meaning inferable from A1 and the Risks row, so the sentence was left untouched.",
+          "Chosen design → Profiles are chains: \"binding an id to a person is ADR-014's, A22\" is a hanging possessive (whose what — the decision, the mechanism?); left as written since the same construction is used for `fingerprint`/`docked` elsewhere.",
+          "Review coverage limit: lines 155 (Id → file) and 227 (Adversarial posture) exceed the 2000-character per-line preview of the reading tools, so only their leading portions were reviewed and edited; the tails of those two lines are unreviewed."
+        ],
+        "commitMessage": "docs: language pass on the 009 canonical profile and manifest proposal"
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/proposal-final-r0.md",
+      "durationMs": 175373,
+      "nudges": 0,
+      "docLines": 316,
+      "docLinesAdded": 25,
+      "docLinesRemoved": 23
+    },
+    {
+      "stage": "editorial-review:performance",
+      "round": 4,
+      "sessionID": "ses_e3308be21ffeml3NpCIaY56B9O",
+      "agent": "review/design-performance",
+      "at": 1794440243757,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/editorial-review-performance-r4.md",
+      "durationMs": 124953,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:compatibility",
+      "round": 4,
+      "sessionID": "ses_e3308be22ffdeqA1y4Z2WrdRVM",
+      "agent": "review/design-compatibility",
+      "at": 1794440330315,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/editorial-review-compatibility-r4.md",
+      "durationMs": 211511,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:security",
+      "round": 4,
+      "sessionID": "ses_e3308be22ffcOgsgXyyIivLtPo",
+      "agent": "review/design-security",
+      "at": 1794440384764,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/editorial-review-security-r4.md",
+      "durationMs": 265960,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:correctness",
+      "round": 4,
+      "sessionID": "ses_e3308be22ffe8V05XC4cEmjyZM",
+      "agent": "review/design-correctness",
+      "at": 1794440404923,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → Encoding rules → Nested arrays for structured lists — \"`stack`, `swap`, and the manifest's `action`/`default`/`exclusive` rows are each a leading id (action, group) followed by its values\"",
+            "problem": "The canonical bullet counts `stack` among rows whose leading element is an id \"(action, group)\", but §4 Transforms pins the opposite shape for it: \"`stack` — an ordered array of invocations, each a non-empty array of strings whose first element is the transform name\", a name from the closed invocation table, and Test strategy #10 rejects an unknown transform name as `Err(InvalidValue)`. So the canonical encoding rule under-describes one of the five row kinds it enumerates (sections disagree), which is exactly the passage the diff's trailing editor note flags. Not a regression of anything previously approved: the bullet is unchanged context in the diff.",
+            "fix": "Replace the parenthetical \"(action, group)\" with \"(an action id, a group id, or, for `stack`, a transform name from the closed invocation table)\" — names the third kind in the existing clause, adds no mechanism, and leaves §4 as the authority for arity; then delete the trailing \"Editor notes\" line."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/editorial-review-correctness-r4.md",
+      "durationMs": 286120,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:complexity",
+      "round": 4,
+      "sessionID": "ses_e3306d5bcffeX4v3WFSrq2tzyM",
+      "agent": "review/design-complexity",
+      "at": 1794440408945,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Revision log, trailing `Editor notes:` line (after the last log entry), pointing at Chosen design → Encoding rules → Nested arrays for structured lists — \"`stack`, `swap`, and the manifest's `action`/`default`/`exclusive` rows are each a leading id (action, group) followed by its values\" — \"is ambiguous; author to clarify.\"",
+            "problem": "The `Editor notes:` line is the only moving part this diff adds, and it traces to no Goal: a process TODO carried inside the design artifact, addressed to an unnamed \"author\", with no consumer, no gate, and no entry in the Revision log's decision record, so it persists past merge as dead weight. The ambiguity it flags is genuine, which is why keeping the note is not the fix — the parenthetical names two roles (action, group) for five row families, and `stack`'s leading element is a transform name (`\"relocate-cluster\"`), neither action nor group, so the sentence does not cover the list it describes.",
+            "fix": "In that one Encoding rules bullet, state the leading element per family: `stack` leads with the transform name, `swap` and the manifest's `action`/`default` lead with an action id, `exclusive` leads with a group id — then delete the `Editor notes:` line. Same sentence length, one line of surface removed."
+          }
+        ]
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/editorial-review-complexity-r4.md",
+      "durationMs": 165133,
+      "nudges": 0
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_e33045058ffeoYc3YJdli6P866",
+      "agent": "code/test-engineer",
+      "at": 1794441532070,
+      "reply": {
+        "testsAdded": 94,
+        "commitMessage": "test(core): add ADR-009 profile/manifest model suites"
+      },
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/test-authoring-r0.md",
+      "durationMs": 1123046,
+      "nudges": 0
+    },
+    {
+      "stage": "implement",
+      "round": 0,
+      "sessionID": "ses_e32f32d0fffeP2xbFxoe1e4qXg",
+      "agent": "code/coder",
+      "at": 1794443332736,
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/implement-r0.md",
+      "durationMs": 1800567,
+      "nudges": 0,
+      "failure": "stage-timeout"
+    },
+    {
+      "stage": "implement",
+      "round": 0,
+      "sessionID": "ses_e32d7b36affe8hzsQ2edu8NjbI",
+      "agent": "code/coder",
+      "at": 1794445134216,
+      "transcript": "docs/designs/009-canonical-profile-and-manifest-model/transcripts/implement-attempt2-r0.md",
+      "durationMs": 1801435,
+      "nudges": 1,
+      "failure": "stage-timeout"
+    }
+  ],
+  "gateLog": [
+    {
+      "gate": "sourceAdmissible",
+      "round": 0,
+      "proceed": true,
+      "reason": "ADR is proposed and complete",
+      "at": 1794435878113
+    },
+    {
+      "gate": "stageFailure",
+      "round": 1,
+      "proceed": false,
+      "reason": "design-review:compatibility: independence violation: read a review report: /home/mike/repos/bindforge/docs/designs/009-canonical-profile-and-manifest-model/reviews/design/compatibility-r1c0.md",
+      "at": 1794436818837
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: correctness, compatibility, security, performance, complexity",
+      "at": 1794437034460
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c2 pending: correctness, security, complexity",
+      "at": 1794437831564
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c3 pending: correctness, security",
+      "at": 1794438326558
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c4 pending: compatibility, performance, complexity",
+      "at": 1794438673494
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794438909577
+    },
+    {
+      "gate": "editorial-review",
+      "round": 2,
+      "proceed": false,
+      "reason": "2 reviewer(s) requested changes",
+      "at": 1794439517183
+    },
+    {
+      "gate": "design-review",
+      "round": 3,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794439943274
+    },
+    {
+      "gate": "editorial-review",
+      "round": 4,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1794440408993
+    },
+    {
+      "gate": "stageFailure",
+      "round": 0,
+      "proceed": false,
+      "reason": "implement: stage-timeout",
+      "at": 1794443332741
+    },
+    {
+      "gate": "escalate",
+      "round": 0,
+      "proceed": false,
+      "reason": "stage implement failed twice (stage-timeout) — nudge/reply rule: one retry, then escalate",
+      "at": 1794445134220
+    }
+  ],
+  "startedAt": 1794435878095,
+  "updatedAt": 1794445134220,
+  "baseRef": "5118e2121929ea41c5881dcf43a4d7f5acf855b3",
+  "designCycle": 1,
+  "designStamp": "4d07da4d5c80e4400db6d7f78e4ac2a8879824ce",
+  "seats": {
+    "design": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "4d07da4d5c80e4400db6d7f78e4ac2a8879824ce",
+        "dissents": 3,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → Manifests state game facts (Drift mechanism), with the same wording in Risks — \"The `cargo test` gate resolves every profile in `data/profiles/` against the manifest revision it pins\" / \"The canonical drift mechanism (contract 5) resolves every `data/profiles/` chain against its pinned revision inside `cargo test`\"",
+            "problem": "new — r4's narrowing made these two universals refer to nothing for part of their domain. r4 withdrew r3's \"`for` is required at parse\" and restored `for` as an optional entry (line 143: \"absent = a profile not bound to a game, which is what serves the ADR's accessibility and alternative-controller case\"; Revision log: \"a rule local to `seeded-from`, since `for` stays optional\"; Defaults: \"`for` absent = not bound to a game\"). These two sentences were written while every profile pinned a manifest and were not amended with the change: a profile/patch in `data/profiles/` with no `for` pins no revision, so \"the manifest revision it pins\" has no referent for exactly the case r4 says the model serves. The gate's behaviour for an unbound profile (resolve + `validate` with `manifest: None`, and no `seeded-from` possible per line 143) is inferable from §3, so the mechanism is not blocking, but the drift suite's scope is now set by inference in the one place that defines it — Test strategy #12 … [elided by the checkpoint cap]",
+            "fix": "Scope both by the key the lookup reads: §5 — \"resolves every profile in `data/profiles/` that declares `for` against the manifest revision it pins (a profile with no `for` is resolved and `validate`d with `manifest: None`, and cannot carry `seeded-from`)\"; Risks — \"resolves every `data/profiles/` chain that pins `for` against its pinned revision\". Replaces the universal quantifier with the one the gate uses; adds no mechanism."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "4d07da4d5c80e4400db6d7f78e4ac2a8879824ce",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Compatibility matrix — Windows 10/11 contributor machine row: \"tree file names follow the shipped case-unique stem rule\"",
+            "problem": "re-raised, unchanged by this diff (the row and §3's stem-rule sentence are byte-identical to what round 3 approved). The shipped case-uniqueness assertion walks format_dirs() and asserts over fixtures/{valid,invalid} only (crates/core/tests/conformance.rs:277-315, \"fixtures/{kind} of {} holds names that differ only by case\"), and schemas/README.md:26-27 scopes the rule to \"Fixture file names ... case-unique within a fixture directory\". The row claims case-uniqueness coverage over data/ trees that no shipped test enforces. Harmless in substance — ids never become path components, the design's own reason — so it stays a nit.",
+            "fix": "In that one cell, scope the claim: \"fixture names follow the shipped case-unique stem rule; `data/` file names follow the stem rule as hygiene, not a load-bearing check\"."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Adversarial posture (final sentence) + Files created → `schemas/README.md` row + Rollout 1: \"`schemas/README.md`'s guard section gains those two constants and their rejections beside the shipped three, so its 'public names for these limits' claim stays true\"",
+            "problem": "re-raised, unchanged in substance by this diff (only \"§4\" → \"contract 4\" and \"valid+invalid\" → \"valid/invalid\"). The README's canonical sentence is \"The three constants are the reference implementation's public names for these limits\" (schemas/README.md:64-65). Adding MAX_INDEX_ENTRIES / MAX_INDEX_DEPTH and their rejections leaves \"the three constants\" naming three of five limits, so the claim stays true only if that sentence is amended, and Rollout 1 and the Files created cell record only the addition. The Revision log's r2 reason (\"the README's 'three constants' claim needed the new limits in it\") states the intent, not the edit.",
+            "fix": "Name the edit in Rollout 1 and the Files created cell: the guard section's \"three constants\" sentence becomes a five-constant sentence."
+          }
+        ]
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "4d07da4d5c80e4400db6d7f78e4ac2a8879824ce",
+        "dissents": 3,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → Profiles are chains → Resolution (`resolve` bullet) + entry-set paragraph — \"whose `manifest` is `Some` whenever the profile declares `for`\" / \"`patch/v1` … carries the same optional chain entries\" / Revision log (r4): \"a rule local to `seeded-from`, since `for` stays optional\"",
+            "problem": "re-raised (open since r3, not a regression). The pin's existence is total, but which manifest a chain pins is unruled, and r4 makes that state plainly legal: `for` is an optional entry on every chain document (base and patch), while `Resolved` carries one `manifest` field and the design speaks of one \"pinned manifest\" (§5, \"the manifest revision it pins\"). A chain whose base declares `for = \"remnant2@0.1\"` and whose tip declares a valid `for = \"remnant2@0.2\"` is a fully valid document set with no stated rule, so `resolve(root, 1)` and `resolve(root, chain.len())` evaluate the `seeded-from` check against different manifests, and the drift gate reports a different revision for one profile id depending on which document's pin the implementation reads. That is the walk-order/implementation-dependent determinism loss the adjacent `DuplicateId` clause exists to prevent (\"an ambiguous pin key would make the drift gate's verdict walk-order dependent\"), on the mechanism ADR-009 names as the onl… [elided by the checkpoint cap]",
+            "fix": "One clause in the §3 entry-set paragraph: the pin is a chain fact — a document whose `for` differs from the `for` of the document its `derives[0]` names is the shipped `InvalidValue` (no new `CoreError` variant, no new mechanism; an unbound chain declares `for` in neither place, so the accessibility case is untouched) — plus one Test strategy #9 case beside the existing pin-lookup sentences, so `Resolved.manifest` has exactly one referent."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Profiles are chains → Id → file — \"Each tree accepts only the formats it holds — `data/profiles/` `profile`/`patch`, `data/manifests/` `manifest`\"",
+            "problem": "re-raised, unchanged by r4. The gate is stated per tree and enumerates two of the four `data/` trees the design walks and loads (`data/{manifests,profiles,policies,placements}/`, Files created; `data/placements/` is load input for Test #3/#4, `data/policies/` for #10/#11), while `schemas/README.md`'s data-homes rule says `data/` \"holds content discovered by walking\". A document misfiled in the two unlisted trees is dispatched on its own declared `format` with no gate named — the fail-closed family this clause closed for the indexed trees.",
+            "fix": "Extend the parenthetical to `data/placements/` → `placement` and `data/policies/` → `policy`, same shipped `InvalidValue` at load; Test #9's planted-document sentence already covers the cases."
+          },
+          {
+            "severity": "nit",
+            "location": "Test strategy #8 — \"a manifest naming an unknown action id, an axis kind that disagrees with the taxonomy (`AxisKindConflict`), … is rejected, each with its own fixture\"",
+            "problem": "re-raised, unchanged by r4. The r3 posture rule (\"pinned by a `fixtures/invalid/` document **only where `parse` can see the condition** … and otherwise, over fixture data, by the model suite\") excludes these conditions from a fixtures directory, and #8's `AxisKindConflict`/`UnknownAction`/`UnknownInput` cases are exactly the ones Adversarial posture routes to #8 as model-suite cases; the untouched \"each with its own fixture\" reads as `schemas/*/v1/fixtures/invalid/` placement, where the shipped harness asserts every file is refused through `parse` — the walk then fails on documents that parse cleanly, instead of exercising the intended `validate` check.",
+            "fix": "One phrase in #8: \"each with its own case in the model suite over fixture data\", never under `schemas/*/v1/fixtures/invalid/`."
+          }
+        ]
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "4d07da4d5c80e4400db6d7f78e4ac2a8879824ce",
+        "dissents": 1,
+        "findings": []
+      },
+      "complexity": {
+        "verdict": "approve",
+        "stamp": "4d07da4d5c80e4400db6d7f78e4ac2a8879824ce",
+        "dissents": 2,
+        "findings": []
+      }
+    }
+  },
+  "lastReviewPass": {
+    "phase": "editorial",
+    "round": 4,
+    "seats": [
+      "correctness",
+      "compatibility",
+      "security",
+      "performance",
+      "complexity"
+    ]
+  },
+  "reviseNoChange": false
+}
