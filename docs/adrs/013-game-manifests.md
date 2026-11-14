@@ -36,28 +36,126 @@ data and is untrusted at every entry point.
 
 ## Decision
 
-A new format, **`schemas/manifests/v1/`**, with a `Document::Manifest` arm and
-a `SUPPORTED_FORMATS` entry, records as versioned data:
+A new format, **`schemas/manifests/v1/`**, with a `Document::Manifest` arm
+and a `SUPPORTED_FORMATS` entry, records as versioned data. Manifests are
+data, versioned, and CI-validated through the conformance harness that
+already runs the other two formats' corpora.
 
-- **game id + detected config fingerprint** — the game this manifest
-  describes, and a fingerprint of the config it was read from.
-- **codec family id** — an identifier only; codec implementations and
-  config-path discovery are ADR-017. This ADR reserves the id space.
-- **the action table** — game-native action name ↔ taxonomy id (011) + axis
-  kind. This is the join's right-hand side, and ids are validated against the
-  loaded registry, so a manifest cannot invent an action the taxonomy does not
-  name.
-- **constraints** — exclusivity groups, dead keys, and hard-docked UI
-  constraints, so transforms (015) and profiles (014) never target a key the
-  game will not honour.
-- **built-in presets** — presets the game ships, which profiles may reference
-  with `seeded-from` (014).
+The decision is recorded below as a **decision-unit ledger**: each unit is a
+bounded choice with a pointer to its normative text in
+`schemas/manifests/v1/spec.md` — the spec is the contract; this ledger is
+the decision record, in application order. A backticked unit id at the end
+of a spec line names the unit that governs that line's claim.
 
-Manifests are data, versioned, and CI-validated through the conformance
-harness that already runs the other two formats' corpora. Profiles pin a
-manifest id **and version**; CI re-validates every dependent profile on each
-manifest bump, so game-patch drift surfaces as a visible CI failure, not a
-mid-game surprise.
+### Contracts
+
+- **013-C1** The new format `schemas/manifests/v1/`: selector
+  `format = "manifests"`, a `Document::Manifest` arm, a `SUPPORTED_FORMATS`
+  entry, shipping `v1` alone; it joins the shared parse path, the
+  conformance corpus, and `supported_majors`.
+  → spec: Grammar, Version gate, Fixtures.
+- **013-C2** Data location: one file per game at
+  `data/manifests/<id>/manifest.toml`; the game directory's name equals the
+  `id` entry byte-for-byte. → spec: Table data.
+- **013-C3** What a manifest records: the game `id`, its `revision`, the
+  codec family id, the config `fingerprint`, the action table (native name
+  ↔ taxonomy id, 011 — the join's right-hand side), the constraints
+  (`exclusive-groups`, `dead-keys`, `docked-actions`), and the built-in
+  `presets`. Field-level typing and the closed entry set live in the spec.
+  → spec: Grammar (entry table).
+- **013-C4** The pinning contract: profiles pin a manifest id **and
+  revision** as `"<id>@<revision>"`; CI re-validates every dependent
+  profile on each manifest bump, so game-patch drift surfaces as a visible
+  CI failure, not a mid-game surprise. (The pin entry's grammar is the
+  profile format's — 014.) → spec: Identity and revision.
+- **013-C5** The `fingerprint` field: optional; `sha256-<base64>` (standard
+  base64, decoding to exactly 32 octets); the closed one-algorithm set —
+  algorithm agility rides a new format major; absent means never read
+  against a config. → spec: Fingerprint grammar.
+- **013-C6** The action-row grammar: `"<action-id> <native-name>"`, split
+  at its first space; the name is the format's only free-text column — 1 to
+  128 octets (013-B4), no ASCII control character, no leading or trailing
+  space, round-tripping byte-exactly. *Recovered from the spec — the source
+  text is silent.* → spec: The action row.
+- **013-C7** A reference loader `load_manifest` in `crates/core` applies
+  the two load-time rules after parsing; its behaviour is pinned by
+  `crates/core/tests/manifest.rs`, which is what keeps the corpus
+  registry-free. *Recovered from the spec — the source text is silent.*
+  → spec: Load-time validation, Fixtures.
+
+### Laws
+
+- **013-L1** The registry join: every action id the document names — each
+  `actions` row and each `docked-actions` row — must be in the loaded
+  registry; one that is not is refused, naming the id. The join is a
+  load-time rule, not a grammar rule, so the corpus stays registry-free.
+  → spec: Load-time validation.
+- **013-L2** One fact, one home: the axis kind is never recorded in the
+  document — the registry owns it per id, and a consumer that wants it asks
+  the registry; the `axis-kinds` entry is the refused alternative the
+  corpus pins. A preset's *contents* are never recorded (the seed set's and
+  the codec's — ADR-017, ADR-019). *Reconciled against the source text's
+  "+ axis kind" clause — see Backfill findings.*
+  → spec: introductory paragraphs, Load-time validation, Grammar (the
+  `axis-kinds` refusal).
+- **013-L3** Facts, never policy: the manifest records what a game *is*,
+  never how a player *should* bind it — no placement, no binding guidance;
+  policy lives in profiles (014) and transforms (015). Enforced by the
+  closed entry set: it admits no policy entry.
+  → spec: introductory paragraphs, Grammar (entry table).
+- **013-L4** Identity and revision: a manifest's identity is its `id` plus
+  its integer `revision` (`>= 1`, monotone per game, enforced forward by
+  the loader); any edit to a tracked entry (`actions`, `codec`,
+  `fingerprint`, `exclusive-groups`, `dead-keys`, `docked-actions`,
+  `presets`) increments `revision`; comment-only edits do not.
+  → spec: Identity and revision.
+- **013-L5** Name agreement: the game directory's name must equal the `id`
+  entry byte-for-byte; the refusal never echoes a local path.
+  → spec: Table data, Load-time validation.
+- **013-L6** Review coupling: a manifest PR that names an action id the
+  registry does not carry adds its `registry.toml` row in the same PR, so
+  the id and the game fact that motivated it are reviewed together.
+  → spec: Identity and revision.
+- **013-L7** The fingerprint is provenance data, not a guard: no load-time
+  rule validates it against a live config. → spec: Fingerprint grammar.
+- **013-L8** Document uniqueness: each action id, native name, dead key,
+  docked action id, and preset id appears once; a group's members are
+  distinct and an input id appears in at most one group; `dead-keys` and
+  `docked-actions` are disjoint. *Recovered from the spec — the source text
+  is silent.* → spec: One fact per document.
+
+### Budgets
+
+All parse-level refusals, exported by the reference implementation beside
+the shared `MAX_DOCUMENT_BYTES` / `MAX_NESTING_DEPTH` family
+(`schemas/README.md`). *All four recovered from the spec — decided in the
+run's design, never written back to the source text.* → spec: Budgets.
+
+- **013-B1** `MAX_MANIFEST_ROWS = 256` — each array-shaped entry
+  (`actions`, `dead-keys`, `docked-actions`, `presets`).
+- **013-B2** `MAX_CONSTRAINT_GROUPS = 64` — the `exclusive-groups` array.
+- **013-B3** `MAX_GROUP_MEMBERS = 16` — one group's members.
+- **013-B4** `MAX_NATIVE_NAME_OCTETS = 128` — one game-native action name.
+
+The spec asserts each cap sits well above the baseline it was surveyed for;
+the baselines themselves are not recorded in the source text.
+
+### Reservations
+
+- **013-R1** Codec implementations and config-path discovery: the manifest
+  carries the codec family id only (slug grammar, at most 63 octets) and
+  reserves the id space. Owner: ADR-017 (reserved).
+  → spec: Grammar (entry table, `codec`), Alternatives.
+- **013-R2** Fingerprint semantics: which bytes are hashed and what a
+  mismatch means. Owner: ADR-017 (reserved). → spec: Fingerprint grammar.
+- **013-R3** Implementation-set checks: `codec` and preset ids are not
+  registry-checked — no implementation set exists to check them against.
+  Owner: ADR-017 (reserved). → spec: Load-time validation.
+- **013-R4** The seed preset set: which presets ship as seeds.
+  Owner: ADR-019 (reserved).
+- **013-R5** How a manifest is authored or reviewed by a human: deferred,
+  with **no owning ADR named** — flagged; the ledger convention should
+  require an owner or an explicit `unassigned` marker.
 
 ## Alternatives considered
 
@@ -90,3 +188,32 @@ the conformance corpus and the `supported_majors` list.
 Not decided here: codec family implementations and config-path discovery
 (ADR-017); which preset sets ship as seeds (ADR-019); how a manifest is
 authored or reviewed by a human.
+
+## Backfill findings
+
+Worked-example backfill (branch `docs/adr-013-backfill`): the ledger above
+re-slices this ADR's normative text — editorial only, the narrative
+sections untouched. Findings:
+
+1. **The axis-kind clause contradicts the shipped spec.** The source
+   action-table bullet read "native name ↔ taxonomy id (011) + axis kind";
+   the shipped spec excludes the axis-kind column (the `axis-kinds` entry is
+   the refused alternative the `unknown-entry` fixture pins, and the
+   load-time rules never read it from the document). Unit 013-L2 follows
+   the spec; the clause was dropped in the re-slice and is recorded here.
+2. **The pinning wording was tightened.** The source text said "Profiles pin
+   a manifest id **and version**"; the shipped contract (spec: Identity and
+   revision) pins the id and the *revision*. Unit 013-C4 follows the spec.
+3. **Seven units are recovered from the spec** (013-C6, 013-C7, 013-L8,
+   013-B1–B4): decisions made in the run (design and build) but never
+   written back to the source text. Provenance:
+   `docs/designs/013-game-manifests/` (budgets in `02-proposal.md`).
+4. **013-R5 has no owner.** The source "Not decided here" defers manifest
+   authoring and review without naming an owning ADR; the ledger
+   convention should require an owner or an explicit `unassigned` marker.
+5. **Cross-attributed spec claims** — governed by other ADRs' units, to be
+   handled by their own backfills: the TOML subset grammar, the version
+   gate, the size budget, and the error-message bound line (011); the id
+   and input-id grammars and the series name-agreement rule (011, 012);
+   the pin entry's grammar (014). Series-wide coverage is complete only
+   once every member is backfilled.
