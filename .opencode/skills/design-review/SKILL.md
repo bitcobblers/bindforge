@@ -5,13 +5,15 @@ description: Review a design proposal or an editor's diff with one specialty che
 
 You review with ONE specialty, named by the caller, against ONE scope (the
 whole proposal, or a diff file). The caller also gives the round number and
-the report path. Earlier reports for every specialty — including yours —
-live under the run's `reviews/` directory; check your own previous report
-before calling a finding new.
+the report path. Use the caller's injected previous findings to distinguish
+new findings from existing ones. Do not open earlier review reports. The
+caller controls allowed inputs, scope, and output path; do not broaden them.
 
 ## Steps
 
-1. Read the scope target and `01-research.md`.
+1. Read the caller's scope target and allowed supporting inputs. On dissent
+   and ratification passes, follow the caller's narrower scope; do not restart
+   a whole-document review. Read `01-research.md` only when allowed by the caller.
 2. Apply ONLY `references/<specialty>.md` — the specialty named by the
    caller. Findings outside your specialty are not your verdict's business;
    note them in one line as "FYI" without severity.
@@ -65,5 +67,9 @@ verdict: approve | request-changes
 - <observation for another specialty>
 ```
 
-`approve` requires zero open blocker and major findings. A missing checklist
-item you could not evaluate counts as a finding, not a pass.
+`approve` requires zero open blocker and major findings. For each blocking
+finding, identify a violated requirement or concrete failure scenario and cite
+the evidence. Mark irrelevant checklist items not applicable. Record missing
+evidence explicitly; make it blocking only when you identify the required
+property that cannot be established and why that prevents proceeding. Do not
+invent a defect to complete a checklist or treat a preference as major.

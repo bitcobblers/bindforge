@@ -24,8 +24,10 @@ Conventions for code landing in this repository.
   test posture you did not execute: a stage that reasons about rustfmt instead
   of running it spends a fix round discovering the gate disagrees.
 - `npm test` — vitest; tests in `tests/**/*.test.ts`.
-- `npm run format` — run before finishing; import order is
-  `node:` externals, then relative, blank line between groups.
+- Format the files you own before finishing. For TypeScript use
+  `npx prettier --write <owned-files>` when permitted; import order is
+  `node:` externals, then relative, blank line between groups. A stage with
+  restricted ownership must not run a package-wide write formatter.
 
 ## Tests
 

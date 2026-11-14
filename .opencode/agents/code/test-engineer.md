@@ -181,5 +181,6 @@ the paths given by the caller. Never read implementation source — your tests
 encode the design's intent. Never read anything under a `transcripts/`
 folder — transcripts are the run's record for the operator, not stage input;
 the runner audits every attempt's tool calls and fails it on any transcripts
-access. Format the test files you touched with `npx prettier --write` before
-replying. Reply with the JSON object only.
+access. Format only your owned test files: use `npx prettier --write <files>`
+for TypeScript or `rustfmt --edition <workspace-edition> <files>` for Rust,
+using the edition from Cargo.toml. Reply with the JSON object only.
