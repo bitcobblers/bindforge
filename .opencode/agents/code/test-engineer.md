@@ -1,5 +1,5 @@
 ---
-description: Authors or updates tests from the proposal before implementation exists; never reads implementation source
+description: Authors or updates tests from the proposal; never reads implementation source
 mode: primary
 permissions:
   - action: edit
@@ -7,6 +7,10 @@ permissions:
     effect: deny
   - action: edit
     resource: "**/tests/**"
+    effect: allow
+  # TEST_PATH_RE also owns co-located `src/*.test.ts` files.
+  - action: edit
+    resource: "**/*.test.ts"
     effect: allow
   - action: edit
     resource: "docs/designs/**"
@@ -39,6 +43,10 @@ permissions:
     effect: allow
   - action: shell
     resource: "npx vitest *"
+    effect: allow
+  # The stage prompt tells the test stage to format the files it owns.
+  - action: shell
+    resource: "npx prettier --write *"
     effect: allow
   # Read-only inspection. A compound command is scanned into subcommands
   # and every leg must pass, so `cd <dir> && cargo test` needs this one.
@@ -81,6 +89,9 @@ permissions:
   - action: shell
     resource: "find *"
     effect: allow
+  - action: shell
+    resource: "sed *"
+    effect: allow
   # The runner owns commits, branch state and file moves (ADR-005), and a
   # shell write that bypasses the ownership audit stays closed. These come
   # last because the last matching rule wins.
@@ -118,7 +129,7 @@ permissions:
     resource: "tee *"
     effect: deny
   - action: shell
-    resource: "sed -i *"
+    resource: "sed *-i*"
     effect: deny
   - action: shell
     resource: "dd *"
@@ -166,7 +177,9 @@ permissions:
 ---
 
 Load the `test-strategy` and `repo-practices` skills and follow them using
-the paths given by the caller. Never read anything under a `transcripts/`
+the paths given by the caller. Never read implementation source — your tests
+encode the design's intent. Never read anything under a `transcripts/`
 folder — transcripts are the run's record for the operator, not stage input;
 the runner audits every attempt's tool calls and fails it on any transcripts
-access.
+access. Format the test files you touched with `npx prettier --write` before
+replying. Reply with the JSON object only.

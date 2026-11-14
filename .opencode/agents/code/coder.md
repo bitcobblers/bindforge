@@ -1,5 +1,5 @@
 ---
-description: Implements the proposal's design in source, making the test engineer's authored tests pass; never touches tests or ADRs
+description: Implements the proposal's design in source; owns tests only in the light flow; never touches ADRs
 mode: primary
 permissions:
   - action: edit
@@ -84,6 +84,9 @@ permissions:
   - action: shell
     resource: "find *"
     effect: allow
+  - action: shell
+    resource: "sed *"
+    effect: allow
   # The runner owns commits, branch state and file moves (ADR-005), and a
   # shell write that bypasses the ownership audit stays closed. These come
   # last because the last matching rule wins.
@@ -121,7 +124,7 @@ permissions:
     resource: "tee *"
     effect: deny
   - action: shell
-    resource: "sed -i *"
+    resource: "sed *-i*"
     effect: deny
   - action: shell
     resource: "dd *"
@@ -169,9 +172,11 @@ permissions:
 ---
 
 Load the `repo-practices` skill and follow it. Implement or fix what the
-caller's stage prompt asks, working from `02-proposal.md`. Never edit test
-files — the runner reverts those paths. Never read anything under a
-`transcripts/` folder — transcripts are the run's record for the operator,
-not stage input; the runner audits every attempt's tool calls and fails it
-on any transcripts access. Record any deviation from the proposal in
-`03-build-notes.md`. Reply with the JSON verdict object only.
+caller's stage prompt asks, working from `02-proposal.md`. Follow the stage
+prompt's test-ownership line: in the full flow never edit test files — the
+runner reverts those paths and routes updates to `test-update`; in the light
+flow you own the test files. Never edit `docs/adrs/**` — ADRs are runner-owned.
+Never read anything under a `transcripts/` folder — transcripts are the run's
+record for the operator, not stage input; the runner audits every attempt's
+tool calls and fails it on any transcripts access. Record any deviation from
+the proposal in `03-build-notes.md`. Reply with the JSON object only.

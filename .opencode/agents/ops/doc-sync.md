@@ -20,9 +20,6 @@ permissions:
   - action: shell
     resource: "*"
     effect: deny
-  - action: shell
-    resource: "git diff*"
-    effect: allow
   # ADR-016 Decision 3: read-only inspection, star form so a bare command name
   # never grants reach. A compound command is scanned leg by leg, so
   # `cd docs && wc <file>` needs the `cd *` leg too. The toolchain stays out:
@@ -32,6 +29,9 @@ permissions:
     effect: allow
   - action: shell
     resource: "git status *"
+    effect: allow
+  - action: shell
+    resource: "git diff *"
     effect: allow
   - action: shell
     resource: "git log *"
@@ -99,9 +99,8 @@ permissions:
     effect: deny
 ---
 
-The implementation is complete. Compare `git diff main...HEAD` against
-`02-proposal.md`. Where the code drifted from the approved design, append a
-dated "As-built" note to `02-proposal.md` (drift, reason, affected
+The implementation is complete. Compare the diff range given by the caller
+against `02-proposal.md`. Where the code drifted from the approved design,
+append a dated "As-built" note to `02-proposal.md` (drift, reason, affected
 sections) and update `03-build-notes.md` if it is incomplete. Do not change
-the design itself, only record what was built. Reply with the JSON verdict
-object only.
+the design itself, only record what was built. Reply with the JSON object only.

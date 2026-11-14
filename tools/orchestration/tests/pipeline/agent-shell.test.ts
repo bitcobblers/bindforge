@@ -170,15 +170,33 @@ describe('stage agent shell rights', () => {
   it('lets a writing stage format, and keeps a review seat read-only', () => {
     for (const agent of CODE_AGENTS) {
       expect(resolveShell(shellRules(agent), 'cargo fmt --all')).toBe('allow');
+      // A writing stage formats in place, through either formatter leg.
+      expect(resolveShell(shellRules(agent), 'rustfmt --edition 2021 src/foo.rs'), agent).toBe(
+        'allow',
+      );
     }
     for (const agent of REVIEW_AGENTS) {
       const rules = shellRules(agent);
-      // The seat grades the tree; it cannot rewrite it.
-      for (const command of ['cargo fmt --all', 'cargo fix --all', 'npm run format']) {
+      // The seat grades the tree; it cannot rewrite it — not through the bare
+      // rustfmt binary, the cargo manifest-mutating subcommands, or the
+      // package's write scripts.
+      for (const command of [
+        'cargo fmt --all',
+        'cargo fix --all',
+        'rustfmt --edition 2021 src/foo.rs',
+        'cargo new scratch',
+        'cargo add serde',
+        'cargo remove serde',
+        'cargo update',
+        'npm run format',
+        'npm run clean',
+        'npm run lint:fix',
+      ]) {
         expect(resolveShell(rules, command), `${agent}: ${command}`).toBe('deny');
       }
-      // ...while still being able to verify the read-only fmt leg of the gate.
+      // ...while still being able to verify the read-only fmt legs of the gate.
       expect(resolveShell(rules, 'cargo fmt --all -- --check'), agent).toBe('allow');
+      expect(resolveShell(rules, 'rustfmt --check src/foo.rs'), agent).toBe('allow');
     }
   });
 });
@@ -290,12 +308,23 @@ describe('design panel read-only reach (ADR-016 Decision 3)', () => {
   // proves: Test strategy #5 — the design seat keeps the code-seat invariants:
   // read-only gate legs allowed, every write leg denied.
   it('keeps the code-seat read-only posture', () => {
-    const allowed = ['cargo test --workspace --locked', 'cargo fmt --all -- --check'];
+    const allowed = [
+      'cargo test --workspace --locked',
+      'cargo fmt --all -- --check',
+      'rustfmt --check src/foo.rs',
+    ];
     const forbidden = [
       'cargo fmt --all',
       'cargo fix --all',
       'cargo clippy --fix',
+      'rustfmt --edition 2021 src/foo.rs',
+      'cargo new scratch',
+      'cargo add serde',
+      'cargo remove serde',
+      'cargo update',
       'npm run format',
+      'npm run clean',
+      'npm run lint:fix',
       'git commit -m feat: x',
       'git push origin main',
       'git checkout -b side',

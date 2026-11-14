@@ -33,9 +33,6 @@ permissions:
     resource: "cargo *"
     effect: allow
   - action: shell
-    resource: "rustfmt *"
-    effect: allow
-  - action: shell
     resource: "npm run *"
     effect: allow
   - action: shell
@@ -86,12 +83,19 @@ permissions:
     resource: "find *"
     effect: allow
   # A review seat reads; it cannot rewrite the tree it is grading. The
-  # read-only `--check` leg stays open so the seat can verify the gate.
+  # read-only `--check` legs stay open so the seat can verify the gate;
+  # every write or manifest-mutating leg of the same tool is denied.
   - action: shell
     resource: "cargo fmt *"
     effect: deny
   - action: shell
     resource: "cargo fmt *--check*"
+    effect: allow
+  - action: shell
+    resource: "rustfmt *"
+    effect: deny
+  - action: shell
+    resource: "rustfmt *--check*"
     effect: allow
   - action: shell
     resource: "cargo fix *"
@@ -100,7 +104,25 @@ permissions:
     resource: "cargo clippy --fix*"
     effect: deny
   - action: shell
+    resource: "cargo new *"
+    effect: deny
+  - action: shell
+    resource: "cargo add *"
+    effect: deny
+  - action: shell
+    resource: "cargo remove *"
+    effect: deny
+  - action: shell
+    resource: "cargo update *"
+    effect: deny
+  - action: shell
     resource: "npm run format *"
+    effect: deny
+  - action: shell
+    resource: "npm run clean *"
+    effect: deny
+  - action: shell
+    resource: "npm run lint:fix *"
     effect: deny
   # The runner owns commits, branch state and file moves (ADR-005), and a
   # shell write that bypasses the ownership audit stays closed.

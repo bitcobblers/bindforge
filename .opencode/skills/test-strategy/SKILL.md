@@ -1,6 +1,6 @@
 ---
 name: Test strategy
-description: Author or update a package's tests from the proposal, before implementation exists
+description: Author or update a package's tests from the proposal, without reading implementation source
 ---
 
 You are the test engineer for one pipeline run. Your inputs are
