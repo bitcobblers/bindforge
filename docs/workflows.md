@@ -14,6 +14,14 @@ pipeline run docs/adrs/007-shared-binding-format.md    # a decision to execute
 pipeline run docs/prompts/<name>.md                    # a brief (small job)
 ```
 
+A run is launched from a dedicated worktree, never from the main checkout
+while it sits on the default branch: `ensureBranch` checks the run branch
+out *in the launch directory*, so a run started from the main checkout
+would move that checkout off `main` for the run's lifetime. Create a
+worktree, launch there, and issue `resume` from the same worktree — the
+restart boundary (ADR-020) names the worktree as the place to relaunch.
+The main checkout stays on `main`.
+
 An ADR that feeds the pipeline must have frontmatter `status: proposed` and
 non-empty **Context** and **Decision** sections. The pipeline flips it to
 `accepted` itself when the run completes; if a run stalls, the ADR stays
@@ -46,8 +54,10 @@ Everything lives under `docs/designs/NNN-<slug>/`:
 | `transcripts/<stage>-rNcM.md`        | What was actually asked/answered, with model + timestamps                 |
 | `.pipeline.json`                     | State, seat ledger, revision stamps, gate log (runner-owned; do not edit) |
 
-Code is committed on a dedicated branch `pipeline/NNN-<slug>`. Merging it
-back after `done` is a human decision.
+Code is committed on a dedicated branch `pipeline/NNN-<slug>`. After
+`done`, the operator merges it back into `main` as a single squash commit
+(`git merge --squash`), then removes the run branch and its worktree —
+merge-back is a human decision, and the runner never merges.
 
 ## The stages
 
