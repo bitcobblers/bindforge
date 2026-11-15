@@ -125,9 +125,9 @@ export const DEFAULT_CONFIG: PipelineConfig = {
    */
   stageTimeoutMs: 30 * 60_000,
   // ADR-003: opt-in fan-out; 1 keeps the serial lane on the same code path.
-  // Operator decision 2026-11-15 raises the shipped default to 2; ADR-003's
+  // Operator decision 2026-11-15 raises the shipped default to 4; ADR-003's
   // "default N = 1" clause is superseded, the flag/env stay the knob.
-  maxParallelReviews: 2,
+  maxParallelReviews: 4,
 };
 
 export interface StageDef {

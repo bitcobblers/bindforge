@@ -328,7 +328,7 @@ Pipeline config defaults (set in `tools/orchestration/src/pipeline/stages.ts`):
 
 - `maxReviews: { design: 40, code: 20 }` — reviewer **sessions** per phase;
   checked at every pass entry, so no pass sneaks past the cap
-- `maxParallelReviews: 2` — review-lane width per pass; the `--max-parallel`
+- `maxParallelReviews: 4` — review-lane width per pass; the `--max-parallel`
   flag and `$OPENCODE_MAX_PARALLEL` override it (see the stages section)
 - `maxPassesPerRound: 6` — dissent/ratify passes inside one round; the
   backstop against a seat that will not converge. It is the one budget
