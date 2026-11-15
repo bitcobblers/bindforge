@@ -404,7 +404,7 @@ describe('run-7 stage guidance', () => {
       designDir: 'docs/designs/007-x',
     });
     expect(authoring).toContain('npx prettier --write');
-    expect(authoring).toContain('the files you touched');
+    expect(authoring).toContain('format only those files');
 
     const update = renderTemplate(await loadTemplate(PROMPTS_DIR, 'test-update.md'), {
       designDir: 'docs/designs/007-x',
@@ -412,7 +412,7 @@ describe('run-7 stage guidance', () => {
       reviewFiles: 'docs/designs/007-x/reviews/code/testing-r2c0.md',
     });
     expect(update).toContain('npx prettier --write');
-    expect(update).toContain('the files you touched');
+    expect(update).toContain('format only those files');
   });
 });
 
