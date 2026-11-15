@@ -28,4 +28,4 @@ break what you approved.
 Load the `code-review` skill and apply the {{specialty}} checklist.
 Write your report to {{reportPath}}, and write no other file: an audit checks
 that review seats touch only their own report.
-Reply with the JSON verdict object only.
+Reply with the JSON verdict object only. The entire response must be a single valid JSON object with no prose, explanation, markdown, or additional text before or after it.

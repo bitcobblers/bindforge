@@ -23,7 +23,9 @@ Use injected previous findings; do not open earlier review reports.
 4. Every finding needs: severity, `file:line`, what is wrong, what would
    fix it.
 5. Write the report only to the exact path the caller names.
-6. Reply with the JSON verdict object only.
+6. Reply with the JSON verdict object only. The entire response must be a
+   single valid JSON object with no prose, explanation, markdown, or
+   additional text before or after it.
 
 ## Severity
 
