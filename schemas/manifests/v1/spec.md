@@ -10,24 +10,27 @@ transform's preconditions read this document's constraints. `013-C4 013-L3`
 
 Keeping the game facts in a manifest is what keeps one fact one home: axis
 kind is a property of a taxonomy id that `registry.toml` owns per id, so no
-entry here restates it, and a preset's *contents* are the seed set's and the
-codec's (ADR-016, ADR-017), so no entry here records a shipped layout. `013-L2`
+entry here restates it, and a preset's *contents* are the seed set's (ADR-019)
+and the codec's (ADR-017), so no entry here records a shipped layout.
+`013-L2`
 
-**Unit handles.** A backticked unit id at the end of a line (e.g.
-`013-C4`) names the ADR-013 decision unit that governs that line's claim;
-the ledger is `docs/adrs/013-game-manifests.md` (Decision). A line without
-a handle is descriptive, or is governed by another ADR's unit — the
-cross-attributions are listed in that ADR's Backfill findings.
+**Unit handles.** A handle is one trailing code span on a line, holding the
+unit ids that govern that line's claim, separated by single spaces; an id
+anywhere else on the line governs nothing. The ids here are the units of
+`docs/adrs/013-game-manifests.md` (Decision); a line without a handle is
+descriptive, or is governed by another ADR's unit — the cross-attributions are
+listed in that ADR's Backfill findings.
 
 ## Table data
 
 One file per game, sitting at `data/manifests/<id>/manifest.toml`: the game
 directory's name must equal the `id` entry byte-for-byte — the same
 name-agreement rule `reach-classes` and `keyboard-geometry` state for a hand
-and a geometry. `013-C2 013-L5` The id grammar is lowercase-only, so the agreement is
-case-unique on a case-insensitive filesystem. Reading a manifest is subject to
-the same size budget as every other document: a file larger than the budget is
-refused before it is read into memory.
+and a geometry. `013-C2 013-L5`
+The id grammar is lowercase-only, so the agreement is case-unique on a
+case-insensitive filesystem. Reading a manifest is subject to the same size
+budget as every other document: a file larger than the budget is refused
+before it is read into memory.
 
 ## Grammar (a documented subset of TOML v1.1.0)
 
@@ -165,10 +168,10 @@ Same rules as every format (`schemas/README.md`): a missing or unsupported
 `version` is rejected with an error naming the supported majors, never
 defaulted, and the gate is per-format — `manifests` ships `v1` alone, so a
 manifest declaring `v2` is refused naming `v1`
-(`fixtures/invalid/major-not-shipped.toml`). `013-C1` A rejection message quoting part
-of the document — an id, a native name — is a single bounded line with the
-part echoed escaped to printable characters and truncated, and never a local
-filesystem path.
+(`fixtures/invalid/major-not-shipped.toml`). `013-C1`
+A rejection message quoting part of the document — an id, a native name — is a
+single bounded line with the part echoed escaped to printable characters and
+truncated, and never a local filesystem path.
 
 ## Fixtures
 
@@ -180,6 +183,6 @@ error naming what is wrong; each carries one fault and is named after it.
 
 The two load-time rules are not in the corpus: they are pinned against the
 reference implementation directly (`crates/core/tests/manifest.rs`), which is
-what keeps this directory registry-free. `013-C7` The conformance harness's
-`schemas/*/v*/` walk picks this directory up with no harness change; the
-corpus, not the code, is what makes the format supported.
+what keeps this directory registry-free. `013-C7`
+The conformance harness's `schemas/*/v*/` walk picks this directory up with no
+harness change; the corpus, not the code, is what makes the format supported.

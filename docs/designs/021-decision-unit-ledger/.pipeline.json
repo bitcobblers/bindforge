@@ -1,0 +1,1257 @@
+{
+  "version": 1,
+  "slug": "decision-unit-ledger",
+  "nnn": "021",
+  "branch": "pipeline/021-decision-unit-ledger",
+  "source": {
+    "kind": "adr",
+    "path": "docs/adrs/021-decision-unit-ledger.md"
+  },
+  "status": "done",
+  "lastStage": "doc-sync",
+  "designRound": 2,
+  "codeRound": 3,
+  "designBudgetUsed": 1,
+  "codeBudgetUsed": 9,
+  "editorialDone": false,
+  "testsGreen": true,
+  "testsNeedUpdate": false,
+  "stageFailures": {
+    "code-review:correctness": 3
+  },
+  "stageCommits": [
+    "b33fb88aba02006e9fb52119b4bc105c2bee8f52",
+    "1c486e452ee75e0d5cd4192b243c018209474b89",
+    "4d2650d2002b1d4c18f1314cc13a5ca189d5d130",
+    "63598f881b0f91dd390c8b8a138a5ff1d4e58d39",
+    "95376f858aae65dd02fd89dd0a42e15391edb7e0",
+    "c32153a6ee9df374a1c06c5feb36b556bf625134",
+    "bc7f402c3b46ba803a3468c75db9dbcdfdbce6b1",
+    "412ff69263e14772f9d948ebd91633417ae35d78",
+    "fb75c8fde3c22b3298990c5e7b36514e63d4fab9",
+    "54bbd4b18c6cec6959676a973db86a008a934cea",
+    "55317e5d6e412cb2013ed7d4a26891fdbc2e3c9f",
+    "e21f63dc2c4ecfc895b0633331ec845b6815da23",
+    "3077087da2ad0a113596cba605dc995044753d72",
+    "9b061513f2ef4958ce0eadc69bbe490abda584dc",
+    "5672164b58efb71753a4849c17e26d22cfa6f966",
+    "48833d885be0cc828b65cd6abc75a93731d3e547",
+    "0ca28e6a7c81de2bd9e1d76faec8463f234d18bc",
+    "99749992c2b2b0216f6589227b241f4a6ce8de91",
+    "05d42f8fe7228bdc154bb66a6cdfdd6b152575d9",
+    "b209bc069eabdc08eb863e51037cf656d09d5ec6",
+    "b5cc5ecb25542c57ec7b39da69d6569e9660d17a"
+  ],
+  "forceNext": null,
+  "results": [
+    {
+      "stage": "research",
+      "round": 0,
+      "sessionID": "ses_e24529eedffeS51fVvjI2wp1um",
+      "agent": "research/researcher",
+      "at": 1794687718124,
+      "reply": {
+        "summary": "Wrote docs/designs/021-decision-unit-ledger/01-research.md for ADR-021 (the decision-unit ledger as the ADR system of record). Read set honoured: the source ADR, the docs/adrs/ listing as the index, the ADRs 021 cites by number (003, 004, 005, 006, 011, 012, 013, 014, 015, 016, 020) and the cited template.md; no prior 021 run artifacts exist, and no run records were opened. Four files beyond that set — gates.ts (parseSource, sourceAdmissible, stagePathAllowed, EXECUTABLE_SURFACE_PREFIXES, documentOutgrewFlow), runner.ts (entry path and ADR status flip), schemas/manifests/v1/spec.md (shipped handles and the Unit handles note), schemas/README.md. Two lenses applied (Prior art, Standards) under the Prior art section, with primary sources: adr-tools, MADR and its category ADR-0010, the Kubernetes KEP template, GitHub CODEOWNERS, Conventional Commits, RFC 8174, W3C 'Cool URIs don't change', and CommonMark. Findings are repo-local and dated to this branch: 021's own ten units carry no → pointer, so the gate it commissions fails its own source document; the shipped 013 pair already breaks 021-L2 and 021-L5 because 013-R5 has neither a handle nor an unassigned marker; 'handle at the end of a spec line' has fifteen table-row and three mid-sentence counterexamples in the only spec that ships handles; the manifests spec's prose cites ADR-016 where the ledger assigns ADR-019; nothing marks an ADR as ledger-bearing and no index gives 'reserved ADR number' a home; only implement/fix may write schemas/, so backfill write rights and 021-R1's unassigned owner are load-bearing; landing the gate crosses ADR-020's restart boundary. Eleven open questions handed to the designer, including handle grammar, gate scope during rollout, → target resolution, and the merged-tree wording of the finalize assert."
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/research-r0.md",
+      "durationMs": 782604,
+      "nudges": 1,
+      "docName": "01-research.md",
+      "docLines": 317,
+      "docLinesAdded": 317,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "proposal",
+      "round": 0,
+      "sessionID": "ses_e2446ac0effexCngPTDd6eEV9l",
+      "agent": "design/designer",
+      "at": 1794688666052,
+      "reply": {
+        "commitMessage": "docs: add the decision-unit ledger design proposal"
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/proposal-r0.md",
+      "durationMs": 947633,
+      "nudges": 0,
+      "docName": "02-proposal.md",
+      "docLines": 401,
+      "docLinesAdded": 401,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e243835dfffe2couHsak0KqlOL",
+      "agent": "review/design-correctness",
+      "at": 1794689409623,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design ¶2 (Unit grammar, 021-C1) — \"anchored with a look-behind and a trailing guard so it cannot match inside a longer token\"",
+            "problem": "[new] The guard as written, `(?![\\d])`, blocks digits only, so the canonical id grammar matches inside `013-C1x`: `\\d{1,2}` takes `1`, the next character `x` is not a digit, so the assertion passes and `013-C1` is returned. Test strategy #1 pins the opposite (\"refuses `1234-C1`, `013-C1x`, `013-C123`\") and ¶2's own stated purpose. `013-C123` and `v013-C1` are genuinely refused; `013-C1x` is not. Impact: a typo id like `**013-C1x**` reads as a valid unit id, so the uniqueness and strictly-increasing checks consume a phantom unit instead of reporting `unit-malformed`, and pin #1 fails as written.",
+            "fix": "Widen the guard in ¶2 to `(?![\\dA-Za-z])` and keep #1's two refusal cases as the pin. Nothing in the corpus depends on the narrower guard: cell-final ids are followed by a backtick, multi-id spans by a space, and `013-B1–B4` by an en dash."
+          },
+          {
+            "severity": "major",
+            "location": "Test strategy #5 (reservations) — \"`owner-missing` for `021-R1`'s pre-run `unassigned` text with no marker\"",
+            "problem": "[new] The shipped text is an owner marker: docs/adrs/021-decision-unit-ledger.md:101 reads \"Owner: `unassigned` — a rollout task, not an ADR slot.\", which assumption A2 itself records (\"`021-R1`'s owner is `unassigned`\"). Under ¶2's own taxonomy `owner-missing` is the no-owner-at-all code (013-R5's shape) and an unparseable owner string is `owner-unknown`, so the pin is wrong either way the parser resolves the form. The deeper gap: ¶2 never states what may follow the owner marker, and the shipped ledgers use three different suffixes — a backticked value plus trailing prose, a bare period (\"Owner: this ADR's run.\"), and a `(reserved)` suffix — none of which #5 pins.",
+            "fix": "Change #5 to pin `owner-unknown` for the shipped 021-R1 form and reserve `owner-missing` for a reservation bullet carrying no `Owner:` (013-R5), and state the deciding rule in ¶2: the owner value runs to the end of the line with backticks stripped, so `ADR-017 (reserved)`, `` `unassigned` `` and `this ADR's run.` all parse."
+          },
+          {
+            "severity": "minor",
+            "location": "Assumption register A2 with ¶2 — \"021 declares ten units (C1–C3, L1–L5, R1–R2) and none carries a `→` pointer\"",
+            "problem": "[new] The cited basis contains a `→`: 021-C1's bullet, line 56, \"plus a `→` pointer to its target\". ¶2's rule — \"The pointer is the last `→` in the bullet and must be followed by non-space text\" — counts that code-span arrow (it is followed by a backtick), and \"or another prose target\" accepts the residue, so the gate sees 021-C1 as pointer-bearing today and `pointer-missing` can never fire for a unit that merely quotes the arrow convention. The conformance pass survives only because ¶8's appended `→` happens to be the last one.",
+            "fix": "¶2: \"the last `→` outside a code span\"; A2: \"no unit carries a pointer; `021-C1` quotes the `→` glyph in a code span\"."
+          },
+          {
+            "severity": "minor",
+            "location": "Assumption register A5 vs A6 — \"Unit-id text in the corpus lives in exactly three kinds of place: a trailing code span at end of line, a trailing code span before a cell's ` |`, and two mid-sentence examples (`spec.md:17`, `021-…:59`)\"",
+            "problem": "[new] A5's third kind is two lines, but A6 records three more handle lines that are neither line-final nor cell-final (\"Three spec lines carry handles mid-paragraph (`spec.md:27,168,183`)\"; verified, spec.md:27 reads \"and a geometry. `013-C2 013-L5` The id grammar is lowercase-only\"). The register therefore states an exhaustive taxonomy that omits three shipped lines, and ¶4's claim that the rule \"excludes the mid-sentence examples (A5) without a special case\" rests on that count.",
+            "fix": "Make A5 four kinds — add \"a handle span in the middle of a wrapped paragraph line (`spec.md:27,168,183`)\" — and cite A6 from it."
+          },
+          {
+            "severity": "minor",
+            "location": "Test strategy #7 against ¶6 — \"a ledger-bearing ADR with no `ledger:` key of its own still gets the check\"",
+            "problem": "[new] ¶6 defines the opposite: \"A ledger is `docs/adrs/NNN-*.md` whose frontmatter carries `ledger: yes`\", so \"a ledger-bearing ADR with no `ledger:` key\" is an empty class and the fixture cannot be built as written, even though ¶7's intent is clear (\"checked on every ADR that carries the key, not only ledger-bearing ones\").",
+            "fix": "Rewrite the clause: \"a non-ledger ADR that carries `depends-on` (013's shape without the key) still gets `depends-order`\"."
+          },
+          {
+            "severity": "minor",
+            "location": "¶2 against ¶8 — \"every top-level bullet under one must be a unit\" / \"the Rollout paragraph re-set as a numbered list whose items 1–3 end with `021-C3`, `021-R1`, `021-R2`\"",
+            "problem": "[new] In the shipped file the Rollout paragraph sits inside `### Reservations` (docs/adrs/021-decision-unit-ledger.md:110–112, before `## Alternatives considered`). An implementation that reads \"top-level bullet\" as \"top-level list item\" reports `unit-malformed` on this run's own conformance text and Test #11 cannot turn green. The numbered list is probably deliberate, but the document never says ordered items are prose.",
+            "fix": "One clause in ¶2: only `- ` bullets are units; ordered items and paragraphs under a kind section are prose."
+          },
+          {
+            "severity": "nit",
+            "location": "Assumption register A3 — basis \"docs/adrs/013-game-manifests.md:128–158\" for \"013's ledger carries 24 units in four kind sections\"",
+            "problem": "[new] The cited range is Budgets and Reservations only and cannot support the row's first claim (7 C + 8 L + 4 B + 5 R, Contracts beginning at line 50). The claim checks out; the basis does not reach it.",
+            "fix": "Cite `:50–158`."
+          },
+          {
+            "severity": "nit",
+            "location": "¶7 (the checks, the taxonomy) — \"denies with the first twelve findings as `file:line code detail` lines plus `+N more`\"",
+            "problem": "[new] Immediately after the sixteen-code list, \"the first twelve\" reads as twelve of the sixteen codes, which would drop every `amends-*` finding from the denial reason; Test #10 (\"lists at most twelve findings\") shows a count cap is meant.",
+            "fix": "\"denies with at most twelve findings, `file:line code detail` each, plus `+N more`\"."
+          },
+          {
+            "severity": "nit",
+            "location": "¶8 (corpus conformance, spec.md) — \"line 14's \\\"ADR-016, ADR-017\\\" is corrected to \\\"ADR-017, ADR-019\\\" to match `013-L2`/`013-R4`\"",
+            "problem": "[new] It does match 013-L2, but both texts then read \"the seed set's and the codec's (ADR-017, ADR-019)\", whose positional pairing is the reverse of 013-R1/R4 and spec.md:125 (codec → ADR-017, seed set → ADR-019), so the shipped pair stays ambiguous in both files.",
+            "fix": "Write \"the seed set's (ADR-019) and the codec's (ADR-017)\" in the same edit."
+          },
+          {
+            "severity": "nit",
+            "location": "¶1 (Components) — \"`parseSource`'s `/^---\\r?\\n([\\s\\S]*?)\\r?\\n---/` is extracted verbatim into an exported `frontmatterOf(content)` that `parseSource` itself now calls\"",
+            "problem": "[new] `parseSource` uses the whole match, not only the capture: `body = content.slice(front[0].length)` (gates.ts:55–57). A `frontmatterOf` returning the frontmatter slice cannot serve that line, so \"extracted verbatim\" and \"parseSource itself now calls\" cannot both hold with the shape implied.",
+            "fix": "State the shape: `frontmatterOf(content): { front: string; body: string } | undefined` (or return the match), so the shared-regex claim is implementable as written."
+          }
+        ]
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/design-review-correctness-r1c0.md",
+      "durationMs": 743445,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e242cdd96ffeNBhfIxED0MSqlk",
+      "agent": "review/design-compatibility",
+      "at": 1794690095916,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Compatibility matrix, row \"ADRs without `ledger:` (001–012, 014–016, 020)\" — \"Yes — unchecked | Absent key means no ledger checks (¶6); their prose and handles behave as today\"",
+            "problem": "The backward-compatibility statement for the unconverted corpus is contradicted by ¶5 and ¶7. ¶5 binds every corpus file regardless of the key (\"A document that carries a handle must state the convention in a `**Unit handles.**` note\"), and ¶4 makes any trailing id span in any docs/adrs or schemas file a handle — so a unit-shaped trailing span added to ADR-005 or schemas/profile/v2/spec.md becomes handle-dangling / note-missing though that file never carries ledger:. ¶7 adds a code that needs no key: \"depends-order … checked on every ADR that carries the key, not only ledger-bearing ones\", which Test #7 restates as \"a ledger-bearing ADR with no `ledger:` key of its own still gets the check\" — self-contradictory, so the test that pins the exception cannot be written as stated. The Risks table already concedes the wider reach (\"A red corpus blocks every new run at entry, including runs unrelated to the ledger\"). Nothing is red today (grep confirms A17/A8: unit-shaped text only in 013, 021 and manifests/v1/spec.md), so this is a wrong compatibility contract rather than a broken tree — a maintainer would believe a 011/012/014/015 backfill run (Rollout 6) enters a tree that does not judge that file.",
+            "fix": "Split that row's Notes into what the absent key exempts (unit, pointer, owner, amendment checks) and what it does not (the ¶4–¶5 handle and note rule on every corpus file; depends-order on every ADR carrying depends-on), and re-word Test #7 to \"an ADR that carries `depends-on` but no `ledger:` key still gets the check\", replacing the self-contradictory phrase."
+          },
+          {
+            "severity": "major",
+            "location": "Test strategy #10 and Rollout 1 — \"the corpus fixture set (temp dirs under `tests/pipeline/fixtures/ledgers/`)\" / \"fixtures under `tests/pipeline/fixtures/ledgers/`\"",
+            "problem": "Committed markdown under tools/orchestration/tests/ lands inside the standing format leg: .prettierignore lists only dist, node_modules and package-lock.json, format:check is `prettier --check .`, and `npm run check` chains lint, format:check and test (tools/orchestration/package.json:23) — the same command the harness runs as checkGate after every implement/fix/test-update stage (runner.ts:3065–3088; states.ts:11 \"executing `npm run check` after each mutating stage\") and CI runs on every PR (.github/workflows/check.yml:54–56). The fixtures must be malformed by design (a unit bullet outside a kind section, a C unit under ### Laws, an id with a trailing word, a preamble-inheriting pointer), which is exactly what prettier's markdown formatter canonicalizes, so a non-canonical fixture turns format:check red on Rollout 1 — the commit the design calls its first landing — and `npm run format` then rewrites the pinned bytes; ¶9 states the opposite rule for the corpus (\"nothing rewrites a ledger or a spec, so no check can be satisfied by a formatter\") without applying it to its own fixtures. Separately, Test #3's CRLF corpus cannot be a committed file at all (.prettierrc sets no endOfLine, so prettier's lf default fails a CRLF markdown file), and #10 (\"temp dirs under\") and Rollout 1 (\"fixtures under\") disagree about whether the tree is committed.",
+            "fix": "State the suite's existing posture: build fixture text in the test module and write it into the scratch repo the vitest.config.ts header describes (\"each file builds a scratch repo under /tmp\"), synthesizing the CRLF variant in memory — which replaces the committed tests/pipeline/fixtures/ledgers/ tree, so Rollout 1 lands only .ts files (already leg-clean). If committed .md fixtures are kept instead, name the tree in .prettierignore, which replaces format:check's coverage of it, and record there that #3's CRLF case is generated, not stored."
+          },
+          {
+            "severity": "minor",
+            "location": "Assumption register A24 — \"the standing CI leg is what keeps the entry hook from blocking unrelated work | unverified | … no CI workflow run was observed\"",
+            "problem": "The leg is verifiable in this repository and true: .github/workflows/check.yml triggers on pull_request, runs `npm run check` with working-directory tools/orchestration on runs-on: ubuntu-latest, with node-version pinned \"22.23.5\" to the engines floor. The design leans on it twice as load-bearing — Risks row 1's mitigation (\"Test strategy #11 makes the join an `npm run check` leg, so the tree is green before a run starts (A24)\") and Rollout 4's acceptance (\"#11 turns the join into a standing CI leg\") — while the register marks it unverified, and the matrix's \"Linux (dev and CI host)\" row states the CI fact with no citation.",
+            "fix": "Set A24's status to verified with .github/workflows/check.yml (on: pull_request; `npm run check` in tools/orchestration; ubuntu-latest; node 22.23.5) as the basis, replacing \"no CI workflow run was observed\", and cite the same file in the matrix's Linux row."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶1 — \"`ledger.ts` reads files with `node:fs`, never writes, and parses no path it did not list itself\"",
+            "problem": "No path library is named, yet the corpus is written as forward-slash patterns (\"docs/adrs/*.md + schemas/**/*.md\"), ¶2 tests an owner by whether \"docs/adrs/NNN-*.md is present\", and ¶6 needs \"template.md is corpus but never a ledger: it matches no `NNN-`\" — all deriving names, and name prefixes, from listed paths. The repo's \"no path parsing\" precedent does not cover this: stagePathAllowed's comment (gates.ts:589–592) rests on paths arriving \"only as git plumbing output — repo-root-relative, POSIX separators\" (moves.ts imports posix for it), whereas a gate that builds paths from fs listings gets platform separators, which are backslashes on the Windows checkout the matrix expects. The macOS/Windows row lists only case and CRLF as the portability axes considered, leaving checklist item 6's separator half open.",
+            "fix": "Add one clause in ¶1 naming node:path for the two corpus roots (join) and for the NNN-prefix and template.md tests (basename), replacing the bare \"reads files with `node:fs`\", and add \"separators via `node:path`\" to the macOS/Windows row's axis list."
+          },
+          {
+            "severity": "nit",
+            "location": "Compatibility matrix, row \"macOS / Windows checkout\" — \"Expected — assumption\"",
+            "problem": "The cell is a hedge rather than a status; the matrix vocabulary is Yes / No / unknown, and the row's own note (\"not executed there\") is what unknown means. Not scored higher because the row states its mitigations and Test #14 names the fallback, so nothing is hidden from a reader.",
+            "fix": "One word: \"Not tested — expectation only\", or `unknown` with #14 named as the sole evidence."
+          }
+        ]
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/design-review-compatibility-r1c0.md",
+      "durationMs": 686246,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e242264b9ffeBfmmn8wG0PsAmC",
+      "agent": "review/design-security",
+      "at": 1794690363792,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶1/¶7 — \"`ledger.ts` reads files with `node:fs`, never writes, and parses no path it did not list itself\"",
+            "problem": "The gate's fail path is specified only for files that parse wrong (sixteen codes → deny → escalate). A corpus file that cannot be read or decoded at all (broken symlink, permission error, non-UTF-8 bytes in a .md) has no specified handling; an exception escaping checkLedgers crashes runPipeline at the entry hook with no gate-log record and no finalizeEscalate, and crashes the completion path inside finalizeDone — violating security checklist item 7's \"reject cleanly, never crash\", and the class the harness already legislated for itself (runner.ts:2430–2431 and 3590–3593 escalate-with-record posture; sibling sourceAdmissible already converts its own read failure into a clean deny at gates.ts:103–107).",
+            "fix": "Add one sentence to ¶7: a corpus read or decode failure makes ledgerGate deny with `ledger corpus not readable: <file>`, the way sourceAdmissible already turns its read failure into deny(\"source document not readable: …\"), so both hooks route through the same escalate path a finding takes; no new taxonomy code needed."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶4 — \"Handles in a fenced block (lines whose trimmed start is ``` or `~~~`, toggled) … are not handles\" (the \"fence toggle, no parser\" middle path)",
+            "problem": "The toggle flips on any fence-looking line and nothing validates the toggle state at end of file, so a single stray fence marker — malformed input any document stage can emit — silently suppresses handle detection for the remainder of the file: a dangling handle past the stray marker then joins green instead of red. The check applies to only part of the file (item 7's \"never … partially apply\"), i.e. fails open, and the design's own Risks table names silent under-coverage as the defect to close without mechanically detecting its cheapest instance.",
+            "fix": "¶7 adds `fence-unbalanced` to the code list: a file whose fence state is still open at EOF is a finding, turning the stray marker red instead of mute; pin with one fixture in Test strategy #2."
+          }
+        ]
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/design-review-security-r1c0.md",
+      "durationMs": 267820,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e241e4e57ffednQn9jX2Mh0YH0",
+      "agent": "review/design-performance",
+      "at": 1794690555642,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design ¶4 — \"A handle is the maximal trailing run of backticked unit ids on a source line: one or more code spans, separated by single spaces, each containing only ids separated by single spaces, followed only by spaces and at most one table-cell `|` before the line terminator.\"",
+            "problem": "As the canonical grammar, this leaves the matching strategy open to a naive nested-quantifier regex: span-internal spaces, inter-span spaces, and trailing spaces are adjacent ambiguous separators, so a long non-matching line backtracks polynomially. Corpus lines are short, so real cost is negligible; labeled new (first pass).",
+            "fix": "State in ¶4 that matching is a deterministic single pass per line — a right-to-left scan splitting on backticked spans, with the remainder required to be spaces plus at most one `|` — instead of an unanchored nested-quantifier regex; Test #2's fixtures already pin the accept/refuse cases the scan must reproduce."
+          }
+        ]
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/design-review-performance-r1c0.md",
+      "durationMs": 191780,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e241b60f9ffegJAwRSS2RR1iq0",
+      "agent": "review/design-complexity",
+      "at": 1794691076794,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design ¶8, `docs/adrs/021-decision-unit-ledger.md` bullet (with Options \"`021-R1`'s owner stays `unassigned`. Rejected\" and Deferred) — \"`021-R1`'s owner becomes `ADR-022 (reserved)`, 021-L5's legal form for 'not written yet' (A18), with a one-line `Reserved: 022` note in its text\"",
+            "problem": "Nothing but the design's own owner grammar requires this moving part, and it reserves exactly the number the allocator hands out next. 021-L5 as shipped admits two forms — \"an existing or reserved ADR number, or this ADR's own run — or carries an explicit `unassigned` marker\" — and 021-R1 already carries one (docs/adrs/021-decision-unit-ledger.md:101, \"Owner: `unassigned` — a rollout task, not an ADR slot\"). The re-mark is needed only because ¶2 accepts the bare `Owner: unassigned` and so rejects the shipped backticked spelling, which test #5 states outright (\"`owner-missing` for `021-R1`'s pre-run `unassigned` text with no marker\"); the Options rebuttal \"021-L5's whole point is a named owner\" therefore misstates the law it cites, which is why this rejected finding is re-reported. The cost is concrete: it rewrites the run's own source ADR's Decision against that unit's \"a rollout task, not an ADR slot\", moves the four product backfills and their order to \"ADR-022 (reserved, 021-R1's new owner)\" in Deferred (contradicting 021-R1's Decision text), and ADR-022 is A18's own `nextNnn` value (`max(existing)+1` = 022), which identity.ts:73 grants to every non-ADR-sourced run — so the next brief run mints `docs/designs/022-<slug>/` while ¶2's reserved test (presence of `docs/adrs/NNN-*.md`) still reports 022 reserved, making the squat invisible to the gate. The 013-R1–R4 precedent only works because 017/019 sit below the counter's reach, and ¶2's bounded-residue argument holds only for numbers at or below the counter's next value.",
+            "fix": "Accept the shipped spelling: ¶2's owner rule reads `Owner: unassigned` backticked or bare. Then ¶8 drops the R1 re-mark, the `Reserved: 022` note and the ADR-022 reservation; Deferred keeps pointing the backfills at 021-R1's `unassigned` rollout task as the ADR words it; test #5's first case becomes a clean case. If a named owner is wanted anyway, reserve a number the allocator cannot reach (≤ 021) and list the R1 re-mark under Goals with its reason."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶8, template bullet — \"`docs/adrs/template.md`: frontmatter gains `series:`, `depends-on:`, `ledger: yes`\"",
+            "problem": "Only `ledger: yes` traces to a Goal (\"`ledger: yes` as the machine-readable marker of a ledger-bearing ADR\"); the other two are knobs with no consumer. No code in tools/orchestration/src reads `series` (grep: no match), and in the corpus it is a literal label — all five series ADRs spell `series: 011-015` — so the template would have 017–019, which Rollout 4 makes ledger-bearing at birth, declare a series they are not in. `depends-on:` is read by ¶7's `depends-order`, but 021-L3 makes it optional (\"Where a `depends-on` key is present\"), so a template default serves nobody.",
+            "fix": "The template gains `ledger: yes` only; if the optional keys should be visible at all, use the template's existing commented style for `depends-on:` and leave `series:` out."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶3 (Amendments) with ¶7's taxonomy — \"No shipped unit uses either (research, Risks), so the check is symmetry, not a workflow\"",
+            "problem": "Four of the sixteen codes (`amends-dangling`, `amends-backlink`, `amends-order`, `unit-id-reuse`), the `amends`/`amended-by` parsing and all of Test strategy #8 serve a notation with zero corpus instances, and none of the four classes 021-R2 names includes it; the source ADR explicitly leaves \"the gate's exact error taxonomy\" to this run, so deferring it is this design's call to make.",
+            "fix": "Keep one sentence in ¶3 defining the notation 021-L4 asks for, and move the symmetry checks to Deferred (\"Owner: the first amendment that carries `amends`\"), dropping the four codes from ¶7's list (twelve findings, not sixteen) and deleting test #8. The same two readers and two hook points remain; #11 can only exercise shapes the corpus ships, so no goal loses coverage."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶4 — \"A handle is the maximal trailing run of backticked unit ids on a source line: one or more code spans, separated by single spaces\"",
+            "problem": "The \"one or more code spans\" clause has no consumer: every shipped handle is a single trailing span, and the multi-id case sits inside one span (`013-B1 013-B2 013-B3 013-B4`, spec.md:111); test #2 pins only one multi-id span and one cell-final span, never two spans on a line. The clause is a grammar branch no fixture exercises and it makes \"maximal trailing run\" ambiguous for a span-text-span line.",
+            "fix": "Define a handle as one trailing code span whose content is ids separated by single spaces, keeping the trailing-spaces-and-one-`|` allowance; C2's \"a line may carry several\" is then satisfied inside the span and #2 needs no change."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design ¶7 — \"denies with the first twelve findings as `file:line code detail` lines plus `+N more` — bounded the way `boundedLegs` bounds a gate record\"",
+            "problem": "The bound is an unnamed literal stated twice (¶7 and test #10) while the repo exports `MAX_GATE_LEGS = 32` for exactly this and routes every other bounded list through it (boundedLegs at gates.ts:457, boundedSurfacePaths/elisionMarker at runner.ts:1881–1892), so the two statements can drift.",
+            "fix": "Name one exported constant (or reuse `MAX_GATE_LEGS`) and have ¶7 and #10 cite the constant instead of the literal \"twelve\"."
+          }
+        ]
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/design-review-complexity-r1c0.md",
+      "durationMs": 521111,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e24136ce9ffeVH2chWeg5AP0i6",
+      "agent": "design/designer",
+      "at": 1794692298297,
+      "reply": {
+        "changed": true,
+        "summary": "Correctness majors: ¶2's id guard is widened to `(?![\\dA-Za-z])` (Test #1's refusals now hold) and the owner rule is stated once — `Owner:` runs to end of line, backticks stripped — so `owner-missing` is only a bullet with no `Owner:` (Test #5 re-pinned, shipped `021-R1` form clean). Compatibility majors: the matrix's `ledger:`-absent row and ¶6 now split what the key exempts (unit/pointer/owner/kind) from the corpus-wide handle rule and key-wide `depends-order`, and Test #7's self-contradictory fixture is re-worded; committed `fixtures/ledgers/` markdown is gone — Test #9 and Rollout 1 build fixtures in the test module into the tmp-dir scratch repo (CRLF synthesized), so prettier cannot rewrite a malformed pin. Complexity major: the ADR-022 reservation, the `Reserved: 022` note, the `021-R1` re-mark and the Options paragraph that justified them are deleted; Deferred and Rollout 6 point back at 021-R1's `unassigned` rollout task. Also consumed the cheap minors by deletion or narrowing: ¶3 keeps 021-L4's notation but its four symmetry codes and Test #8 are deferred to the first amendment carrying `amends` (taxonomy now twelve codes, denial bounded by a named `MAX_LEDGER_FINDINGS`, tests renumbered), the template gains `ledger: yes` only, the handle is one trailing span, ¶5's dead exclusions and the duplicate ¶9 section are gone, A2/A3/A5/A24 bases corrected (CI leg verified against .github/workflows/check.yml), paths via `node:path`, and the macOS/Windows cell reads \"Not tested — expectation only\". Diff is net −1 line (401 → 400).",
+        "commitMessage": "docs: revise the decision-unit ledger proposal for round 1"
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/proposal-revise-r1.md",
+      "durationMs": 1221364,
+      "nudges": 0,
+      "docName": "02-proposal.md",
+      "docLines": 400,
+      "docLinesAdded": 145,
+      "docLinesRemoved": 146
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e2400c941ffewuKImuaAdEmY55",
+      "agent": "review/design-correctness",
+      "at": 1794693083306,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Chosen design ¶2 (Unit grammar) — \"an owner matching neither `ADR-\\d{3}`, `unassigned` nor `this ADR's run` is `owner-unknown`\"",
+            "problem": "[new] Every owner the design itself accepts carries a suffix beyond the shape name: the shipped forms are `ADR-017 (reserved).` (docs/adrs/013-game-manifests.md:147,150,153,155), `this ADR's run.` (docs/adrs/021-decision-unit-ledger.md:108) and, for 021-R1, `unassigned — a rollout task, not an ADR slot.` (:101). Exact equality can accept none of them, yet ¶2 says they \"all parse\" and Test #5 pins them clean, so the rule must mean *begins with*; \"matching\" also admits a search reading, under which `Owner: see ADR-017` would parse clean. Test #5 pins the intent but the rule's one word is ambiguous.",
+            "fix": "One word: \"an owner not beginning with `ADR-\\d{3}`, `unassigned` nor `this ADR's run` is `owner-unknown`\" — replaces \"matching\", keeps the three shapes."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design ¶8 (spec.md bullet) — \"line 14's \\\"ADR-016, ADR-017\\\" is corrected to the pairing `013-L2`/`013-R4` state gives\"",
+            "problem": "[re-raised] The spec.md half of my r1 nit is closed (the corrected pairing matches 013-R1 codec→ADR-017 and 013-R4 seed set→ADR-019); the other half is not: 013-L2 does not state that pairing positionally — docs/adrs/013-game-manifests.md:96–97 reads \"the seed set's and the codec's — ADR-017, ADR-019\", positionally seed set→ADR-017, codec→ADR-019, the reverse of both the corrected spec.md:14 and its own R1/R4. After ¶8 lands, spec.md:14 is the only half of the shipped pair that reads right, and ¶8 cites L2 as a source of the very pairing L2 positionally contradicts.",
+            "fix": "Extend the same editorial edit to group L2's parenthetical (\"the seed set's (ADR-019) and the codec's (ADR-017)\"), or attribute the pairing to `013-R1`/`013-R4` alone and note L2's flat order inside the sixth `Backfill findings` entry."
+          },
+          {
+            "severity": "nit",
+            "location": "Goals / Non-goals — \"no Rust-side re-implementation, no CommonMark dependency (Deferred)\"",
+            "problem": "[new] Deferred / out of scope lists neither item; they are rejections recorded in Options (\"A CommonMark parse … Rejected\") and the Compatibility matrix (\"Rust product … out of scope\"). With ¶9 — the old second pointer — deleted, \"(Deferred)\" is the only citation and it under-cites two of the items it covers.",
+            "fix": "Point the parenthetical at \"(Deferred; Options and matrix)\", or add the two one-line entries the heading (\"Deferred / out of scope\") already admits."
+          }
+        ]
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/design-review-correctness-r1c1.md",
+      "durationMs": 784830,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e23f4cf38ffeoxq5yEqIrfOj1P",
+      "agent": "review/design-compatibility",
+      "at": 1794693573824,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design ¶8, `docs/adrs/021-decision-unit-ledger.md` bullet — \"a `**Unit handles.**` note (¶5) — the shipped `Rollout:` prose lines end with `021-C3`, `021-R1` and `021-R2`\"",
+            "problem": "The clause is false against the file it describes and is the only handle mechanism the revision leaves for `021-R2`. Shipped Rollout text (docs/adrs/021-decision-unit-ledger.md:110–112) reads \"Rollout: (1) the template adopts the ledger sections; (2) the product / backfills land per 021-R1; (3) the gate lands per 021-R2; (4) 017–019 / adopt at landing.\": the ids sit mid-line and unbackticked, the lines end with \"the product\", \"(4) 017–019\" and \"adopt at landing.\", and `021-C3` is not in the Rollout paragraph at all (only at :63). A trailing-backticked-span grep over docs/adrs/ returns no match at all (schemas/ yields only spec.md), so under ¶4 these are the prose mentions ¶7 excludes. Consequence: after ¶8's conformance pass, `021-R2` carries zero handles — its owner is `this ADR's run`, so it is not the ¶6/Test #6 `unassigned` exception, ¶8's template note lists only C1–C3 and L1–L5 (\"where 021's C/L units get their handles\"), and grep for 021-[CLBRS][0-9] over schemas/ is empty — so `unit-unhandled` fires and Test #10 (\"checkLedgers over this repository is green\") stays red, contradicting Goals (\"The tree green at merge: 021's ten units each carry a `→` and a handle\"), making Rollout 4's \"`npm run check` green is the acceptance evidence\" unreachable, and making ¶7's finalize denial plus #12 escalate forever so Rollout 5's flip of 021 to `accepted` never happens. The r0 wording this clause replaced (re-set the paragraph as a numbered list whose items end with the ids) was the mechanism.",
+            "fix": "Replace the clause with the edit it asserts away: \"the three `Rollout:` lines are re-wrapped so each ends with its backticked handle: `021-C3`, `021-R1`, `021-R2`\" — r0's numbered-list wording, keeping `021-R1`'s owner at its shipped backticked `unassigned`."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶2 — \"A reservation's owner is the text from `Owner:` to the end of the line, backticks stripped\" with \"an owner matching neither `ADR-\\d{3}`, `unassigned` nor `this ADR's run` is `owner-unknown`\"",
+            "problem": "Read literally the owner string is the whole rest of the line, and then every shipped reservation is `owner-unknown`: 021-R1 ships \"Owner: `unassigned` — a rollout task, not an ADR slot.\" (docs/adrs/021-decision-unit-ledger.md:101), 021-R2 ships \"Owner: this ADR's run.\" with a trailing period (:108), and the 013 form ¶2 itself lists is \"ADR-017 (reserved)\" — none equals any of the three alternatives, so Test #10 would be held red on text ¶8 leaves untouched. Test #5 already pins the intended reading (\"clean for … `unassigned` with `021-R1`'s shipped trailing prose\"), so only the match position the test assumes is missing from the rule.",
+            "fix": "State the position: \"the owner text must begin with `ADR-\\d{3}`, `unassigned` or `this ADR's run`; the rest of the line is free prose. Anything else is `owner-unknown`\", replacing \"an owner matching neither `ADR-\\d{3}`, `unassigned` nor `this ADR's run` is `owner-unknown`\"."
+          },
+          {
+            "severity": "nit",
+            "location": "Compatibility matrix, row \"macOS / Windows checkout\" — \"separators come from `node:path` (¶1), and CRLF is handled by `\\r?\\n` splits (A13)\"",
+            "problem": "The row now enumerates the portability axes but omits the one that silently disables the check rather than mis-reporting it: ¶1 moves `parseSource`'s `/^---\\r?\\n([\\s\\S]*?)\\r?\\n---/` verbatim into `frontmatterOf`, and that regex anchors at offset 0 and strips nothing (tools/orchestration/src/pipeline/gates.ts:55), so a UTF-8 BOM on a Windows-authored corpus file means no frontmatter block is found, `ledger: yes` is invisible, and the file is treated as non-ledger with no finding — the same silent-under-coverage class as Risks row 2, reached by encoding rather than placement.",
+            "fix": "One clause in the row's axis list — \"no BOM in the corpus (reads are UTF-8; a BOM defeats `frontmatterOf`)\" — or one clause in ¶1 that `frontmatterOf` drops a leading `\\uFEFF`."
+          }
+        ]
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/design-review-compatibility-r1c1.md",
+      "durationMs": 490455,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e23ed5326ffeCuZlopACBfBCYS",
+      "agent": "review/design-complexity",
+      "at": 1794694192323,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design ¶8, 021 bullet — \"the shipped `Rollout:` prose lines end with `021-C3`, `021-R1` and `021-R2`, and `021-R1`'s owner stays its shipped backticked `unassigned`, which ¶2 accepts\"",
+            "problem": "new in the revised text (regression: the r1 wording — 'the Rollout paragraph re-set as a numbered list whose items 1–3 end with `021-C3`, `021-R1`, `021-R2`' — did the needed edit; the revision dropped it and asserted it was already true). The premise is false on the shipped text: docs/adrs/021-decision-unit-ledger.md:110–112 is one wrapped paragraph whose lines end with 'the product', '017–019' and 'adopt at landing.'; the ids sit mid-line and unbackticked ('backfills land per 021-R1; (3) the gate lands per 021-R2'), and `021-C3` does not appear in the Rollout text at all. ¶4 defines a handle as one trailing code span, so none of these is a handle. Chain: ¶8's template note block carries handles for C1–C3 and L1–L5 only; ¶7's exemption covers `021-R1` alone (a reservation carrying `unassigned`); so `021-R2` — 'Owner: this ADR's run', this run's own unit — finishes the conformance pass with no handle → `unit-unhandled` → Test #10 ('`checkLedgers` over **this repository** is green') red → Rollout 4's '`npm run check` green is the acceptance evidence' unreachable, and the Goal 'The tree green at merge: 021's ten units each carry a `→` and a handle' unmet. A17 holds (grep over docs/adrs matches only 013 and 021), so 021's Rollout prose is the only place `021-R2` can be handled.",
+            "fix": "Keep the r1 simplification (no re-mark, no ADR-022) and restore only the handle edit in the same bullet: 'the Rollout paragraph's three lines are re-wrapped so they end with `021-C3`, `021-R1` and `021-R2`' (backticked, line-final per ¶4). One line of ¶8, no new mechanism, and Test #10's green claim becomes true."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶2 — \"A reservation's owner is the text from `Owner:` to the end of the line, backticks stripped, so `ADR-017 (reserved)`, `unassigned` — bare or backticked … all parse\" with \"an owner matching neither `ADR-\\d{3}`, `unassigned` nor `this ADR's run` is `owner-unknown`\"",
+            "problem": "The capture extent and the acceptance test differ and nothing reconciles them. `021-R1`'s shipped line is \"Owner: `unassigned` — a rollout task, not an ADR slot.\" (ADR:101), so the captured text is 'unassigned — a rollout task, not an ADR slot', which matches none of the three forms exactly; yet Test #5 requires it clean ('`unassigned` with `021-R1`'s shipped trailing prose') while requiring `owner-unknown` for `Owner: someday`. Acceptance is therefore an unstated prefix/leading-form match — and under a containment reading it is over-broad: 'Owner: ADR-017, ADR-019' or 'unassigned forever' would pass. The rule is wider than any shipped line needs: in the corpus the owner form is always what immediately follows `Owner:` (013-R1–R4 `ADR-017 (reserved).`, 021-R1 backticked `unassigned`, 021-R2 `this ADR's run.`).",
+            "fix": "State one rule at one extent: 'the owner is the form immediately after `Owner:`, backticks stripped: `ADR-\\d{3}` | `unassigned` | `this ADR's run`; whatever follows it on the line is prose; text after `Owner:` that begins with none of the three is `owner-unknown`.' Same code, no extra branch; Test #5 unchanged and now unambiguous."
+          },
+          {
+            "severity": "nit",
+            "location": "Rollout 1 / Test strategy #9 — \"Only `.ts` files land here, so the format leg is untouched\" and \"no committed fixture tree, so prettier never rewrites a deliberately malformed ledger\"",
+            "problem": "The stated reason is inverted. The leg is `format:check` → `prettier --check .` run from `tools/orchestration` (package.json:20,23; .github/workflows/check.yml:54–56), so it does check the landing `.ts` files, and it never sees the corpus (`docs/**`, `schemas/**` are outside that directory). The narrower, true reason is that committed `.md` fixtures would sit under the leg's path — `tests/pipeline/fixtures/` is the repo's existing fixture convention (fixtures/checkpoints/*.json) — and prettier owns markdown table padding and line-final whitespace, the exact shape Test #2 pins.",
+            "fix": "Reword both clauses to that reason: fixtures are built in the test module and written to the scratch repo of the existing `tests/pipeline/tmp-dir.ts` helper, so no committed markdown under `tools/orchestration` can be reformatted out from under a shape pin. No design change."
+          }
+        ]
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/design-review-complexity-r1c1.md",
+      "durationMs": 618448,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e23e3e2bcffeokgs13qdVB56cO",
+      "agent": "design/designer",
+      "at": 1794694947080,
+      "reply": {
+        "changed": true,
+        "summary": "Major (both reports): ¶8's 021 bullet no longer asserts the shipped Rollout prose ends with handles — it names the edit (Rollout re-set as a numbered list whose items 1–3 end with `021-C3`, `021-R1`, `021-R2`), restoring the only mechanism that makes 021-R2 handled and Test #10/Rollout 4/5 green. Minor owner-extent (both): ¶2 now states one rule with one extent — the owner is the form immediately after `Owner:` (backticks stripped), the rest of the line is prose, owner-unknown keys on the leading form — so 021-R1/R2's shipped lines parse and Test #5's pins are unambiguous; this rewrite is one line shorter. Minor BOM (compatibility): ¶1's frontmatterOf now drops a leading `\\uFEFF` (reviewer's prescribed ¶1 clause), absorbed without new lines. Minor Rollout 1/Test #9 (complexity): the inverted 'format leg is untouched' reason is gone — Rollout 1 says the .ts files land prettier-formatted and no markdown enters the leg's path (pointing at Test #9), Test #9 states the narrower reason with the existing tmp-dir.ts helper, also fixing the ' 9.' numbering glitch and shedding one line. Revision log maintained in place: the ¶2 and ¶1/Test #9/Rollout 1 entries rewritten to the current decisions, one new r1c1 ¶8 entry. Diff is net-zero (400 → 400 lines).",
+        "commitMessage": "docs: revise the proposal for the round-1 dissent findings"
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/proposal-revise-r1.md",
+      "durationMs": 754584,
+      "nudges": 0,
+      "docName": "02-proposal.md",
+      "docLines": 400,
+      "docLinesAdded": 25,
+      "docLinesRemoved": 25
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e23d85e8cffeGXRlBg307W2zPt",
+      "agent": "review/design-compatibility",
+      "at": 1794695303796,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Rollout 1 — \"Only `.ts` files land here, prettier-formatted, and no markdown enters the format leg's path (Test #9).\"",
+            "problem": "The last clause asserts a property of the format leg that the tree contradicts: .github/workflows/check.yml:54-56 runs `npm run check` with `working-directory: tools/orchestration`, that package's `format:check` is `prettier --check .` (tools/orchestration/package.json:20), and tools/orchestration/.prettierignore holds only `dist`, `node_modules`, `package-lock.json` — so the 14 markdown files already in that tree (README.md, prompts/*.md) are in the leg's path today. The narrower claim the sentence is arguing for is true: nothing in the test-authoring commit adds markdown there, and ¶8's corpus (`docs/adrs/*.md`, `schemas/manifests/v1/spec.md`) sits outside the leg's cwd, with no `proseWrap` in .prettierrc to re-wrap a line that must end with a handle span. Fix: replace \"and no markdown enters the format leg's path (Test #9)\" with \"and no markdown is added to the format leg's path by this commit (Test #9)\".",
+            "fix": "Replace \"and no markdown enters the format leg's path (Test #9)\" with \"and no markdown is added to the format leg's path by this commit (Test #9)\"."
+          }
+        ]
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/design-review-compatibility-r1c2.md",
+      "durationMs": 356576,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e23d2ed7affeLbT0X2Qa7el622",
+      "agent": "review/design-complexity",
+      "at": 1794695670535,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶1 — \"so both readers share one regex and one CRLF posture, with a leading `\\uFEFF` dropped (A13)\"",
+            "problem": "new in this revision (the only moving part the diff adds) and it traces to no Goal — complexity checklist item 2. No Goal, risk or Deferred clause asks for BOM handling; A13's basis is CRLF only (gates.ts:54–57 matches `\\r?\\n`, and grep over `tools/orchestration/src` finds no `\\uFEFF`/BOM handling anywhere), so the citation points at a precedent that does not exist; Test strategy pins CRLF only (#3), never a BOM; the sole would-be consumer is a checkout on the platform the Compatibility matrix marks \"Not tested — expectation only\", since the corpus, the harness and CI produce BOM-free files on Linux. The clause also opens an offset the text does not resolve: `parseSource` derives its body by slicing the original content at `front[0].length` (gates.ts:57), so stripping inside the shared `frontmatterOf` puts that slice one character out unless `parseSource` is switched to the returned `body` — shared-code behavior plus a coupling, bought for input nothing in the design produces.",
+            "fix": "Delete the clause and inherit A13's CRLF-only posture: no other text changes and Test #3 is unchanged. If kept instead: state that `frontmatterOf` returns already-stripped content and that `parseSource` uses the returned `body` rather than slicing `content`, add a BOM case to Test #3, and cite a basis that shows a BOM case exists rather than A13."
+          },
+          {
+            "severity": "nit",
+            "location": "Rollout 1 — \"Only `.ts` files land here, prettier-formatted, and no markdown enters the format leg's path (Test #9)\"",
+            "problem": "false as written: the leg is `format:check` → `prettier --check .` run from `tools/orchestration` (package.json:20,23; .github/workflows/check.yml:55–56), a path that already contains committed markdown (`README.md`, `prompts/*.md`), so markdown does enter the leg's path. The narrower claim the revision established is true and is what the conclusion needs: no committed ledger markdown lands there, because Test #9's fixtures live in `tmp-dir.ts`'s scratch (`mkdtempSync(join(tmpdir(), prefix))`, tmp-dir.ts:21 — /tmp, outside the leg) and ¶8's markdown sits in `docs/**`, which no leg formats (the other format step is `cargo fmt --all`, check.yml:29; there is no root package.json).",
+            "fix": "One clause: \"and no committed markdown fixture lands in the leg's path (Test #9)\". No design change."
+          }
+        ]
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/design-review-complexity-r1c2.md",
+      "durationMs": 366691,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e23cd5489ffewEe82qLqNXITzD",
+      "agent": "review/design-correctness",
+      "at": 1794696123555,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/design-review-correctness-r1c3.md",
+      "durationMs": 452842,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e23c66b3affefsz942FcJTyDat",
+      "agent": "review/design-security",
+      "at": 1794696665042,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶1/¶7 — \"`ledger.ts` reads with `node:fs`, builds every path with `node:path` …, never writes, and parses no path it did not list\"",
+            "problem": "re-raised, and widened by this revision. ¶7 still specifies a fail path only for files that parse wrong: a corpus file that cannot be read or decoded at all (broken symlink, permission error, non-UTF-8 bytes in a .md) has no handling, so the escaping exception reaches runPipeline beside sourceAdmissible with no `ledger-join` gate log and no finalizeEscalate, and crashes the completion path inside finalizeDone — the class the harness legislated for itself (runner.ts:2430–2431, 3590–3593, \"escalation with a record, not a crash\") and the one sourceAdmissible already converts into a clean deny (gates.ts:105–107). The revision added a second silent route through the same class: ¶1's `frontmatterOf(content): { front; body } | undefined` returns undefined for a file whose `---` block does not match, and revised ¶6 now states that an absent key means \"no unit, pointer, owner or kind check\" and that depends-order binds only \"every ADR that carries `depends-on`\" — so a ledger-bearing ADR with a malformed frontmatter block reads as not ledger-bearing and neither its units nor its depends-on are checked, with no finding in any code. Security checklist item 7 (reject cleanly, never crash or partially apply).",
+            "fix": "One sentence in ¶7, no new taxonomy code: a corpus read or decode failure, or a `docs/adrs/NNN-*.md` whose frontmatter block frontmatterOf returns undefined for, is denied as `ledger corpus not readable: <file>` — the way sourceAdmissible turns its own read failure into deny(\"source document not readable: …\") — so both hooks route through the escalate path a finding already takes."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶4 — \"Handles in a fenced block (lines whose trimmed start is ``` ``` or `~~~`, toggled) … are not handles\"",
+            "problem": "re-raised: the toggle and its missing end-of-file validation are untouched by this diff, so a single stray fence marker suppresses handle detection to the end of the file and a dangling handle past it joins green — a check that partially applies. What the diff changed is the blast radius: revised ¶6 (\"absent means no unit, pointer, owner or kind check … while ¶4–¶5's handle rule binds every corpus file\") and the rewritten compatibility row (\"it does not exempt it from ¶4–¶5's handle and note rule\") now make the handle rule explicitly load-bearing on every file in docs/adrs/ and schemas/, including the ledger-less ADRs 001–016 and 020 that last round's wording left ambiguous. This is the silent-under-coverage defect the Risks table names, now on a wider file set.",
+            "fix": "Unchanged from r1: add `fence-unbalanced` to ¶7's code list — a file whose fence state is still open at EOF is a finding, turning the stray marker red instead of mute — and pin it with one fixture in Test strategy #2."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶2 — \"The pointer is the last `→` outside a code span and must be followed by non-space text\"",
+            "problem": "new in this diff. The sentence introduces a third scanning state the design never defines: ¶4 defines exactly two non-prose regions (fence toggle, frontmatter block), and inline code-span state gets no toggling rule, no per-line reset and no end-of-input or unbalanced case — the same shape as the ¶4 toggle in my open finding. On malformed input the outcomes split: an unmatched backtick before the real pointer yields pointer-missing (fail closed, and Test #10's green-corpus leg would surface it), while an unmatched backtick before a code-span arrow — the corpus quotes glyphs in spans, 021-C1 itself quotes `→` per A2 — lets an arrow inside a span be taken as the pointer. Since targets are presence-checked and never resolved (Deferred), that unit is then green with a pointer no reader would accept, and nothing reports it. Checklist item 7: malformed input silently changes which text the check applies to.",
+            "fix": "One clause in ¶2: code-span state for the pointer is computed per line and resets at the line terminator, and a bullet with an unbalanced number of span delimiters is `unit-malformed` — reusing a code ¶7 already has; the same clause can settle whether a backticked target (`→ \\`ADR-019\\``) counts."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design ¶7 — \"`ledgerGate` denies with at most `MAX_LEDGER_FINDINGS` findings — an exported constant, the way `MAX_GATE_LEGS` bounds a gate record\"",
+            "problem": "the cap bounds the count, and this revision is where the design leans on it hardest, but each line is `file:line code detail`, so per-line size is whatever the corpus line contributes; Test strategy #9 also dropped old #10's clause \"so no reason string is unbounded\". The harness's own findings cap does both jobs — boundedFindings slices to MAX_RECORDED_FINDINGS and runs every field through boundedField/printable (runner.ts:3206–3232) — because, per gates.ts:300–307, one gate record is cloned into every later checkpoint and rendered into every later prompt. Checklist item 4's logging half.",
+            "fix": "One clause: each `file:line code detail` line passes through the existing printable/boundedField posture (which also normalizes the non-UTF-8 case), or ¶7 states that `detail` never quotes corpus text, only coordinates and code."
+          }
+        ]
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/design-review-security-r1c3.md",
+      "durationMs": 541396,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e23be2814ffe5GGWgBa52aY7wK",
+      "agent": "review/design-performance",
+      "at": 1794696915456,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/design-review-performance-r1c3.md",
+      "durationMs": 250350,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-final",
+      "round": 0,
+      "sessionID": "ses_e23ba55a2ffe7OTFN0yL5YAvAq",
+      "agent": "design/editor",
+      "at": 1794697373088,
+      "reply": {
+        "ambiguities": [
+          "Goals / Non-goals — \"so 021-R1's \\\"backfill / forward-only\\\" split has an extension\": what \"an extension\" denotes (a machine-readable statement of the split? a third category?) is not clear from context; author to clarify.",
+          "Chosen design ¶2 — \"The residue is a typo naming a number nobody fills, which the gate cannot tell from a real reservation\": the referent of \"the residue\" (the owner-unknown text? an ADR-NNN form that is really a typo?) is hard to follow; author to clarify.",
+          "Chosen design ¶5 — \"so the rule is three note lines in the whole corpus\": reads as the rule being identical to three lines rather than as the corpus ending up with three notes; author to confirm the intended claim."
+        ],
+        "commitMessage": "docs: final language pass on the decision-unit ledger proposal"
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/proposal-final-r0.md",
+      "durationMs": 457496,
+      "nudges": 0,
+      "docName": "02-proposal.md",
+      "docLines": 400,
+      "docLinesAdded": 7,
+      "docLinesRemoved": 7
+    },
+    {
+      "stage": "editorial-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e23b359ffffeia237ABNEPsWez",
+      "agent": "review/design-correctness",
+      "at": 1794697749048,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/editorial-review-correctness-r2.md",
+      "durationMs": 375834,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e23ad9dafffeQubQwIispROkAC",
+      "agent": "review/design-compatibility",
+      "at": 1794698109157,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/editorial-review-compatibility-r2.md",
+      "durationMs": 360051,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:security",
+      "round": 2,
+      "sessionID": "ses_e23a81f06ffel0C1kb7PGY9Az4",
+      "agent": "review/design-security",
+      "at": 1794698328189,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/editorial-review-security-r2.md",
+      "durationMs": 218985,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:performance",
+      "round": 2,
+      "sessionID": "ses_e23a4c76fffeWLL3sMIjgXpeUY",
+      "agent": "review/design-performance",
+      "at": 1794698510533,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/editorial-review-performance-r2.md",
+      "durationMs": 182294,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:complexity",
+      "round": 2,
+      "sessionID": "ses_e23a1ff19ffeM4pg9u5Ld02158",
+      "agent": "review/design-complexity",
+      "at": 1794698620865,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/editorial-review-complexity-r2.md",
+      "durationMs": 110158,
+      "nudges": 0
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_e23a04fe4ffeIaHtirlNf9l96I",
+      "agent": "code/test-engineer",
+      "at": 1794699757927,
+      "reply": {
+        "testsAdded": 32,
+        "commitMessage": "test: pin the decision-unit ledger parser, join, and gate hooks"
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/test-authoring-r0.md",
+      "durationMs": 1136936,
+      "nudges": 0
+    },
+    {
+      "stage": "implement",
+      "round": 0,
+      "sessionID": "ses_e238ef64effe901CYNWdDMFGWv",
+      "agent": "code/coder",
+      "at": 1794701383664,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "feat: add the decision-unit ledger gate",
+        "moves": []
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/implement-r0.md",
+      "durationMs": 1625629,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e23096b8affeffRGS8xjIM4AJm",
+      "agent": "code/coder",
+      "at": 1794709280561,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "fix: clear the ledger lint errors and restore a reverted prompt line",
+        "moves": []
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/fix-r0.md",
+      "durationMs": 770575,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e1fd4a8dcffeOsFW2CTA5CO1QR",
+      "agent": "code/test-engineer",
+      "at": 1794762679388,
+      "reply": {
+        "commitMessage": "test: point the brief-source pin at the runner-allocated design directory",
+        "moves": []
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/test-update-r0.md",
+      "durationMs": 379999,
+      "nudges": 2
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e1fce9f3dffeeD2WPEL4CQ25Hm",
+      "agent": "code/coder",
+      "at": 1794762952463,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "docs: record the red corpus legs as the docs/adrs half's lane",
+        "moves": []
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/fix-r0.md",
+      "durationMs": 257584,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e1fca7e75ffeArZLyR0ACJnF93",
+      "agent": "code/coder",
+      "at": 1794763309633,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "docs: record the 17:16 gate recapture and the conformance audit",
+        "moves": []
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/fix-r0.md",
+      "durationMs": 344211,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e1fc50b13ffe0TOYBT905qSDmR",
+      "agent": "code/coder",
+      "at": 1794764410881,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "docs: stage the verified docs/adrs conformance payload for the ledger corpus",
+        "moves": []
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/fix-r0.md",
+      "durationMs": 1088252,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e1fb43f60ffeI6FGYLTYgrL6AR",
+      "agent": "code/coder",
+      "at": 1794764882698,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "docs: record this round's gate posture in the ledger build notes",
+        "moves": []
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/fix-r0.md",
+      "durationMs": 459343,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e1f7dba6dffeQOYU1vwEtUli4L",
+      "agent": "code/coder",
+      "at": 1794768179709,
+      "reply": {
+        "testsNeedUpdate": false,
+        "moves": []
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/fix-r0.md",
+      "durationMs": 183358,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e1f7abe11ffeS4pWHMJIn3UpLU",
+      "agent": "codereview/code-correctness",
+      "at": 1794768354294,
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/code-review-correctness-r1c0.md",
+      "durationMs": 162285,
+      "nudges": 8,
+      "failure": "invalid-reply: not JSON"
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e1f76593cffeI1nQi9On85c23T",
+      "agent": "codereview/code-correctness",
+      "at": 1794768642189,
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/code-review-correctness-r2c0.md",
+      "durationMs": 162218,
+      "nudges": 8,
+      "failure": "invalid-reply: not JSON"
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e1f76593cffeI1nQi9On85c23T",
+      "agent": "codereview/code-correctness",
+      "at": 1794768802542,
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/code-review-correctness-attempt2-r2c0.md",
+      "durationMs": 160329,
+      "nudges": 8,
+      "failure": "invalid-reply: not JSON"
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 3,
+      "sessionID": "ses_e1f56a453ffecvBtP7Ed0bnTsJ",
+      "agent": "codereview/code-correctness",
+      "at": 1794770672553,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/code-review-correctness-r3c0.md",
+      "durationMs": 114647,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 3,
+      "sessionID": "ses_e1f54e451ffeB2KAgOOvvtg7A0",
+      "agent": "codereview/code-compatibility",
+      "at": 1794770749024,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/code-review-compatibility-r3c0.md",
+      "durationMs": 76444,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 3,
+      "sessionID": "ses_e1f53b99bffegnFOE6rloH066Y",
+      "agent": "codereview/code-security",
+      "at": 1794770775191,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/code-review-security-r3c0.md",
+      "durationMs": 26140,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 3,
+      "sessionID": "ses_e1f535364ffeXuORXpxDmIrzD6",
+      "agent": "codereview/code-performance",
+      "at": 1794770835554,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/code-review-performance-r3c0.md",
+      "durationMs": 60337,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 3,
+      "sessionID": "ses_e1f526799ffe7Eyc53spfotVf6",
+      "agent": "codereview/code-testing",
+      "at": 1794770944289,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/code-review-testing-r3c0.md",
+      "durationMs": 108709,
+      "nudges": 0
+    },
+    {
+      "stage": "doc-sync",
+      "round": 3,
+      "sessionID": "ses_e1f50be88ffeY8LWYZgdObgJpZ",
+      "agent": "ops/doc-sync",
+      "at": 1794771000705,
+      "reply": {
+        "drifted": true,
+        "commitMessage": "docs: record as-built drift for decision-unit ledger proposal and build notes"
+      },
+      "transcript": "docs/designs/021-decision-unit-ledger/transcripts/doc-sync-r3.md",
+      "durationMs": 56301,
+      "nudges": 0
+    }
+  ],
+  "gateLog": [
+    {
+      "gate": "sourceAdmissible",
+      "round": 0,
+      "proceed": true,
+      "reason": "ADR is proposed and complete",
+      "at": 1794686935285
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: correctness, compatibility, complexity",
+      "at": 1794691076873
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c2 pending: compatibility, complexity",
+      "at": 1794694192435
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c3 pending: correctness, security, performance",
+      "at": 1794695670624
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794696915537
+    },
+    {
+      "gate": "editorial-review",
+      "round": 2,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1794698620946
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794701388436
+    },
+    {
+      "gate": "restart-boundary",
+      "round": 0,
+      "proceed": true,
+      "reason": "stage implement changed 3 harness file(s) this runner executes or renders: tools/orchestration/src/pipeline/gates.ts, tools/orchestration/src/pipeline/ledger.ts, tools/orchestration/src/pipeline/runner.ts — not a failure: the run pauses here so a fresh process imports and renders the committed tree (pipeline resume 021-decision-unit-ledger)",
+      "at": 1794701388440
+    },
+    {
+      "gate": "restart-boundary-crossed",
+      "round": 0,
+      "proceed": true,
+      "reason": "crossed the restart boundary stage implement opened on 3 harness file(s): tools/orchestration/src/pipeline/gates.ts, tools/orchestration/src/pipeline/ledger.ts, tools/orchestration/src/pipeline/runner.ts — this process imported the committed tree, so the record is cleared and the run drives on",
+      "at": 1794708509755
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794709293336
+    },
+    {
+      "gate": "restart-boundary",
+      "round": 0,
+      "proceed": true,
+      "reason": "stage fix changed 3 harness file(s) this runner executes or renders: tools/orchestration/prompts/test-authoring.md, tools/orchestration/prompts/test-update.md, tools/orchestration/src/pipeline/ledger.ts — not a failure: the run pauses here so a fresh process imports and renders the committed tree (pipeline resume 021-decision-unit-ledger)",
+      "at": 1794709293342
+    },
+    {
+      "gate": "restart-boundary-crossed",
+      "round": 0,
+      "proceed": true,
+      "reason": "crossed the restart boundary stage fix opened on 3 harness file(s): tools/orchestration/prompts/test-authoring.md, tools/orchestration/prompts/test-update.md, tools/orchestration/src/pipeline/ledger.ts — this process imported the committed tree, so the record is cleared and the run drives on",
+      "at": 1794762299138
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794762694841
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794762965374
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794763322592
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794764423316
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794764895044
+    },
+    {
+      "gate": "escalate",
+      "round": 0,
+      "proceed": false,
+      "reason": "tests not green at the code-review budget limit",
+      "at": 1794764895048
+    },
+    {
+      "gate": "escalate",
+      "round": 0,
+      "proceed": false,
+      "reason": "tests not green at the code-review budget limit",
+      "at": 1794766847061
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1794768191969
+    },
+    {
+      "gate": "operatorExtension",
+      "round": 1,
+      "proceed": true,
+      "reason": "extended the review budget by 1 review session(s) over the caps of 40/20: over-cap code round entered under operator extension (1 granted round(s) left)",
+      "at": 1794768191971
+    },
+    {
+      "gate": "stageFailure",
+      "round": 1,
+      "proceed": false,
+      "reason": "code-review:correctness: invalid-reply: not JSON",
+      "at": 1794768354294
+    },
+    {
+      "gate": "operatorExtension",
+      "round": 2,
+      "proceed": true,
+      "reason": "extended the review budget by 1 review session(s) over the caps of 40/20: over-cap code round entered under operator extension (0 granted round(s) left)",
+      "at": 1794768479905
+    },
+    {
+      "gate": "stageFailure",
+      "round": 2,
+      "proceed": false,
+      "reason": "code-review:correctness: invalid-reply: not JSON",
+      "at": 1794768642190
+    },
+    {
+      "gate": "escalate",
+      "round": 0,
+      "proceed": false,
+      "reason": "stage code-review:correctness failed twice (invalid-reply: not JSON) — nudge/reply rule: one retry, then escalate",
+      "at": 1794768802563
+    },
+    {
+      "gate": "operatorExtension",
+      "round": 3,
+      "proceed": true,
+      "reason": "extended the review budget by 1 review session(s) over the caps of 40/20: over-cap code round entered under operator extension (0 granted round(s) left)",
+      "at": 1794770557833
+    },
+    {
+      "gate": "code-review",
+      "round": 3,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794770944369
+    },
+    {
+      "gate": "ledger-join",
+      "round": 0,
+      "proceed": true,
+      "reason": "the ledger join holds: every handle resolves, every unit is handled",
+      "at": 1794771000763
+    },
+    {
+      "gate": "done",
+      "round": 0,
+      "proceed": true,
+      "reason": "pipeline complete",
+      "at": 1794771000763
+    }
+  ],
+  "startedAt": 1794686935267,
+  "updatedAt": 1794771000763,
+  "flow": "full",
+  "baseRef": "1bda5c34f1561afd79fc395d63855b3d1194d08d",
+  "designCycle": 4,
+  "designStamp": "e66564c0d7fdfd8c438ebf4e1c66d9f3ddd1644a",
+  "seats": {
+    "design": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "e66564c0d7fdfd8c438ebf4e1c66d9f3ddd1644a",
+        "dissents": 1,
+        "findings": []
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "e66564c0d7fdfd8c438ebf4e1c66d9f3ddd1644a",
+        "dissents": 2,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Rollout 1 — \"Only `.ts` files land here, prettier-formatted, and no markdown enters the format leg's path (Test #9).\"",
+            "problem": "The last clause asserts a property of the format leg that the tree contradicts: .github/workflows/check.yml:54-56 runs `npm run check` with `working-directory: tools/orchestration`, that package's `format:check` is `prettier --check .` (tools/orchestration/package.json:20), and tools/orchestration/.prettierignore holds only `dist`, `node_modules`, `package-lock.json` — so the 14 markdown files already in that tree (README.md, prompts/*.md) are in the leg's path today. The narrower claim the sentence is arguing for is true: nothing in the test-authoring commit adds markdown there, and ¶8's corpus (`docs/adrs/*.md`, `schemas/manifests/v1/spec.md`) sits outside the leg's cwd, with no `proseWrap` in .prettierrc to re-wrap a line that must end with a handle span. Fix: replace \"and no markdown enters the format leg's path (Test #9)\" with \"and no markdown is added to the format leg's path by this commit (Test #9)\".",
+            "fix": "Replace \"and no markdown enters the format leg's path (Test #9)\" with \"and no markdown is added to the format leg's path by this commit (Test #9)\"."
+          }
+        ]
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "e66564c0d7fdfd8c438ebf4e1c66d9f3ddd1644a",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶1/¶7 — \"`ledger.ts` reads with `node:fs`, builds every path with `node:path` …, never writes, and parses no path it did not list\"",
+            "problem": "re-raised, and widened by this revision. ¶7 still specifies a fail path only for files that parse wrong: a corpus file that cannot be read or decoded at all (broken symlink, permission error, non-UTF-8 bytes in a .md) has no handling, so the escaping exception reaches runPipeline beside sourceAdmissible with no `ledger-join` gate log and no finalizeEscalate, and crashes the completion path inside finalizeDone — the class the harness legislated for itself (runner.ts:2430–2431, 3590–3593, \"escalation with a record, not a crash\") and the one sourceAdmissible already converts into a clean deny (gates.ts:105–107). The revision added a second silent route through the same class: ¶1's `frontmatterOf(content): { front; body } | undefined` returns undefined for a file whose `---` block does not match, and revised ¶6 now states that an absent key means \"no unit, pointer, owner or kind check\" and that depends-order binds only \"every ADR that carries `depends-on`\" — so a ledger-bearing ADR with a … [elided by the checkpoint cap]",
+            "fix": "One sentence in ¶7, no new taxonomy code: a corpus read or decode failure, or a `docs/adrs/NNN-*.md` whose frontmatter block frontmatterOf returns undefined for, is denied as `ledger corpus not readable: <file>` — the way sourceAdmissible turns its own read failure into deny(\"source document not readable: …\") — so both hooks route through the escalate path a finding already takes."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶4 — \"Handles in a fenced block (lines whose trimmed start is ``` ``` or `~~~`, toggled) … are not handles\"",
+            "problem": "re-raised: the toggle and its missing end-of-file validation are untouched by this diff, so a single stray fence marker suppresses handle detection to the end of the file and a dangling handle past it joins green — a check that partially applies. What the diff changed is the blast radius: revised ¶6 (\"absent means no unit, pointer, owner or kind check … while ¶4–¶5's handle rule binds every corpus file\") and the rewritten compatibility row (\"it does not exempt it from ¶4–¶5's handle and note rule\") now make the handle rule explicitly load-bearing on every file in docs/adrs/ and schemas/, including the ledger-less ADRs 001–016 and 020 that last round's wording left ambiguous. This is the silent-under-coverage defect the Risks table names, now on a wider file set.",
+            "fix": "Unchanged from r1: add `fence-unbalanced` to ¶7's code list — a file whose fence state is still open at EOF is a finding, turning the stray marker red instead of mute — and pin it with one fixture in Test strategy #2."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶2 — \"The pointer is the last `→` outside a code span and must be followed by non-space text\"",
+            "problem": "new in this diff. The sentence introduces a third scanning state the design never defines: ¶4 defines exactly two non-prose regions (fence toggle, frontmatter block), and inline code-span state gets no toggling rule, no per-line reset and no end-of-input or unbalanced case — the same shape as the ¶4 toggle in my open finding. On malformed input the outcomes split: an unmatched backtick before the real pointer yields pointer-missing (fail closed, and Test #10's green-corpus leg would surface it), while an unmatched backtick before a code-span arrow — the corpus quotes glyphs in spans, 021-C1 itself quotes `→` per A2 — lets an arrow inside a span be taken as the pointer. Since targets are presence-checked and never resolved (Deferred), that unit is then green with a pointer no reader would accept, and nothing reports it. Checklist item 7: malformed input silently changes which text the check applies to.",
+            "fix": "One clause in ¶2: code-span state for the pointer is computed per line and resets at the line terminator, and a bullet with an unbalanced number of span delimiters is `unit-malformed` — reusing a code ¶7 already has; the same clause can settle whether a backticked target (`→ \\`ADR-019\\``) counts."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design ¶7 — \"`ledgerGate` denies with at most `MAX_LEDGER_FINDINGS` findings — an exported constant, the way `MAX_GATE_LEGS` bounds a gate record\"",
+            "problem": "the cap bounds the count, and this revision is where the design leans on it hardest, but each line is `file:line code detail`, so per-line size is whatever the corpus line contributes; Test strategy #9 also dropped old #10's clause \"so no reason string is unbounded\". The harness's own findings cap does both jobs — boundedFindings slices to MAX_RECORDED_FINDINGS and runs every field through boundedField/printable (runner.ts:3206–3232) — because, per gates.ts:300–307, one gate record is cloned into every later checkpoint and rendered into every later prompt. Checklist item 4's logging half.",
+            "fix": "One clause: each `file:line code detail` line passes through the existing printable/boundedField posture (which also normalizes the non-UTF-8 case), or ¶7 states that `detail` never quotes corpus text, only coordinates and code."
+          }
+        ]
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "e66564c0d7fdfd8c438ebf4e1c66d9f3ddd1644a",
+        "dissents": 0,
+        "findings": []
+      },
+      "complexity": {
+        "verdict": "approve",
+        "stamp": "e66564c0d7fdfd8c438ebf4e1c66d9f3ddd1644a",
+        "dissents": 2,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design ¶1 — \"so both readers share one regex and one CRLF posture, with a leading `\\uFEFF` dropped (A13)\"",
+            "problem": "new in this revision (the only moving part the diff adds) and it traces to no Goal — complexity checklist item 2. No Goal, risk or Deferred clause asks for BOM handling; A13's basis is CRLF only (gates.ts:54–57 matches `\\r?\\n`, and grep over `tools/orchestration/src` finds no `\\uFEFF`/BOM handling anywhere), so the citation points at a precedent that does not exist; Test strategy pins CRLF only (#3), never a BOM; the sole would-be consumer is a checkout on the platform the Compatibility matrix marks \"Not tested — expectation only\", since the corpus, the harness and CI produce BOM-free files on Linux. The clause also opens an offset the text does not resolve: `parseSource` derives its body by slicing the original content at `front[0].length` (gates.ts:57), so stripping inside the shared `frontmatterOf` puts that slice one character out unless `parseSource` is switched to the returned `body` — shared-code behavior plus a coupling, bought for input nothing in the design produces.",
+            "fix": "Delete the clause and inherit A13's CRLF-only posture: no other text changes and Test #3 is unchanged. If kept instead: state that `frontmatterOf` returns already-stripped content and that `parseSource` uses the returned `body` rather than slicing `content`, add a BOM case to Test #3, and cite a basis that shows a BOM case exists rather than A13."
+          },
+          {
+            "severity": "nit",
+            "location": "Rollout 1 — \"Only `.ts` files land here, prettier-formatted, and no markdown enters the format leg's path (Test #9)\"",
+            "problem": "false as written: the leg is `format:check` → `prettier --check .` run from `tools/orchestration` (package.json:20,23; .github/workflows/check.yml:55–56), a path that already contains committed markdown (`README.md`, `prompts/*.md`), so markdown does enter the leg's path. The narrower claim the revision established is true and is what the conclusion needs: no committed ledger markdown lands there, because Test #9's fixtures live in `tmp-dir.ts`'s scratch (`mkdtempSync(join(tmpdir(), prefix))`, tmp-dir.ts:21 — /tmp, outside the leg) and ¶8's markdown sits in `docs/**`, which no leg formats (the other format step is `cargo fmt --all`, check.yml:29; there is no root package.json).",
+            "fix": "One clause: \"and no committed markdown fixture lands in the leg's path (Test #9)\". No design change."
+          }
+        ]
+      }
+    },
+    "code": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "c8a52d4ac41d1572a9b63222a443bff0cce1fd9c",
+        "dissents": 0,
+        "findings": []
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "c8a52d4ac41d1572a9b63222a443bff0cce1fd9c",
+        "dissents": 0,
+        "findings": []
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "c8a52d4ac41d1572a9b63222a443bff0cce1fd9c",
+        "dissents": 0,
+        "findings": []
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "c8a52d4ac41d1572a9b63222a443bff0cce1fd9c",
+        "dissents": 0,
+        "findings": []
+      },
+      "testing": {
+        "verdict": "approve",
+        "stamp": "c8a52d4ac41d1572a9b63222a443bff0cce1fd9c",
+        "dissents": 0,
+        "findings": []
+      }
+    }
+  },
+  "lastReviewPass": {
+    "phase": "code",
+    "round": 3,
+    "cycle": 0,
+    "seats": [
+      "correctness",
+      "compatibility",
+      "security",
+      "performance",
+      "testing"
+    ]
+  },
+  "reviseNoChange": false,
+  "gateEvidence": {
+    "at": 1794768191968,
+    "green": true,
+    "legs": [
+      {
+        "command": "npm run check",
+        "cwd": "tools/orchestration",
+        "exit": 0,
+        "tail": "npm notice run @bindforge/orchestration@1.0.0 check npm notice run npm run lint && npm run format:check && npm run test npm notice run @bindforge/orchestration@1.0.0 lint npm notice run eslint . npm notice run @bindforge/orchestration@1.0.0 format:check npm notice run prettier --check . Checking formatting... All matched files use Prettier code style! npm notice run @bindforge/orchestration@1.0.0 test npm notice run vitest run          dmesg(1) may have more information after failed mount system call.   Test Files  58 passed (58)       Tests  641 passed | 2 skipped (643)    Start at  13:43:03    Duration  7.82s (tests 93%, import 6%)      Isolate  58 workers spawned · ~73ms startup each (spawn + environment, per file)              at least ~454ms faster with isolate: false — reuses workers across files instead of one per file [2 tail line(s) dropped by the record's citation rule]"
+      },
+      {
+        "command": "cargo fmt --all -- --check",
+        "cwd": ".",
+        "exit": 0,
+        "tail": ""
+      },
+      {
+        "command": "cargo clippy --workspace --all-targets -- -D warnings",
+        "cwd": ".",
+        "exit": 0,
+        "tail": "warning: unused workspace dependency `serde`   --> Cargo.toml:22:1    | 22 | serde = { version = \"1\", features = [\"derive\"] }    | ^^^^^    |    = note: `cargo::unused_workspace_dependencies` is set to `warn` by default help: consider removing the workspace dependency `serde` warning: workspace (manifest) generated 1 warning     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.05s"
+      },
+      {
+        "command": "cargo test --workspace --locked",
+        "cwd": ".",
+        "exit": 0,
+        "tail": "[26130 characters elided by the gate tail cap]ons_of_the_row_below_it ... ok test swap_mouse_buttons_on_a_docked_mouse_input_reports_reserved_input ... ok test applying_the_same_policy_twice_answers_serialize_identical_bytes ... ok test relocate_cluster_with_a_foreign_occupied_target_reports_it_by_name ... ok test swap_polarity_applied_twice_is_the_identity ... ok test relocate_cluster_with_a_tag_matching_no_registry_id_reports_unmatched_tags ... ok test relocate_cluster_with_disconnected_source_keys_reports_not_contiguous ... ok test swap_mouse_buttons_exchanges_the_bound_actions_and_lands_as_set_elements ... ok test swap_polarity_exchanges_a_bound_discrete_lateral_pair ... ok test swap_mouse_buttons_with_an_unbound_mouse_input_reports_it_by_name ... ok test swap_polarity_including_a_continuous_lateral_id_reports_axis_kind_naming_it ... ok test swap_polarity_with_a_match_that_is_not_two_ids_reports_match_count ... ok test the_produced_base_is_an_ordinary_profile_v2_base_document ... ok test swap_polarity_leaves_an_unbound_side_unbound ... ok test relocate_cluster_with_a_match_count_that_is_not_the_target_count_reports_match_count ... ok test relocate_cluster_touching_reserved_manifest_data_reports_reserved_input ... ok  test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s       Running tests/zz_api_probe.rs (target/debug/build/bindforge-transforms/81b8039fb1cc7adb/out/zz_api_probe-81b8039fb1cc7adb)  running 2 tests test the_not_applicable_reason_vocabulary_answers_the_contract_spellings ... ok test the_adr_015_names_resolve_at_the_crate_root ... ok  test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests bindforge_core  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests bindforge_transforms  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      }
+    ]
+  },
+  "extensionSessions": 3,
+  "extensionRounds": 0,
+  "codeCycle": 1,
+  "codeStamp": "c8a52d4ac41d1572a9b63222a443bff0cce1fd9c"
+}

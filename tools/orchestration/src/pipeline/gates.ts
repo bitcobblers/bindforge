@@ -46,16 +46,33 @@ export interface ParsedSource {
 }
 
 /**
+ * The frontmatter block and the body it does not cover — the harness's one
+ * frontmatter regex, exported so the ledger readers share it instead of
+ * growing a second one (ADR-021 ¶1): one grammar, one CRLF posture (A13). A
+ * leading byte-order mark is dropped, because it is not part of the text.
+ */
+export function frontmatterOf(content: string): { front: string; body: string } | undefined {
+  // A byte-order mark is not text, and it would otherwise hide the `---`.
+  const text = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
+  const block = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
+  if (block === null) {
+    return undefined;
+  }
+  return { front: block[1] ?? '', body: text.slice(block[0].length) };
+}
+
+/**
  * Minimal frontmatter + section parsing (no YAML dependency).
  *
  * `flow` is deliberately not normalised: the registry lookup decides, so the
  * comparison stays case-sensitive and whitespace-sensitive by construction.
  */
 export function parseSource(content: string, kind: 'adr' | 'brief'): ParsedSource {
-  const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(content);
-  const status = /status:\s*(\w+)/.exec(front?.[1] ?? '')?.[1] ?? 'none';
-  const body = front ? content.slice(front[0].length) : content;
-  const flow = /^flow:[ \t]*([^\r\n]*)/m.exec(front?.[1] ?? '')?.[1];
+  const fm = frontmatterOf(content);
+  const front = fm?.front ?? '';
+  const status = /status:\s*(\w+)/.exec(front)?.[1] ?? 'none';
+  const body = fm === undefined ? content : fm.body;
+  const flow = /^flow:[ \t]*([^\r\n]*)/m.exec(front)?.[1];
   const section = (name: string): boolean => {
     // The end anchor must be end-of-string, not multiline `$`: `$` matches
     // before every newline, so a section whose body starts with a blank line

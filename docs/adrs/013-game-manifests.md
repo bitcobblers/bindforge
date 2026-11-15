@@ -4,6 +4,7 @@ date: 2026-11-12
 supersedes: 009
 series: 011-015
 depends-on: [011]
+ledger: yes
 ---
 
 # ADR 013: Define game manifests as the game-facts contract
@@ -132,10 +133,13 @@ the shared `MAX_DOCUMENT_BYTES` / `MAX_NESTING_DEPTH` family
 run's design, never written back to the source text.* → spec: Budgets.
 
 - **013-B1** `MAX_MANIFEST_ROWS = 256` — each array-shaped entry
-  (`actions`, `dead-keys`, `docked-actions`, `presets`).
+  (`actions`, `dead-keys`, `docked-actions`, `presets`). → spec: Budgets.
 - **013-B2** `MAX_CONSTRAINT_GROUPS = 64` — the `exclusive-groups` array.
+  → spec: Budgets.
 - **013-B3** `MAX_GROUP_MEMBERS = 16` — one group's members.
+  → spec: Budgets.
 - **013-B4** `MAX_NATIVE_NAME_OCTETS = 128` — one game-native action name.
+  → spec: Budgets.
 
 The spec asserts each cap sits well above the baseline it was surveyed for;
 the baselines themselves are not recorded in the source text.
@@ -152,10 +156,11 @@ the baselines themselves are not recorded in the source text.
   registry-checked — no implementation set exists to check them against.
   Owner: ADR-017 (reserved). → spec: Load-time validation.
 - **013-R4** The seed preset set: which presets ship as seeds.
-  Owner: ADR-019 (reserved).
+  Owner: ADR-019 (reserved). → ADR-019
 - **013-R5** How a manifest is authored or reviewed by a human: deferred,
   with **no owning ADR named** — flagged; the ledger convention should
   require an owner or an explicit `unassigned` marker.
+  Owner: unassigned. → unassigned
 
 ## Alternatives considered
 
@@ -217,3 +222,9 @@ sections untouched. Findings:
    and input-id grammars and the series name-agreement rule (011, 012);
    the pin entry's grammar (014). Series-wide coverage is complete only
    once every member is backfilled.
+6. **The spec's preset-content attribution was corrected.** The shipped
+   spec attributed a preset's contents to "ADR-016, ADR-017"; the pairing
+   the ledger states (013-L2, 013-R4) is the seed set's ADR-019 and the
+   codec's ADR-017. The ledger run corrected the line in
+   `schemas/manifests/v1/spec.md` to that pairing; the correction is
+   recorded here, not silently absorbed.

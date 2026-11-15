@@ -57,6 +57,7 @@ import {
   brief,
   printable,
 } from './independence.js';
+import { ledgerGate } from './ledger.js';
 import { applyMoves, validateMoves } from './moves.js';
 import {
   type PassPlan,
@@ -2441,6 +2442,19 @@ export async function runPipeline(opts: RunOptions): Promise<PipelineRunResult> 
       await finalizeEscalate(opts.repoDir, state, `source not admissible: ${verdict.reason}`, cfg);
       return runResult(state);
     }
+    // ADR-021, 021-R2's first hook: the ledger join is deterministic, so it runs
+    // at the same source step, before any inference is spent, at the one
+    // `sourceAdmissible` call site — which is how every entry path and every
+    // source kind inherits it. The join is a property of the tree, not of the
+    // source document, so a light run's brief is checked against the same
+    // corpus as an ADR's (¶7, Compatibility matrix).
+    const ledgerCheck = ledgerGate(opts.repoDir);
+    gateLog(state, 'ledger-join', 0, ledgerCheck);
+    if (!ledgerCheck.proceed) {
+      const why = `ledger join refused: ${ledgerCheck.reason}`;
+      await finalizeEscalate(opts.repoDir, state, why, cfg);
+      return runResult(state);
+    }
     await drive(opts, state, cfg);
     return runResult(state);
   } finally {
@@ -3573,6 +3587,19 @@ async function finalizeDone(
   cfg: PipelineConfig,
 ): Promise<void> {
   const designDir = join(repoDir, designDirOf(state));
+  // ADR-021, 021-R2's second hook: the join is re-checked before the status
+  // flip, which is what makes the source ADR a work order with machine-verified
+  // acceptance — a run cannot complete while one of its own units is unhandled,
+  // the drift class the 013 backfill found (seven units made in the run and
+  // never written back). The tree it reads is the run's worktree, which at
+  // finalize is the branch the merge would take.
+  const ledgerCheck = ledgerGate(repoDir);
+  gateLog(state, 'ledger-join', 0, ledgerCheck);
+  if (!ledgerCheck.proceed) {
+    const why = `ledger join refused: ${ledgerCheck.reason}`;
+    await finalizeEscalate(repoDir, state, why, cfg);
+    return;
+  }
   if (state.source.kind === 'adr') {
     const adrPath = join(repoDir, state.source.path);
     const content = readFileSync(adrPath, 'utf8');

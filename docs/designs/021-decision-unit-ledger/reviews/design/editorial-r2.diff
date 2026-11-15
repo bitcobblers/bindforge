@@ -1,0 +1,53 @@
+diff --git a/tmp/bindforge-editorial-decision-unit-ledger-r2.md b/home/mike/.local/share/opencode/worktree/f852d4/run-021-decision-unit-ledger/docs/designs/021-decision-unit-ledger/02-proposal.md
+index e66564c..12feb6a 100644
+--- a/tmp/bindforge-editorial-decision-unit-ledger-r2.md
++++ b/home/mike/.local/share/opencode/worktree/f852d4/run-021-decision-unit-ledger/docs/designs/021-decision-unit-ledger/02-proposal.md
+@@ -18,7 +18,7 @@ the gate green the day it lands: 021's own ledger carries no pointer
+ - Goals:
+   - One deterministic parser for the ledger shape and one for handles, in the
+     TypeScript harness, with the anchored grammar 021-C1 needs (021-C1, C2).
+-  - The join, checked both directions plus the laws 021-L3 and 021-L5 make
++  - The join, checked in both directions plus the laws 021-L3 and 021-L5 make
+     decidable, at run entry and at `finalizeDone`, with this run's error
+     taxonomy — the item ADR-021 defers to "021-R2's run".
+   - `ledger: yes` as the machine-readable marker of a ledger-bearing ADR, so
+@@ -122,7 +122,7 @@ Platform notes).
+    `parseSource` calls, so both readers share one regex and one CRLF posture,
+    with a leading `\uFEFF` dropped (A13). `ledger.ts` reads with `node:fs`,
+    builds every path with `node:path` (`join` for the roots, `basename` for
+-   `NNN` and `template.md`), never writes, and parses no path it did not list.
++   `NNN` and `template.md`), never writes, and parses no path it does not list.
+    Flow: `docs/adrs/*.md` + `schemas/**/*.md` → `parseLedger`/`extractHandles`
+    → unit registry + handle set → `checkLedgers` → findings → `ledgerGate`.
+ 
+@@ -229,7 +229,7 @@ Platform notes).
+      commented-out unit skeleton each, and a `**Unit handles.**` note block
+      stating, one claim per line and each line ending with its handle, the
+      ledger preamble (021-C1), the handle rule (021-C2), the harness-ADR
+-     adoption rule (021-C3), never-re-specifies (021-L1), the total join (L2),
++     adoption rule (021-C3), the "never re-specifies" test (021-L1), the total join (L2),
+      `depends-on ⊆ smaller numbers` (L3), `amends`/`amended-by` (L4) and the
+      owner rule (L5). The template is the convention's single normative
+      statement, so these lines are where 021's C/L units get their handles.
+@@ -246,9 +246,9 @@ Platform notes).
+      (`:27`, `:168`, `:183`) move to the end of the last source line of the
+      claim they govern (A6 — this is what makes `013-C2` handled), the
+      `**Unit handles.**` note takes the template's canonical wording, and
+-     line 14's "ADR-016, ADR-017" is corrected to the pairing `013-L2`/`013-R4` state
+-     gives — the seed set's `(ADR-019)`, the codec's `(ADR-017)` (A19) — and
+-     recorded as a sixth `Backfill findings` entry in 013, per the
++     line 14's "ADR-016, ADR-017" is corrected to the pairing that `013-L2` and `013-R4` state
++     — the seed set's `(ADR-019)`, the codec's `(ADR-017)` (A19) — and
++     the correction is recorded as a sixth `Backfill findings` entry in 013, per the
+      "recorded, not silently absorbed" consequence.
+ 
+ ## Risks
+@@ -260,7 +260,7 @@ Platform notes).
+ | Bootstrapping: the corpus is red between the wiring commit and the conformance commit | High inside this run | Low | Both halves land in one branch; the entry hook cannot fire for the already-running process, and finalize escalates if the conformance half is missing |
+ | 021's `→` targets are names, not references, so a pointer to a section that never exists stays invisible | Medium | Low | Accepted and Deferred: the pointer's mechanical half (presence) is checked now; A19 shows the drift class is prose, which no handle check sees either |
+ | Landing the gate crosses the ADR-020 boundary and the run pauses mid-flow | High | Low | Expected, handled by the existing mechanism: Rollout 2 names it, and the doc/spec conformance commits are not surface (A12) |
+-| Re-marking `013-R5` and re-wrapping spec lines touches a shipped, accepted ADR and its contract | Low | Medium | Both are editorial-only — no normative sentence changes — the ADR's consequence "the backfill is a mechanical, reviewable diff" is the precedent, and A19's correction is recorded in 013's `Backfill findings` |
++| Re-marking `013-R5` and re-wrapping spec lines touches a shipped, accepted ADR and its contract | Low | Medium | Both are editorial-only (no normative sentence changes), the ADR's consequence "the backfill is a mechanical, reviewable diff" is the precedent, and A19's correction is recorded in 013's `Backfill findings` |
+ 
+ ## Compatibility matrix
+ 

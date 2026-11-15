@@ -1,6 +1,7 @@
 ---
-status: proposed
+status: accepted
 date: 2026-11-14
+ledger: yes
 ---
 
 # ADR 021: Define the decision-unit ledger as the ADR system of record
@@ -54,18 +55,18 @@ the normative text that carries it.
   own number, the kind letter, a per-ADR sequence — with the grep form
   `[0-9]{3}-[CLBRS][0-9]{1,2}`. Each unit is one bounded choice plus a
   `→` pointer to its target: a spec section, or the owning ADR number for
-  a reservation.
+  a reservation. → template: Decision kind sections.
 - **021-C2** Unit handles. A backticked unit id at the end of a spec line
   (e.g. `013-B1`) names the unit that governs that line's claim; a line
   may carry several, space-separated. A line without a handle is
   descriptive or is governed by another ADR's unit. The spec states the
-  convention in a `Unit handles` note.
+  convention in a `Unit handles` note. → template: Unit handles note.
 - **021-C3** Self-dogfooding. This ADR's own `Decision` is a ledger, and
   its units point to this ADR's sections or to the rollout artifacts.
   `docs/adrs/template.md` adopts the ledger sections when this run
   completes. This ADR's narrative sections keep the legacy form —
   harness ADRs adopt the full convention at their next amendment
-  (021-R1).
+  (021-R1). → Rollout, item 1.
 
 ### Laws
 
@@ -73,23 +74,25 @@ the normative text that carries it.
   unit records a bounded choice — a reader can know what was chosen and
   its bounds without opening the spec — and never re-specifies. The test:
   an entry is a unit only if deleting it from the spec loses no normative
-  content; otherwise it belongs in the spec.
+  content; otherwise it belongs in the spec. → template: Unit handles note.
 - **021-L2** The join is total and mechanical. Every handle in a spec
   resolves to a unit; every unit carries at least one handle, except a
   reservation marked `unassigned`. Coverage is checked by pattern, not by
-  reading.
+  reading. → Rollout, item 3.
 - **021-L3** Replay order is file-number order. Where a `depends-on` key
   is present, `depends-on ⊆ smaller numbers`; a unit may reference only
   what earlier units defined. Chronology and application order coincide by
   construction — a violation is a gate failure, not a renumbering. This
   retires the failure mode the 003/004 and 005/006 swaps paid for.
+  → template: Unit handles note.
 - **021-L4** Amendments never renumber. A later ADR adds a unit with
   `amends NNN-K<n>`; the target unit gains `amended-by`; unit ids are
   never reused. The spec always reads as current state; the ledger is the
-  per-claim sequence.
+  per-claim sequence. → template: Unit handles note.
 - **021-L5** Every reservation names an owning ANNN — an existing or
   reserved ADR number, or this ADR's own run — or carries an explicit
   `unassigned` marker. 013-R5 is the failure mode: a deferral to nobody.
+  → template: Unit handles note.
 
 ### Reservations
 
@@ -99,17 +102,26 @@ the normative text that carries it.
   reconciliation against its spec, per the 013 precedent. Harness ADRs
   (001–010, 016, 020) adopt forward-only: ledger at their next
   amendment. Owner: `unassigned` — a rollout task, not an ADR slot.
+  → Rollout, item 2.
 - **021-R2** The gate. The pipeline's deterministic source step parses
   the ledger and checks the join in both directions before any inference
   runs — dangling handles, unregistered units, a `depends-on` that
   violates 021-L3, a reservation with neither owner nor `unassigned` —
   and finalize asserts the run's own units all resolve in the merged
   tree: the ADR is a work order with machine-verified acceptance.
-  Owner: this ADR's run.
+  Owner: this ADR's run. → Rollout, item 3.
 
-Rollout: (1) the template adopts the ledger sections; (2) the product
-backfills land per 021-R1; (3) the gate lands per 021-R2; (4) 017–019
-adopt at landing.
+**Unit handles.** The handles in this ADR sit at the end of the Rollout
+list items: one trailing code span of unit ids governs the line's claim, an
+id anywhere else governs nothing — the convention the template states
+canonically (021-C2).
+
+Rollout:
+
+1. the template adopts the ledger sections. `021-C3`
+2. the product backfills land per 021-R1. `021-R1`
+3. the gate lands per 021-R2. `021-R2`
+4. 017–019 adopt at landing.
 
 ## Alternatives considered
 
