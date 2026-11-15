@@ -128,10 +128,9 @@ named `rNc0`, `rNc1`, …:
   never deadlocks the fix loop. A fix summoned this way is never handed
   review reports that do not exist yet.
 
-A pass runs up to N seats at a time (`--max-parallel`, default 1 — the
-serial lane). Launch order is fixed for reproducibility, and one commit
-lands per pass: at the default the schedule is unchanged, but the commit
-shape changed with the knob — one per pass, not one per seat. Keep N at or
+A pass runs up to N seats at a time (`--max-parallel`, default 2; N = 1 is
+the serial lane). Launch order is fixed for reproducibility, and one commit
+lands per pass whatever the width — one per pass, not one per seat. Keep N at or
 below the inference slots your server actually exposes: the runner cannot
 verify the slot count, an oversized N queues seats, and each seat's timeout
 starts at its own prompt send and counts that queue waiting. The editorial
@@ -149,7 +148,7 @@ pipeline resume <slug> --stage plan  # light flow: re-plan a run a plan stop end
 pipeline run <source> --max-parallel 3     # review-lane width ($OPENCODE_MAX_PARALLEL also works)
 ```
 
-`--max-parallel <n>` (on `run` and `resume`, default 1) is the only review
+`--max-parallel <n>` (on `run` and `resume`, default 2) is the only review
 lane knob; `$OPENCODE_MAX_PARALLEL` is its env fallback and a malformed value
 in either source fails the command before any inference is spent. The
 guidance on picking `n` is in the stages section above.
@@ -329,7 +328,7 @@ Pipeline config defaults (set in `tools/orchestration/src/pipeline/stages.ts`):
 
 - `maxReviews: { design: 40, code: 20 }` — reviewer **sessions** per phase;
   checked at every pass entry, so no pass sneaks past the cap
-- `maxParallelReviews: 1` — review-lane width per pass; the `--max-parallel`
+- `maxParallelReviews: 2` — review-lane width per pass; the `--max-parallel`
   flag and `$OPENCODE_MAX_PARALLEL` override it (see the stages section)
 - `maxPassesPerRound: 6` — dissent/ratify passes inside one round; the
   backstop against a seat that will not converge. It is the one budget

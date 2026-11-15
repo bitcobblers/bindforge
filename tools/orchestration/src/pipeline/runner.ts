@@ -137,7 +137,7 @@ import {
 // The inference lane. Mutating stages keep exactly one session at a time, each
 // a fresh top-level session bound to its stage agent. A `kind: 'review'` pass
 // fans its seats out through a semaphore of `cfg.maxParallelReviews` (default
-// 1 — the same seats, strictly one at a time) and finalizes once per pass.
+// 2 — the same seats, one at a time at N = 1) and finalizes once per pass.
 // ---------------------------------------------------------------------------
 
 /**

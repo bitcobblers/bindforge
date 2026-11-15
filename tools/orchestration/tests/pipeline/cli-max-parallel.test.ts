@@ -34,11 +34,11 @@ describe('resolveMaxParallel', () => {
     expect(resolveMaxParallel(1, undefined)).toBe(1);
   });
 
-  // proves: Test strategy #8 — the documented default is 1 (opt-in fan-out;
-  // DEFAULT_CONFIG is the sole default authority)
-  it('defaults to 1 when neither flag nor environment is set', () => {
-    expect(resolveMaxParallel(undefined, undefined)).toBe(1);
-    expect(DEFAULT_CONFIG.maxParallelReviews).toBe(1);
+  // proves: Test strategy #8 — the documented default is 2 (operator decision
+  // 2026-11-15; DEFAULT_CONFIG is the sole default authority)
+  it('defaults to 2 when neither flag nor environment is set', () => {
+    expect(resolveMaxParallel(undefined, undefined)).toBe(2);
+    expect(DEFAULT_CONFIG.maxParallelReviews).toBe(2);
   });
 
   // proves: Test strategy #8 — flag values < 1 are rejected by a range check

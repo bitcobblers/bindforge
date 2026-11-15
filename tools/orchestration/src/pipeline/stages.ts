@@ -124,8 +124,10 @@ export const DEFAULT_CONFIG: PipelineConfig = {
    * `FLOWS.light.config`, never by moving this default.
    */
   stageTimeoutMs: 30 * 60_000,
-  // ADR-003: opt-in fan-out; 1 keeps today's serial lane on the same code path.
-  maxParallelReviews: 1,
+  // ADR-003: opt-in fan-out; 1 keeps the serial lane on the same code path.
+  // Operator decision 2026-11-15 raises the shipped default to 2; ADR-003's
+  // "default N = 1" clause is superseded, the flag/env stay the knob.
+  maxParallelReviews: 2,
 };
 
 export interface StageDef {
