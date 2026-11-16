@@ -97,6 +97,9 @@ permissions:
   - action: glob
     resource: "docs/designs/**/.pipeline.json"
     effect: deny
+  - action: read
+    resource: ".opencode/skills/**"
+    effect: allow
 ---
 
 Load the `proposal-editing` skill and apply it to the proposal path given by

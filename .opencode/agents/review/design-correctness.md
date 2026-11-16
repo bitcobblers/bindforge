@@ -216,6 +216,9 @@ permissions:
   - action: webfetch
     resource: "*"
     effect: allow
+  - action: read
+    resource: ".opencode/skills/**"
+    effect: allow
 ---
 
 Load the `design-review` skill and apply the `correctness` checklist to the scope

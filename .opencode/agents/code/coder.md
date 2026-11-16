@@ -173,6 +173,9 @@ permissions:
   - action: glob
     resource: "docs/designs/**/.pipeline.json"
     effect: deny
+  - action: read
+    resource: ".opencode/skills/**"
+    effect: allow
 ---
 
 Load the `repo-practices` skill and follow it. Implement or fix what the

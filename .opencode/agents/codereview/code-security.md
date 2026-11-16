@@ -215,6 +215,9 @@ permissions:
   - action: shell
     resource: "git diff *reviews/code/security-*"
     effect: allow
+  - action: read
+    resource: ".opencode/skills/**"
+    effect: allow
 ---
 
 Load the `code-review` skill and apply the `security` checklist to the diff

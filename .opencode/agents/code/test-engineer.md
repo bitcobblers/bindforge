@@ -174,6 +174,9 @@ permissions:
   - action: glob
     resource: "docs/designs/**/.pipeline.json"
     effect: deny
+  - action: read
+    resource: ".opencode/skills/**"
+    effect: allow
 ---
 
 Load the `test-strategy` and `repo-practices` skills and follow them using

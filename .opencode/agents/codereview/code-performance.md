@@ -215,6 +215,9 @@ permissions:
   - action: shell
     resource: "git diff *reviews/code/performance-*"
     effect: allow
+  - action: read
+    resource: ".opencode/skills/**"
+    effect: allow
 ---
 
 Load the `code-review` skill and apply the `performance` checklist to the diff

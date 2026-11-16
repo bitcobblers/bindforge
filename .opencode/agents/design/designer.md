@@ -97,6 +97,9 @@ permissions:
   - action: glob
     resource: "docs/designs/**/.pipeline.json"
     effect: deny
+  - action: read
+    resource: ".opencode/skills/**"
+    effect: allow
 ---
 
 Load the `design-proposal` skill and follow it using the paths given by the

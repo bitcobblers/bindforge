@@ -103,6 +103,9 @@ permissions:
   - action: glob
     resource: "docs/designs/**/.pipeline.json"
     effect: deny
+  - action: read
+    resource: ".opencode/skills/**"
+    effect: allow
 ---
 
 Load the `research` skill and follow it against the source and output paths
