@@ -8,8 +8,8 @@
     "path": "docs/adrs/022-game-discovery.md"
   },
   "status": "running",
-  "lastStage": "design-review",
-  "designRound": 1,
+  "lastStage": "proposal-final",
+  "designRound": 2,
   "codeRound": 0,
   "designBudgetUsed": 1,
   "codeBudgetUsed": 0,
@@ -23,7 +23,8 @@
     "49eb87804337cdf1988fe9c7788878e395cb7469",
     "fdf1271e979e4f328de81b3591d4c6616e13d22d",
     "7029c0d01dc8e759d00880c1250a203b2fb06018",
-    "8819006b70ff8dc0a8cc6315a26c652801d66b9a"
+    "8819006b70ff8dc0a8cc6315a26c652801d66b9a",
+    "2286b450bb16bb1a06287fc7f2711bb4e2891836"
   ],
   "forceNext": null,
   "results": [
@@ -247,6 +248,94 @@
       "transcript": "docs/designs/022-game-discovery/transcripts/design-review-complexity-r1c2.md",
       "durationMs": 12048,
       "nudges": 0
+    },
+    {
+      "stage": "proposal-final",
+      "round": 0,
+      "sessionID": "ses_e1955a524ffeJrIpTYS35eyyoH",
+      "agent": "design/editor",
+      "at": 1794871330752,
+      "reply": {
+        "ambiguities": [],
+        "commitMessage": "docs: final language pass for 02-proposal.md"
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/proposal-final-r0.md",
+      "durationMs": 44235,
+      "nudges": 0,
+      "docName": "02-proposal.md",
+      "docLines": 163,
+      "docLinesAdded": 17,
+      "docLinesRemoved": 17
+    },
+    {
+      "stage": "editorial-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e1954f807ffe6iQGY43GzXvx73",
+      "agent": "review/design-correctness",
+      "at": 1794871354967,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/editorial-review-correctness-r2.md",
+      "durationMs": 24115,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e1954f806ffeYvB1DKyCF8nv5W",
+      "agent": "review/design-compatibility",
+      "at": 1794871373043,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/editorial-review-compatibility-r2.md",
+      "durationMs": 42191,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:security",
+      "round": 2,
+      "sessionID": "ses_e195499a6ffecRmXbtZhc6woPg",
+      "agent": "review/design-security",
+      "at": 1794871381085,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/editorial-review-security-r2.md",
+      "durationMs": 26095,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:performance",
+      "round": 2,
+      "sessionID": "ses_e1954530affej2I54szlt1Ogz8",
+      "agent": "review/design-performance",
+      "at": 1794871399159,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/editorial-review-performance-r2.md",
+      "durationMs": 26090,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:complexity",
+      "round": 2,
+      "sessionID": "ses_e195433a0ffeoAvYtQM2HcZfwM",
+      "agent": "review/design-complexity",
+      "at": 1794871409202,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/editorial-review-complexity-r2.md",
+      "durationMs": 28094,
+      "nudges": 0
     }
   ],
   "gateLog": [
@@ -287,7 +376,7 @@
     }
   ],
   "startedAt": 1794871024480,
-  "updatedAt": 1794871286486,
+  "updatedAt": 1794871409203,
   "flow": "full",
   "baseRef": "39dad280017bbf1473f3dc10841ad17b68fdf1e8",
   "designCycle": 3,

@@ -1,0 +1,111 @@
+diff --git a/tmp/bindforge-editorial-game-discovery-r2.md b/home/mike/.local/share/opencode/worktree/f852d4/adr-022-discovery-2/docs/designs/022-game-discovery/02-proposal.md
+index c7833529..382c731d 100644
+--- a/tmp/bindforge-editorial-game-discovery-r2.md
++++ b/home/mike/.local/share/opencode/worktree/f852d4/adr-022-discovery-2/docs/designs/022-game-discovery/02-proposal.md
+@@ -1,7 +1,7 @@
+ # Design: Game discovery via pluggable probes
+ 
+ ## Context
+-ADR-022 (docs/adrs/022-game-discovery.md) identifies the need for a reliable way to enumerate installed games and expose a stable BindForge identifier for each. Discovery must be platform-aware and extensible to support different stores (Steam, Epic) and manual installs. The first consumer is a bootstrap CLI that probes the system before the Tauri UI is available.
++ADR-022 (docs/adrs/022-game-discovery.md) identifies the need for a reliable way to enumerate installed games and expose a stable BindForge identifier for each. Discovery must be platform-aware and extensible to support various stores (e.g., Steam, Epic) and manual installations. The first consumer is a bootstrap CLI that probes the system before the Tauri UI is available.
+ 
+ ## Goals / Non-goals
+ 
+@@ -29,17 +29,17 @@ ADR-022 (docs/adrs/022-game-discovery.md) identifies the need for a reliable way
+ 
+ ## Options considered
+ 
+-**Use Steam AppID as the game id.** Rejected: BindForge IDs should be stable and under our control. Syncing with third-party library IDs introduces unnecessary coupling and dependency on their ID stability.
++**Use Steam AppID as the game ID. Rejected: BindForge IDs must be stable and under our control. Syncing with third-party library IDs introduces unnecessary coupling and dependency on their ID stability.
+ 
+-**Discover via a central database / remote service.** Rejected for v1: adds network dependency and complexity. Local probing is sufficient for the bootstrap requirement.
++**Discover via a central database or remote service. Rejected for v1: adds network dependencies and complexity. Local probing is sufficient for the bootstrap requirement.
+ 
+-**Hard-code a single Steam implementation without a plugin trait.** Rejected: The plugin model is essential for supporting Epic, manual installs, and platform differences in a clean, extensible way.
++**Hard-code a single Steam implementation without a plugin trait. Rejected: The plugin model is essential for supporting Epic, manual installations, and platform differences in a clean, extensible way.**
+ 
+-**Derive slug from install path.** Rejected: Paths are unstable, vary by user/OS, and are not human-readable.
++**Derive slug from the installation path.** Rejected: Paths are unstable, vary by user/OS, and are not human-readable.
+ 
+ ## Chosen design
+ 
+-The design implements a pluggable discovery system in Rust, providing a library for core logic and a CLI for bootstrapping.
++This design implements a pluggable discovery system in Rust, providing a core logic library and a bootstrap CLI.
+ 
+ ### 1. Components
+ 
+@@ -51,7 +51,7 @@ The design implements a pluggable discovery system in Rust, providing a library
+   - Provides a `discovery list` command.
+   - Outputs a human-readable table or JSON for programmatic use.
+ - **Steam Discovery Plugins**:
+-  - **Linux/Windows implementation**: Parses Steam metadata via `.vdf`/Registry and `.acf` files, with path canonicalization and resource limits.
++  - **Linux/Windows implementation**: Parses Steam metadata via `.vdf`/Registry and `.acf` files, including path canonicalization and resource limits.
+ 
+ ### 2. Data Model
+ 
+@@ -59,7 +59,7 @@ The primary unit of discovery is the `DiscoveredGame` struct:
+ 
+ ```rust
+ pub struct DiscoveredGame {
+-    /// Provisional identifier: `unknown/<kebab(display_name)>` for v1.
++    /// Provisional identifier: `unknown/<kebab(display_name)>` (for v1).
+     pub slug: String,
+     /// Human-readable name of the game.
+     pub display_name: String,
+@@ -74,7 +74,7 @@ pub struct DiscoveredGame {
+ 
+ ### 3. Plugin Contract
+ 
+-Plugins are decoupled from the core engine via the `DiscoveryPlugin` trait:
++Plugins are decoupled from the core engine through the `DiscoveryPlugin` trait:
+ 
+ ```rust
+ pub trait DiscoveryPlugin {
+@@ -121,8 +121,8 @@ The CLI will support the following command structure:
+ 
+ | Platform / Environment | Supported? | Notes |
+ |---|---|---|
+-| Linux | Yes | Supported via Steam/Linux plugin. |
+-| Windows | Yes | Supported via Steam/Windows plugin. |
++| Linux | Yes | Supported via the Steam/Linux plugin. |
++| Windows | Yes | Supported via the Steam/Windows plugin. |
+ | macOS | No | No plugin implemented for macOS. |
+ | Steam Deck | No | Out of scope for v1. |
+ | Epic Games Store | No | Deferred to future plugins. |
+@@ -130,14 +130,14 @@ The CLI will support the following command structure:
+ ## Test strategy
+ 
+ 1. **Unit Tests (`crates/discovery`)**:
+-   - Test slug normalization with various edge cases (special chars, casing, repeats).
++   - Test slug normalization with various edge cases (e.g., special characters, casing, and repeats).
+    - Test `DiscoveredGame` construction.
+    - Test error handling in the plugin registry.
+ 2. **Plugin Integration Tests**:
+-   - Mock filesystem/registry tests and platform-specific CI integration tests (Linux/Windows).
++   - Perform mock filesystem/registry tests and platform-specific CI integration tests (Linux/Windows).
+    - Verify that `.acf` parsing correctly extracts `name` and `installdir`.
+ 3. **CLI Tests**:
+-   - Verify `discovery list` output format (table and JSON).
++   - Verify the `discovery list` output format (table and JSON).
+    - Ensure the CLI correctly aggregates results from multiple mock plugins.
+ 
+ ## Rollout
+@@ -145,15 +145,15 @@ The CLI will support the following command structure:
+ 1. **Phase 1: Core Library**: Implement `crates/discovery` with the trait, slugging logic, and the base `DiscoveredGame` model.
+ 2. **Phase 2: Steam Linux Plugin**: Implement the Linux-specific backend using `libraryfolders.vdf` and `.acf` parsing.
+ 3. **Phase 3: Bootstrap CLI**: Implement `apps/discovery-cli` to provide immediate visibility.
+-4. **Phase 4: Steam Windows Plugin**: Implement the Windows-specific backend using registry and `.acf` parsing.
++4. **Phase 4: Steam Windows Plugin**: Implement the Windows-specific backend using the registry and `.acf` parsing.
+ 5. **Phase 5: Verification**: Run the full suite of integration and CLI tests.
+ 
+ ## Deferred / out of scope
+ 
+ - Epic Games Store discovery.
+-- Manual/custom directory discovery.
++- Manual or custom directory discovery.
+ - Steam Deck (SteamOS) specifics.
+-- Persistence/caching of discovered games.
++- Persistence and caching of discovered games.
+ - Mapping `unknown/` slugs to real `publisher/name` slugs.
+ - Codec taxonomy and per-game codec selection.
+ 
