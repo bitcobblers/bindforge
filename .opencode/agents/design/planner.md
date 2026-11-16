@@ -1,4 +1,5 @@
 ---
+role: planner
 description: Writes the light flow's 02-proposal.md plan from the source document
 mode: primary
 permissions:

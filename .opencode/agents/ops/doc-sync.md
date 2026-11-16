@@ -1,4 +1,5 @@
 ---
+role: doc-sync
 description: After a completed implementation, records as-built drift in the design artifacts so docs/designs stays the system record
 mode: primary
 permissions:

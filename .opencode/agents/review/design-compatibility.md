@@ -1,4 +1,5 @@
 ---
+role: design-compatibility
 description: Reviews a design proposal for compatibility; produces a report and a JSON verdict
 mode: primary
 permissions:

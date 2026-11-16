@@ -1,4 +1,5 @@
 ---
+role: code-performance
 description: Reviews the pipeline branch diff for performance against the proposal; produces a report and a JSON verdict
 mode: primary
 permissions:

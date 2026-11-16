@@ -1,4 +1,5 @@
 ---
+role: researcher
 description: Researches the run's source document and writes the cited 01-research.md artifact
 mode: primary
 permissions:

@@ -1,4 +1,5 @@
 ---
+role: designer
 description: Writes or revises the run's 02-proposal.md from the research and prior review findings
 mode: primary
 permissions:

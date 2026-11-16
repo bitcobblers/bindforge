@@ -10,6 +10,8 @@ import type {
 } from '@opencode/client';
 import { z } from 'zod';
 
+import { roleResolver } from './role-resolver.js';
+
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
@@ -126,9 +128,20 @@ export interface PromptOptions {
   agent?: string;
 
   /**
+   * The model that should process the prompt. If omitted, the server uses its
+   * default model for the agent.
+   */
+  model?: ModelRef;
+
+  /**
    * The title of the created session. Defaults to `Untitled Session`.
    */
   title?: string;
+
+  /**
+   * The directory to use for the session.
+   */
+  location?: { directory: string };
 
   /**
    * Wall-clock cap, in milliseconds, on waiting for the completed assistant
@@ -186,20 +199,32 @@ export function extractReply<T>(result: PromptResult<T>): T {
 }
 
 /**
- * Create a session, optionally with a specific agent and title (defaulting to
- * {@link SESSION_TITLE}), wrapping any failure (including a missing session
+ * Create a session, optionally with a specific agent, title, model, and location.
+ * Wrapping any failure (including a missing session
  * id) in a descriptive error.
  */
 async function createSession(
   client: OpenCodeClient,
-  agent?: string,
-  title?: string,
+  options: {
+    agent?: string;
+    title?: string;
+    model?: ModelRef;
+    location?: { directory: string };
+    timeoutMs?: number;
+  },
 ): Promise<SessionInfo> {
   try {
-    const session = await client.session.create({
-      title: title ?? SESSION_TITLE,
-      ...(agent ? { agent } : {}),
-    });
+    const session = await client.session.create(
+      {
+        title: options.title ?? SESSION_TITLE,
+        ...(options.agent ? { agent: options.agent } : {}),
+        ...(options.model ? { model: options.model } : {}),
+        ...(options.location ? { location: options.location } : {}),
+      },
+      {
+        signal: options.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
+      },
+    );
     if (!session.id) {
       throw new Error('the server did not return a session id');
     }
@@ -255,7 +280,18 @@ export async function runPrompt<T extends z.ZodType>(
     );
   }
 
-  const session = await createSession(client, options.agent, options.title);
+  let model = options.model;
+  if (!model && options.agent) {
+    model = await roleResolver.resolveModel(options.agent);
+  }
+
+  const session = await createSession(client, {
+    agent: options.agent,
+    title: options.title,
+    model,
+    location: options.location,
+    timeoutMs,
+  });
   const text = `${prompt}\n\n${replyFormat(schema)}`;
   await client.session.prompt({ sessionID: session.id, text });
 

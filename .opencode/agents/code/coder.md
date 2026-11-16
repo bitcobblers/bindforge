@@ -1,4 +1,5 @@
 ---
+role: coder
 description: Implements the proposal's design in source; owns tests only in the light flow; never touches ADRs
 mode: primary
 permissions:

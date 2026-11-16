@@ -1,4 +1,5 @@
 ---
+role: test-engineer
 description: Authors or updates tests from the proposal; never reads implementation source
 mode: primary
 permissions:

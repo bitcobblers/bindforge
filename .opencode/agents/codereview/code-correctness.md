@@ -1,4 +1,5 @@
 ---
+role: code-correctness
 description: Reviews the pipeline branch diff for correctness against the proposal; produces a report and a JSON verdict
 mode: primary
 permissions:

@@ -137,7 +137,10 @@ describe('runPrompt', () => {
 
     const result = await runPrompt(client, { agent: 'explore' }, FactSchema, 'say hi');
 
-    expect(create).toHaveBeenCalledWith({ title: 'Untitled Session', agent: 'explore' });
+    expect(create).toHaveBeenCalledWith(
+      { title: 'Untitled Session', agent: 'explore' },
+      expect.anything(),
+    );
     expect(result.session.agent).toBe('explore');
   });
 
@@ -146,7 +149,7 @@ describe('runPrompt', () => {
 
     const result = await runPrompt(stubClient({ create }), {}, FactSchema, 'say hi');
 
-    expect(create).toHaveBeenCalledWith({ title: 'Untitled Session' });
+    expect(create).toHaveBeenCalledWith({ title: 'Untitled Session' }, expect.anything());
     expect(result.session.agent).toBeUndefined();
   });
 
@@ -155,7 +158,7 @@ describe('runPrompt', () => {
 
     await runPrompt(stubClient({ create }), { title: 'my session' }, FactSchema, 'say hi');
 
-    expect(create).toHaveBeenCalledWith({ title: 'my session' });
+    expect(create).toHaveBeenCalledWith({ title: 'my session' }, expect.anything());
   });
 
   it('polls message.list until a completed assistant reply appears', async () => {

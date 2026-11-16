@@ -1,4 +1,5 @@
 ---
+role: editor
 description: Final language-only pass over 02-proposal.md; never changes technical meaning
 mode: primary
 permissions:
