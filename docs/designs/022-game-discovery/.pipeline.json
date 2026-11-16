@@ -8,7 +8,7 @@
     "path": "docs/adrs/022-game-discovery.md"
   },
   "status": "running",
-  "lastStage": "proposal-revise",
+  "lastStage": "design-review",
   "designRound": 1,
   "codeRound": 0,
   "designBudgetUsed": 1,
@@ -21,7 +21,8 @@
     "9161561de1516b14b2c0e3e1dda7744d4b3614b1",
     "0ae366626b3dbf1c0a81a44e7bd1c0e639069ba1",
     "49eb87804337cdf1988fe9c7788878e395cb7469",
-    "fdf1271e979e4f328de81b3591d4c6616e13d22d"
+    "fdf1271e979e4f328de81b3591d4c6616e13d22d",
+    "7029c0d01dc8e759d00880c1250a203b2fb06018"
   ],
   "forceNext": null,
   "results": [
@@ -203,6 +204,48 @@
       "transcript": "docs/designs/022-game-discovery/transcripts/design-review-security-r1c1.md",
       "durationMs": 38182,
       "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e19564a78ffe6Rlicdq20yVuN8",
+      "agent": "review/design-performance",
+      "at": 1794871274368,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/design-review-performance-r1c2.md",
+      "durationMs": 30155,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e19564a79ffeoHmhJ6f5WDxvWF",
+      "agent": "review/design-correctness",
+      "at": 1794871274368,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/design-review-correctness-r1c2.md",
+      "durationMs": 30156,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e1955d47dffeMxpnhLsTBZPPLt",
+      "agent": "review/design-complexity",
+      "at": 1794871286441,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/design-review-complexity-r1c2.md",
+      "durationMs": 12048,
+      "nudges": 0
     }
   ],
   "gateLog": [
@@ -226,13 +269,20 @@
       "proceed": false,
       "reason": "dissent pass c1 pending: compatibility, security",
       "at": 1794871175653
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c2 pending: correctness, performance, complexity",
+      "at": 1794871244158
     }
   ],
   "startedAt": 1794871024480,
-  "updatedAt": 1794871244112,
+  "updatedAt": 1794871286442,
   "flow": "full",
   "baseRef": "39dad280017bbf1473f3dc10841ad17b68fdf1e8",
-  "designCycle": 1,
+  "designCycle": 2,
   "designStamp": "c7833529238cdd03cd14ca2540e6a054091887c8",
   "seats": {
     "design": {
@@ -250,36 +300,16 @@
         ]
       },
       "compatibility": {
-        "verdict": "request-changes",
-        "stamp": "4bd657deda3e0ffd7afe52ed9a17370b5f06c788",
+        "verdict": "approve",
+        "stamp": "c7833529238cdd03cd14ca2540e6a054091887c8",
         "dissents": 1,
-        "findings": [
-          {
-            "severity": "major",
-            "location": "Test strategy — \"2. Plugin Integration Tests\"",
-            "problem": "The test strategy relies on mocks for Steam Linux/Windows parsing and does not specify any platform-specific tests (running on actual Linux/Windows environments) for the platforms claimed as supported in the compatibility matrix.",
-            "fix": "Add platform-specific integration tests that run on actual Linux and Windows environments (e.g., in CI) to verify the Steam parsing logic against real filesystem structures and the Windows Registry."
-          }
-        ]
+        "findings": []
       },
       "security": {
-        "verdict": "request-changes",
-        "stamp": "4bd657deda3e0ffd7afe52ed9a17370b5f06c788",
+        "verdict": "approve",
+        "stamp": "c7833529238cdd03cd14ca2540e6a054091887c8",
         "dissents": 1,
-        "findings": [
-          {
-            "severity": "major",
-            "location": "### 1. Components — \"Parses libraryfolders.vdf to find library paths, then scans steamapps/appmanifest_*.acf for game metadata.\"",
-            "problem": "The design relies on values from local files (.vdf, .acf) and the Windows Registry to construct the `install_path`. Since these sources are untrusted, a malicious actor could use `..` or absolute paths to cause path traversal.",
-            "fix": "Implement path canonicalization and validate that the resulting `install_path` is a child of a verified library directory."
-          },
-          {
-            "severity": "major",
-            "location": "### 1. Components — \"Parses libraryfolders.vdf to find library paths, then scans steamapps/appmanifest_*.acf for game metadata.\"",
-            "problem": "The parsing of .vdf and .acf files does not specify resource limits. Maliciously large or complex files could cause a Denial of Service (DoS) via memory exhaustion.",
-            "fix": "Enforce strict maximum file size limits and use a parser that handles malformed/deeply nested structures with bounded resource usage."
-          }
-        ]
+        "findings": []
       },
       "performance": {
         "verdict": "approve",
@@ -298,7 +328,7 @@
   "lastReviewPass": {
     "phase": "design",
     "round": 1,
-    "cycle": 0,
+    "cycle": 1,
     "seats": [
       "compatibility",
       "security"
