@@ -9,7 +9,7 @@ resolver = "3"                    # a virtual workspace has no edition to infer 
 # directory. `apps/*` joins with the first app crate — `apps/cli` arrives with
 # ADR-017 — and the desktop era adds the explicit member path
 # `apps/desktop/src-tauri` (the globs match one path segment).
-members = ["crates/*"]
+members = ["crates/*", "apps/*"]
 
 [workspace.package]
 version = "0.1.0"
