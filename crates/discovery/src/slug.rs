@@ -1,6 +1,6 @@
 pub fn normalize_slug(display_name: &str) -> String {
     let mut slug = display_name.to_lowercase();
-    
+
     // Replace all non-alphanumeric characters with '-'
     let mut result = String::new();
     for c in slug.chars() {

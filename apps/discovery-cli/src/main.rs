@@ -39,7 +39,7 @@ fn main() {
         Commands::List { json } => {
             let mut engine = DiscoveryEngine::new();
             engine.register_plugin(Box::new(DummyPlugin));
-            
+
             let all_games = engine.discover_all().unwrap();
 
             if *json {

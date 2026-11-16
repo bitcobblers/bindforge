@@ -32,3 +32,9 @@ impl DiscoveryEngine {
         Ok(all_games)
     }
 }
+
+impl Default for DiscoveryEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
