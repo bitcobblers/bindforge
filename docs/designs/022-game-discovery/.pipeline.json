@@ -8,7 +8,7 @@
     "path": "docs/adrs/022-game-discovery.md"
   },
   "status": "running",
-  "lastStage": "design-review",
+  "lastStage": "proposal-revise",
   "designRound": 1,
   "codeRound": 0,
   "designBudgetUsed": 1,
@@ -20,7 +20,8 @@
   "stageCommits": [
     "9161561de1516b14b2c0e3e1dda7744d4b3614b1",
     "0ae366626b3dbf1c0a81a44e7bd1c0e639069ba1",
-    "49eb87804337cdf1988fe9c7788878e395cb7469"
+    "49eb87804337cdf1988fe9c7788878e395cb7469",
+    "fdf1271e979e4f328de81b3591d4c6616e13d22d"
   ],
   "forceNext": null,
   "results": [
@@ -155,6 +156,53 @@
       "transcript": "docs/designs/022-game-discovery/transcripts/design-review-complexity-r1c0.md",
       "durationMs": 24085,
       "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e19575613ffeN2ju3aDu0qBXVP",
+      "agent": "design/designer",
+      "at": 1794871205828,
+      "reply": {
+        "changed": true,
+        "summary": "Added a Revision log section and expanded descriptions in Components and Test strategy to incorporate security and compatibility mitigations.",
+        "commitMessage": "docs: address security and compatibility findings in 022 proposal"
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/proposal-revise-r1.md",
+      "durationMs": 30140,
+      "nudges": 0,
+      "docName": "02-proposal.md",
+      "docLines": 163,
+      "docLinesAdded": 7,
+      "docLinesRemoved": 3
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e1956e002ffewpseL90617I0Zl",
+      "agent": "review/design-compatibility",
+      "at": 1794871222011,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/design-review-compatibility-r1c1.md",
+      "durationMs": 16082,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e1956e002ffdJEOddmPB3ZQe8i",
+      "agent": "review/design-security",
+      "at": 1794871244111,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/design-review-security-r1c1.md",
+      "durationMs": 38182,
+      "nudges": 0
     }
   ],
   "gateLog": [
@@ -181,11 +229,11 @@
     }
   ],
   "startedAt": 1794871024480,
-  "updatedAt": 1794871175653,
+  "updatedAt": 1794871244112,
   "flow": "full",
   "baseRef": "39dad280017bbf1473f3dc10841ad17b68fdf1e8",
   "designCycle": 1,
-  "designStamp": "4bd657deda3e0ffd7afe52ed9a17370b5f06c788",
+  "designStamp": "c7833529238cdd03cd14ca2540e6a054091887c8",
   "seats": {
     "design": {
       "correctness": {
@@ -255,5 +303,6 @@
       "compatibility",
       "security"
     ]
-  }
+  },
+  "reviseNoChange": false
 }
