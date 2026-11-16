@@ -1,5 +1,5 @@
 ---
-role: code-security
+role: code-review
 description: Reviews the pipeline branch diff for security against the proposal; produces a report and a JSON verdict
 mode: primary
 permissions:

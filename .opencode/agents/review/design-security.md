@@ -1,5 +1,5 @@
 ---
-role: design-security
+role: design-review
 description: Reviews a design proposal for security; produces a report and a JSON verdict
 mode: primary
 permissions:

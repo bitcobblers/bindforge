@@ -1,5 +1,5 @@
 ---
-role: test-engineer
+role: coder
 description: Authors or updates tests from the proposal; never reads implementation source
 mode: primary
 permissions:

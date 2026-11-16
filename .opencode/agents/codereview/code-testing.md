@@ -1,5 +1,5 @@
 ---
-role: code-testing
+role: code-review
 description: Reviews the pipeline branch diff for testing against the proposal; produces a report and a JSON verdict
 mode: primary
 permissions:

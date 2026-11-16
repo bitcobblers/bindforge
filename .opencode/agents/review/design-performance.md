@@ -1,5 +1,5 @@
 ---
-role: design-performance
+role: design-review
 description: Reviews a design proposal for performance; produces a report and a JSON verdict
 mode: primary
 permissions:

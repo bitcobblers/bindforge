@@ -1,5 +1,5 @@
 ---
-role: design-complexity
+role: design-review
 description: Reviews a design proposal for complexity; produces a report and a JSON verdict
 mode: primary
 permissions:
