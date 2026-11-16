@@ -8,7 +8,7 @@
     "path": "docs/adrs/022-game-discovery.md"
   },
   "status": "running",
-  "lastStage": "fix",
+  "lastStage": "code-review",
   "designRound": 2,
   "codeRound": 1,
   "designBudgetUsed": 1,
@@ -32,7 +32,8 @@
     "ffdcea83f31a6cbe258710df9b9e6be238bb596b",
     "a9dd828893f8ac2ddbecd597ff82896938db1f25",
     "5aaefc2095a1544b4f9a450913e3b578e404ef7b",
-    "596a09c3106cdf982c8555f6c4e1a0bdf4d3233c"
+    "596a09c3106cdf982c8555f6c4e1a0bdf4d3233c",
+    "ec5d74565bc4f21ff74f1b3a8d5ede6765b2600c"
   ],
   "forceNext": null,
   "results": [
@@ -551,6 +552,62 @@
       "transcript": "docs/designs/022-game-discovery/transcripts/code-review-correctness-r1c1.md",
       "durationMs": 34156,
       "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e19475ae7ffe1Rdf2y7sweVETK",
+      "agent": "codereview/code-compatibility",
+      "at": 1794872251188,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/code-review-compatibility-r1c2.md",
+      "durationMs": 28135,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e19475ae7ffdK4vJoSSne28xJ3",
+      "agent": "codereview/code-security",
+      "at": 1794872261231,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/code-review-security-r1c2.md",
+      "durationMs": 38178,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e1946ecc9ffeFJDmEDJ1XlbG7X",
+      "agent": "codereview/code-performance",
+      "at": 1794872271278,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/code-review-performance-r1c2.md",
+      "durationMs": 20066,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e1946c58dffeCgHByH66xmNxiK",
+      "agent": "codereview/code-testing",
+      "at": 1794872293375,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/code-review-testing-r1c2.md",
+      "durationMs": 32119,
+      "nudges": 0
     }
   ],
   "gateLog": [
@@ -637,10 +694,17 @@
       "proceed": true,
       "reason": "npm run check + cargo gate green",
       "at": 1794872188747
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c2 pending: compatibility, security, performance, testing",
+      "at": 1794872222994
     }
   ],
   "startedAt": 1794871024480,
-  "updatedAt": 1794872222947,
+  "updatedAt": 1794872293375,
   "flow": "full",
   "baseRef": "39dad280017bbf1473f3dc10841ad17b68fdf1e8",
   "designCycle": 3,
@@ -680,22 +744,10 @@
     },
     "code": {
       "correctness": {
-        "verdict": "request-changes",
-        "stamp": "ffdcea83f31a6cbe258710df9b9e6be238bb596b",
+        "verdict": "approve",
+        "stamp": "596a09c3106cdf982c8555f6c4e1a0bdf4d3233c",
         "dissents": 1,
-        "findings": [
-          {
-            "severity": "major",
-            "location": "gate record",
-            "problem": "The gate record shows that `cargo test --workspace --locked` resulted in `0 passed` tests, despite the introduction of new test files in the diff. This indicates the tests are not being executed, leaving the code unverified."
-          },
-          {
-            "severity": "minor",
-            "location": "apps/discovery-cli/src/main.rs",
-            "problem": "The CLI output for the 'Platform' column uses the `Debug` representation of the `Platform` enum (e.g., `SteamLinux`), whereas the design specification's example output and documentation specify kebab-case tags (e.g., `steam-linux`).",
-            "fix": "Implement `std::fmt::Display` for the `Platform` enum to return the kebab-case string, or format the string in the CLI output."
-          }
-        ]
+        "findings": []
       },
       "compatibility": {
         "verdict": "approve",
@@ -752,7 +804,7 @@
   "lastReviewPass": {
     "phase": "code",
     "round": 1,
-    "cycle": 0,
+    "cycle": 1,
     "seats": [
       "correctness"
     ]
@@ -788,6 +840,6 @@
       }
     ]
   },
-  "codeCycle": 1,
+  "codeCycle": 2,
   "codeStamp": "596a09c3106cdf982c8555f6c4e1a0bdf4d3233c"
 }
