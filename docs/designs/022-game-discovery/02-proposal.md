@@ -51,8 +51,7 @@ The design implements a pluggable discovery system in Rust, providing a library 
   - Provides a `discovery list` command.
   - Outputs a human-readable table or JSON for programmatic use.
 - **Steam Discovery Plugins**:
-  - **Linux implementation**: Parses `libraryfolders.vdf` to find library paths, then scans `steamapps/appmanifest_*.acf` for game metadata.
-  - **Windows implementation**: Uses the Windows Registry to find the Steam installation, enumerates library folders, and parses `appmanifest_*.acf`.
+  - **Linux/Windows implementation**: Parses Steam metadata via `.vdf`/Registry and `.acf` files, with path canonicalization and resource limits.
 
 ### 2. Data Model
 
@@ -135,7 +134,7 @@ The CLI will support the following command structure:
    - Test `DiscoveredGame` construction.
    - Test error handling in the plugin registry.
 2. **Plugin Integration Tests**:
-   - Mock filesystem/registry to test Steam Linux/Windows parsing logic without requiring actual Steam installs.
+   - Mock filesystem/registry tests and platform-specific CI integration tests (Linux/Windows).
    - Verify that `.acf` parsing correctly extracts `name` and `installdir`.
 3. **CLI Tests**:
    - Verify `discovery list` output format (table and JSON).
@@ -157,3 +156,8 @@ The CLI will support the following command structure:
 - Persistence/caching of discovered games.
 - Mapping `unknown/` slugs to real `publisher/name` slugs.
 - Codec taxonomy and per-game codec selection.
+
+## Revision log
+
+- **1. Components (Security)**: Added path validation and resource limits for Steam parsing.
+- **Test strategy (Compatibility)**: Added platform-specific integration tests in CI.
