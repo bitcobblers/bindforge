@@ -22,7 +22,8 @@
     "0ae366626b3dbf1c0a81a44e7bd1c0e639069ba1",
     "49eb87804337cdf1988fe9c7788878e395cb7469",
     "fdf1271e979e4f328de81b3591d4c6616e13d22d",
-    "7029c0d01dc8e759d00880c1250a203b2fb06018"
+    "7029c0d01dc8e759d00880c1250a203b2fb06018",
+    "8819006b70ff8dc0a8cc6315a26c652801d66b9a"
   ],
   "forceNext": null,
   "results": [
@@ -206,20 +207,6 @@
       "nudges": 0
     },
     {
-      "stage": "design-review:performance",
-      "round": 1,
-      "sessionID": "ses_e19564a78ffe6Rlicdq20yVuN8",
-      "agent": "review/design-performance",
-      "at": 1794871274368,
-      "reply": {
-        "verdict": "approve",
-        "findings": []
-      },
-      "transcript": "docs/designs/022-game-discovery/transcripts/design-review-performance-r1c2.md",
-      "durationMs": 30155,
-      "nudges": 0
-    },
-    {
       "stage": "design-review:correctness",
       "round": 1,
       "sessionID": "ses_e19564a79ffeoHmhJ6f5WDxvWF",
@@ -231,6 +218,20 @@
       },
       "transcript": "docs/designs/022-game-discovery/transcripts/design-review-correctness-r1c2.md",
       "durationMs": 30156,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e19564a78ffe6Rlicdq20yVuN8",
+      "agent": "review/design-performance",
+      "at": 1794871274368,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/design-review-performance-r1c2.md",
+      "durationMs": 30155,
       "nudges": 0
     },
     {
@@ -276,28 +277,28 @@
       "proceed": false,
       "reason": "ratify pass c2 pending: correctness, performance, complexity",
       "at": 1794871244158
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794871286486
     }
   ],
   "startedAt": 1794871024480,
-  "updatedAt": 1794871286442,
+  "updatedAt": 1794871286486,
   "flow": "full",
   "baseRef": "39dad280017bbf1473f3dc10841ad17b68fdf1e8",
-  "designCycle": 2,
+  "designCycle": 3,
   "designStamp": "c7833529238cdd03cd14ca2540e6a054091887c8",
   "seats": {
     "design": {
       "correctness": {
         "verdict": "approve",
-        "stamp": "4bd657deda3e0ffd7afe52ed9a17370b5f06c788",
+        "stamp": "c7833529238cdd03cd14ca2540e6a054091887c8",
         "dissents": 0,
-        "findings": [
-          {
-            "severity": "minor",
-            "location": "Slug Derivation — \"Replace all non-alphanumeric characters with '-'. ... Example: 'Super Mario Odyssey!' → unknown/super-mario-odyssey\"",
-            "problem": "The algorithm as described would result in a trailing hyphen for the example provided (`unknown/super-mario-odyssey-`). The algorithm should explicitly include a step to trim leading and trailing hyphens to match the example and ensure clean slugs.",
-            "fix": "Add \"5. Trim leading and trailing hyphens.\" to the derivation steps."
-          }
-        ]
+        "findings": []
       },
       "compatibility": {
         "verdict": "approve",
@@ -313,13 +314,13 @@
       },
       "performance": {
         "verdict": "approve",
-        "stamp": "4bd657deda3e0ffd7afe52ed9a17370b5f06c788",
+        "stamp": "c7833529238cdd03cd14ca2540e6a054091887c8",
         "dissents": 0,
         "findings": []
       },
       "complexity": {
         "verdict": "approve",
-        "stamp": "4bd657deda3e0ffd7afe52ed9a17370b5f06c788",
+        "stamp": "c7833529238cdd03cd14ca2540e6a054091887c8",
         "dissents": 0,
         "findings": []
       }
@@ -328,10 +329,11 @@
   "lastReviewPass": {
     "phase": "design",
     "round": 1,
-    "cycle": 1,
+    "cycle": 2,
     "seats": [
-      "compatibility",
-      "security"
+      "correctness",
+      "performance",
+      "complexity"
     ]
   },
   "reviseNoChange": false
