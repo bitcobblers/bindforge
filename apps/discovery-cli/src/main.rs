@@ -48,7 +48,7 @@ fn main() {
                 println!("| Slug | Display Name | Install Path | Platform |");
                 for game in all_games {
                     println!(
-                        "| {} | {} | {} | {:?} |",
+                        "| {} | {} | {} | {} |",
                         game.slug,
                         game.display_name,
                         game.install_path.display(),

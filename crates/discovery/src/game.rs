@@ -1,3 +1,4 @@
+use std::fmt;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -5,6 +6,15 @@ use std::path::PathBuf;
 pub enum Platform {
     SteamLinux,
     SteamWindows,
+}
+
+impl fmt::Display for Platform {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Platform::SteamLinux => write!(f, "steam-linux"),
+            Platform::SteamWindows => write!(f, "steam-windows"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

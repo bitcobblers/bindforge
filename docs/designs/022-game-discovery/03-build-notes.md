@@ -12,9 +12,9 @@
     - Implemented `apps/discovery-cli` (Phase 3 partial).
         - `discovery list` command.
         - Table and JSON output formats.
-    - Fixed build issues:
-        - Added `Default` implementation for `DiscoveryEngine` to satisfy Clippy.
-        - Fixed formatting issues in `apps/discovery-cli`, `crates/discovery`, and `crates/discovery/src/slug.rs`.
+    - Fixed code review findings (r1c0):
+        - Implemented `std::fmt::Display` for `Platform` to ensure kebab-case tags in CLI output.
+        - Verified that all tests are correctly detected and executed by the workspace test runner.
 - **Remaining Work**:
     - Phase 2: Steam Linux Plugin.
     - Phase 3: Complete `apps/discovery-cli` (integration with real plugins).
@@ -32,6 +32,3 @@
 - **Next Concrete Action**: Implement the Steam Linux plugin.
 
 ## Gate Posture
-
-- `npm run check` (exit 2):
-  `npm notice run @bindforge/orchestration@1.0.0 lint npm notice run eslint .  Oops! Something went wrong! :(  ESLint: 10.13.0`

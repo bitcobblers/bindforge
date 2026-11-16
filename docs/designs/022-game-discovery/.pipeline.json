@@ -8,7 +8,7 @@
     "path": "docs/adrs/022-game-discovery.md"
   },
   "status": "running",
-  "lastStage": "fix",
+  "lastStage": "code-review",
   "designRound": 2,
   "codeRound": 1,
   "designBudgetUsed": 1,
@@ -29,7 +29,8 @@
     "3890c8579154cd7709753352f820f0bc8cdd4754",
     "ff12902813e5d8ae2e6def54b6ba68a0c0b3a5dc",
     "2d73f92a3e8d7fdc9d476751a65778ec4a807e37",
-    "ffdcea83f31a6cbe258710df9b9e6be238bb596b"
+    "ffdcea83f31a6cbe258710df9b9e6be238bb596b",
+    "a9dd828893f8ac2ddbecd597ff82896938db1f25"
   ],
   "forceNext": null,
   "results": [
@@ -399,20 +400,6 @@
       "nudges": 0
     },
     {
-      "stage": "code-review:compatibility",
-      "round": 1,
-      "sessionID": "ses_e194c82d7ffeq3sDjeNljdhZRz",
-      "agent": "codereview/code-compatibility",
-      "at": 1794871943480,
-      "reply": {
-        "verdict": "approve",
-        "findings": []
-      },
-      "transcript": "docs/designs/022-game-discovery/transcripts/code-review-compatibility-r1c0.md",
-      "durationMs": 58326,
-      "nudges": 0
-    },
-    {
       "stage": "code-review:correctness",
       "round": 1,
       "sessionID": "ses_e194c82d8ffeCRLRcRIkGkF0xx",
@@ -436,6 +423,20 @@
       },
       "transcript": "docs/designs/022-game-discovery/transcripts/code-review-correctness-r1c0.md",
       "durationMs": 100530,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e194c82d7ffeq3sDjeNljdhZRz",
+      "agent": "codereview/code-compatibility",
+      "at": 1794871943480,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/code-review-compatibility-r1c0.md",
+      "durationMs": 58326,
       "nudges": 0
     },
     {
@@ -570,10 +571,17 @@
       "proceed": true,
       "reason": "npm run check + cargo gate green",
       "at": 1794871885083
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: correctness",
+      "at": 1794872090201
     }
   ],
   "startedAt": 1794871024480,
-  "updatedAt": 1794872090152,
+  "updatedAt": 1794872090201,
   "flow": "full",
   "baseRef": "39dad280017bbf1473f3dc10841ad17b68fdf1e8",
   "designCycle": 3,
@@ -610,17 +618,84 @@
         "dissents": 0,
         "findings": []
       }
+    },
+    "code": {
+      "correctness": {
+        "verdict": "request-changes",
+        "stamp": "ffdcea83f31a6cbe258710df9b9e6be238bb596b",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "major",
+            "location": "gate record",
+            "problem": "The gate record shows that `cargo test --workspace --locked` resulted in `0 passed` tests, despite the introduction of new test files in the diff. This indicates the tests are not being executed, leaving the code unverified."
+          },
+          {
+            "severity": "minor",
+            "location": "apps/discovery-cli/src/main.rs",
+            "problem": "The CLI output for the 'Platform' column uses the `Debug` representation of the `Platform` enum (e.g., `SteamLinux`), whereas the design specification's example output and documentation specify kebab-case tags (e.g., `steam-linux`).",
+            "fix": "Implement `std::fmt::Display` for the `Platform` enum to return the kebab-case string, or format the string in the CLI output."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "ffdcea83f31a6cbe258710df9b9e6be238bb596b",
+        "dissents": 0,
+        "findings": []
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "ffdcea83f31a6cbe258710df9b9e6be238bb596b",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "apps/discovery-cli/src/main.rs:58",
+            "problem": "The CLI prints `game.display_name` directly to the terminal when displaying the discovery table. If a plugin provides a string containing ANSI escape sequences, it can perform terminal injection.",
+            "fix": "Sanitize strings to remove or escape control characters/ANSI escape sequences before printing."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/discovery/src/engine.rs:17",
+            "problem": "The `DiscoveryEngine::discover_all` method executes plugins sequentially and lacks a timeout mechanism. A single plugin that hangs will cause the entire CLI to become unresponsive.",
+            "fix": "Implement a timeout mechanism for plugin execution (e.g., by running the discovery process in a separate thread with a timeout)."
+          }
+        ]
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "ffdcea83f31a6cbe258710df9b9e6be238bb596b",
+        "dissents": 0,
+        "findings": []
+      },
+      "testing": {
+        "verdict": "approve",
+        "stamp": "ffdcea83f31a6cbe258710df9b9e6be238bb596b",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/discovery/tests/game_tests.rs, crates/discovery/tests/plugin_tests.rs, crates/discovery/tests/registry_tests.rs, crates/discovery/tests/slug_tests.rs, apps/discovery-cli/tests/cli_tests.rs",
+            "problem": "Tests lack the required `// proves: Test strategy #N` citations mandated by the testing checklist.",
+            "fix": "Add the appropriate citations to the relevant tests."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/discovery/src/engine.rs",
+            "problem": "The `DiscoveryEngine::discover_all` aggregation logic (combining results from multiple plugins) is not covered by any tests, although it is a requirement in the CLI test strategy.",
+            "fix": "Add an integration test that registers multiple mock plugins and verifies that `discover_all` correctly aggregates their results."
+          }
+        ]
+      }
     }
   },
   "lastReviewPass": {
-    "phase": "editorial",
-    "round": 2,
+    "phase": "code",
+    "round": 1,
+    "cycle": 0,
     "seats": [
-      "correctness",
-      "compatibility",
-      "security",
-      "performance",
-      "complexity"
+      "correctness"
     ]
   },
   "reviseNoChange": false,
@@ -654,6 +729,6 @@
       }
     ]
   },
-  "codeCycle": 0,
+  "codeCycle": 1,
   "codeStamp": "ffdcea83f31a6cbe258710df9b9e6be238bb596b"
 }
