@@ -1,0 +1,12 @@
+{
+  "roles": {
+    "coder": "llama/qwen-unsloth",
+    "code-review": "llama/glimmer",
+    "designer": "llama/gemma-q6",
+    "editor": "llama/gemma-q6",
+    "planner": "llama/gemma-q6",
+    "doc-sync": "llama/gemma-q6",
+    "researcher": "llama/gemma-q6",
+    "design-review": "llama/glimmer"
+  }
+}
