@@ -15,6 +15,7 @@
     - Fixed code review findings (r1c0):
         - Implemented `std::fmt::Display` for `Platform` to ensure kebab-case tags in CLI output.
         - Verified that all tests are correctly detected and executed by the workspace test runner.
+    - Resolved formatting errors in `crates/discovery/src/game.rs`.
 - **Remaining Work**:
     - Phase 2: Steam Linux Plugin.
     - Phase 3: Complete `apps/discovery-cli` (integration with real plugins).
@@ -32,3 +33,12 @@
 - **Next Concrete Action**: Implement the Steam Linux plugin.
 
 ## Gate Posture
+
+- `cargo fmt --all -- --check` (exit 1):
+  ```
+  -use std::fmt;
+    use serde::{Deserialize, Serialize};
+  +use std::fmt;
+    use std::path::PathBuf;
+  ```
+
