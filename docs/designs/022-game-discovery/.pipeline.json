@@ -7,8 +7,8 @@
     "kind": "adr",
     "path": "docs/adrs/022-game-discovery.md"
   },
-  "status": "running",
-  "lastStage": "code-review",
+  "status": "done",
+  "lastStage": "doc-sync",
   "designRound": 2,
   "codeRound": 1,
   "designBudgetUsed": 1,
@@ -34,7 +34,8 @@
     "5aaefc2095a1544b4f9a450913e3b578e404ef7b",
     "596a09c3106cdf982c8555f6c4e1a0bdf4d3233c",
     "ec5d74565bc4f21ff74f1b3a8d5ede6765b2600c",
-    "13e15a1ddd5c6bdaba9cc57aaf82778621664a95"
+    "13e15a1ddd5c6bdaba9cc57aaf82778621664a95",
+    "2992164a706c8b0efb3a5040428425ea54d6f06a"
   ],
   "forceNext": null,
   "results": [
@@ -609,6 +610,19 @@
       "transcript": "docs/designs/022-game-discovery/transcripts/code-review-testing-r1c2.md",
       "durationMs": 32119,
       "nudges": 0
+    },
+    {
+      "stage": "doc-sync",
+      "round": 1,
+      "sessionID": "ses_e19453c3bffeqYvSlOZY3MuKii",
+      "agent": "ops/doc-sync",
+      "at": 1794872408188,
+      "reply": {
+        "drifted": false
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/doc-sync-r1.md",
+      "durationMs": 46233,
+      "nudges": 0
     }
   ],
   "gateLog": [
@@ -709,10 +723,24 @@
       "proceed": true,
       "reason": "all five seats approve the current revision stamp",
       "at": 1794872293420
+    },
+    {
+      "gate": "ledger-join",
+      "round": 0,
+      "proceed": true,
+      "reason": "the ledger join holds: every handle resolves, every unit is handled",
+      "at": 1794872408239
+    },
+    {
+      "gate": "done",
+      "round": 0,
+      "proceed": true,
+      "reason": "pipeline complete",
+      "at": 1794872408240
     }
   ],
   "startedAt": 1794871024480,
-  "updatedAt": 1794872293420,
+  "updatedAt": 1794872408240,
   "flow": "full",
   "baseRef": "39dad280017bbf1473f3dc10841ad17b68fdf1e8",
   "designCycle": 3,
