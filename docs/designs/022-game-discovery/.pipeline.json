@@ -8,17 +8,18 @@
     "path": "docs/adrs/022-game-discovery.md"
   },
   "status": "running",
-  "lastStage": "research",
-  "designRound": 0,
+  "lastStage": "proposal",
+  "designRound": 1,
   "codeRound": 0,
-  "designBudgetUsed": 0,
+  "designBudgetUsed": 1,
   "codeBudgetUsed": 0,
   "editorialDone": false,
   "testsGreen": false,
   "testsNeedUpdate": false,
   "stageFailures": {},
   "stageCommits": [
-    "9161561de1516b14b2c0e3e1dda7744d4b3614b1"
+    "9161561de1516b14b2c0e3e1dda7744d4b3614b1",
+    "0ae366626b3dbf1c0a81a44e7bd1c0e639069ba1"
   ],
   "forceNext": null,
   "results": [
@@ -39,6 +40,120 @@
       "docLines": 65,
       "docLinesAdded": 65,
       "docLinesRemoved": 0
+    },
+    {
+      "stage": "proposal",
+      "round": 0,
+      "sessionID": "ses_e19593d7cffeHy39RWCv1T58JH",
+      "agent": "design/designer",
+      "at": 1794871075023,
+      "reply": {
+        "commitMessage": "feat: design game discovery via pluggable probes"
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/proposal-r0.md",
+      "durationMs": 24111,
+      "nudges": 0,
+      "docName": "02-proposal.md",
+      "docLines": 159,
+      "docLinesAdded": 159,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e1958def7ffexuakUQ6187n4Qd",
+      "agent": "review/design-correctness",
+      "at": 1794871121360,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Slug Derivation — \"Replace all non-alphanumeric characters with '-'. ... Example: 'Super Mario Odyssey!' → unknown/super-mario-odyssey\"",
+            "problem": "The algorithm as described would result in a trailing hyphen for the example provided (`unknown/super-mario-odyssey-`). The algorithm should explicitly include a step to trim leading and trailing hyphens to match the example and ensure clean slugs.",
+            "fix": "Add \"5. Trim leading and trailing hyphens.\" to the derivation steps."
+          }
+        ]
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/design-review-correctness-r1c0.md",
+      "durationMs": 46231,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e1958def7ffdlqSfgjn0z6ATD8",
+      "agent": "review/design-compatibility",
+      "at": 1794871131407,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Test strategy — \"2. Plugin Integration Tests\"",
+            "problem": "The test strategy relies on mocks for Steam Linux/Windows parsing and does not specify any platform-specific tests (running on actual Linux/Windows environments) for the platforms claimed as supported in the compatibility matrix.",
+            "fix": "Add platform-specific integration tests that run on actual Linux and Windows environments (e.g., in CI) to verify the Steam parsing logic against real filesystem structures and the Windows Registry."
+          }
+        ]
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/design-review-compatibility-r1c0.md",
+      "durationMs": 56278,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e19582a2cffe1szYd9iuKOHs42",
+      "agent": "review/design-security",
+      "at": 1794871151496,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "### 1. Components — \"Parses libraryfolders.vdf to find library paths, then scans steamapps/appmanifest_*.acf for game metadata.\"",
+            "problem": "The design relies on values from local files (.vdf, .acf) and the Windows Registry to construct the `install_path`. Since these sources are untrusted, a malicious actor could use `..` or absolute paths to cause path traversal.",
+            "fix": "Implement path canonicalization and validate that the resulting `install_path` is a child of a verified library directory."
+          },
+          {
+            "severity": "major",
+            "location": "### 1. Components — \"Parses libraryfolders.vdf to find library paths, then scans steamapps/appmanifest_*.acf for game metadata.\"",
+            "problem": "The parsing of .vdf and .acf files does not specify resource limits. Maliciously large or complex files could cause a Denial of Service (DoS) via memory exhaustion.",
+            "fix": "Enforce strict maximum file size limits and use a parser that handles malformed/deeply nested structures with bounded resource usage."
+          }
+        ]
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/design-review-security-r1c0.md",
+      "durationMs": 30110,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e195802eefferKgUE8KXJYFhhV",
+      "agent": "review/design-performance",
+      "at": 1794871169580,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/design-review-performance-r1c0.md",
+      "durationMs": 38149,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e1957b475ffe7fed1mmk2WZRs2",
+      "agent": "review/design-complexity",
+      "at": 1794871175607,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/design-review-complexity-r1c0.md",
+      "durationMs": 24085,
+      "nudges": 0
     }
   ],
   "gateLog": [
@@ -58,7 +173,9 @@
     }
   ],
   "startedAt": 1794871024480,
-  "updatedAt": 1794871050877,
+  "updatedAt": 1794871175607,
   "flow": "full",
-  "baseRef": "39dad280017bbf1473f3dc10841ad17b68fdf1e8"
+  "baseRef": "39dad280017bbf1473f3dc10841ad17b68fdf1e8",
+  "designCycle": 0,
+  "designStamp": "4bd657deda3e0ffd7afe52ed9a17370b5f06c788"
 }
