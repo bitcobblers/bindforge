@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "slug": "game-discovery",
+  "nnn": "022",
+  "branch": "pipeline/022-game-discovery",
+  "source": {
+    "kind": "adr",
+    "path": "docs/adrs/022-game-discovery.md"
+  },
+  "status": "running",
+  "lastStage": "",
+  "designRound": 0,
+  "codeRound": 0,
+  "designBudgetUsed": 0,
+  "codeBudgetUsed": 0,
+  "editorialDone": false,
+  "testsGreen": false,
+  "testsNeedUpdate": false,
+  "stageFailures": {},
+  "stageCommits": [],
+  "forceNext": null,
+  "results": [],
+  "gateLog": [],
+  "startedAt": 1794871024480,
+  "updatedAt": 1794871024488,
+  "flow": "full",
+  "baseRef": "39dad280017bbf1473f3dc10841ad17b68fdf1e8"
+}
