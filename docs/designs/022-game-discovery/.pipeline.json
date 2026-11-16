@@ -8,7 +8,7 @@
     "path": "docs/adrs/022-game-discovery.md"
   },
   "status": "running",
-  "lastStage": "",
+  "lastStage": "research",
   "designRound": 0,
   "codeRound": 0,
   "designBudgetUsed": 0,
@@ -17,12 +17,48 @@
   "testsGreen": false,
   "testsNeedUpdate": false,
   "stageFailures": {},
-  "stageCommits": [],
+  "stageCommits": [
+    "9161561de1516b14b2c0e3e1dda7744d4b3614b1"
+  ],
   "forceNext": null,
-  "results": [],
-  "gateLog": [],
+  "results": [
+    {
+      "stage": "research",
+      "round": 0,
+      "sessionID": "ses_e1959a472ffe8FGrds8Gky9ZH8",
+      "agent": "research/researcher",
+      "at": 1794871050728,
+      "reply": {
+        "summary": "Researched ADR-022 (Game discovery via pluggable probes) and wrote findings to docs/designs/022-game-discovery/01-research.md, covering the plugin architecture, data model, v1 Steam implementation details, and relationships to ADR-008 and ADR-013.",
+        "commitMessage": "docs: research game discovery via pluggable probes"
+      },
+      "transcript": "docs/designs/022-game-discovery/transcripts/research-r0.md",
+      "durationMs": 26165,
+      "nudges": 0,
+      "docName": "01-research.md",
+      "docLines": 65,
+      "docLinesAdded": 65,
+      "docLinesRemoved": 0
+    }
+  ],
+  "gateLog": [
+    {
+      "gate": "sourceAdmissible",
+      "round": 0,
+      "proceed": true,
+      "reason": "ADR is proposed and complete",
+      "at": 1794871024495
+    },
+    {
+      "gate": "ledger-join",
+      "round": 0,
+      "proceed": true,
+      "reason": "the ledger join holds: every handle resolves, every unit is handled",
+      "at": 1794871024499
+    }
+  ],
   "startedAt": 1794871024480,
-  "updatedAt": 1794871024488,
+  "updatedAt": 1794871050877,
   "flow": "full",
   "baseRef": "39dad280017bbf1473f3dc10841ad17b68fdf1e8"
 }
