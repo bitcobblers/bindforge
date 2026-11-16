@@ -20,6 +20,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "precheck": "npm install",
     "check": "npm run lint && npm run format:check && npm run test",
     "pipeline": "tsx src/pipeline/cli.ts"
   },
