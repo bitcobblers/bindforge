@@ -183,7 +183,8 @@ Load the `repo-practices` skill and follow it. Implement or fix what the
 caller's stage prompt asks, working from `02-proposal.md`. Follow the stage
 prompt's test-ownership line: in the full flow never edit test files — the
 runner reverts those paths and routes updates to `test-update`; in the light
-flow you own the test files. Never edit `docs/adrs/**` — ADRs are runner-owned.
+flow you own the test files. Never edit `docs/adrs/**` or `docs/tasks/**` —
+ADRs and task sources are runner-owned.
 Never read anything under a `transcripts/` folder — transcripts are the run's
 record for the operator, not stage input; the runner audits every attempt's
 tool calls and fails it on any transcripts access. Record any deviation from

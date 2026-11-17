@@ -14,9 +14,26 @@ export function statePath(designDir: string): string {
   return join(designDir, STATE_FILE);
 }
 
-/** Repo-relative design directory for a run, e.g. docs/designs/002-x. */
+/**
+ * Repo-relative design directory for a run, e.g. docs/designs/002-x. A task
+ * run's artifacts sit under the segregated tasks root (ADR-023, 023-C3):
+ * docs/designs/tasks/NNN-slug.
+ */
 export function designDirOf(state: PipelineState): string {
-  return join('docs', 'designs', `${state.nnn}-${state.slug}`);
+  const root =
+    state.source.kind === 'task' ? join('docs', 'designs', 'tasks') : join('docs', 'designs');
+  return join(root, `${state.nnn}-${state.slug}`);
+}
+
+/**
+ * ADR-023 (023-C3): the design roots a `resume`/`status` slug can name, in
+ * search order — the ADR/brief root first, the segregated task root second.
+ * A slug present in BOTH is ambiguous and the caller refuses rather than
+ * guessing: the two series number independently (023-C5), so a shared NNN is
+ * legal and only the slug usually separates them.
+ */
+export function designDirCandidates(slug: string): string[] {
+  return [join('docs', 'designs', slug), join('docs', 'designs', 'tasks', slug)];
 }
 
 /** A seat's persisted verdict record; the StateSchema header below owns the
@@ -100,7 +117,11 @@ const StateSchema = z.object({
   slug: z.string().regex(SLUG_RE),
   branch: z.string().min(1),
   baseRef: z.string().optional(),
-  source: z.object({ kind: z.enum(['adr', 'brief']), path: z.string().min(1) }),
+  // ADR-023: the source kind gains `task`. An enum member is not a retyped
+  // field: a pre-023 checkpoint (adr/brief) still loads unchanged, and a
+  // pre-023 runner refusing a task checkpoint is the documented MAY-REFUSE
+  // posture (ADR-006 §2) for a shape its schema does not name.
+  source: z.object({ kind: z.enum(['adr', 'brief', 'task']), path: z.string().min(1) }),
   // ADR-010: the flow the run follows, stamped once at entry. Additive-optional
   // — its absence is a pre-ADR-010 checkpoint and reads as `full` — and
   // validated, not coerced: a checkpoint is model-visible data at the resume
@@ -277,6 +298,32 @@ export async function loadState(designDir: string): Promise<PipelineState | null
   // reverted, so the fence keeps its teeth.
   recordRunnerWrite(file, raw);
   return parsed as PipelineState;
+}
+
+/**
+ * ADR-023 (023-C3): load a run's checkpoint by slug across both design roots,
+ * returning the state and the repo-relative directory it came from. `null`
+ * when no root holds a readable checkpoint; a slug present in BOTH roots
+ * throws — the ambiguity 023-C3 refuses instead of guessing.
+ */
+export async function loadStateForSlug(
+  repoDir: string,
+  slug: string,
+): Promise<{ state: PipelineState; dir: string } | null> {
+  const found: Array<{ state: PipelineState; dir: string }> = [];
+  for (const dir of designDirCandidates(slug)) {
+    const state = await loadState(join(repoDir, dir));
+    if (state) {
+      found.push({ state, dir });
+    }
+  }
+  if (found.length > 1) {
+    throw new Error(
+      `ambiguous slug "${slug}": checkpoints at ${found.map((f) => f.dir).join(' and ')} — ` +
+        'the two design series share no slug; remove one run or name a different slug',
+    );
+  }
+  return found[0] ?? null;
 }
 
 /**

@@ -11,6 +11,7 @@ sentence:
 
 ```sh
 pipeline run docs/adrs/007-shared-binding-format.md    # a decision to execute
+pipeline run docs/tasks/T-001-add-auth-service.md      # a task (a unit of work beneath an ADR)
 pipeline run docs/prompts/<name>.md                    # a brief (small job)
 ```
 
@@ -27,9 +28,24 @@ non-empty **Context** and **Decision** sections. The pipeline flips it to
 `accepted` itself when the run completes; if a run stalls, the ADR stays
 `proposed` and the reason is recorded in the run's `.pipeline.json`.
 
+A **task** (ADR-023) is a smaller, concrete unit of work — often one of
+several required by an ADR. Tasks live in `docs/tasks/T-NNN-slug.md`, count
+in their own number series from 001 (separate from ADRs), and carry their
+artifacts to the segregated root `docs/designs/tasks/NNN-slug/`. A task must
+have frontmatter `doc_type: task`, `status: pending`, `type`, and
+`functional_area`, plus a non-empty body; `associated_adr` (the ADR it
+serves) and `depends_on` (other tasks, as `T-NNN-slug` names) are optional.
+The pipeline flips `status` to `completed` itself when the run completes;
+`disposition` is yours to manage. A `depends_on` entry is checked at entry:
+the named task must exist, and its run must be `done`, or the run refuses to
+start. Every source document carries a `doc_type` key — `adr` or `task` —
+and a `doc_type` that disagrees with the document's path is a usage error.
+
 Brief-driven runs claim the next free `NNN` number. If that work later
 becomes a real decision, write `docs/adrs/NNN-<slug>.md` with the same
-number.
+number. `resume` and `status` search both design roots —
+`docs/designs/NNN-slug` and `docs/designs/tasks/NNN-slug` — and refuse a
+slug that exists in both.
 
 A source document can select the **light flow** with frontmatter
 `flow: light` (ADR-010): one `plan` stage instead of research and the design

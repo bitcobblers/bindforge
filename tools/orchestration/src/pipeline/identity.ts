@@ -15,7 +15,7 @@ import { NNN_RE, SLUG_RE, STATE_FILE } from './types.js';
 export interface RunIdentity {
   slug: string;
   nnn: string;
-  kind: 'adr' | 'brief';
+  kind: 'adr' | 'brief' | 'task';
   branch: string;
 }
 
@@ -32,7 +32,14 @@ export interface IdentityPin {
  * which would have made those runs unresumable.
  */
 export function slugFromSource(sourcePath: string): string {
-  return sanitizeSlug(basename(sourcePath, '.md').replace(/^\d{3}-/, ''));
+  // ADR-023 (023-C2): a task source is T-NNN-slug, so the `T-NNN-` prefix is
+  // stripped first; the two prefixes are mutually exclusive, so the ADR
+  // `NNN-` strip that follows never touches a task name.
+  return sanitizeSlug(
+    basename(sourcePath, '.md')
+      .replace(/^T-\d{3}-/, '')
+      .replace(/^\d{3}-/, ''),
+  );
 }
 
 export function sanitizeSlug(raw: string): string {
@@ -59,25 +66,37 @@ export function deriveIdentity(
   const rel = relative(repoDir, sourcePath).split(/[\\/]/).join('/');
   const kind = kindOfRel(rel);
   const fromName = /^docs\/(adrs|prompts)\/(\d{3})-/.exec(rel);
+  // ADR-023 (023-C5): a task's number is its own, read from the T-NNN- name.
+  const taskName = /^docs\/tasks\/T-(\d{3})-/.exec(rel);
   const slug = pin.slug ?? slugFromSource(sourcePath);
   let nnn: string;
   if (pin.nnn !== undefined) {
     nnn = pin.nnn;
   } else if (kind === 'adr' && fromName?.[2]) {
     nnn = fromName[2];
+  } else if (kind === 'task' && taskName?.[1]) {
+    nnn = taskName[1];
   } else {
-    // A17, unchanged: the shared counter's next free number. The
-    // checkpoint-identity rule below is the light flow's alone, so a
-    // `flow: full` entry allocates exactly as it always did.
+    // A17, unchanged for ADRs and briefs: the shared counter's next free
+    // number. The checkpoint-identity rule below is the light flow's alone,
+    // so a `flow: full` entry allocates exactly as it always did.
     const existing = flow === 'light' ? nnnOfExistingRun(repoDir, rel, slug) : undefined;
-    nnn = existing ?? nextNnn(takenNames(repoDir));
+    // ADR-023 (023-C5): a task without a number in its name allocates from
+    // the TASK series, never the shared ADR/design counter.
+    nnn = existing ?? (kind === 'task' ? nextTaskNnn(repoDir) : nextNnn(takenNames(repoDir)));
   }
   return { slug, nnn, kind, branch: `pipeline/${nnn}-${slug}` };
 }
 
-/** The rule both readers share: `docs/adrs/**` is a decision, anything else is a brief. */
-function kindOfRel(rel: string): 'adr' | 'brief' {
-  return rel.startsWith('docs/adrs/') ? 'adr' : 'brief';
+/** The rule both readers share: `docs/adrs/**` is a decision, `docs/tasks/**` is a task, anything else is a brief. */
+function kindOfRel(rel: string): 'adr' | 'brief' | 'task' {
+  if (rel.startsWith('docs/adrs/')) {
+    return 'adr';
+  }
+  if (rel.startsWith('docs/tasks/')) {
+    return 'task';
+  }
+  return 'brief';
 }
 
 /**
@@ -87,8 +106,27 @@ function kindOfRel(rel: string): 'adr' | 'brief' {
  * before the identity exists — one rule, so the parse and the identity can
  * never disagree.
  */
-export function sourceKind(repoDir: string, sourcePath: string): 'adr' | 'brief' {
+export function sourceKind(repoDir: string, sourcePath: string): 'adr' | 'brief' | 'task' {
   return kindOfRel(relative(repoDir, sourcePath).split(/[\\/]/).join('/'));
+}
+
+/**
+ * ADR-023 (023-C5): the task series' next free number, counting from 001 and
+ * separate from the shared ADR/design counter. The series is the task SOURCES
+ * (`T-NNN-...`) plus the task design directories (`NNN-...`) — the same
+ * sources-plus-artifacts posture as `takenNames`, so a deleted source still
+ * reserves its number through its artifacts.
+ */
+export function nextTaskNnn(repoDir: string): string {
+  const sources = listDir(join(repoDir, 'docs', 'tasks')).map(
+    (name) => /^T-(\d{3})-/.exec(name)?.[1],
+  );
+  const designs = listDir(join(repoDir, 'docs', 'designs', 'tasks')).map(
+    (name) => /^(\d{3})-/.exec(name)?.[1],
+  );
+  const used = [...sources, ...designs].filter((n): n is string => n !== undefined).map(Number);
+  const next = used.length === 0 ? 1 : Math.max(...used) + 1;
+  return String(next).padStart(3, '0');
 }
 
 /** Every name the shared `NNN` counter has consumed: decisions and designs. */
@@ -117,24 +155,29 @@ function takenNames(repoDir: string): string[] {
  * it is not this design's.
  */
 function nnnOfExistingRun(repoDir: string, sourceRel: string, slug: string): string | undefined {
-  for (const entry of listDir(join(repoDir, 'docs', 'designs'))) {
-    const match = /^(\d{3})-(.+)$/.exec(entry);
-    if (match === null) {
-      continue;
-    }
-    const [, nnn, dirSlug] = match;
-    if (nnn === undefined || !NNN_RE.test(nnn) || dirSlug !== slug) {
-      continue;
-    }
-    try {
-      const raw = JSON.parse(
-        readFileSync(join(repoDir, 'docs', 'designs', entry, STATE_FILE), 'utf8'),
-      ) as { source?: { path?: unknown } };
-      if (raw.source?.path === sourceRel) {
-        return nnn;
+  // ADR-023 (023-C3): both design roots — a task's light run checkpoints under
+  // docs/designs/tasks/, and the re-entry rule must find it there.
+  const roots = [join(repoDir, 'docs', 'designs'), join(repoDir, 'docs', 'designs', 'tasks')];
+  for (const root of roots) {
+    for (const entry of listDir(root)) {
+      const match = /^(\d{3})-(.+)$/.exec(entry);
+      if (match === null) {
+        continue;
       }
-    } catch {
-      // No readable checkpoint: a design directory left behind is not a run.
+      const [, nnn, dirSlug] = match;
+      if (nnn === undefined || !NNN_RE.test(nnn) || dirSlug !== slug) {
+        continue;
+      }
+      try {
+        const raw = JSON.parse(readFileSync(join(root, entry, STATE_FILE), 'utf8')) as {
+          source?: { path?: unknown };
+        };
+        if (raw.source?.path === sourceRel) {
+          return nnn;
+        }
+      } catch {
+        // No readable checkpoint: a design directory left behind is not a run.
+      }
     }
   }
   return undefined;
@@ -148,9 +191,13 @@ function listDir(dir: string): string[] {
   }
 }
 
-/** Repo-relative design directory for an identity. */
+/**
+ * Repo-relative design directory for an identity. A task's artifacts sit
+ * under the segregated tasks root (ADR-023, 023-C3).
+ */
 export function designDirOfIdentity(id: RunIdentity): string {
-  return join('docs', 'designs', `${id.nnn}-${id.slug}`);
+  const root = id.kind === 'task' ? join('docs', 'designs', 'tasks') : join('docs', 'designs');
+  return join(root, `${id.nnn}-${id.slug}`);
 }
 
 /**

@@ -1,12 +1,12 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 import { flowDef } from './flows.js';
 import type { FlowId } from './flows.js';
 import type { PipelineConfig } from './stages.js';
-import { namesReservedSegment } from './types.js';
+import { STATE_FILE, namesReservedSegment } from './types.js';
 import type { Finding, GateLeg, PipelineState, VerdictReply } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -26,7 +26,7 @@ export const deny = (reason: string): GateResult => ({ proceed: false, reason })
 // --- source gate ------------------------------------------------------------
 
 export interface ParsedSource {
-  kind: 'adr' | 'brief';
+  kind: 'adr' | 'brief' | 'task';
   status: string;
   hasContext: boolean;
   hasDecision: boolean;
@@ -37,6 +37,26 @@ export interface ParsedSource {
    * misspelling surfaces as a usage error instead of a silent `full` run.
    */
   flow: FlowId;
+  /**
+   * ADR-023 (023-C1): the frontmatter `doc_type:` key, first token as spelled
+   * (`adr`, `task`, …). Absent is `undefined`, never a guess — the source
+   * gate is the only judge, and a task document missing the key is its
+   * refusal, not a path fallback.
+   */
+  docType?: string;
+  /**
+   * ADR-023 (023-C4): the task's `type:` and `functional_area:` keys, first
+   * token as spelled. Absent is `undefined`; the gate's presence check is the
+   * only validation (023 leaves the value sets to a schema).
+   */
+  type?: string;
+  functionalArea?: string;
+  /**
+   * ADR-023 (023-L4): the `depends_on:` list, entry-verbatim (whitespace
+   * trimmed, quotes stripped, order kept). Absent or empty is `[]`; the
+   * dependency gate is the only judge of the entries.
+   */
+  dependsOn: string[];
   /**
    * The document with its frontmatter block removed — the part a brief *is*.
    * The brief gate judges this, because with ADR-010 a `flow:` key is a legal
@@ -62,17 +82,39 @@ export function frontmatterOf(content: string): { front: string; body: string } 
 }
 
 /**
+ * ADR-023 (023-L2): a task source file name — `T-NNN-slug.md` — on the
+ * run-identity grammar (NNN_RE / SLUG_RE in types.ts): the generator and the
+ * gate must agree on the spelling or a task is unrunnable by its own name.
+ */
+export const TASK_SOURCE_NAME_RE = /^T-\d{3}-[a-z0-9][a-z0-9-]*\.md$/;
+/** ADR-023 (023-L4): a `depends_on` entry — the task name without the `.md`. */
+export const TASK_NAME_RE = /^T-\d{3}-[a-z0-9][a-z0-9-]*$/;
+
+/**
  * Minimal frontmatter + section parsing (no YAML dependency).
  *
  * `flow` is deliberately not normalised: the registry lookup decides, so the
  * comparison stays case-sensitive and whitespace-sensitive by construction.
+ * The ADR-023 keys follow the same posture: first token captured verbatim,
+ * the gates the only judges.
  */
-export function parseSource(content: string, kind: 'adr' | 'brief'): ParsedSource {
+export function parseSource(content: string, kind: 'adr' | 'brief' | 'task'): ParsedSource {
   const fm = frontmatterOf(content);
   const front = fm?.front ?? '';
   const status = /status:\s*(\w+)/.exec(front)?.[1] ?? 'none';
   const body = fm === undefined ? content : fm.body;
   const flow = /^flow:[ \t]*([^\r\n]*)/m.exec(front)?.[1];
+  const docType = /^doc_type:[ \t]*([\w-]+)/m.exec(front)?.[1];
+  const type = /^type:[ \t]*([\w-]+)/m.exec(front)?.[1];
+  const functionalArea = /^functional_area:[ \t]*([\w-]+)/m.exec(front)?.[1];
+  const dependsOnLine = /^depends_on:[ \t]*\[([^\]]*)\]/m.exec(front);
+  const dependsOn =
+    dependsOnLine === null
+      ? []
+      : (dependsOnLine[1] ?? '')
+          .split(',')
+          .map((entry) => entry.trim().replace(/^['"]|['"]$/g, ''))
+          .filter((entry) => entry.length > 0);
   const section = (name: string): boolean => {
     // The end anchor must be end-of-string, not multiline `$`: `$` matches
     // before every newline, so a section whose body starts with a blank line
@@ -87,6 +129,10 @@ export function parseSource(content: string, kind: 'adr' | 'brief'): ParsedSourc
     hasContext: section('Context'),
     hasDecision: section('Decision'),
     flow: flow ?? 'full',
+    docType,
+    type,
+    functionalArea,
+    dependsOn,
     body,
   };
 }
@@ -109,7 +155,7 @@ export function parseSource(content: string, kind: 'adr' | 'brief'): ParsedSourc
  */
 export async function sourceAdmissible(
   sourcePath: string,
-  kind: 'adr' | 'brief',
+  kind: 'adr' | 'brief' | 'task',
   flow: FlowId = 'full',
   parsed?: ParsedSource,
 ): Promise<GateResult> {
@@ -122,6 +168,41 @@ export async function sourceAdmissible(
     } catch {
       return deny(`source document not readable: ${sourcePath}`);
     }
+  }
+  // ADR-023 (023-C1): a present `doc_type` must agree with the path's kind.
+  // The path stays authoritative; the key is a redundant declaration, and a
+  // disagreement is a usage error — fail closed, never silently re-routed.
+  // A task document must carry the key at all (023-C4).
+  if (doc.docType !== undefined && doc.docType !== doc.kind) {
+    return deny(
+      `doc_type "${doc.docType}" disagrees with the source path (kind: ${doc.kind}) — ` +
+        'the path is authoritative: move the document or fix the key',
+    );
+  }
+  if (doc.kind === 'task') {
+    // ADR-023 (023-L2): the name is part of the contract — the series number
+    // and the slug both derive from it, so an unnumbered or misnamed file
+    // cannot enter.
+    if (!TASK_SOURCE_NAME_RE.test(basename(sourcePath))) {
+      return deny(`task source must be named T-NNN-slug.md (got ${basename(sourcePath)})`);
+    }
+    if (doc.docType !== 'task') {
+      return deny('task source has no doc_type: task frontmatter key');
+    }
+    if (doc.status !== 'pending') {
+      return deny(`task status is "${doc.status}", expected "pending"`);
+    }
+    if (doc.type === undefined) {
+      return deny('task has no non-empty "type:" frontmatter key');
+    }
+    if (doc.functionalArea === undefined) {
+      return deny('task has no non-empty "functional_area:" frontmatter key');
+    }
+    // The gate judges the body, not its frontmatter — the same rule the brief
+    // gate has always run: a task that is only frontmatter carries no task.
+    return doc.body.trim().length > 0
+      ? allow('task is pending and complete')
+      : deny('task body is empty');
   }
   if (doc.kind === 'brief') {
     // The gate judges the brief, not its frontmatter: the raw document still
@@ -138,6 +219,72 @@ export async function sourceAdmissible(
     return deny('ADR has no non-empty "## Decision" section');
   }
   return allow('ADR is proposed and complete');
+}
+
+/**
+ * The task design directory that checkpoints a given task source — the same
+ * authority `nnnOfExistingRun` uses for light re-entry (ADR-010 A17): the
+ * checkpoint's `source.path` names the run, so a `--slug`-pinned run still
+ * resolves. `undefined` when no task design directory checkpoints it.
+ */
+function taskRunStatus(repoDir: string, dep: string): string | undefined {
+  const sourceRel = join('docs', 'tasks', `${dep}.md`);
+  const root = join(repoDir, 'docs', 'designs', 'tasks');
+  let entries: string[];
+  try {
+    entries = readdirSync(root);
+  } catch {
+    return undefined; // no task design tree at all: the dependency has no run
+  }
+  for (const entry of entries) {
+    if (!/^\d{3}-/.test(entry)) {
+      continue;
+    }
+    try {
+      const raw = JSON.parse(readFileSync(join(root, entry, STATE_FILE), 'utf8')) as {
+        source?: { kind?: unknown; path?: unknown };
+        status?: unknown;
+      };
+      if (raw.source?.kind === 'task' && raw.source?.path === sourceRel) {
+        return typeof raw.status === 'string' ? raw.status : undefined;
+      }
+    } catch {
+      // No readable checkpoint: a design directory left behind is not a run.
+    }
+  }
+  return undefined;
+}
+
+/**
+ * ADR-023 (023-L4): the task dependency gate — a deterministic entry check,
+ * run beside `sourceAdmissible` before any inference is spent. Every
+ * `depends_on` entry must name an EXISTING task source whose run is DONE:
+ * its checkpoint exists and carries `status: done`. A missing checkpoint is
+ * "never started", which is not done, and is refused the same way.
+ */
+export function taskDependenciesGate(repoDir: string, deps: readonly string[]): GateResult {
+  if (deps.length === 0) {
+    return allow('no dependencies declared');
+  }
+  for (const dep of deps) {
+    if (!TASK_NAME_RE.test(dep)) {
+      return deny(`depends_on entry "${dep}" is not a T-NNN-slug task name`);
+    }
+    const sourceRel = join('docs', 'tasks', `${dep}.md`);
+    if (!existsSync(join(repoDir, 'docs', 'tasks', `${dep}.md`))) {
+      return deny(`depends_on names ${dep}, but ${sourceRel} does not exist`);
+    }
+    const status = taskRunStatus(repoDir, dep);
+    if (status === undefined) {
+      return deny(
+        `depends_on names ${dep}, which has no run — no task checkpoint names ${sourceRel}`,
+      );
+    }
+    if (status !== 'done') {
+      return deny(`depends_on names ${dep}, whose run is not done (status: ${status})`);
+    }
+  }
+  return allow(`${String(deps.length)} dependency(ies) satisfied`);
 }
 
 /**
@@ -538,6 +685,22 @@ export function flipAdrStatus(content: string): string | null {
   const patched = content.replace(/^status:[ \t]*proposed[ \t]*$/m, 'status: accepted');
   const ok =
     /^status:[ \t]*accepted[ \t]*$/m.test(patched) && /^status:[ \t]*proposed/m.test(content);
+  return ok ? patched : null;
+}
+
+/**
+ * ADR-023 (023-L3): the deterministic task status flip — the sibling of
+ * `flipAdrStatus`, `pending` to `completed`. `disposition` is operator-managed
+ * and this flip never touches it.
+ */
+export function flipTaskStatus(content: string): string | null {
+  if (!/^---\r?\n[\s\S]*?\r?\n---/.test(content)) {
+    return null;
+  }
+  const patched = content.replace(/^status:[ \t]*pending[ \t]*$/m, 'status: completed');
+  const ok =
+    /^status:[ \t]*completed[ \t]*$/m.test(patched) &&
+    /^status:[ \t]*pending[ \t]*$/m.test(content);
   return ok ? patched : null;
 }
 

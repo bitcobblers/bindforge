@@ -36,12 +36,14 @@ import {
   checkGate,
   documentOutgrewFlow,
   flipAdrStatus,
+  flipTaskStatus,
   isSemanticCommit,
   lastSeatReply,
   parseSource,
   planOutgrewFlow,
   sourceAdmissible,
   stagePathAllowed,
+  taskDependenciesGate,
   touchesExecutableSurface,
 } from './gates.js';
 import {
@@ -102,9 +104,10 @@ import {
   CheckpointWriteFailure,
   type CheckpointWriter,
   createStateWriter,
+  designDirCandidates,
   designDirOf,
   holdsRunnerBytes,
-  loadState,
+  loadStateForSlug,
   recordRunnerDelete,
   recordRunnerWrite,
   runnerBytesFor,
@@ -2442,6 +2445,36 @@ export async function runPipeline(opts: RunOptions): Promise<PipelineRunResult> 
       await finalizeEscalate(opts.repoDir, state, `source not admissible: ${verdict.reason}`, cfg);
       return runResult(state);
     }
+    // ADR-023 (023-L4): a task's dependencies are a deterministic entry gate at
+    // the same source step, in the same shape as the ledger join — the runner
+    // refuses to start a task whose declared predecessors are not done, before
+    // any inference is spent. `sourceAdmissible` cleared, so the document is
+    // readable: re-parse only when the pre-lock read failed (the ADR-010
+    // single-read posture keeps the common path at one read), and an
+    // unreadable document HERE is a refusal, not an empty list.
+    if (id.kind === 'task') {
+      let deps: string[] = parsed?.dependsOn ?? [];
+      if (parsed === undefined) {
+        try {
+          deps = parseSource(readFileSync(sourceAbs, 'utf8'), 'task').dependsOn;
+        } catch {
+          const why = 'task dependencies refused: source not readable for the dependency check';
+          await finalizeEscalate(opts.repoDir, state, why, cfg);
+          return runResult(state);
+        }
+      }
+      const depsVerdict = taskDependenciesGate(opts.repoDir, deps);
+      gateLog(state, 'taskDependencies', 0, depsVerdict);
+      if (!depsVerdict.proceed) {
+        await finalizeEscalate(
+          opts.repoDir,
+          state,
+          `task dependencies refused: ${depsVerdict.reason}`,
+          cfg,
+        );
+        return runResult(state);
+      }
+    }
     // ADR-021, 021-R2's first hook: the ledger join is deterministic, so it runs
     // at the same source step, before any inference is spent, at the one
     // `sourceAdmissible` call site — which is how every entry path and every
@@ -2463,11 +2496,18 @@ export async function runPipeline(opts: RunOptions): Promise<PipelineRunResult> 
 }
 
 export async function resumePipeline(opts: ResumeOptions): Promise<PipelineRunResult> {
-  const designDirRel = join('docs', 'designs', opts.slug);
-  const state = await loadState(join(opts.repoDir, designDirRel));
-  if (!state) {
-    throw new Error(`no pipeline checkpoint at ${designDirRel}`);
+  // ADR-023 (023-C3): the slug can name a run in either design root — the
+  // ADR/brief root or the segregated task root. The lookup searches both, in
+  // order, and throws on a slug present in both.
+  const loaded = await loadStateForSlug(opts.repoDir, opts.slug);
+  if (!loaded) {
+    throw new Error(
+      `no pipeline checkpoint for slug ${opts.slug} (searched ` +
+        `${designDirCandidates(opts.slug).join(' and ')})`,
+    );
   }
+  const designDirRel = loaded.dir;
+  const state = loaded.state;
   // ADR-010: the flow is the checkpoint's, read through `flowOf` (an absent key
   // is `full`). The config resolves from it — the effective numbers the drive
   // loop runs — validated pre-lock so an empty caller panel is a usage error,
@@ -3600,6 +3640,8 @@ async function finalizeDone(
     await finalizeEscalate(repoDir, state, why, cfg);
     return;
   }
+  // ADR-023 (023-L3): the source flip is kind-scoped — an ADR goes `accepted`,
+  // a task goes `completed` — and the runner is the only writer of that line.
   if (state.source.kind === 'adr') {
     const adrPath = join(repoDir, state.source.path);
     const content = readFileSync(adrPath, 'utf8');
@@ -3608,6 +3650,15 @@ async function finalizeDone(
       console.warn(`ADR status not flipped (unexpected format): ${state.source.path}`);
     } else {
       writeFileSync(adrPath, patched, 'utf8');
+    }
+  } else if (state.source.kind === 'task') {
+    const taskPath = join(repoDir, state.source.path);
+    const content = readFileSync(taskPath, 'utf8');
+    const patched = flipTaskStatus(content);
+    if (patched === null) {
+      console.warn(`task status not flipped (unexpected format): ${state.source.path}`);
+    } else {
+      writeFileSync(taskPath, patched, 'utf8');
     }
   }
   state.status = 'done';

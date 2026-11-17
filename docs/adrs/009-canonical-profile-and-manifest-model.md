@@ -1,4 +1,5 @@
 ---
+doc_type: adr
 status: superseded
 date: 2026-11-11
 supersedes: —

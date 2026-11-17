@@ -16,7 +16,7 @@ import {
   runPipeline,
 } from './runner.js';
 import { DEFAULT_CONFIG } from './stages.js';
-import { loadState } from './state-store.js';
+import { designDirCandidates, loadStateForSlug } from './state-store.js';
 import { ESCALATION_FILE } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -168,7 +168,8 @@ async function dispatch(argv: string[]): Promise<number> {
     yargs(hideBin(argv))
       .command(
         'run <source>',
-        'Run the pipeline for an ADR (docs/adrs/NNN-*.md) or brief (docs/prompts/*.md)',
+        'Run the pipeline for an ADR (docs/adrs/NNN-*.md), a task (docs/tasks/T-NNN-*.md), ' +
+          'or a brief (docs/prompts/*.md)',
         (cmd) =>
           cmd
             .positional('source', { describe: 'source document path', type: 'string' })
@@ -248,15 +249,25 @@ async function dispatch(argv: string[]): Promise<number> {
   switch (args._[0]) {
     case 'status': {
       const slug = String(args.slug);
-      const state = await loadState(join(repo, 'docs', 'designs', slug));
-      if (!state) {
-        console.error(`no pipeline checkpoint for ${slug}`);
+      // ADR-023 (023-C3): the slug can name a run in either design root; the
+      // shared lookup searches both and refuses an ambiguous slug.
+      let loaded;
+      try {
+        loaded = await loadStateForSlug(repo, slug);
+      } catch (error) {
+        console.error(printable(error instanceof Error ? error.message : String(error)));
+        return 1;
+      }
+      if (!loaded) {
+        console.error(
+          `no pipeline checkpoint for ${slug} (searched ${designDirCandidates(slug).join(' and ')})`,
+        );
         return 1;
       }
       // ADR-006 §3: the marker sits alongside the loaded state, and status
       // prints the split-record line when they disagree.
-      const marker = existsSync(join(repo, 'docs', 'designs', slug, ESCALATION_FILE));
-      console.log(renderStatus(state, marker));
+      const marker = existsSync(join(repo, loaded.dir, ESCALATION_FILE));
+      console.log(renderStatus(loaded.state, marker));
       return 0;
     }
     case 'run': {

@@ -1,4 +1,5 @@
 ---
+doc_type: adr           # the source document's kind: adr (ADR-023)
 status: proposed        # proposed | accepted | superseded
 date: YYYY-MM-DD
 deciders:               # optional, humans accountable for the decision

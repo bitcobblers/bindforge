@@ -74,7 +74,7 @@ export type StageKind = keyof typeof StageReplySchemas;
 // ---------------------------------------------------------------------------
 
 export interface SourceRef {
-  kind: 'adr' | 'brief';
+  kind: 'adr' | 'brief' | 'task';
   path: string;
 }
 

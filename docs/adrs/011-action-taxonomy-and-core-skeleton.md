@@ -1,4 +1,5 @@
 ---
+doc_type: adr
 status: accepted
 date: 2026-11-12
 supersedes: 009

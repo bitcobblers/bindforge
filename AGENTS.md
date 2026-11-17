@@ -34,9 +34,13 @@ BindForge is an open framework for creating, sharing, and translating game input
   - `pipeline run <source-path>` to start or continue a run
   - `pipeline resume <design-slug>` to continue from checkpoint
   - `pipeline status <design-slug>` for current state
-- Source documents must have frontmatter `status: proposed` with non-empty Context and Decision to enter the pipeline.
+- Source documents are ADRs (`docs/adrs/NNN-slug.md`), tasks (`docs/tasks/T-NNN-slug.md`, ADR-023), or briefs (`docs/prompts/*.md`).
+  - An ADR must have frontmatter `status: proposed` with non-empty Context and Decision to enter the pipeline.
+  - A task must have frontmatter `doc_type: task`, `status: pending`, `type`, and `functional_area` with a non-empty body; optional `associated_adr` and `depends_on` (task names, each must exist and be `done` before the run starts).
+  - Every source document carries a `doc_type` key (`adr`/`task`); a `doc_type` that disagrees with the document's path is a usage error.
+- The pipeline flips the source's `status` itself on completion: ADR `proposed` → `accepted`, task `pending` → `completed`.
 - Light flow is selected with frontmatter `flow: light` (ADR-010). Otherwise the full flow runs.
-- Design artifacts live under `docs/designs/<NNN-slug>/` with `01-research.md`, `02-proposal.md`, `03-build-notes.md`, reviews, transcripts, `.pipeline.json`.
+- Design artifacts live under `docs/designs/<NNN-slug>/` (task runs under `docs/designs/tasks/<NNN-slug>/`) with `01-research.md`, `02-proposal.md`, `03-build-notes.md`, reviews, transcripts, `.pipeline.json`.
 
 ## Agent / shell rights
 
