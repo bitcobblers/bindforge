@@ -89,7 +89,7 @@ export const FLOWS: Record<Flow, FlowDef> = {
       maxRounds: 2,
       maxReviews: { design: 0, code: 6 },
       maxPassesPerRound: 3,
-      stageTimeoutMs: 12 * 60_000,
+      stageTimeoutMs: 15 * 60_000,
       planMaxLines: 80,
       reviewSeats: { design: [], code: ['correctness', 'testing'] },
     },

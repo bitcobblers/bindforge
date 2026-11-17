@@ -1594,7 +1594,7 @@ async function executeInference(
       }
     }
     if (violations.length > 0) {
-      console.warn(`stage ${handle.stageKey}: independence violation — ${violations.join('; ')}`);
+      console.error(`stage ${handle.stageKey}: INDEPENDENCE VIOLATION — ${violations.join('; ')}`);
       outcome = { ok: false, failure: `independence violation: ${violations.join('; ')}` };
       break;
     }

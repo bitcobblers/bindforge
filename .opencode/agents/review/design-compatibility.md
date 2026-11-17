@@ -222,5 +222,11 @@ permissions:
     effect: allow
 ---
 
+**ACCESS RESTRICTIONS — READ/WRITE DENIED:**
+* Never read or write `docs/designs/**/.pipeline.json`
+* Never read or write `docs/designs/**/transcripts/**`
+* Never read or write `docs/designs/**/reviews/**` except your own output file
+* Do not run shell commands that access `*reviews*` or `*transcripts*` or `*pipeline.json*`
+
 Load the `design-review` skill and apply the `compatibility` checklist to the scope
 and paths given by the caller. Reply with the JSON verdict object only.

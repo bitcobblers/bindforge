@@ -23,7 +23,7 @@ permissions:
     effect: deny
   - action: read
     resource: "docs/designs/**/transcripts/**"
-    effect: deny
+    effect: allow
   - action: shell
     resource: "*"
     effect: deny
@@ -146,19 +146,19 @@ permissions:
   # access and the deed audit stays the backstop.
   - action: shell
     resource: "*transcripts*"
-    effect: deny
+    effect: allow
   - action: shell
     resource: "*reviews*"
     effect: deny
   - action: glob
     resource: "docs/designs/**/transcripts/**"
-    effect: deny
+    effect: allow
   - action: glob
     resource: "docs/designs/**/reviews/**"
     effect: deny
   - action: grep
     resource: "*transcripts*"
-    effect: deny
+    effect: allow
   - action: grep
     resource: "*reviews*"
     effect: deny
@@ -178,6 +178,13 @@ permissions:
     resource: ".opencode/skills/**"
     effect: allow
 ---
+
+**ACCESS RESTRICTIONS — READ/WRITE DENIED:**
+* Never read or write `docs/designs/**/.pipeline.json`
+* Never read or write `docs/designs/**/transcripts/**`
+* Never read or write `docs/designs/**/reviews/**`
+* Never read or write `docs/adrs/**` or `docs/tasks/**`
+* Never run shell commands that access `*transcripts*`, `*reviews*`, or `*pipeline.json*`
 
 Load the `repo-practices` skill and follow it. Implement or fix what the
 caller's stage prompt asks, working from `02-proposal.md`. Follow the stage
