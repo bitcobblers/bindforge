@@ -8,7 +8,7 @@
     "path": "docs/tasks/T-001-steam-linux-discovery.md"
   },
   "status": "running",
-  "lastStage": "proposal-final",
+  "lastStage": "editorial-review",
   "designRound": 4,
   "codeRound": 0,
   "designBudgetUsed": 3,
@@ -24,7 +24,8 @@
     "df0e965c9ff8a9830c4b96132bdd5c1b01071330",
     "e2a308885b380dca31d249badc8479a7c68a87e5",
     "418a2677f45bd50a6472fd0688cfadc0abecac61",
-    "f1d5594fc6536907b7ad25420d8d53665f16f1f7"
+    "f1d5594fc6536907b7ad25420d8d53665f16f1f7",
+    "b054ac3a38ba59cfa860867dfe32b518289b322b"
   ],
   "forceNext": null,
   "results": [
@@ -599,20 +600,6 @@
       "nudges": 0
     },
     {
-      "stage": "editorial-review:performance",
-      "round": 4,
-      "sessionID": "ses_e133c761effebhZxytfRgJ7ET9",
-      "agent": "review/design-performance",
-      "at": 1794973646667,
-      "reply": {
-        "verdict": "approve",
-        "findings": []
-      },
-      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/editorial-review-performance-r4.md",
-      "durationMs": 46373,
-      "nudges": 0
-    },
-    {
       "stage": "editorial-review:security",
       "round": 4,
       "sessionID": "ses_e133cf457ffeURIDyeHlZeTSn5",
@@ -624,6 +611,20 @@
       },
       "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/editorial-review-security-r4.md",
       "durationMs": 86764,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:performance",
+      "round": 4,
+      "sessionID": "ses_e133c761effebhZxytfRgJ7ET9",
+      "agent": "review/design-performance",
+      "at": 1794973646667,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/editorial-review-performance-r4.md",
+      "durationMs": 46373,
       "nudges": 0
     },
     {
@@ -669,10 +670,17 @@
       "proceed": true,
       "reason": "all five seats approve the current revision stamp",
       "at": 1794973424112
+    },
+    {
+      "gate": "editorial-review",
+      "round": 4,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1794973687232
     }
   ],
   "startedAt": 1794969708852,
-  "updatedAt": 1794973687173,
+  "updatedAt": 1794973687232,
   "flow": "full",
   "baseRef": "4caa688933b2969f569f6126dddb713180c7c410",
   "designCycle": 3,
@@ -745,12 +753,14 @@
     }
   },
   "lastReviewPass": {
-    "phase": "design",
-    "round": 3,
-    "cycle": 2,
+    "phase": "editorial",
+    "round": 4,
     "seats": [
+      "correctness",
+      "compatibility",
       "security",
-      "performance"
+      "performance",
+      "complexity"
     ]
   },
   "reviseNoChange": false

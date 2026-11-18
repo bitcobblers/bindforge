@@ -1,0 +1,10 @@
+"AppState"
+{
+	"appid"		"900004"
+	"name"		"Truncated Game"
+	"installdir"		"Truncated Game"
+	"MountedConfig"
+	{
+		"depot_900004"
+		{
+			"manifestid"		"12345"

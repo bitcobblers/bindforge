@@ -1,0 +1,10 @@
+"AppState"
+{
+	"appid"		"900201"
+	"name"		"BrokenMarker900201"
+	"installdir"		"Broken Install 201"
+	"MountedConfig"
+	{
+		"depot_900201"
+		{
+			"manifestid"		"7777"
