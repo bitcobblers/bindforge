@@ -8,8 +8,8 @@
     "path": "docs/tasks/T-001-steam-linux-discovery.md"
   },
   "status": "running",
-  "lastStage": "design-review",
-  "designRound": 3,
+  "lastStage": "proposal-final",
+  "designRound": 4,
   "codeRound": 0,
   "designBudgetUsed": 3,
   "codeBudgetUsed": 0,
@@ -23,7 +23,8 @@
     "e4fa8859a0343bacfe5a67fdf701cb12120475a7",
     "df0e965c9ff8a9830c4b96132bdd5c1b01071330",
     "e2a308885b380dca31d249badc8479a7c68a87e5",
-    "418a2677f45bd50a6472fd0688cfadc0abecac61"
+    "418a2677f45bd50a6472fd0688cfadc0abecac61",
+    "f1d5594fc6536907b7ad25420d8d53665f16f1f7"
   ],
   "forceNext": null,
   "results": [
@@ -540,6 +541,111 @@
       "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/design-review-performance-r3c2.md",
       "durationMs": 125172,
       "nudges": 0
+    },
+    {
+      "stage": "proposal-final",
+      "round": 0,
+      "sessionID": "ses_e133f2606fferv7N3ea65gi7wG",
+      "agent": "design/editor",
+      "at": 1794973509089,
+      "reply": {
+        "ambiguities": [
+          "Options considered — \"Windows discovery, Steam Deck, Epic/manual discovery (ADR-022 scopes; see *Deferred*).\" is ambiguous: \"ADR-022 scopes\" reads as an incomplete clause (scopes them how?); author to clarify.",
+          "*Chosen design* §1 — \"Every `pub` item above except `from_host()` is exercised by a test in *Test strategy*\" is a singular \"a test\" for items touched by several test entries, and #5's \"its\" has two possible antecedents (the item or `from_roots()`); author to confirm intended coverage.",
+          "*Chosen design* §4 — \"since `crates/discovery` takes no `bindforge-core` edge (A16)\": the `bindforge-core` clause is the reason for plugin-local constants, while A16 is the file-size assumption; the tag appears attached to the wrong half of the sentence.",
+          "*Chosen design* §4 — \"the behavior the two surveyed readers share\": \"the two surveyed readers\" is not anchored to a named pair in this document; author to point at the intended pair.",
+          "*Chosen design* §7 — \"a missing or malformed `libraryfolders.vdf`\" is one skip category, but the single `Err` case counts \"at least one file was skipped as unreadable or malformed\"; whether a *missing* (not malformed) VDF counts toward that tally is ambiguous; author to clarify.",
+          "*Chosen design* §2 — \"resolves symlink aliases (`~/.steam/root` → the real root) and the `\"0\" → root` duplicate\": the `\"0\" → root` shorthand could mean the `\"0\"` libraryfolders key whose path is the root or the `\"0\"` fixture entry pointing to `..`; author to clarify.",
+          "*Chosen design* §9 fixture tree — `compatdata/900001/pfx/drive_c/Program Files (x86)/Steam/steamapps/`: unclear whether the `/` in \"Files (x86)/Steam\" is a literal path separator or shorthand notation; author to confirm.",
+          "*Compatibility matrix* — the `$XDG_DATA_HOME/Steam` override row's Notes cell opens with \"Honoured\" while the prose uses the US spelling (\"behavior\"); the cell is verbatim-locked, so the author may want to normalize the variety.",
+          "*Revision log* r0 q18 — \"kept as a property of the code, not as a promised cross-plugin API for the un-filed Windows plugin\" reads as a compressed sentence; log convention kept it verbatim; author to clarify if reworded."
+        ],
+        "commitMessage": "docs: final language pass on the T-001 Steam Linux discovery proposal"
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/proposal-final-r0.md",
+      "durationMs": 84931,
+      "nudges": 0,
+      "docName": "02-proposal.md",
+      "docLines": 437,
+      "docLinesAdded": 9,
+      "docLinesRemoved": 8
+    },
+    {
+      "stage": "editorial-review:correctness",
+      "round": 4,
+      "sessionID": "ses_e133dd9d1ffehkFagdp7m0VTBE",
+      "agent": "review/design-correctness",
+      "at": 1794973567904,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/editorial-review-correctness-r4.md",
+      "durationMs": 58695,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:compatibility",
+      "round": 4,
+      "sessionID": "ses_e133dd9d1ffd1oi9UsmGVH7rU6",
+      "agent": "review/design-compatibility",
+      "at": 1794973600215,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/editorial-review-compatibility-r4.md",
+      "durationMs": 91006,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:performance",
+      "round": 4,
+      "sessionID": "ses_e133c761effebhZxytfRgJ7ET9",
+      "agent": "review/design-performance",
+      "at": 1794973646667,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/editorial-review-performance-r4.md",
+      "durationMs": 46373,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:security",
+      "round": 4,
+      "sessionID": "ses_e133cf457ffeURIDyeHlZeTSn5",
+      "agent": "review/design-security",
+      "at": 1794973654742,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/editorial-review-security-r4.md",
+      "durationMs": 86764,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:complexity",
+      "round": 4,
+      "sessionID": "ses_e133bc091ffexn7oD9pBosqGJW",
+      "agent": "review/design-complexity",
+      "at": 1794973687173,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "Assumption register, row A9 — \"; so, `home` is read from `std::env::var_os(\"HOME\")`\"",
+            "problem": "The editorial pass inserted a comma after the conjunction `so` following a semicolon; the pre-diff \"; so `home` is read from …\" read correctly and the new comma makes `so` scan as a sentence adverb — a small language regression introduced by this round's changed text.",
+            "fix": "Delete the comma after `so` in A9; no other text changes."
+          }
+        ]
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/editorial-review-complexity-r4.md",
+      "durationMs": 40388,
+      "nudges": 0
     }
   ],
   "gateLog": [
@@ -566,7 +672,7 @@
     }
   ],
   "startedAt": 1794969708852,
-  "updatedAt": 1794973424112,
+  "updatedAt": 1794973687173,
   "flow": "full",
   "baseRef": "4caa688933b2969f569f6126dddb713180c7c410",
   "designCycle": 3,
