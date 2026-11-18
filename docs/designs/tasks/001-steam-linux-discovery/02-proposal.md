@@ -2,7 +2,7 @@
 
 ## Context
 
-`crates/discovery` ships the engine, the two-method plugin trait and the data model, but no real probe:
+`crates/discovery` ships the engine, the two-method plugin trait, and the data model, but no real probe:
 `apps/discovery-cli` registers a `DummyPlugin` returning `Ok(vec![])`
 (apps/discovery-cli/src/main.rs:25-41). T-001 (docs/tasks/T-001-steam-linux-discovery.md) adds the first
 implementation — `SteamLinuxPlugin`, which reads library folders from `libraryfolders.vdf`, enumerates
@@ -12,9 +12,9 @@ implementation — `SteamLinuxPlugin`, which reads library folders from `library
 docs/designs/tasks/001-steam-linux-discovery/01-research.md.
 
 The task is additive: no change to `DiscoveredGame`, `Platform`, the `DiscoveryPlugin` trait,
-`normalize_slug`, `DiscoveryEngine` or any `schemas/` spec. The open decisions research left (19 open
+`normalize_slug`, `DiscoveryEngine`, or any `schemas/` spec. The open decisions research left (19 open
 questions) are all about selection policy and failure policy, not about the data model, and this document
-settles each one that traces to T-001's Decision clauses; the rest are listed in
+settles each such question that traces to T-001's Decision clauses; the rest are listed in
 *Deferred / out of scope*.
 
 ## Goals / Non-goals
@@ -49,7 +49,7 @@ settles each one that traces to T-001's Decision clauses; the rest are listed in
 | A6 | The only escapes Steam writes inside quoted values are `\\` and `\"`. | unverified | https://github.com/frankea/Whisky/blob/e51bd9f6/WhiskyKit/Sources/WhiskyKit/Steam/VDFParser.swift (no Valve grammar exists) |
 | A7 | These two file kinds contain no `#base` directive, `[$WIN32]`-style conditional or other construct the reader is designed to reject. | unverified | no statement of what the Linux client writes was found (01-research.md:352-357) |
 | A8 | Steam roots are found under the home directory (native plus `~/.steam/*`), `$XDG_DATA_HOME/Steam`, the Flatpak `~/.var/app/com.valvesoftware.Steam` tree and the Snap `~/snap/steam/common` tree; a directory is a root when it has a `steamapps` directory. | verified | https://raw.githubusercontent.com/WilliamVenner/steamlocate-rs/master/src/locate/linux.rs |
-| A9 | On the pinned 1.85.0 floor `std::env::home_dir()` is `#[deprecated]` (removed only in 1.87.0) and returns `Some("")` for a set-but-empty `$HOME`; so `home` is read from `std::env::var_os("HOME")`, and unset or empty means no home directory. A relative `$XDG_DATA_HOME` is invalid and must be ignored. | verified | https://doc.rust-lang.org/1.85.0/std/env/fn.home_dir.html, https://specifications.freedesktop.org/basedir-spec/latest/ |
+| A9 | On the pinned 1.85.0 floor `std::env::home_dir()` is `#[deprecated]` (removed only in 1.87.0) and returns `Some("")` for a set-but-empty `$HOME`; so, `home` is read from `std::env::var_os("HOME")`, and unset or empty means no home directory. A relative `$XDG_DATA_HOME` is invalid and must be ignored. | verified | https://doc.rust-lang.org/1.85.0/std/env/fn.home_dir.html, https://specifications.freedesktop.org/basedir-spec/latest/ |
 | A10 | A Flatpak install can name library paths that exist only inside the sandbox, or on mounts the discovery user cannot read. | verified | https://docs.flatpak.org/en/latest/sandbox-permissions.html |
 | A11 | `ReadDir` yields entries in unspecified order, so any stable output needs an explicit sort. | verified | https://doc.rust-lang.org/std/fs/struct.ReadDir.html |
 | A12 | `libraryfolders.vdf` also exists in a pre-2021 shape that a modern-shape-only reader parses to zero libraries. | verified | https://docs.rs/aurelia-steam/latest/aurelia/library/fn.library_folder_paths.html |
@@ -141,7 +141,7 @@ pub fn parse_manifest(text: &str) -> Option<AppManifest>;   // None = skip this 
 ```
 
 No `new()` / `Default` impl: a bare `pub fn new()` would trip clippy's `new_without_default` under
-`-D warnings` (A18), and both constructors say more than `new()` does. Every `pub` item above except
+`-D warnings` (A18), and both constructors say more than `new()` would. Every `pub` item above except
 `from_host()` is exercised by a test in *Test strategy* — #5 pins its candidate list through the pure
 `host_candidates` and *Rollout* #5 checks its host probe. The rest (scan loop, composition, comparison
 key) stays private. The plugin holds its roots because `discover(&self)` takes no arguments (A17).
@@ -170,7 +170,8 @@ is ever scanned twice, including by two roots sharing one. Emitted `install_path
 library prefix; nothing the plugin emits carries an unresolved `..`.
 
 `from_roots()` skips `host_candidates` and the existence probe, taking caller-supplied roots through the
-canonical path rule. It is the seam tests and `--steam-root` use; `from_host()` is a thin wrapper over it.
+canonical path rule. It is the seam that tests and `--steam-root` use;
+`from_host()` is a thin wrapper over `from_roots()`.
 
 ### 3. Library selection within a root
 
@@ -193,7 +194,7 @@ read only as entries directly inside a selected library's `steamapps/`.
 
 `keyvalues::parse` accepts, for both file kinds: whitespace-separated tokens; quoted and bare keys and
 values; `{}`-nested sections; `//` line comments; a leading UTF-8 BOM; LF and CRLF. It unescapes `\\` and
-`\"` inside quoted values — assumed sufficient for what Steam emits (A6) and the behaviour the two
+`\"` inside quoted values — assumed sufficient for what Steam emits (A6) and the behavior the two
 surveyed readers share. `children` keeps declaration order and `get_str` is case-insensitive first-match
 (A5), so a duplicate key resolves to its first occurrence. It rejects, as a positioned
 `KeyValueError { line, message }`: unbalanced braces, an unterminated string, a `[` conditional or `#base`
@@ -362,7 +363,7 @@ pinned 1.85 floor (A15) no `std` feature flags and no `deprecated` lint to work 
    `DiscoveredGame` objects; a third test asserts `list --json` prints `[]` for a `--steam-root` that does
    not exist. No CLI test probes the host, so `list --json` stops being machine-dependent
    (01-research.md:308-312).
-10. Platform: `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings` and
+10. Platform: `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and
     `cargo test --workspace --locked` pass on the pinned 1.85 toolchain with `Cargo.lock` unchanged (A15,
     A18); the A18 CI job runs on `ubuntu-latest` with no Steam installed and no network, and every test
     above passes there — no test reads the developer's home directory.
