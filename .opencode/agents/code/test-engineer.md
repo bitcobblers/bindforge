@@ -24,7 +24,7 @@ permissions:
     effect: deny
   - action: read
     resource: "docs/designs/**/transcripts/**"
-    effect: allow
+    effect: deny
   - action: shell
     resource: "*"
     effect: deny
@@ -147,13 +147,13 @@ permissions:
   # access and the deed audit stays the backstop.
   - action: shell
     resource: "*transcripts*"
-    effect: allow
+    effect: deny
   - action: shell
     resource: "*reviews*"
     effect: deny
   - action: glob
     resource: "docs/designs/**/transcripts/**"
-    effect: allow
+    effect: deny
   - action: glob
     resource: "docs/designs/**/reviews/**"
     effect: deny
