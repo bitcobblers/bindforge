@@ -1,12 +1,12 @@
 {
   "roles": {
-    "coder": "llama/qwen-unsloth",
-    "code-review": "llama/glimmer",
-    "designer": "llama/gemma-q6",
-    "editor": "llama/gemma-q6",
-    "planner": "llama/gemma-q6",
-    "doc-sync": "llama/gemma-q6",
-    "researcher": "llama/gemma-q6",
-    "design-review": "llama/glimmer"
+    "coder": "basalt/Qwen3.8-Flash-Next NVIDIA-NVFP4",
+    "code-review": "basalt/Qwen3.8-Flash-Next NVIDIA-NVFP4",
+    "designer": "basalt/Qwen3.8-Flash-Next NVIDIA-NVFP4",
+    "editor": "basalt/Qwen3.8-Flash-Next NVIDIA-NVFP4",
+    "planner": "basalt/Qwen3.8-Flash-Next NVIDIA-NVFP4",
+    "doc-sync": "basalt/Qwen3.8-Flash-Next NVIDIA-NVFP4",
+    "researcher": "basalt/Qwen3.8-Flash-Next NVIDIA-NVFP4",
+    "design-review": "basalt/Qwen3.8-Flash-Next NVIDIA-NVFP4"
   }
 }
