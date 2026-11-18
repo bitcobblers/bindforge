@@ -16,7 +16,9 @@
   "editorialDone": false,
   "testsGreen": true,
   "testsNeedUpdate": false,
-  "stageFailures": {},
+  "stageFailures": {
+    "doc-sync": 1
+  },
   "stageCommits": [
     "45f9036d97e784a4ff8b41c1fd0a60da00bb65c4",
     "8376382788b2d3ec9fdbfeae16f24c1c6582fb75",
@@ -35,7 +37,8 @@
     "02edb876116398ce264a98db39160ef0a6c91d8c",
     "752096e9a851843caca904c18f36c0ab06710779",
     "c9fb37b7ab8c5313f61368fddba3cb93ea8a339b",
-    "349d1f6861e179f69e96dd569fd769c0443347d2"
+    "349d1f6861e179f69e96dd569fd769c0443347d2",
+    "a6619bb00822d0cb4f9d9b9f41879da693bea47f"
   ],
   "forceNext": null,
   "results": [
@@ -1226,6 +1229,17 @@
       "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/code-review-performance-r1c3.md",
       "durationMs": 105234,
       "nudges": 0
+    },
+    {
+      "stage": "doc-sync",
+      "round": 1,
+      "sessionID": "ses_e1304cf86ffe1UuhDG0nG0JRM6",
+      "agent": "ops/doc-sync",
+      "at": 1794977524942,
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/doc-sync-r1.md",
+      "durationMs": 277550,
+      "nudges": 0,
+      "failure": "independence violation: grep accessed run records: /home/mike/.local/share/opencode/worktree/f852d4/t001-run3/docs/designs/tasks/001-steam-linux-discovery/.pipeline.json"
     }
   ],
   "gateLog": [
@@ -1333,10 +1347,24 @@
       "proceed": false,
       "reason": "ratify pass c3 pending: security, performance",
       "at": 1794977141999
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1794977247347
+    },
+    {
+      "gate": "stageFailure",
+      "round": 1,
+      "proceed": false,
+      "reason": "doc-sync: independence violation: grep accessed run records: /home/mike/.local/share/opencode/worktree/f852d4/t001-run3/docs/designs/tasks/001-steam-linux-discovery/.pipeline.json",
+      "at": 1794977524943
     }
   ],
   "startedAt": 1794969708852,
-  "updatedAt": 1794977247291,
+  "updatedAt": 1794977524943,
   "flow": "full",
   "baseRef": "4caa688933b2969f569f6126dddb713180c7c410",
   "designCycle": 3,
@@ -1448,31 +1476,31 @@
       },
       "security": {
         "verdict": "approve",
-        "stamp": "752fd5abc9e4e88b57a98ef1c23c31daa3983c13",
+        "stamp": "c9fb37b7ab8c5313f61368fddba3cb93ea8a339b",
         "dissents": 0,
         "findings": [
           {
             "severity": "minor",
-            "location": "crates/discovery/src/steam_linux.rs:285-311 (read_text_file; hostile read path at steam_linux.rs:168)",
-            "problem": "The 1 MiB per-file cap is decided from a pre-read std::fs::metadata length and then applied with std::fs::read. For special files (/dev/zero, /dev/urandom) metadata().len() is 0, so a symlink at the fixed <root>/steamapps/libraryfolders.vdf path passes the cap gate and fs::read pulls an unbounded stream into memory, hanging/OOM-killing `discovery list`; the manifest leg is gated by is_file() (steam_linux.rs:216) but the VDF leg is not. The metadata-then-read split is also a TOCTOU: a file grown past the cap between probe and read is fully allocated before parse rejects it. This weakens the design's per-file bound (§4, Risks '1 MiB per file') for non-regular files; severity kept minor because exploiting it needs write access inside a scanned root's steamapps/ and the impact is DoS of a read-only CLI, with no content leakage (§7 messages carry no file contents).",
-            "fix": "Bind the read to the opened handle instead of pre-read metadata: File::open, verify file.metadata()?.is_file(), then Read::take(MAX_FILE_BYTES as u64 + 1) and treat a limit-hit as an oversize skip. This makes the cap hold for every file type and closes the growth race; at minimum add an is_file() gate to the libraryfolders.vdf read at steam_linux.rs:168."
+            "location": "crates/discovery/src/steam_linux.rs:287-316 (read_text_file; VDF read path at steam_linux.rs:170) — carried unchanged from r1, untouched by the c3 fixes",
+            "problem": "Carried forward from round 1; the ratification diff does not touch this code, so the finding stands exactly as approved: the 1 MiB per-file cap is decided from a pre-read std::fs::metadata length and applied with std::fs::read. For special files (/dev/zero, /dev/urandom) metadata().len() is 0, so a symlink at the fixed <root>/steamapps/libraryfolders.vdf path passes the cap gate and fs::read pulls an unbounded stream into memory (hang/OOM of `discovery list`); the manifest leg is gated by is_file() (steam_linux.rs:218) but the VDF leg is not. The metadata-then-read split is also a TOCTOU: a file grown past the cap between probe and read is fully allocated before parse rejects it. This weakens the design's per-file bound (§4, Risks '1 MiB per file') for non-regular files; kept minor because exploiting it needs write access inside a scanned root's steamapps/ and the impact is DoS of a read-only CLI, with no content leakage (§7 messages carry no file contents).",
+            "fix": "Bind the read to the opened handle instead of pre-read metadata: File::open, verify file.metadata()?.is_file(), then Read::take(MAX_FILE_BYTES as u64 + 1) and treat a limit-hit as an oversize skip. This makes the cap hold for every file type and closes the growth race; at minimum add an is_file() gate to the libraryfolders.vdf read reached at steam_linux.rs:170."
           }
         ]
       },
       "performance": {
         "verdict": "approve",
-        "stamp": "752fd5abc9e4e88b57a98ef1c23c31daa3983c13",
+        "stamp": "c9fb37b7ab8c5313f61368fddba3cb93ea8a339b",
         "dissents": 0,
         "findings": [
           {
             "severity": "nit",
-            "location": "crates/discovery/src/steam_linux.rs:66",
-            "problem": "discover() applies the canonical path rule twice to every library: libraries_in_root_with_skips already runs canonical_paths (realpath + steamapps is_dir + sort + de-dupe per root, :160), and discover() runs canonical_paths again over the concatenated set (:68). Each library pays two realpath calls and two steamapps stats per scan."
+            "location": "crates/discovery/src/steam_linux.rs:68",
+            "problem": "Carried unchanged from r1: discover() still applies the canonical path rule twice to every library — libraries_in_root_with_skips ends with canonical_paths (canonicalize + steamapps is_dir + sort + de-dupe per root, :162), and discover() runs canonical_paths again over the concatenated set (:68, body :322). Each library pays two realpath calls and two steamapps stats per scan. The post-approval revisions did not touch this; line number shifted +2 from the r1 report only."
           },
           {
             "severity": "nit",
-            "location": "crates/discovery/src/steam_linux.rs:216",
-            "problem": "Each candidate appmanifest_*.acf is stat'd twice before being opened: path.is_file() in scan_library (:216), then std::fs::metadata for the size cap in read_text_file (:289), then std::fs::read. Hundreds of manifests on a real install means hundreds of redundant stats."
+            "location": "crates/discovery/src/steam_linux.rs:218",
+            "problem": "Carried unchanged from r1: each candidate appmanifest_*.acf is still stat'd twice before being opened — path.is_file() in scan_library (:218), then std::fs::metadata for the 1 MiB size cap in read_text_file (:291), then std::fs::read (:299). Hundreds of manifests on a real install means hundreds of redundant stats. The post-approval revisions did not touch this; line number shifted +2 from the r1 report only."
           }
         ]
       },
@@ -1536,11 +1564,10 @@
   "lastReviewPass": {
     "phase": "code",
     "round": 1,
-    "cycle": 2,
+    "cycle": 3,
     "seats": [
-      "correctness",
-      "compatibility",
-      "testing"
+      "security",
+      "performance"
     ]
   },
   "reviseNoChange": false,
@@ -1574,6 +1601,6 @@
       }
     ]
   },
-  "codeCycle": 3,
+  "codeCycle": 4,
   "codeStamp": "c9fb37b7ab8c5313f61368fddba3cb93ea8a339b"
 }

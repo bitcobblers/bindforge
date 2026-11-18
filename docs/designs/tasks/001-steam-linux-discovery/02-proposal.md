@@ -435,3 +435,146 @@ pinned 1.85 floor (A15) no `std` feature flags and no `deprecated` lint to work 
 - r0: q18 Windows reuse — `keyvalues.rs` carries no Linux or Steam knowledge, kept as a property of the
   code, not as a promised cross-plugin API for the un-filed Windows plugin; *§1, Compatibility matrix*.
 - r0: q19 legacy `SteamApps` spelling — not accepted, kept as assumption A20 and deferred; *A20, Deferred*.
+
+## As-built
+
+Recorded 2026-11-17, after the code-review round-1 ratification (all five seats
+approve: correctness r1c2, compatibility r1c2, testing r1c2, security r1c3,
+performance r1c3), by comparing `git diff 4caa6889…HEAD` against this document.
+Nothing here amends a decision; each item records where the built code sits
+relative to the approved text, and *03-build-notes.md* → *Deviations from the
+design* is the running implementation log for the same list.
+
+1. **§1 / §4 — two `pub` items beyond the listed surface.** `keyvalues.rs`
+   exports `MAX_DOCUMENT_BYTES` (1 MiB) and `MAX_NESTING_DEPTH` (16); §1's
+   surface lists neither. *Reason:* §4 states both caps as plugin-local
+   constants because `crates/discovery` takes no `bindforge-core` edge, and
+   `steam_linux.rs:290` defines its read-side size gate as
+   `keyvalues::MAX_DOCUMENT_BYTES`, so the parse-side and read-side caps cannot
+   drift apart. *Affected:* §1, §4, §10.
+2. **§1 / §3 / §7 — the skip count is threaded through a private helper.**
+   `libraries_in_root` keeps §1's signature and delegates to a private
+   `libraries_in_root_with_skips(root, &mut usize)`, which `discover()` calls so
+   a malformed or unreadable `libraryfolders.vdf` can reach §7's counter from
+   inside library selection. *Reason:* §7's trigger needs file-level skips that
+   are only visible during library selection, and §1's signature is what
+   *Test strategy* #3/#4 assert. *Affected:* §1, §3, §7.
+3. **§7 — an absent file is not a counted skip.** `read_text_file` counts an
+   unreadable (non-`NotFound`), oversize or non-UTF-8 file, and `library_paths`
+   counts a VDF that fails to parse; a *missing* `libraryfolders.vdf` or manifest
+   is a normal degraded scan and increments nothing. *Reason:* counting absence
+   would fire §7's error for "Steam installed, nothing under it", which §7 rules
+   out; §3's always-scan of the root's own `steamapps` is that case's designed
+   outcome. *Affected:* §7 (and the "missing … `libraryfolders.vdf`" clause of
+   §7's first paragraph).
+4. **§7 — the counter the message prints is wider than its noun.** Beyond files,
+   it is incremented by an unreadable `<library>/steamapps` directory
+   (`scan_library`'s `read_dir` failure) and by a failed `read_dir` entry. The
+   message keeps §7's own noun — "N file(s) skipped as unreadable or malformed".
+   *Reason:* §7's first paragraph already lists "an unreadable library" as a
+   skip-and-continue category, so the counter follows the document; only the
+   printed noun is narrower. Recorded by the correctness and compatibility seats
+   as a nit; settling the noun is a one-word proposal edit owned by the document,
+   not by the implementation. *Affected:* §7.
+5. **§4 — the mechanism for "unterminated string".** A quoted value that reaches
+   a newline, a bare CR or EOF before its closing quote is refused, positioned at
+   the line the string *opened* on; multi-line quoted values are therefore
+   refused. *Reason:* §4 left the mechanism open; scanning to the next quote
+   would report the wrong line, which
+   `keyvalues_tests.rs::rejects_unterminated_string_with_positioned_error` pins.
+   No known `appmanifest_*.acf` or `libraryfolders.vdf` carries a multi-line
+   value. *Affected:* §4.
+6. **§4 — the 1 MiB cap is enforced at two points.** `parse` refuses an
+   over-cap `&str` (a positioned error at line 1), and `read_text_file` refuses
+   on `std::fs::metadata` length *before* the contents are allocated. *Reason:*
+   the read-side gate is what keeps a pathological file from being read into
+   memory at all, matching `repo-practices` ("cap input before they allocate
+   it"); the in-`parse` gate keeps the pure parser's own bound testable.
+   *Affected:* §4.
+7. **§5 — the `installdir` reject set is one clause wider, and "empty" is
+   trimmed.** `usable_install_dir` refuses `.`/`..`/absolute/`/`/empty as §5
+   says, additionally refuses an interior NUL byte, and treats a whitespace-only
+   `installdir` or `name` as empty (`name` then falls back to `installdir`). No
+   backslash refusal was added. *Reason:* a NUL is not a name any platform can
+   open, so it is refused for the same reason §5 refuses `..`; on Linux, the only
+   supported platform, `\` is an ordinary filename byte, so refusing it would
+   reject legal names beyond §5's stated set. Aligning §5's list and the Risks
+   row with the NUL clause is the document owner's edit. *Affected:* §5, Risks
+   row 3.
+8. **§9 — the checked-in fixture set is two trees, not the one enumerated
+   tree.** `tests/fixtures/steam/minimal/` is built as §9 draws it, decoys
+   included; a second tree `tests/fixtures/steam/all-broken/` (two truncated
+   manifests, no `libraryfolders.vdf`) was added. *Reason:* *Test strategy* #7's
+   "a root whose entries are all unparseable" and #3's "`libraryfolders.vdf` is
+   absent" cases need a root on disk, and §9 forbids test filesystem writes and
+   took no dev-dependency, so a read-only tree is the only way to express them.
+   *Affected:* §9, *Test strategy* #3 and #7.
+9. **§7 — the guard spells all three clauses.** `discover()` tests
+   `!self.roots.is_empty() && games.is_empty() && skipped > 0`; the first clause
+   is redundant (every skip increment is reachable only under a selected root)
+   and is behavior-identical to the implicit form. *Reason:* the code restates
+   §7's sentence clause-for-clause; the alternative considered (counting skipped
+   roots) would have changed §7's trigger and was not taken. *Affected:* §7.
+10. **Net-zero history against Context / Non-goals / §8.** The branch briefly
+    added `#[serde(rename_all = "kebab-case")]` to `Platform` (2bc4c2eb); the
+    code-review r1 panel kept it open as a major in all three seats and it was
+    reverted (752096e9) with the CLI assertion re-pinned to `"SteamLinux"`
+    (c9fb37b7). `crates/discovery/src/game.rs` at HEAD is identical to `main`, so
+    the merged change set carries no data-model and no JSON-shape change, as
+    Context, Non-goals and §8 require.
+11. **Out-of-proposal-scope posture repair (touches no §1–§10 design decision).**
+    `.opencode/agents/code/coder.md` and `.opencode/agents/code/test-engineer.md`
+    had `transcripts/**` read/glob/grep/shell permissions at `allow`, and
+    `tools/orchestration/src/pipeline/flows.ts` had the light flow's
+    `stageTimeoutMs` at 15 min; this branch restored `deny` and 12 min.
+    *Reason:* the parent-branch commit 780cf9ab had flipped them and `npm run
+    check` was red against tests pinned to ADR-016 and ADR-010; the AGENTS.md
+    rights section and the `docs/workflows.md` per-flow budget table state
+    `deny` and 12 min. *Affected:* none of §1–§10; recorded for the audit trail.
+12. **§2 — the Snap base is taken only from an *absolute* `$SNAP_USER_DATA`.**
+    §2 says the Snap trio hangs under `$SNAP_USER_DATA/steam/common` "when that
+    variable is set"; the code drops a set-but-relative value and falls back to
+    `$HOME/snap/steam/common`, using the same `absolute_env` helper as
+    `$XDG_DATA_HOME`. *Reason:* A9's rule that a relative base-directory
+    environment value is invalid is applied uniformly to both variables; §2's
+    candidate list is otherwise unchanged, order included. *Affected:* §2,
+    Compatibility matrix (Snap row).
+13. **Confirmed-as-designed, no drift.** `install_path` keeps the prefix of the
+    canonical library that *holds* the manifest (§5 + A2 + §2's "canonical
+    library prefix"), which is why the secondary fixture library's row carries
+    `<root>/secondary`; `crates/discovery/Cargo.toml`,
+    `apps/discovery-cli/Cargo.toml` and `Cargo.lock` do not appear in the diff at
+    all (§10); `DummyPlugin` is deleted and `--steam-root` is the only new CLI
+    surface (§8); `from_host()` is the only `pub` item without a direct test, as
+    §1 states; `MAX_NESTING_DEPTH` is exercised only through the 16-vs-17-level
+     pair in `keyvalues_tests.rs`, and `MAX_DOCUMENT_BYTES` through no direct test
+     at all — the testing seat's coverage minor, not a design change.
+
+**Re-verified 2026-11-17 against `git diff 4caa6889…HEAD` (HEAD = a6619bb0).**
+Items 1–13 were each re-checked against the source at HEAD, which is unchanged
+since `c9fb37b7` (the only later commits touch `docs/designs/**`): the two
+`pub` caps and their single definition (`keyvalues.rs:21,24`, consumed at
+`steam_linux.rs:290`); the private `libraries_in_root_with_skips` behind §1's
+`libraries_in_root` (`steam_linux.rs:142-148`); the absent-file-is-not-a-
+counted-skip rule (`read_text_file`'s `NotFound` arm, `steam_linux.rs:302`);
+the wider counter with §7's narrower printed noun (`steam_linux.rs:84`, `:204`,
+`:210`); the open-line-positioned unterminated string with its CR and EOF arms
+(`keyvalues.rs:170-214`); both 1 MiB gates (`keyvalues.rs:77-82`,
+`steam_linux.rs:288-298`); the interior-NUL refusal plus the trimmed "empty"
+(`steam_linux.rs:275-282`); the two fixture trees on disk — `steam/minimal/` as
+§9 draws it, decoys included, plus `steam/all-broken/` with two truncated
+manifests and no `libraryfolders.vdf`; the three-clause guard
+(`steam_linux.rs:77`); the absolute-`$SNAP_USER_DATA` gate through the shared
+`absolute_env` helper (`steam_linux.rs:128-131`, `:338-342`); the
+agent-rights and `stageTimeoutMs` restoration confirmed by the change set
+itself (`.opencode/agents/code/{coder,test-engineer}.md` back to `deny`,
+`tools/orchestration/src/pipeline/flows.ts` 15 → 12 min); `game.rs`, both
+`Cargo.toml` files, `Cargo.lock`, `rust-toolchain.toml`, `schemas/` and `data/`
+confirmed absent from the change set (`git diff --name-only 4caa6889…HEAD` over
+those paths: no output); `from_host` and both caps referenced by no test; and
+§8's wiring exact — `DummyPlugin` and its three imports deleted, `--steam-root`
+the only new surface, the printing code and the pre-existing `discover_all()`
+call untouched. No item closed as designed was reopened, none proved
+inaccurate, and this pass adds no new drift item; the only open document-owner
+edits remain the §5-list / Risks-row-3 NUL clause (item 7) and §7's skip-count
+noun (item 4).
