@@ -8,7 +8,7 @@
     "path": "docs/tasks/T-001-steam-linux-discovery.md"
   },
   "status": "running",
-  "lastStage": "design-review",
+  "lastStage": "proposal-revise",
   "designRound": 3,
   "codeRound": 0,
   "designBudgetUsed": 3,
@@ -20,7 +20,8 @@
   "stageCommits": [
     "45f9036d97e784a4ff8b41c1fd0a60da00bb65c4",
     "8376382788b2d3ec9fdbfeae16f24c1c6582fb75",
-    "e4fa8859a0343bacfe5a67fdf701cb12120475a7"
+    "e4fa8859a0343bacfe5a67fdf701cb12120475a7",
+    "df0e965c9ff8a9830c4b96132bdd5c1b01071330"
   ],
   "forceNext": null,
   "results": [
@@ -415,6 +416,87 @@
       "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/design-review-complexity-r3c0.md",
       "durationMs": 238802,
       "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 3,
+      "sessionID": "ses_e13496fe2ffed18g9NxHK0snXh",
+      "agent": "design/designer",
+      "at": 1794973052130,
+      "reply": {
+        "changed": true,
+        "summary": "Blocker (library level): §3's always-scan entry is now `<root>` itself with the one stated convention 'a library is the parent of its steamapps/', the fixture's \"0\" entry re-spelled \"..\" so root/library de-duping, §2's canonicalize example, §5's install_path composition and Test #3 all agree at one level. Majors: home now comes from std::env::var_os(\"HOME\") with unset/empty/relative meaning no roots (fixes the 1.85 -D warnings break, the Some(\"\")/relative-candidate hole, and §10's floor claim), A9 re-cited to the versioned 1.85.0 docs, and §7's Err trigger restated as 'root selected, zero games emitted, at least one file skipped' so Test #7's all-unparseable fixture is the Err side; cheap same-section minors folded in (from_host pub exception, cross-root de-dup, DummyPlugin import removal, schemas budget cross-reference, Windows-row reuse rationale deleted, q1/q8/q13/q18 log entries superseded in place). Net +7 lines because the three majors each require an explicit source-of-truth statement (var_os rule, one-level library rule, new Err trigger) plus two test assertions the reports named, offset by deleting the Windows reuse rationale, the 'asserts nothing' clause, and tightened prose.",
+        "commitMessage": "docs: revise T-001 proposal r3 — single library level, var_os HOME source, §7 error trigger"
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/proposal-revise-r3.md",
+      "durationMs": 302248,
+      "nudges": 0,
+      "docName": "02-proposal.md",
+      "docLines": 436,
+      "docLinesAdded": 52,
+      "docLinesRemoved": 45
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 3,
+      "sessionID": "ses_e1344d2cfffdYErF2sXY6bgcXl",
+      "agent": "review/design-compatibility",
+      "at": 1794973219947,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Compatibility matrix row \"Linux, libraries on arbitrary mounts (`/run/media/…`, `/mnt/…`, ZFS) | Yes | Absolute `path` values are accepted as-is; an unmounted library is skipped, not fatal\", read against §3 \"a `path` is used as-is when absolute and otherwise joined to the directory holding the VDF\" and Test strategy #3 \"the root itself and `<root>/secondary` are both returned … the `\"0\" → \"..\"` entry adds no duplicate against the always-included root\"",
+            "problem": "Re-raised (unchanged by this diff even though §3 and #3 were both rewritten): this remains the only `Yes` matrix row whose distinguishing mechanism no named test exercises (checklist item 7). The fixture reaches only the relative-join branch; a fabricated absolute value cannot survive the canonicalize + `steamapps` gate, so \"accepted as-is\" is unobservable through libraries_in_root; the `--steam-root`/`from_roots` seam supplies roots and bypasses the VDF branch. The row's second clause (\"an unmounted library is skipped, not fatal\") is likewise unclaimed: #7's two cases are a nonexistent root and an all-unparseable `steamapps`.",
+            "fix": "Name the branch: `pub fn resolve_library_path(vdf_dir: &Path, value: &str) -> Option<PathBuf>` in §1's public surface with `libraries_in_root` calling it (or an in-file `#[cfg(test)]` unit test over a private helper of that name, keeping §1's surface unchanged). Extend Test #3 with two assertions on nameable values: an absolute value such as `/bindforge-abs/Media/SteamLibrary` resolves to itself, and `\"1\"` under the fixture VDF dir resolves inside the fixture."
+          },
+          {
+            "severity": "nit",
+            "location": "Test strategy #8 — \"returns exactly four games — `unknown/example-game`, `unknown/mixed-case-game`, `unknown/nameless-install`, `unknown/secondary-title`\" (and #6's \"`slug == normalize_slug(display_name)`\")",
+            "problem": "Re-raised (the diff does not touch #6/#8/§9 and the Revision log records no rejection): every pinned display name is ASCII, so nothing pins that accented or non-Latin store names survive `normalize_slug`'s `char::is_alphanumeric` character test instead of degrading to `unknown/`, on the one input (§5's `display_name`) real Linux Steam installs supply in the user's locale.",
+            "fix": "Give one fixture manifest an accented `name` (e.g. \"Les Misérables\"), add its row to #8's expected list and its `unknown/les-misérables` slug to #6's output contract; slug format itself stays ADR-022's deferred concern."
+          }
+        ]
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/design-review-compatibility-r3c1.md",
+      "durationMs": 167688,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 3,
+      "sessionID": "ses_e1344d2cfffepCoIinE0bjDEeI",
+      "agent": "review/design-correctness",
+      "at": 1794973230052,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "§8 CLI wiring (`apps/discovery-cli`) — \"its `DiscoveryPlugin` import goes with it rather than being re-imported\"",
+            "problem": "Re-raised against my own r3 nit, now narrowed by the revised text: the sentence covers only one of the three imports `DummyPlugin` solely uses. `apps/discovery-cli/src/main.rs` names `DiscoveredGame` (line 3) and `DiscoveryError` (line 5) only inside `DummyPlugin`'s `fn discover` (line 30), and `register_plugin`'s `Box<dyn DiscoveryPlugin>` argument (crates/discovery/src/engine.rs:16) needs no import at the call site, so implementing §8's sentence as written leaves two unused imports that `cargo clippy --workspace --all-targets -- -D warnings` (A18, Test #10) turns into a build failure. All five of my r3 blocker/major/minor findings are otherwise closed for real; the compiler forces this one, so no design decision is at stake.",
+            "fix": "Widen the clause: \"`DiscoveredGame` and `DiscoveryError`, whose only other user is its `discover` signature, go with it too.\""
+          }
+        ]
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/design-review-correctness-r3c1.md",
+      "durationMs": 177796,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 3,
+      "sessionID": "ses_e13424383ffeUQ72L69DcZNM7k",
+      "agent": "review/design-complexity",
+      "at": 1794973294735,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/design-review-complexity-r3c1.md",
+      "durationMs": 74711,
+      "nudges": 0
     }
   ],
   "gateLog": [
@@ -427,11 +509,11 @@
     }
   ],
   "startedAt": 1794969708852,
-  "updatedAt": 1794972749843,
+  "updatedAt": 1794973294735,
   "flow": "full",
   "baseRef": "4caa688933b2969f569f6126dddb713180c7c410",
   "designCycle": 1,
-  "designStamp": "b08c55894c68e616e5536c73cc7a9921db842309",
+  "designStamp": "61907ce31bc8cb18f436caf4fcf96f29ea9c488d",
   "seats": {
     "design": {
       "correctness": {
@@ -582,5 +664,6 @@
       "compatibility",
       "complexity"
     ]
-  }
+  },
+  "reviseNoChange": false
 }
