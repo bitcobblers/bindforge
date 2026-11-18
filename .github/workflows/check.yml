@@ -23,8 +23,13 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      # rustup reads rust-toolchain.toml and installs the pinned toolchain
-      # (channel 1.85.0) automatically; nothing else is installed.
+      # T-002 Chosen design §9: the cfg(windows) code (the steam_windows host
+      # probe and its winreg reader) is compile-verified from this Linux runner;
+      # cargo check performs no code generation or linking (A11, A12).
+      - name: Windows compile check
+        run: |
+          rustup target add x86_64-pc-windows-msvc
+          cargo check --workspace --all-targets --target x86_64-pc-windows-msvc
       - name: Format check
         run: cargo fmt --all -- --check
       - name: Clippy

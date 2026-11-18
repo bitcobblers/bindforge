@@ -20,4 +20,5 @@ license = "Apache-2.0"    # matches the LICENSE file at the repo root
 [workspace.dependencies]
 bindforge-core = { path = "crates/core" }
 serde = { version = "1", features = ["derive"] }
+winreg = "0.56"    # T-002: steam_windows' registry seam; reached only from cfg(windows) code
 # clap, toml_edit (first consumer: ADR-017), axum, sqlx (A2, A3): enter when their consumer lands

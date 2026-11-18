@@ -1,0 +1,103 @@
+diff --git a/tmp/bindforge-editorial-steam-windows-discovery-r2.md b/home/mike/.local/share/opencode/worktree/f852d4/run-t002-steam-windows/docs/designs/tasks/002-steam-windows-discovery/02-proposal.md
+index bc928d9c..38955f6f 100644
+--- a/tmp/bindforge-editorial-steam-windows-discovery-r2.md
++++ b/home/mike/.local/share/opencode/worktree/f852d4/run-t002-steam-windows/docs/designs/tasks/002-steam-windows-discovery/02-proposal.md
+@@ -123,7 +123,7 @@ process per key. (source: https://github.com/osztenkurden/steam-game-path/blob/m
+ **A trait (`trait Registry { fn string_value(...) }`) with a named fake in the crate.**
+ Reused-testability across packages is nicer, but nothing outside `crates/discovery`
+ constructs a registry — `apps/discovery-cli` only ever calls `from_host()`. Rejected in
+-favour of the `&dyn Fn` shape the Linux probe already uses for the environment
++favor of the `&dyn Fn` shape the Linux probe already uses for the environment
+ (A14): the fake becomes a closure in the test file and the crate gains no test-only
+ public type.
+ 
+@@ -134,7 +134,7 @@ and the hardcoded spelling is wrong on 32-bit Windows (A4).
+ **Query HKLM before HKCU (steam-game-path's order).** Rejected: the task prescribes
+ HKCU-`SteamPath`-first with the machine key as fallback
+ (docs/tasks/T-002-steam-windows-discovery.md:41-43), and the per-user key is the one
+-that tracks the Steam client that user actually runs (A5).
++that tracks the Steam client the user actually runs (A5).
+ 
+ **Expand `REG_EXPAND_SZ` registry values before use.** Matches the widest precedent.
+ Rejected for v1: it buys one more FFI call (`ExpandEnvironmentStringsW`) for a value
+@@ -164,7 +164,7 @@ plugin of the compiled-for host, where the task's ":65-67" clause is met.
+ 
+ Four moves in `crates/discovery`, alongside the existing seven modules
+ (crates/discovery/src/lib.rs:1-7): a private `steam_common` and a public
+-`steam_windows` module, the `steam_linux.rs` rewiring described under them, and
++`steam_windows` module, the `steam_linux.rs` rewiring described below, and
+ `lib.rs` gaining the two module declarations.
+ 
+ ```rust
+@@ -215,7 +215,7 @@ becomes public by accident. `steam_linux.rs` keeps every `pub` item it has today
+ `host_candidates` stays a Linux-only function in `steam_linux.rs`, and
+ `parse_manifest` / `libraries_in_root` / `AppManifest` become thin wrappers and a
+ `pub use` re-export over `steam_common`. `crates/discovery/tests/steam_linux_tests.rs`
+-and `crates/discovery/tests/plugin_tests.rs` therefore compile and pass without one
++and `crates/discovery/tests/plugin_tests.rs` therefore compile and pass without a single
+ edited line, and that is the refactor's acceptance test.
+ 
+ The plugin struct, not the core, is what `discovery-cli` boxes; `SteamCore<T>`'s
+@@ -301,7 +301,7 @@ The seam reports a value *only* when the registry stored a plain `REG_SZ` path:
+ a non-UTF-16 value is `None` (A9, A18). Consequences, stated once here and referenced
+ elsewhere: no `%VAR%` expansion, no multi-string guessing, and no environment-variable
+ syntax in an emitted path. A host whose Steam records its path in another value type
+-simply loses that candidate and is picked up by the `%ProgramFiles%` default or by
++simply loses that candidate and is covered by the `%ProgramFiles%` default or by
+ `--steam-root` (§8).
+ 
+ ### 5. Root candidates
+@@ -345,7 +345,7 @@ than `Path::is_absolute` (which reads a Windows path as relative on a Linux host
+ 
+ Nothing wider is added here: reserved device names, trailing dots and spaces, and
+ alternate-data-stream colons are *Deferred*. A manifest is untrusted input in the same
+-way the Linux design already treats it, and the composed path is emitted without being
++way that the Linux design already treats it, and the composed path is emitted without being
+ opened.
+ 
+ ### 7. Emitted rows and their path namespace
+@@ -356,7 +356,7 @@ Rows are built exactly as on Linux: `slug = normalize_slug(display_name)`,
+ reach `discovery list`). AppIDs stay unread and unstored (docs/adrs/022-game-discovery.md:49).
+ 
+ Because Windows `canonicalize` yields extended-length paths (A8), an emitted
+-`install_path` on Windows starts `\\?\`, e.g.
++`install_path` on Windows starts with `\\?\`, e.g.
+ `\\?\C:\Program Files (x86)\Steam\steamapps\common\<installdir>`, and so does the JSON.
+ This design keeps that form: the prefix is the namespace in which long library paths are
+ openable at all, `install_path` is the field a later consumer opens, and stripping it
+@@ -404,7 +404,7 @@ and the workspace's `[workspace.dependencies]` (Cargo.toml:20-22) gains the pinn
+ so the crate inherits it with `workspace = true`, matching how `serde` is handled. The
+ lock file therefore gains `winreg` and its `cfg-if` dependency; `windows-sys 0.61.2` is
+ already locked and sits inside winreg's accepted window, so it is reused, not duplicated
+-(A10). `Cargo.lock` is committed once with that diff and every later gate runs under
++(A10). `Cargo.lock` is committed once with that diff, and every later gate runs under
+ `--locked` as before. Nothing else in the workspace changes: no new `apps/` member, no
+ change to `bindforge-core`, no schema change.
+ 
+@@ -423,7 +423,7 @@ alternative; CI does not run it.
+ | The `SteamCore<T>`/`SteamTarget` refactor regresses Linux behavior. | Low | High | The refactor is a move, not a rewrite: `steam_linux_tests.rs`, `plugin_tests.rs` and the three CLI tests are the gate and are not allowed to change (§1); *Test strategy* #1 and #9 pin the two rule sets apart. |
+ | Windows Steam keeps `libraryfolders.vdf` only under `config/`, so secondary libraries go missing on Windows (A19). | Medium | Medium | The root's own `steamapps/` is still scanned, so the default install still yields games; the manual Windows gate (*Rollout* #5) checks secondary libraries explicitly, and *Deferred* names the follow-up if it reports a miss. |
+ | No Windows CI runner: registry policy is compile-verified but never run against a real install (A17, A18 unverified). | Medium | Medium | `host_candidates` is pure and its full ordering matrix is unit-tested with a fake (§5, *Test strategy* #3); `--steam-root` gives any user an override; the manual gate records a real `discovery list` run in `03-build-notes.md`. |
+-| `winreg` goes unmaintained (single maintainer, self-described work in progress). | Low | Medium | It is target-gated, reached through one private function, and its only non-trivial need (view flags, raw-type read) is two calls; the migration to `windows-core` is one file (§"Options considered"). |
++| `winreg` goes unmaintained (single maintainer, self-described work in progress). | Low | Medium | It is target-gated, reached through one private function, and its only non-trivial need (view flags, raw-type read) is two calls; the migration to `windows-core` is one file (§*Options considered*). |
+ | A corrupt or hostile registry value makes the plugin scan somewhere unexpected, and its path becomes an emitted prefix. | Medium | Medium | A candidate must canonicalize and contain a `steamapps/` directory before anything under it is read (§2); scanning is read-only with per-file caps; AppIDs stay unused and nothing persists; write-side validation stays the codec's job (*Deferred*). |
+ | `install_path` values carry a `\\?\` prefix that surprises a later consumer (§7). | High | Low–Medium | Documented in the *Compatibility matrix*; the extended-length namespace is the safe-to-open form; normalization is *Deferred* until a consumer exists. |
+ | A reserved-name or trailing-dot `installdir` yields a path Windows cannot open. | Low | Medium | The existing reject set plus the `\` clause covers traversal; the wider naming rules are *Deferred* with their evidence, and discovery never opens the path. |
+@@ -473,7 +473,7 @@ alternative; CI does not run it.
+    (exactly the two env candidates in order); `%ProgramFiles(x86)%` unset (only
+    `%ProgramFiles%\Steam`); both unset and no key (empty list); a set-but-relative env value
+    ignored; a key the fake reports as `None` (the §4 refusals) contributing no candidate; and a
+-   registry value equal to an env candidate not deduped by `host_candidates` (§5).
++   registry value equal to an env candidate not de-duped by `host_candidates` (§5).
+ 4. Unit (`SteamWindowsPlugin::from_registry_and_roots` on the `minimal` fixture): the
+    fake registry points at the fixture root and the four games come back tagged
+    `Platform::SteamWindows` with `codec_id == None`,
+@@ -494,7 +494,7 @@ alternative; CI does not run it.
+ 8. Unit (registry seam shape): a recording fake shows `host_candidates` querying exactly
+    the three `RegistryKey` variants §5 names, in that order, so a fourth pair cannot be
+    added silently; `registry_string_value` stays the crate's only `winreg` consumer and stays
+-   `#[cfg(windows)]`, which *Test strategy* #12 is what compiles.
++   `#[cfg(windows)]`, which *Test strategy* #12 compiles.
+ 9. Integration (Linux regression, the refactor's gate): `crates/discovery/tests/*` and
+    `apps/discovery-cli/tests/cli_tests.rs` compile and pass unmodified — including the
+    `"SteamLinux"` serde spelling and the "exactly the four fixture rows" count — which

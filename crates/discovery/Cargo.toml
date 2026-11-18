@@ -5,3 +5,9 @@ edition = "2024"
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
+
+# T-002: the registry reader behind the steam_windows seam is the crate's only
+# winreg consumer, and it is `#[cfg(windows)]`, so winreg never compiles for a
+# non-Windows target (Chosen design §3, §9, A11).
+[target.'cfg(windows)'.dependencies]
+winreg = { workspace = true }

@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use discovery::engine::DiscoveryEngine;
 use discovery::steam_linux::SteamLinuxPlugin;
+use discovery::steam_windows::SteamWindowsPlugin;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -30,12 +31,23 @@ fn main() {
     match &cli.command {
         Commands::List { json, steam_root } => {
             let mut engine = DiscoveryEngine::new();
-            let plugin = if steam_root.is_empty() {
-                SteamLinuxPlugin::from_host()
+            if steam_root.is_empty() {
+                // Host probing: each plugin probes its own platform (§8, §3).
+                engine.register_plugin(Box::new(SteamLinuxPlugin::from_host()));
+                engine.register_plugin(Box::new(SteamWindowsPlugin::from_host()));
             } else {
-                SteamLinuxPlugin::from_roots(steam_root.iter().cloned())
-            };
-            engine.register_plugin(Box::new(plugin));
+                // `--steam-root` feeds the plugin whose host can produce tagged
+                // rows; the row's platform tag is the plugin's, as on T-001's
+                // seam (§8).
+                #[cfg(not(windows))]
+                engine.register_plugin(Box::new(SteamLinuxPlugin::from_roots(
+                    steam_root.iter().cloned(),
+                )));
+                #[cfg(windows)]
+                engine.register_plugin(Box::new(SteamWindowsPlugin::from_roots(
+                    steam_root.iter().cloned(),
+                )));
+            }
 
             let all_games = engine.discover_all().unwrap();
 
