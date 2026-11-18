@@ -7,8 +7,8 @@
     "kind": "task",
     "path": "docs/tasks/T-001-steam-linux-discovery.md"
   },
-  "status": "running",
-  "lastStage": "code-review",
+  "status": "done",
+  "lastStage": "doc-sync",
   "designRound": 4,
   "codeRound": 1,
   "designBudgetUsed": 3,
@@ -38,7 +38,8 @@
     "752096e9a851843caca904c18f36c0ab06710779",
     "c9fb37b7ab8c5313f61368fddba3cb93ea8a339b",
     "349d1f6861e179f69e96dd569fd769c0443347d2",
-    "a6619bb00822d0cb4f9d9b9f41879da693bea47f"
+    "a6619bb00822d0cb4f9d9b9f41879da693bea47f",
+    "62336a9927331e2b23b5732c2b1a504498444f9b"
   ],
   "forceNext": null,
   "results": [
@@ -1240,6 +1241,20 @@
       "durationMs": 277550,
       "nudges": 0,
       "failure": "independence violation: grep accessed run records: /home/mike/.local/share/opencode/worktree/f852d4/t001-run3/docs/designs/tasks/001-steam-linux-discovery/.pipeline.json"
+    },
+    {
+      "stage": "doc-sync",
+      "round": 1,
+      "sessionID": "ses_e13009326ffe3yrJVWfsCRwoIL",
+      "agent": "ops/doc-sync",
+      "at": 1794977640807,
+      "reply": {
+        "drifted": true,
+        "commitMessage": "docs(001-steam-linux-discovery): re-verify as-built drift against the change set and finish build notes"
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/doc-sync-attempt2-r1.md",
+      "durationMs": 115832,
+      "nudges": 0
     }
   ],
   "gateLog": [
@@ -1361,10 +1376,24 @@
       "proceed": false,
       "reason": "doc-sync: independence violation: grep accessed run records: /home/mike/.local/share/opencode/worktree/f852d4/t001-run3/docs/designs/tasks/001-steam-linux-discovery/.pipeline.json",
       "at": 1794977524943
+    },
+    {
+      "gate": "ledger-join",
+      "round": 0,
+      "proceed": true,
+      "reason": "the ledger join holds: every handle resolves, every unit is handled",
+      "at": 1794977640882
+    },
+    {
+      "gate": "done",
+      "round": 0,
+      "proceed": true,
+      "reason": "pipeline complete",
+      "at": 1794977640883
     }
   ],
   "startedAt": 1794969708852,
-  "updatedAt": 1794977524943,
+  "updatedAt": 1794977640883,
   "flow": "full",
   "baseRef": "4caa688933b2969f569f6126dddb713180c7c410",
   "designCycle": 3,
