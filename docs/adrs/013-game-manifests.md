@@ -114,6 +114,7 @@ of a spec line names the unit that governs that line's claim.
 - **013-L5** Name agreement: the game directory's name must equal the `id`
   entry byte-for-byte; the refusal never echoes a local path.
   → spec: Table data, Load-time validation.
+  amended-by 024-B1 (ADR-024, per 021-L4).
 - **013-L6** Review coupling: a manifest PR that names an action id the
   registry does not carry adds its `registry.toml` row in the same PR, so
   the id and the game fact that motivated it are reviewed together.

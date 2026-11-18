@@ -123,8 +123,24 @@ can reach a writer:
   registry. `schemas/policy/v1/spec.md` states the composite the same way, and
   because a policy references no other document by path, a per-document cap
   cannot be defeated by document count.
+- ADR-024 adds one budget for the ids themselves: `MAX_SLUG_OCTETS = 128` is
+  the shared length bound for every id that rides the slug grammar
+  (`[a-z][a-z0-9-]*`) — a manifest `id`, a manifest `codec` or preset id, a
+  `profile/v2` `id` or `derives` element, a `policy/v1` `id`, a keyboard
+  geometry name, and one action-id segment, which keeps its stricter shape
+  rules and borrows only this number. The bound rides beside the grammar at
+  every one of these ids: the reference implementation checks a geometry name
+  against it beside the grammar check, before the name is joined onto a
+  directory, so no rider is enforced more narrowly than `024-B1` enumerates
+  it.
+  The bound supersedes the DNS-label limit RFC 1035 §2.3.1 publishes, which
+  these specs used to state for themselves: each of the four now
+  cross-references this bullet instead of carrying a number of its own. The
+  value is the sibling of `MAX_NATIVE_NAME_OCTETS = 128` — one legal path
+  component on every platform this product names — and the amendment is
+  relaxation only: an id valid under the 63-octet text stays valid.
 
-The reference implementation exports all eleven constants as the public names
+The reference implementation exports all twelve constants as the public names
 for these limits, so an implementer never has to guess which number a
 rejection names.
 

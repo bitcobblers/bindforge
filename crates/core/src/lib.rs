@@ -80,7 +80,11 @@
 //! `load_chain`, `resolve`, `ResolvedBinding`, `fork`, `diff`, `merge`,
 //! `ProfileKind`, and the two chain budgets named above — and, from design 015,
 //! `Policy`, `Transform`, `TagPattern`, `load_policy`, and the two policy
-//! budgets named above.
+//! budgets named above — and, from ADR-024, `is_slug_name`, `MAX_SLUG_OCTETS`,
+//! and `escape_and_truncate`: the shared slug grammar, the one exported bound
+//! every slug-grammar id rides, and the single echo renderer a refusal runs its
+//! payload through, so a discovered game's slug is checked against the same
+//! grammar a manifest `id` is parsed by.
 
 mod action;
 mod chain;
@@ -103,14 +107,14 @@ pub use document::{MAX_POLICY_TRANSFORMS, MAX_RELOCATE_TARGETS};
 pub use document::{Policy, TagPattern, Transform};
 pub use document::{Profile, ProfileKind, ReachClassTable};
 pub use document::{parse, parse_file, parse_reader, serialize};
-pub use error::CoreError;
+pub use error::{CoreError, escape_and_truncate};
 pub use input::{InputId, InputNamespace};
 pub use manifest::{
     DockedAction, ExclusivityGroup, MAX_CONSTRAINT_GROUPS, MAX_GROUP_MEMBERS, MAX_MANIFEST_ROWS,
     MAX_NATIVE_NAME_OCTETS, Manifest, ManifestAction, load_manifest,
 };
-pub use placement::{GradeBound, KeyboardGeometry, PlacementCheck};
-pub use placement::{geometry_matches_file_name, load_geometry, placement_is_legal};
+pub use placement::{GradeBound, KeyboardGeometry, MAX_SLUG_OCTETS, PlacementCheck};
+pub use placement::{geometry_matches_file_name, is_slug_name, load_geometry, placement_is_legal};
 pub use policy::load_policy;
 pub use reach::{Hand, InputGrade, ReachClass, ReachTable, ReachTables};
 pub use reach::{hand_matches_file_name, load_reach_tables};

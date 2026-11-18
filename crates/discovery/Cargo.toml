@@ -5,6 +5,15 @@ edition = "2024"
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
+# ADR-024: the shared slug grammar and bound a discovered game's identity is
+# checked against at the emission seam. The edge points at the workspace root,
+# so `bindforge-core` keeps its depends-on-nothing status.
+bindforge-core = { workspace = true }
+
+# The row's serde shape (its `namespace` field and its JSON spelling) is pinned by
+# `tests/game_tests.rs`, the crate's first serde assertions.
+[dev-dependencies]
+serde_json = "1.0"
 
 # T-002: the registry reader behind the steam_windows seam is the crate's only
 # winreg consumer, and it is `#[cfg(windows)]`, so winreg never compiles for a

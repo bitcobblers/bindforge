@@ -4,11 +4,12 @@
 //! The subprocess test points the host probe at a nonexistent home so it does
 //! not depend on the build host having Steam installed; the engine test
 //! composes the two plugins in-process. The three pre-existing tests in
-//! `cli_tests.rs` are the untouched Linux-regression gate (Test strategy #9)
-//! and are deliberately not modified here.
+//! `cli_tests.rs` are the Linux-regression gate (Test strategy #9) and are not
+//! duplicated here; ADR-024 re-pinned their rendering there, and the rows below
+//! carry the same prefix-free slugs.
 
 use discovery::engine::DiscoveryEngine;
-use discovery::game::Platform;
+use discovery::game::{Namespace, Platform};
 use discovery::steam_linux::SteamLinuxPlugin;
 use discovery::steam_windows::SteamWindowsPlugin;
 use std::path::{Path, PathBuf};
@@ -83,11 +84,16 @@ fn test_empty_windows_plugin_adds_nothing_beside_a_populated_linux_plugin() {
     assert_eq!(
         slugs,
         [
-            "unknown/example-game",
-            "unknown/mixed-case-game",
-            "unknown/nameless-install",
-            "unknown/secondary-title",
+            "example-game",
+            "mixed-case-game",
+            "nameless-install",
+            "secondary-title",
         ],
-        "the aggregate must be exactly the fixture's four Linux rows"
+        "the aggregate must be exactly the fixture's four Linux rows, with ADR-024's \
+         prefix-free slugs"
+    );
+    assert!(
+        games.iter().all(|g| g.namespace == Namespace::Unknown),
+        "the engine's aggregate carries the v1 namespace on every row, kept out of the slug"
     );
 }

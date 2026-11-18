@@ -30,21 +30,30 @@ use std::path::Path;
 
 use crate::document::{Document, major_dir_segment, parse_file, string_array};
 use crate::error::CoreError;
+// The segment length bound is the shared slug bound, borrowed from its one
+// exported home rather than restated here, so the number a rejection names is
+// the number the grammar enforces (ADR-024).
+use crate::placement::MAX_SLUG_OCTETS;
 use crate::toml::Value;
-
-/// How long one id segment may be, in octets: the DNS-label bound RFC 1035
-/// §2.3.1 publishes, borrowed rather than guessed, so the number a rejection
-/// names is a published one.
-const MAX_SEGMENT_OCTETS: usize = 63;
 
 /// The rule an id breaks when it does not hold exactly two segments.
 const SEGMENT_COUNT_RULE: &str = "an action id is exactly two `.`-separated segments";
 
-/// The rule an id breaks when one of its segments is malformed.
-const SEGMENT_SHAPE_RULE: &str = "expected 1-63 octets of `a-z`, `0-9`, and `-`";
+/// The rule an id breaks when one of its segments is malformed in shape: the
+/// character class and the two edge conditions. The offender leads this refusal
+/// (see [`invalid_segment`]), so a short malformed id is always visible in the
+/// bounded message.
+const SEGMENT_SHAPE_RULE: &str =
+    "a malformed id segment: expected `a-z`, `0-9`, and `-`, letter first, letter or digit last";
 
-/// The rule's edge condition, stated apart so each refusal names one rule.
-const SEGMENT_EDGE_RULE: &str = "letter first, letter or digit last";
+/// The rule an id breaks when a segment is longer than the shared slug bound.
+/// The bound is interpolated from [`MAX_SLUG_OCTETS`] rather than spelled as a
+/// literal, so a future amendment has one source (ADR-024). The bound leads this
+/// refusal (see [`invalid_id`]), because the offender is by definition past the
+/// number the message has to name.
+fn segment_bound_rule() -> String {
+    format!("an id segment is at most {MAX_SLUG_OCTETS} octets")
+}
 
 /// Which axis an action sits on: the array of the registry that lists it. The
 /// three values are exactly the three array names the entry table defines, so
@@ -118,11 +127,14 @@ impl ActionId {
             return Err(invalid_id(text, SEGMENT_COUNT_RULE));
         }
         for segment in [first, second] {
+            // The two faults are named apart because their messages put the two
+            // facts in opposite order: a bound refusal leads with the number, a
+            // shape refusal leads with the offender (ADR-024, Test strategy #6).
+            if !segment_within_bound(segment) {
+                return Err(invalid_id(text, &segment_bound_rule()));
+            }
             if !is_well_formed_segment(segment) {
-                let fault = format!(
-                    "`{segment}` is not an id segment: {SEGMENT_SHAPE_RULE}, {SEGMENT_EDGE_RULE}"
-                );
-                return Err(invalid_id(text, &fault));
+                return Err(invalid_segment(text, SEGMENT_SHAPE_RULE));
             }
         }
         Ok(ActionId {
@@ -242,13 +254,27 @@ pub fn load_action_registry(dir: &Path) -> Result<ActionRegistry, CoreError> {
     Ok(registry)
 }
 
-/// The one refusal shape for a malformed id: `InvalidValue`, echoing the id as
-/// written. `CoreError`'s rendering escapes control characters and truncates,
-/// so a hostile id can neither forge a log line nor inflate one.
+/// The refusal for a segment-count or segment-length fault: `InvalidValue`,
+/// leading with the rule and echoing the id last. `CoreError`'s rendering escapes
+/// control characters and truncates what it echoes at 80 characters, so an id
+/// already past the shared bound would otherwise push the bound the refusal names
+/// past the cut (ADR-024, Test strategy #6).
 fn invalid_id(id: &str, fault: &str) -> CoreError {
     CoreError::InvalidValue {
         key: "id".to_string(),
-        message: format!("`{id}` is not a valid action id: {fault}"),
+        message: format!("{fault}: `{id}`"),
+    }
+}
+
+/// The refusal for a segment-shape fault: `InvalidValue`, leading with the id as
+/// written — the shipped spelling every grammar in this crate uses for a
+/// malformed id — so the offender a caller has to fix is always in the bounded
+/// message. A hostile id still cannot inflate the line: the same rendering
+/// truncates it.
+fn invalid_segment(id: &str, fault: &str) -> CoreError {
+    CoreError::InvalidValue {
+        key: "id".to_string(),
+        message: format!("`{id}` is {fault}"),
     }
 }
 
@@ -264,13 +290,26 @@ fn name_the_entry(err: CoreError, entry: &str) -> CoreError {
     }
 }
 
+/// Whether one segment is inside the shared slug bound. Named apart from
+/// [`is_well_formed_segment`] so a length refusal can name the bound — the number
+/// the contract states once — instead of the character-class rule it did not
+/// break (ADR-024).
+fn segment_within_bound(segment: &str) -> bool {
+    segment.len() <= MAX_SLUG_OCTETS
+}
+
 /// The segment rule on its own: an ASCII lowercase letter, then `a-z`, `0-9`,
-/// and `-`, closing with a letter or digit, at most `MAX_SEGMENT_OCTETS`
-/// octets. A non-ASCII byte fails the last test, which is what keeps the id
-/// grammar byte-exact rather than case- or Unicode-folded.
+/// and `-`, closing with a letter or digit, at most [`MAX_SLUG_OCTETS`] octets —
+/// the shared slug bound ADR-024 states once in `placement`, which the action-id
+/// grammar borrows for its length alone and keeps its stricter shape rules for.
+/// A non-ASCII byte fails the last test, which is what keeps the id grammar
+/// byte-exact rather than case- or Unicode-folded. It re-checks the bound so it
+/// stays a complete predicate on its own; [`ActionId::parse`] asks
+/// [`segment_within_bound`] first so an over-long segment is refused in the words
+/// of the bound it broke.
 fn is_well_formed_segment(segment: &str) -> bool {
     let bytes = segment.as_bytes();
-    if bytes.is_empty() || bytes.len() > MAX_SEGMENT_OCTETS {
+    if bytes.is_empty() || bytes.len() > MAX_SLUG_OCTETS {
         return false;
     }
     if !bytes[0].is_ascii_lowercase() || !bytes[bytes.len() - 1].is_ascii_alphanumeric() {

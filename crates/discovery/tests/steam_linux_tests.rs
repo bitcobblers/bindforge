@@ -5,10 +5,10 @@
 //! read-only fixture trees under `tests/fixtures/steam/`, so no test probes the
 //! host, writes to the filesystem, or needs Steam installed (Chosen design §9).
 
-use discovery::game::{DiscoveredGame, Platform};
+use discovery::game::{DiscoveredGame, Namespace, Platform};
 use discovery::plugin::DiscoveryPlugin;
 use discovery::registry::DiscoveryError;
-use discovery::slug::normalize_slug;
+use discovery::slug::derive_slug;
 use discovery::steam_linux::{
     SteamLinuxPlugin, host_candidates, libraries_in_root, parse_manifest,
 };
@@ -331,7 +331,9 @@ fn plugin_name_is_steam_linux() {
 
 // proves: Test strategy #8 — the minimal fixture root yields exactly four games
 // in slug order: the two libraries, the name-absent fallback, mixed key case,
-// the skipped malformed and escaping manifests, and the ignored decoys.
+// the skipped malformed and escaping manifests, and the ignored decoys. Re-pinned
+// by ADR-024: the slugs are prefix-free, so the `unknown/` namespace that used to
+// sit inside them is gone.
 #[test]
 fn discover_fixture_root_yields_the_four_expected_games() {
     let games = minimal_games();
@@ -339,10 +341,10 @@ fn discover_fixture_root_yields_the_four_expected_games() {
     assert_eq!(
         slugs,
         [
-            "unknown/example-game",
-            "unknown/mixed-case-game",
-            "unknown/nameless-install",
-            "unknown/secondary-title",
+            "example-game",
+            "mixed-case-game",
+            "nameless-install",
+            "secondary-title",
         ]
     );
     let names: Vec<&str> = games.iter().map(|g| g.display_name.as_str()).collect();
@@ -360,7 +362,9 @@ fn discover_fixture_root_yields_the_four_expected_games() {
 // proves: Test strategy #6 (Chosen design §5, A2) — the output contract: every
 // game carries platform SteamLinux, codec_id None and a slug derived from the
 // display name; install_path is `<canonical library>/steamapps/common/<installdir>`;
-// the vector is ordered by (slug, install_path).
+// the vector is ordered by (slug, install_path). Re-pinned by ADR-024: the slug is
+// `derive_slug`'s output, in the shared grammar and bound, and the row's namespace
+// is its own field.
 #[test]
 fn discover_output_honours_the_game_output_contract() {
     let root = canonical(&fixture("minimal"));
@@ -369,7 +373,22 @@ fn discover_output_honours_the_game_output_contract() {
     for game in &games {
         assert_eq!(game.platform, Platform::SteamLinux);
         assert!(game.codec_id.is_none(), "codec_id must stay None");
-        assert_eq!(game.slug, normalize_slug(&game.display_name));
+        assert_eq!(
+            game.slug,
+            derive_slug(&game.display_name).expect("a fixture display name derives a slug"),
+            "the slug is the canonical derivation of the row's display name"
+        );
+        assert!(
+            bindforge_core::is_slug_name(&game.slug)
+                && game.slug.len() <= bindforge_core::MAX_SLUG_OCTETS,
+            "`{}` must be a grammar-valid id inside the shared bound",
+            game.slug
+        );
+        assert_eq!(
+            game.namespace,
+            Namespace::Unknown,
+            "the one v1 namespace rides its own field, not the slug"
+        );
         assert!(
             game.install_path.starts_with(&root),
             "{:?} must start with the canonicalized fixture root {root:?}",
@@ -384,10 +403,10 @@ fn discover_output_honours_the_game_output_contract() {
     // §5/A2: `install_path` composes from the library that holds the manifest,
     // so the secondary library's game carries the `<root>/secondary` prefix.
     for (slug, library, install_dir) in [
-        ("unknown/example-game", "", "Example Game"),
-        ("unknown/mixed-case-game", "", "Mixed Case Game"),
-        ("unknown/nameless-install", "", "Nameless Install"),
-        ("unknown/secondary-title", "secondary", "Secondary Title"),
+        ("example-game", "", "Example Game"),
+        ("mixed-case-game", "", "Mixed Case Game"),
+        ("nameless-install", "", "Nameless Install"),
+        ("secondary-title", "secondary", "Secondary Title"),
     ] {
         let library_root = if library.is_empty() {
             root.clone()

@@ -72,21 +72,23 @@ fn test_cli_list_format() {
     // T-003 §1: cells are padded, so the old unpadded header string is gone and
     // every header cell carries padding beyond its single leading space.
     assert!(
-        !stdout.contains("| Slug | Display Name | Install Path | Platform |"),
+        !stdout.contains("| Slug | Namespace | Display Name | Install Path | Platform |"),
         "the header must be padded to its columns' widths:\n{}",
         lines[0]
     );
     let header_cells = cells(lines[0]);
     assert_eq!(
         header_cells.len(),
-        4,
-        "the header names exactly four columns"
+        5,
+        "the header names exactly five columns: ADR-024 puts `Namespace` beside `Slug`"
     );
-    for (cell, column) in
-        header_cells
-            .iter()
-            .zip(["Slug", "Display Name", "Install Path", "Platform"])
-    {
+    for (cell, column) in header_cells.iter().zip([
+        "Slug",
+        "Namespace",
+        "Display Name",
+        "Install Path",
+        "Platform",
+    ]) {
         assert_eq!(
             cell.trim(),
             column,
@@ -107,39 +109,59 @@ fn test_cli_list_format() {
         );
     }
 
-    for slug in [
-        "unknown/example-game",
-        "unknown/mixed-case-game",
-        "unknown/nameless-install",
-        "unknown/secondary-title",
-    ] {
-        assert!(stdout.contains(slug), "table must contain the {slug} row");
-    }
-    for name in [
-        "Example Game",
-        "Mixed Case Game",
-        "Nameless Install",
-        "Secondary Title",
-    ] {
+    // Test strategy #8 (ADR-024's re-pin): the `Slug` cell is prefix-free and the
+    // `Namespace` cell carries the namespace that used to ride inside the slug, so
+    // the identity's two axes are rendered apart.
+    let rows: Vec<Vec<String>> = lines[2..].iter().map(|line| cells(line)).collect();
+    assert_eq!(rows.len(), 4, "exactly the four fixture rows are rendered");
+    let rendered: Vec<(&str, &str, &str)> = rows
+        .iter()
+        .map(|row| (row[0].trim(), row[1].trim(), row[2].trim()))
+        .collect();
+    assert_eq!(
+        rendered,
+        vec![
+            ("example-game", "unknown", "Example Game"),
+            ("mixed-case-game", "unknown", "Mixed Case Game"),
+            ("nameless-install", "unknown", "Nameless Install"),
+            ("secondary-title", "unknown", "Secondary Title"),
+        ],
+        "the slug, namespace and display name cells, in the plugin's row order:\n{stdout}"
+    );
+    for row in &rows {
         assert!(
-            stdout.contains(name),
-            "table must contain the {name} display name"
+            !row[0].contains('/'),
+            "a rendered slug must not contain a path separator, got {:?}",
+            row[0].trim()
+        );
+        assert!(
+            !row[3].contains("unknown/"),
+            "the install path carries no namespace segment, got {:?}",
+            row[3].trim()
         );
     }
+
+    // Test strategy #8 (ADR-024's re-pin): `unknown/` as a slug segment is gone
+    // from the whole rendering, table and paths alike.
+    assert_eq!(
+        stdout.matches("unknown/").count(),
+        0,
+        "no rendered cell may spell a slug as `unknown/…`:\n{stdout}"
+    );
+    assert!(
+        stdout.matches("unknown").count() == 4,
+        "the four rows carry their namespace in the `Namespace` column and nowhere else"
+    );
     assert!(
         !stdout.contains("prefix-decoy"),
         "compatdata decoys must never appear in the table"
-    );
-    assert_eq!(
-        stdout.matches("unknown/").count(),
-        4,
-        "the table must contain exactly the four fixture rows"
     );
 }
 
 // proves: Test strategy #9 (Chosen design §8) — `list --steam-root <fixture> --json`
 // prints exactly the four DiscoveredGame objects, in (slug, install_path) order,
-// with the unchanged five-field JSON shape.
+// with ADR-024's six-field JSON shape: `namespace` sits beside `slug` and the slug
+// is prefix-free.
 #[test]
 fn test_cli_list_json_format() {
     let root_arg = fixture_root();
@@ -158,21 +180,16 @@ fn test_cli_list_json_format() {
     // §5/A2: each row's `install_path` composes from the library that holds its
     // manifest, so the secondary library's game carries the `<root>/secondary` prefix.
     let expected = [
-        ("unknown/example-game", "Example Game", "Example Game", ""),
+        ("example-game", "Example Game", "Example Game", ""),
+        ("mixed-case-game", "Mixed Case Game", "Mixed Case Game", ""),
         (
-            "unknown/mixed-case-game",
-            "Mixed Case Game",
-            "Mixed Case Game",
-            "",
-        ),
-        (
-            "unknown/nameless-install",
+            "nameless-install",
             "Nameless Install",
             "Nameless Install",
             "",
         ),
         (
-            "unknown/secondary-title",
+            "secondary-title",
             "Secondary Title",
             "Secondary Title",
             "secondary",
@@ -180,12 +197,25 @@ fn test_cli_list_json_format() {
     ];
     for (game, (slug, display_name, install_dir, library)) in games.iter().zip(expected) {
         let obj = game.as_object().expect("each game is a JSON object");
-        assert_eq!(obj.len(), 5, "DiscoveredGame has exactly five fields");
-        assert_eq!(obj["slug"], slug);
+        assert_eq!(
+            obj.len(),
+            6,
+            "DiscoveredGame has exactly six fields: ADR-024 adds `namespace`"
+        );
+        assert_eq!(obj["slug"], slug, "the JSON slug carries no namespace");
+        assert!(
+            !slug.contains('/'),
+            "a serialized slug must not contain a path separator: {slug}"
+        );
+        assert_eq!(
+            obj["namespace"], "unknown",
+            "the namespace the slug used to carry is its own field, spelled kebab-case"
+        );
         assert_eq!(obj["display_name"], display_name);
-        // Chosen design §8 / Context: T-001 changes no serialized shape, so
-        // `platform` keeps serde's default variant-name spelling (the r1 major
-        // `#[serde(rename_all = "kebab-case")]` was reverted as unauthorized).
+        // Chosen design §8 / Context: ADR-024 changes the row's field *set*, not
+        // `Platform`'s spelling, so `platform` keeps serde's default variant-name
+        // spelling (the r1 major `#[serde(rename_all = "kebab-case")]` was reverted
+        // as unauthorized); the mixed spelling of the two closed enums is by design.
         assert_eq!(obj["platform"], "SteamLinux");
         assert!(obj["codec_id"].is_null(), "codec_id must be null");
         let library_root = if library.is_empty() {
@@ -201,6 +231,14 @@ fn test_cli_list_json_format() {
             obj["install_path"],
             want.to_string_lossy().as_ref(),
             "install_path must be the composed steamapps/common path under the canonicalized library that holds the manifest"
+        );
+        assert!(
+            !obj["install_path"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("unknown"),
+            "an install path carries no namespace segment: {}",
+            obj["install_path"]
         );
     }
 }

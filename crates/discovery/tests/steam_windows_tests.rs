@@ -10,10 +10,10 @@
 //! compile-verified by the cross-target `cargo check` gate (Test strategy
 //! #12), never executed here.
 
-use discovery::game::{DiscoveredGame, Platform};
+use discovery::game::{DiscoveredGame, Namespace, Platform};
 use discovery::plugin::DiscoveryPlugin;
 use discovery::registry::DiscoveryError;
-use discovery::slug::normalize_slug;
+use discovery::slug::derive_slug;
 use discovery::steam_linux;
 use discovery::steam_linux::SteamLinuxPlugin;
 use discovery::steam_windows::{
@@ -161,11 +161,22 @@ fn expected_registry_calls() -> Vec<(RegistryKey, String)> {
     ]
 }
 
-/// The plugin's rows reduced to everything except the platform tag.
-fn rows_without_platform(games: Vec<DiscoveredGame>) -> Vec<(String, String, PathBuf, bool)> {
+/// The plugin's rows reduced to everything except the platform tag. ADR-024 adds
+/// the namespace's spelling: two plugins must agree on it as much as on the slug.
+fn rows_without_platform(
+    games: Vec<DiscoveredGame>,
+) -> Vec<(String, String, String, PathBuf, bool)> {
     games
         .into_iter()
-        .map(|g| (g.slug, g.display_name, g.install_path, g.codec_id.is_none()))
+        .map(|g| {
+            (
+                g.slug,
+                g.namespace.to_string(),
+                g.display_name,
+                g.install_path,
+                g.codec_id.is_none(),
+            )
+        })
         .collect()
 }
 
@@ -483,12 +494,13 @@ fn from_registry_and_roots_scans_two_view_roots_deduped() {
     assert_eq!(
         slugs,
         [
-            "unknown/example-game",
-            "unknown/mixed-case-game",
-            "unknown/nameless-install",
-            "unknown/secondary-title",
+            "example-game",
+            "mixed-case-game",
+            "nameless-install",
+            "secondary-title",
         ],
-        "both installs contribute their rows, ordered by (slug, install_path)"
+        "both installs contribute their rows, ordered by (slug, install_path); ADR-024's \
+         slugs carry no namespace prefix"
     );
     assert!(
         games.iter().all(|g| g.platform == Platform::SteamWindows),
@@ -606,8 +618,11 @@ fn host_candidates_does_not_dedup_a_registry_value_equal_to_an_env_default() {
 // proves: Test strategy #4 (Chosen design §5, §7) — a registry-sourced root
 // reaches the shared scan end to end: the four minimal-fixture games come back
 // tagged `Platform::SteamWindows` with `codec_id == None`,
-// `slug == normalize_slug(display_name)`, `install_path` composed from the
+// `slug == derive_slug(display_name)`, `install_path` composed from the
 // canonicalized library's `steamapps/common/`, ordered by (slug, install_path).
+// Re-pinned by ADR-024: the derivation is the canonical one, the slug is
+// prefix-free and inside the shared bound, and the namespace is the row's own
+// field.
 #[test]
 fn from_registry_and_roots_scans_the_registry_sourced_root_end_to_end() {
     let root_arg = fixture("minimal");
@@ -622,14 +637,29 @@ fn from_registry_and_roots_scans_the_registry_sourced_root_end_to_end() {
     for game in &games {
         assert_eq!(game.platform, Platform::SteamWindows);
         assert!(game.codec_id.is_none(), "codec_id must stay None");
-        assert_eq!(game.slug, normalize_slug(&game.display_name));
+        assert_eq!(
+            game.slug,
+            derive_slug(&game.display_name).expect("a fixture display name derives a slug"),
+            "the Windows plugin derives the same prefix-free slug the Linux plugin does"
+        );
+        assert!(
+            bindforge_core::is_slug_name(&game.slug)
+                && game.slug.len() <= bindforge_core::MAX_SLUG_OCTETS,
+            "`{}` must be a grammar-valid id inside the shared bound",
+            game.slug
+        );
+        assert_eq!(
+            game.namespace,
+            Namespace::Unknown,
+            "a Windows row's namespace is the v1 namespace, kept out of its slug"
+        );
     }
 
     let expected = [
-        ("unknown/example-game", "", "Example Game"),
-        ("unknown/mixed-case-game", "", "Mixed Case Game"),
-        ("unknown/nameless-install", "", "Nameless Install"),
-        ("unknown/secondary-title", "secondary", "Secondary Title"),
+        ("example-game", "", "Example Game"),
+        ("mixed-case-game", "", "Mixed Case Game"),
+        ("nameless-install", "", "Nameless Install"),
+        ("secondary-title", "secondary", "Secondary Title"),
     ];
     for (game, (slug, library, install_dir)) in games.iter().zip(expected) {
         assert_eq!(
@@ -654,7 +684,8 @@ fn from_registry_and_roots_scans_the_registry_sourced_root_end_to_end() {
 
 // proves: Test strategy #5 (Chosen design §1, §2) — the Windows plugin on the
 // shared minimal fixture returns the same four rows as the Linux plugin except
-// for the `platform` field; no new fixture tree is introduced.
+// for the `platform` field; no new fixture tree is introduced. ADR-024's identity
+// rule is part of that parity: slug and namespace agree across the two plugins.
 #[test]
 fn windows_rows_match_linux_rows_except_the_platform_tag() {
     let root = fixture("minimal");

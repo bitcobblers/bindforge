@@ -13,11 +13,13 @@
 //! `steam_windows` can use and re-export them, and nothing outside the crate
 //! reaches them.
 
-use crate::game::{DiscoveredGame, Platform};
+use crate::game::{DiscoveredGame, Namespace, Platform};
 use crate::keyvalues::{self, Value};
 use crate::plugin::DiscoveryPlugin;
 use crate::registry::DiscoveryError;
-use crate::slug::normalize_slug;
+use crate::slug::derive_slug;
+use bindforge_core::{MAX_SLUG_OCTETS, is_slug_name};
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 /// A parsed `appmanifest_*.acf`, reduced to the two fields discovery emits.
@@ -92,6 +94,10 @@ impl<T: SteamTarget> DiscoveryPlugin for SteamCore<T> {
             for library in canonical_paths(libraries) {
                 scan_library(&library, &self.target, &mut games, &mut skipped);
             }
+            // One game, one slug (`024-L2`): the pass is scoped to this plugin's
+            // own rows, and runs before the skip diagnostic below so a refusal
+            // here is counted like a refusal at the emission seam.
+            resolve_collisions(&mut games, &mut skipped);
         }
 
         // §7's one error path, its three clauses spelled out: at least one root
@@ -206,7 +212,12 @@ fn scan_library<T: SteamTarget>(
             continue;
         };
         match parse_manifest(&text, target) {
-            Some(manifest) => games.push(discovered_game(library, &manifest, target)),
+            // A row whose identity cannot be built is a refusal of this file, so
+            // it counts here too (ADR-024): count-only, never echoed per row.
+            Some(manifest) => match discovered_game(library, &manifest, target) {
+                Some(game) => games.push(game),
+                None => *skipped += 1,
+            },
             None => *skipped += 1,
         }
     }
@@ -214,13 +225,29 @@ fn scan_library<T: SteamTarget>(
 
 /// Builds the emitted row for `manifest` in `library` (Chosen design §5, A2).
 /// The `platform` field is the only one the target changes (§2).
+///
+/// ADR-024 makes this the plugin's identity gate: the slug is derived from the
+/// display name, falling back to the install directory, and the result must
+/// satisfy the shared grammar and bound before the row is built at all — the
+/// derivation is grammar-correct by construction except for length, so the
+/// predicate here is defence in depth. `None` is the named refusal: the caller
+/// counts the row into `skipped` and emits nothing, and no invented slug (such as
+/// the retired bare `unknown/`) ever becomes an identity. Length is never
+/// truncated, so an over-bound title is refused rather than cut into a different
+/// game.
 fn discovered_game<T: SteamTarget>(
     library: &Path,
     manifest: &AppManifest,
     target: &T,
-) -> DiscoveredGame {
-    DiscoveredGame {
-        slug: normalize_slug(&manifest.display_name),
+) -> Option<DiscoveredGame> {
+    let slug =
+        derive_slug(&manifest.display_name).or_else(|| derive_slug(&manifest.install_dir))?;
+    if !is_slug_name(&slug) || slug.len() > MAX_SLUG_OCTETS {
+        return None;
+    }
+    Some(DiscoveredGame {
+        slug,
+        namespace: Namespace::Unknown,
         display_name: manifest.display_name.clone(),
         // Emitted whether or not the directory exists; `library` is canonical,
         // and `install_dir` is validated by `parse_manifest`.
@@ -230,7 +257,72 @@ fn discovered_game<T: SteamTarget>(
             .join(&manifest.install_dir),
         platform: target.platform(),
         codec_id: None,
+    })
+}
+
+/// ADR-024's collision pass (`024-L2`): one display name, one slug, within one
+/// plugin's own rows.
+///
+/// The pass walks the distinct display names in byte order keeping the slugs
+/// already handed out. The first name to claim a base slug keeps it; a later name
+/// whose derivation is claimed takes the first free candidate `base-2`,
+/// `base-3`, …, skipping candidates another name already holds so a suffixed slug
+/// cannot collide with a different name's base. A name with no candidate inside
+/// `MAX_SLUG_OCTETS` is refused: it is dropped and counted into `skipped`, exactly
+/// like a row the derivation could not name. Rows that share a display name share
+/// its assigned slug, so one game seen in two libraries keeps one identity while
+/// the `(slug, install_path)` ordering at the call site keeps the two rows apart.
+///
+/// `games` is rewritten in place: surviving rows carry their assigned slug, and
+/// the refused rows are removed.
+fn resolve_collisions(games: &mut Vec<DiscoveredGame>, skipped: &mut usize) {
+    // Each distinct display name, in byte order, with the base slug its rows
+    // derive. The derivation is pure, so rows of one name hold one base slug.
+    let mut bases: BTreeMap<&str, &str> = BTreeMap::new();
+    for game in games.iter() {
+        bases
+            .entry(game.display_name.as_str())
+            .or_insert(game.slug.as_str());
     }
+
+    let mut assigned: BTreeMap<String, String> = BTreeMap::new();
+    let mut claimed: BTreeSet<String> = BTreeSet::new();
+    for (name, base) in &bases {
+        if claimed.contains(*base) {
+            // The bound check ends the search: candidates only grow with the
+            // counter, so once one falls outside it none can be accepted.
+            let mut accepted = None;
+            for suffix in 2_u32.. {
+                let candidate = format!("{base}-{suffix}");
+                if candidate.len() > MAX_SLUG_OCTETS {
+                    break;
+                }
+                if !claimed.contains(&candidate) {
+                    accepted = Some(candidate);
+                    break;
+                }
+            }
+            if let Some(candidate) = accepted {
+                claimed.insert(candidate.clone());
+                assigned.insert((*name).to_string(), candidate);
+            }
+            // No accepted candidate: the name keeps no slug, so its rows are
+            // refused below and counted.
+        } else {
+            claimed.insert((*base).to_string());
+            assigned.insert((*name).to_string(), (*base).to_string());
+        }
+    }
+    drop(bases);
+
+    for game in games.iter_mut() {
+        if let Some(slug) = assigned.get(&game.display_name) {
+            game.slug.clone_from(slug);
+        }
+    }
+    let before = games.len();
+    games.retain(|game| assigned.contains_key(&game.display_name));
+    *skipped += before - games.len();
 }
 
 /// Extracts the display name and install directory of one `appmanifest_*.acf`.
@@ -333,4 +425,84 @@ pub fn absolute_env(env: &dyn Fn(&str) -> Option<String>, key: &str) -> Option<P
     let value = env(key)?;
     let path = PathBuf::from(value);
     path.is_absolute().then_some(path)
+}
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for the private collision pass (`024-L2`), over hand-built
+    //! rows: the `skipped` delta is asserted to grow by exactly the refused
+    //! row count, which the end-to-end suites cannot observe (its refusal
+    //! counter is only read by the all-rows-refused diagnostic).
+    use super::*;
+
+    fn game(slug: &str, display_name: &str, install: &str) -> DiscoveredGame {
+        DiscoveredGame {
+            slug: slug.to_string(),
+            namespace: Namespace::Unknown,
+            display_name: display_name.to_string(),
+            install_path: PathBuf::from(install),
+            platform: Platform::SteamLinux,
+            codec_id: None,
+        }
+    }
+
+    #[test]
+    fn a_name_with_no_in_bound_candidate_grows_skipped_by_its_own_row_count() {
+        // A base slug sitting exactly on the bound leaves no room for `-2`,
+        // so the later name's every row is refused and counted — two rows of
+        // one refused name are two skipped rows, not one.
+        let base = "a".repeat(MAX_SLUG_OCTETS);
+        let mut games = vec![
+            game(&base, "Alpha Bound", "/lib/steamapps/common/alpha"),
+            game(&base, "Zeta Bound", "/lib/steamapps/common/zeta"),
+            game(&base, "Zeta Bound", "/lib2/steamapps/common/zeta-copy"),
+        ];
+        let mut skipped = 0;
+        resolve_collisions(&mut games, &mut skipped);
+        assert_eq!(skipped, 2, "both rows of the refused name are counted");
+        assert_eq!(games.len(), 1);
+        assert_eq!(games[0].display_name, "Alpha Bound");
+        assert_eq!(
+            games[0].slug, base,
+            "the byte-order-first name keeps the base"
+        );
+    }
+
+    #[test]
+    fn suffix_assignment_and_shared_names_refuse_nothing_and_count_nothing() {
+        // Byte order puts `Ys IX -Monstrum NOX-` before `Ys IX: Monstrum Nox`
+        // (` ` precedes `:`), so the former keeps the base and the latter
+        // takes `base-2`; the two rows of one display name share one slug.
+        let mut games = vec![
+            game(
+                "ys-ix-monstrum-nox",
+                "Ys IX: Monstrum Nox",
+                "/a/steamapps/common/ys",
+            ),
+            game(
+                "ys-ix-monstrum-nox",
+                "Ys IX -Monstrum NOX-",
+                "/b/steamapps/common/ys",
+            ),
+            game("dup", "Dup Game", "/c/steamapps/common/dup"),
+            game("dup", "Dup Game", "/d/steamapps/common/dup"),
+        ];
+        let mut skipped = 0;
+        resolve_collisions(&mut games, &mut skipped);
+        assert_eq!(skipped, 0, "a suffixed name is never a refusal");
+        let assigned: Vec<(&str, &str)> = games
+            .iter()
+            .map(|game| (game.display_name.as_str(), game.slug.as_str()))
+            .collect();
+        assert_eq!(
+            assigned,
+            [
+                // Input order is preserved: the pass rewrites in place.
+                ("Ys IX: Monstrum Nox", "ys-ix-monstrum-nox-2"),
+                ("Ys IX -Monstrum NOX-", "ys-ix-monstrum-nox"),
+                ("Dup Game", "dup"),
+                ("Dup Game", "dup"),
+            ]
+        );
+    }
 }

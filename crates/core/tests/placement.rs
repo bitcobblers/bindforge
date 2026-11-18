@@ -320,6 +320,79 @@ fn a_geometry_name_outside_the_grammar_is_refused_before_any_file_is_read() {
     );
 }
 
+/// proves: design 024's Test strategy #14 + Chosen design (Shared grammar and
+/// bound) — `load_geometry` checks the name against `MAX_SLUG_OCTETS` beside the
+/// `is_slug_name` check, before the join, because `024-B1` enumerates a keyboard
+/// geometry name among the bound's riders and no scope narrowing may drop one:
+/// this is the case the branch previously pinned as a past-bound name *loading*,
+/// re-pinned to the refusal by the escalation repair. A grammar-valid name one
+/// octet past the bound is refused as `InvalidValue` even while the matching
+/// geometry document sits in the directory — the bound check runs before the
+/// join, like the grammar check beside it — the refusal keeps A11's one-line
+/// printable shape and names no local path, and a name at exactly the bound
+/// still loads.
+#[test]
+fn a_geometry_name_past_the_shared_slug_bound_is_refused_beside_the_grammar() {
+    let scratch = ScratchDir::new("geometry-name-past-bound");
+    let dir = scratch.path().join("grid");
+    let past_bound = "g".repeat(bindforge_core::MAX_SLUG_OCTETS + 1);
+    let at_bound = "g".repeat(bindforge_core::MAX_SLUG_OCTETS);
+    // The file a past-bound name would reach is a perfectly valid geometry
+    // document: if the name reached the join, it would load cleanly.
+    scratch.write(
+        &format!("grid/{past_bound}.toml"),
+        &geometry_doc(&past_bound, &["keyboard:a 0 2"]),
+    );
+
+    let Err(err) = bindforge_core::load_geometry(&dir, &past_bound) else {
+        panic!(
+            "a grammar-valid name of {} octets must be refused: `024-B1` enumerates a \
+             geometry name among the ids riding `MAX_SLUG_OCTETS`, so the bound applies \
+             wherever the grammar does",
+            bindforge_core::MAX_SLUG_OCTETS + 1
+        )
+    };
+    assert!(
+        matches!(err, bindforge_core::CoreError::InvalidValue { .. }),
+        "a name past the shared bound is refused beside the grammar refusal, as \
+         `InvalidValue`, got {err:?}"
+    );
+    let detail = err.to_string();
+    assert!(
+        !detail.contains(&scratch.path().display().to_string()),
+        "a refusal for a past-bound `name` must not disclose the local path the loader \
+         resolved (A11), got `{detail}`"
+    );
+    assert!(
+        !detail.contains("keyboard:a"),
+        "the refusal must not echo document content: the bound check runs before the \
+         join, so no file is opened, got `{detail}`"
+    );
+    assert!(
+        !detail.contains('\n') && detail.chars().all(|ch| !ch.is_control()),
+        "a refusal stays one bounded printable line whatever `name` carried (A11), got \
+         {detail:?}"
+    );
+
+    // The boundary itself stays open: the bound is *at most* `MAX_SLUG_OCTETS`,
+    // so a name at exactly the bound rides grammar and bound alike and loads.
+    scratch.write(
+        &format!("grid/{at_bound}.toml"),
+        &geometry_doc(&at_bound, &["keyboard:a 0 2"]),
+    );
+    let geometry = bindforge_core::load_geometry(&dir, &at_bound).unwrap_or_else(|err| {
+        panic!(
+            "a name of exactly {} octets is inside the shared bound and must load: {err}",
+            bindforge_core::MAX_SLUG_OCTETS
+        )
+    });
+    assert_eq!(
+        geometry.name(),
+        at_bound.as_str(),
+        "the name at exactly the bound is kept whole: refusal starts one octet past it"
+    );
+}
+
 /// proves: Test strategy #4 — the file-name rule mirrors the hand rule: a
 /// `geometry` entry contradicting its file stem is refused, and the refusal keeps
 /// the local path out of the message shown to whoever supplied the file.
@@ -811,4 +884,81 @@ fn a_geometry_is_loaded_by_name_from_its_directory() {
     assert_eq!(ansi.coordinate(&id("keyboard:w")), Some((1, 1)));
     assert_eq!(dvorak.coordinate(&id("keyboard:w")), Some((2, 1)));
     assert_eq!(dvorak.name(), "dvorak-us");
+}
+
+// ---------------------------------------------------------------------------
+// The shared slug grammar and its one exported bound (design 024 / ADR-024)
+// ---------------------------------------------------------------------------
+
+/// proves: design 024's Test strategy #2 + Chosen design (Shared grammar and bound)
+/// — the bound has exactly one exported home and ADR-024's number: `MAX_SLUG_OCTETS`
+/// is reachable through `lib.rs`, the crate's only export list, beside
+/// `is_slug_name` in this module, and its value is the 128 that amends `013-L5`.
+#[test]
+fn the_shared_slug_bound_is_exported_at_one_hundred_twenty_eight_octets() {
+    assert_eq!(
+        bindforge_core::MAX_SLUG_OCTETS,
+        128,
+        "ADR-024 raises the shared slug bound from 63 to 128 octets and states it once, so every \
+         consumer reads this constant instead of a private copy"
+    );
+}
+
+/// proves: design 024's Test strategy #2 + Chosen design (Shared grammar and bound)
+/// — the exported predicate accepts every spelling a product id can take, including
+/// the `g-`-prefixed spellings and the suffixed candidates ADR-024's derivation and
+/// collision rule emit, up to exactly the shared bound.
+#[test]
+fn is_slug_name_accepts_every_slug_shaped_spelling_up_to_the_bound() {
+    let at_bound = "a".repeat(bindforge_core::MAX_SLUG_OCTETS);
+
+    for slug in [
+        "a",
+        "g-7-days-to-die",
+        "g-8bitboy",
+        "g-8-bit-armies",
+        "ys-ix-monstrum-nox",
+        "ys-ix-monstrum-nox-2",
+        "warhammer-40-000-darktide-sisters-novitiate-class-deluxe-edition",
+        at_bound.as_str(),
+    ] {
+        assert!(
+            bindforge_core::is_slug_name(slug),
+            "`{slug}` is `[a-z][a-z0-9-]*` and inside the shared bound, so the exported grammar \
+             must accept it"
+        );
+    }
+}
+
+/// proves: design 024's Test strategy #2 + Chosen design (Shared grammar and bound)
+/// — the spellings that can never be a product id are refused by the same predicate a
+/// discovered game's slug is checked against: the empty string, an uppercase spelling,
+/// a leading digit, the `unknown/<name>` spelling ADR-024 retires, and the `.` / `..`
+/// and separator shapes that must never ask the filesystem for a path.
+#[test]
+fn is_slug_name_refuses_every_spelling_that_cannot_be_one_path_component() {
+    for slug in [
+        "",
+        "Elden-Ring",
+        "ELDEN",
+        "7-days-to-die",
+        "unknown/elden-ring",
+        "elden/ring",
+        "/",
+        ".",
+        "..",
+        "./elden",
+        "../elden",
+        "elden ring",
+        "elden_ring",
+        "-elden",
+        "elden*",
+        "эльден",
+    ] {
+        assert!(
+            !bindforge_core::is_slug_name(slug),
+            "`{slug}` is outside `[a-z][a-z0-9-]*`, so the shared predicate must refuse it \
+             before it can name a directory or an id"
+        );
+    }
 }

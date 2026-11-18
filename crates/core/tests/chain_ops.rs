@@ -689,25 +689,51 @@ fn refuses_a_malformed_for_pin_naming_the_offender() {
     }
 }
 
-/// proves: Test strategy #1 (`id-uppercase.toml`, `id-past-cap.toml`) — a v2
-/// `id` rides the shipped slug grammar (A14), capped at 63 octets, because a
+/// proves: Test strategy #6 + the accepted code-review r1 finding (the load-seam
+/// fault-kind split) — `check_pin` refuses a *grammar-valid* `for` head one octet
+/// past `MAX_SLUG_OCTETS` by naming the bound it broke, interpolated from the
+/// exported constant: the head satisfies `[a-z][a-z0-9-]*`, so a refusal that
+/// recited the manifest-identity grammar would name a rule the offender keeps.
+#[test]
+fn refuses_a_for_pin_head_one_octet_past_the_slug_bound_naming_the_bound() {
+    let head = "m".repeat(bindforge_core::MAX_SLUG_OCTETS + 1);
+    let err = parse_refusal(&doc_with_entry("for", &quoted(&format!("{head}@3"))));
+    let detail = err.to_string();
+    assert!(
+        detail.contains(&bindforge_core::MAX_SLUG_OCTETS.to_string()),
+        "the bound fault names the shared bound it enforced ({}, built from the exported \
+         constant), not the grammar rule the head satisfies: `{detail}`",
+        bindforge_core::MAX_SLUG_OCTETS
+    );
+    assert!(
+        !detail.contains('\n') && detail.chars().all(|ch| !ch.is_control()),
+        "a refusal stays one bounded printable line whatever the head carried (A13): \
+         {detail:?}"
+    );
+}
+
+/// proves: Test strategy #1 (`id-uppercase.toml`, `id-past-cap.toml`), with the cap
+/// re-pinned by design 024's Test strategy #6 — a v2
+/// `id` rides the shipped slug grammar (A14), capped at the shared
+/// `MAX_SLUG_OCTETS` bound (128 from ADR-024), because a
 /// v2 id is a chain lookup key and a file name: uppercase, a dot path, a
-/// slash path, and a 64-octet spelling are each refused as `InvalidValue`
+/// slash path, and a one-past-the-bound spelling are each refused as `InvalidValue`
 /// naming the id, never carried into a lookup.
 #[test]
 fn refuses_a_v2_id_that_breaks_the_slug_grammar_naming_the_id() {
-    let long_id = "a".repeat(64);
+    let long_id = "a".repeat(bindforge_core::MAX_SLUG_OCTETS + 1);
     for id in ["My-Profile", long_id.as_str(), "..", "a/b"] {
         let err = parse_refusal(&doc_with_entry("id", &quoted(id)));
         assert_refusal_names(&err, &["id", id]);
     }
 }
 
-/// proves: Chosen design (Id grammars) — the 63-octet cap is a limit, not an
-/// off-by-one wall: a slug id of exactly 63 octets parses and survives.
+/// proves: Chosen design (Id grammars) + design 024's Test strategy #6 — the shared
+/// cap is a limit, not an
+/// off-by-one wall: a slug id of exactly `MAX_SLUG_OCTETS` octets parses and survives.
 #[test]
 fn accepts_a_v2_id_at_the_slug_length_bound() {
-    let id = "p".repeat(63);
+    let id = "p".repeat(bindforge_core::MAX_SLUG_OCTETS);
     let document = parse_ok(&doc_with_entry("id", &quoted(&id)));
     assert_eq!(
         profile_in(&document).id,
@@ -719,11 +745,12 @@ fn accepts_a_v2_id_at_the_slug_length_bound() {
 /// proves: Test strategy #1 (`derives-element-uppercase.toml`) + Cross-file
 /// loading step 2 — every `derives` element is slug-checked at parse, which is
 /// what makes the constructed link path always a direct child of the major
-/// directory: `..`, `a/b`, an uppercase spelling, and a 64-octet element are
+/// directory: `..`, `a/b`, an uppercase spelling, and a one-past-the-shared-bound
+/// element are
 /// refused before any path is built.
 #[test]
 fn refuses_a_derives_element_that_breaks_the_slug_grammar_naming_the_element() {
-    let long_id = "a".repeat(64);
+    let long_id = "a".repeat(bindforge_core::MAX_SLUG_OCTETS + 1);
     for element in ["..", "a/b", "Game-Base", long_id.as_str()] {
         let err = parse_refusal(&doc_with_entry("derives", &array([element])));
         assert_refusal_names(&err, &["derives", element]);

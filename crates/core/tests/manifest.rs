@@ -775,14 +775,16 @@ fn accepts_an_exclusivity_group_of_exactly_max_group_members() {
     );
 }
 
-/// proves: Test strategy #3 + Chosen design (Identity grammar) — a manifest `id`
-/// that breaks the slug grammar is refused: an uppercase spelling, a dot, a leading
-/// hyphen, and one past the 63-octet label bound. The id is a path component and
+/// proves: Test strategy #3 + Chosen design (Identity grammar), re-pinned by design
+/// 024's Test strategy #6 — a manifest `id` that breaks the slug grammar is refused:
+/// an uppercase spelling, a dot, a leading hyphen, and one past the shared
+/// `MAX_SLUG_OCTETS` bound (128 octets from ADR-024, whose one stated home is
+/// `placement.rs`). The id is a path component and
 /// the left half of every ADR-014 `for` pin, so a spelling that merely *looks*
 /// lowercase is the collision the rule exists to prevent.
 #[test]
 fn refuses_a_manifest_id_that_breaks_the_slug_grammar_naming_the_offender() {
-    let long_id = "a".repeat(64);
+    let long_id = "a".repeat(bindforge_core::MAX_SLUG_OCTETS + 1);
 
     for id in ["Remnant-2", "remnant.2", "-remnant", long_id.as_str()] {
         let text = doc_with_entry("id", &format!("\"{id}\""));
@@ -792,12 +794,13 @@ fn refuses_a_manifest_id_that_breaks_the_slug_grammar_naming_the_offender() {
     }
 }
 
-/// proves: Chosen design (Identity grammar) — the bound is a limit: a slug `id` of
-/// exactly 63 octets, the DNS-label bound RFC 1035 §2.3.1 publishes and the
-/// action-id grammar already borrows, parses and is kept byte-exact.
+/// proves: Chosen design (Identity grammar) + design 024's Test strategy #6 — the
+/// bound is a limit at the exported constant, which design 024 raises from 63 to 128
+/// octets and gives one stated home: a slug `id` of exactly `MAX_SLUG_OCTETS` octets
+/// parses and is kept byte-exact.
 #[test]
 fn accepts_a_manifest_id_at_the_slug_length_bound() {
-    let id = "g".repeat(63);
+    let id = "g".repeat(bindforge_core::MAX_SLUG_OCTETS);
     let text = doc_with_entry("id", &format!("\"{id}\""));
 
     let manifest = parse_manifest(&text);
@@ -809,7 +812,7 @@ fn accepts_a_manifest_id_at_the_slug_length_bound() {
 /// id is refused at parse, while the document still has one answer for it.
 #[test]
 fn refuses_a_codec_that_breaks_the_slug_grammar_naming_the_offender() {
-    let long_codec = "c".repeat(64);
+    let long_codec = "c".repeat(bindforge_core::MAX_SLUG_OCTETS + 1);
 
     for codec in [
         "Unreal-Engine",
@@ -829,7 +832,7 @@ fn refuses_a_codec_that_breaks_the_slug_grammar_naming_the_offender() {
 /// that can never resolve.
 #[test]
 fn refuses_a_preset_id_that_breaks_the_slug_grammar_naming_the_offender() {
-    let long_preset = "p".repeat(64);
+    let long_preset = "p".repeat(bindforge_core::MAX_SLUG_OCTETS + 1);
 
     for preset in ["Default", "south.paw", "-southpaw", long_preset.as_str()] {
         let text = doc_with_entry("presets", &array(&["default", preset]));
@@ -837,6 +840,33 @@ fn refuses_a_preset_id_that_breaks_the_slug_grammar_naming_the_offender() {
         let err = parse_refusal(&text);
         assert_refusal_names(&err, &["presets", preset]);
     }
+}
+
+/// proves: design 024's Test strategy #6 — the raised bound is a limit for every
+/// manifest id that rides the slug grammar, not only the `id`: a `codec` and a preset
+/// id of exactly `MAX_SLUG_OCTETS` octets (128 from ADR-024) parse and are kept
+/// byte-exact.
+#[test]
+fn accepts_a_codec_and_a_preset_id_at_the_slug_length_bound() {
+    let at_cap = "c".repeat(bindforge_core::MAX_SLUG_OCTETS);
+
+    let codec_manifest = parse_manifest(&doc_with_entry("codec", &format!("\"{at_cap}\"")));
+    assert_eq!(
+        codec_manifest.codec, at_cap,
+        "the codec id is kept exactly as written"
+    );
+
+    let preset_manifest = parse_manifest(&doc_with_entry(
+        "presets",
+        &array(&["default", at_cap.as_str()]),
+    ));
+    assert!(
+        preset_manifest
+            .presets
+            .iter()
+            .any(|preset| preset == &at_cap),
+        "a preset id of exactly MAX_SLUG_OCTETS octets parses and is kept as written"
+    );
 }
 
 /// proves: Test strategy #3 + Chosen design (Identity, revision, and the series

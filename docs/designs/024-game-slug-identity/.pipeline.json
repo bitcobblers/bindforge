@@ -1,0 +1,1621 @@
+{
+  "version": 1,
+  "slug": "game-slug-identity",
+  "nnn": "024",
+  "branch": "pipeline/024-game-slug-identity",
+  "source": {
+    "kind": "adr",
+    "path": "docs/adrs/024-game-slug-identity.md"
+  },
+  "status": "done",
+  "lastStage": "doc-sync",
+  "designRound": 2,
+  "codeRound": 1,
+  "designBudgetUsed": 1,
+  "codeBudgetUsed": 11,
+  "editorialDone": false,
+  "testsGreen": true,
+  "testsNeedUpdate": false,
+  "stageFailures": {
+    "fix": 1
+  },
+  "stageCommits": [
+    "1b080c19a63f91e257c21b03d93efb9c5baf3c22",
+    "11aa42e8f729f19bb7e1c2a6c8d0a1b97165019b",
+    "031019282f3b3800f657031783406474a2e4cd30",
+    "6a22b8bee5ddf8e6e09b372035bf3541c91ce69b",
+    "d7c4950c09f557501805951dfeaace351be9187a",
+    "ef7860bcfe53a9280c77ff577bd2f9db4ac3bddc",
+    "a66464e1a5a6ab5a9273442142d9b8311e9d0abd",
+    "3c105dfa5cfd58c3d43551c13603006a668aeebd",
+    "4fde12e09c75b78fc6031cbe82025c50771f99b8",
+    "554bc0d52aa83de11f8e60008f75768ba9ca0f59",
+    "9164bdf573c77dc32da8ee8975d093fcf27909d7",
+    "dde63e0e62474cf28e2bb0685be51bead94cb197",
+    "0ee2eeeb7992f470561763e45e56261f503e64ae",
+    "7f616274bbb9fa69bc55a181958b68b8a1e7f83a",
+    "f611a60482fb491aaed68541f65e6f6b17df03f3",
+    "818ca62094aacfed640ec7320fe3d293a235646d",
+    "74fbc82f58fdb65e7ffe942eb3636cff5e49a649",
+    "0dd57591ac2cd358f698bd95508da1c0f0701f81",
+    "73ef6ca37c8e8205a51f37586425e971db9a4fd9",
+    "cf947b640b2f26386db6ca399f8aa44358ed9548",
+    "2d0bfff1892322ca8bae27013ea0ae88413f9cb8",
+    "75c2eeef83642697e8cd9f9e64bedff8ff785cdc",
+    "30a42f962b5ce2cdf3627b9b1af581736bd76fb6",
+    "001d07ff9fa10d130f608084c1bc8c32ae2e4aef",
+    "1318feeb5c482747e36062f627a792f9f601b02b",
+    "0d3650f6aa9968943e4555cb9893763fdd58e7f1",
+    "69a70e51d5daa986a32b1fcc9d3f47c5575a4e0b",
+    "ef1cac980b1c46014175c9dfb3fe20388e3102b8",
+    "53bacd4425991b3c90c033944007ac3c65d4a26e",
+    "c9b33a7f9caf70814de00fa0bdd8fa52d3a8fb1f",
+    "eb8783d6e4bf5f8700a655b4ed9314d856c237e5",
+    "2294ab9cf1a3fb9a4a01bf6128f96e1195b19e7b",
+    "f4733c471c59e201d88260b2ba1344b204a8dede"
+  ],
+  "forceNext": null,
+  "results": [
+    {
+      "stage": "research",
+      "round": 0,
+      "sessionID": "ses_e104479b6ffezsUmmiFGN3zZnf",
+      "agent": "research/researcher",
+      "at": 1795023860939,
+      "reply": {
+        "summary": "Wrote docs/designs/024-game-slug-identity/01-research.md for ADR-024 (discovered-game slug identity and the 63→128 shared bound). Read set: the ADR plus cited ADRs 013, 021, 022, and the ADR/task directory listings; then 14 files outside that set (discovery slug/game/steam_common/CLI sources and Cargo.toml, core placement/action/lib/error/manifest/policy/document lines, four schema specs, README, three invalid fixtures, discovery slug_tests, rust-toolchain.toml). Findings pin down today's state: one crate-private grammar predicate, four private 63-octet constants (three MAX_SLUG_OCTETS plus a differently named MAX_SEGMENT_OCTETS in action.rs that the ADR's rollout omits), the 63 number restated in four published specs, four Rust test files (not two) that re-pin 63/64, an 'eleven constants' count in schemas/README.md that becomes twelve, no past-cap id fixture in schemas/manifests/v1, and that discovery does not depend on bindforge-core — so 024-L1 forces a new public core API or a duplicate. A survey of 143 live Steam store titles through Valve's store-search endpoint found one title deriving to 64 octets under 024-C2, a byte-identical slug collision between two real store entries, and frequent g- leading-digit cases, but nothing past 128 — so the ADR's 'one octet above the longest surveyed title' basis is unproven. External grounding covers Kubernetes RFC-1123 63-octet labels and its digit-start refusal, UTS #46 IDNA mapping/Punycode, UAX #15 NFKD plus the fact that Rust std has no normalisation API (which collides head-on with the ADR's 'std-only, no transliteration table' clause), Django slugify, WordPress' -2 suffix loop with truncation and _wp_old_slug, FriendlyId history, Steamworks immutable App IDs, IGDB id+slug, git core.protectNTFS with CVE-2019-1353, and NAME_MAX/MAX_PATH/255-character component limits. Eleven open questions are queued for the designer, led by the std-only/NFKD contradiction, the undefined collision-suffix-versus-bound interaction, per-plugin-only collision scope, and Windows reserved device names reachable through derivation.",
+        "commitMessage": "docs: research game slug identity for ADR-024"
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/research-r0.md",
+      "durationMs": 453564,
+      "nudges": 0,
+      "docName": "01-research.md",
+      "docLines": 397,
+      "docLinesAdded": 397,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "proposal",
+      "round": 0,
+      "sessionID": "ses_e103d8aedffeCCQAzOUaxZi3D9",
+      "agent": "design/designer",
+      "at": 1795024076510,
+      "reply": {
+        "commitMessage": "docs: add design proposal for ADR-024 game slug identity"
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/proposal-r0.md",
+      "durationMs": 215473,
+      "nudges": 0,
+      "docName": "02-proposal.md",
+      "docLines": 345,
+      "docLinesAdded": 345,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e103a40dbffeA3anvZlCQG28WN",
+      "agent": "review/design-correctness",
+      "at": 1795024565863,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design → Derivation — \"fold precomposed Latin via a private `fold_latin_base(char) -> Option<char>` match table covering Latin-1 Supplement and Latin Extended-A single-base-letter decompositions, both cases\"",
+            "problem": "The steps are stated \"in order\" with ASCII case-fold first and the Latin fold second, and the Options section says each covered letter \"maps to that base\", meaning its Unicode canonical-decomposition base. For every uppercase precomposed letter that base is ASCII uppercase (Å → A, É → E, İ → I), and the ASCII case-fold has already run behind it, so the next clause — \"map every remaining character outside `[a-z0-9]` to `-`\" — dashes it out. `Åpen` derives `pen`; an accented all-caps title loses every accented letter. That is precisely the accented-folds-to-`-` loss the Options section cites as the reason to keep the diacritic clause (\"\\\"Pokémon\\\" → `pok-mon`\"). Test strategy #1 cannot catch it: its diacritic cases (é, ü, ñ) are all lowercase, and A15's registered claim is about the fold reproducing NFKD, not about case.",
+            "fix": "One clause: the table maps each covered letter to its lower-case ASCII base (or the ASCII case-fold is re-applied after the diacritic fold); add an upper-case accented case (É → e, Å → a) to Test strategy #1."
+          },
+          {
+            "severity": "major",
+            "location": "Chosen design → Specs, fixtures, ledger — \"the four `spec.md` sentences (A3) are amended in place: the number and the RFC 1035 derivation are replaced by a cross-reference\"",
+            "problem": "A3's action-ids citation is `schemas/action-ids/v1/spec.md:54` only, so line 58 of the same sentence is left unamended: \"`move..steer`, `steer-left`, `move.steer.left`, and a 64-octet segment are each a refusal, and each has a fixture under `fixtures/invalid/` naming it\". Under `MAX_SLUG_OCTETS = 128` a 64-octet segment is legal, so the amended published spec refuses something two lines above it now permits, and the fixture it promises to name is the file this run renames to `segment-past-cap.toml` with a 129-octet segment.",
+            "fix": "Extend the amendment list and A3's citation to that example clause: replace \"a 64-octet segment\" with \"a segment past the shared bound\" so it names the renamed fixture instead of a stale length."
+          },
+          {
+            "severity": "minor",
+            "location": "Test strategy #6 — \"`crates/core/tests/{manifest.rs, policy.rs, chain_ops.rs, action.rs}` accept 128 and refuse 129\"",
+            "problem": "Those four are exactly the files pinning the 63/64 boundary, but the file pinning the action-ids invalid fixture's *name* is a fifth: `crates/core/tests/action_ids.rs:124` lists `\"segment-past-63-octets.toml\"` in its required-fixture set. Neither Test strategy #6 nor #10 names it, so the fixture rename this design orders has no named re-pin site.",
+            "fix": "Add `action_ids.rs` (with the new literal `segment-past-cap.toml`) to #6's file list and to Rollout item 1's re-pin list."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Emission, refusal and collisions — \"refusals increment the existing `skipped` counter, and that diagnostic's wording widens from \\\"unreadable or malformed\\\" to name un-derivable names as well\"",
+            "problem": "That diagnostic is `crates/discovery/src/steam_common.rs:101`, guarded by `!self.roots.is_empty() && games.is_empty() && skipped > 0`: it fires only when the plugin emitted nothing. A scan that refuses one game and emits the rest prints nothing, so the widened wording never appears in the ordinary mixed case, and 024-L1's \"a violation is a named refusal\" is user-invisible for the Steam plugins — their rows are refused inside the plugin and never reach the CLI's named `error: refused game with invalid slug:` line.",
+            "fix": "Emit one named line per construction-path refusal through `escape_and_truncate` (mirroring the CLI's line, no path), or state that plugin-side refusals are count-only and that 024-L1's named refusal is the CLI-boundary line alone."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Identity shape — \"`pub enum Namespace { Unknown }` with `#[serde(rename_all = \\\"kebab-case\\\")]` and a `Display` impl, mirroring `Platform`'s pattern\"",
+            "problem": "The pattern cited does not exist: `Platform` (`crates/discovery/src/game.rs:5-18`) carries no serde attribute, and `apps/discovery-cli/tests/cli_tests.rs:186-189` pins `obj[\"platform\"] == \"SteamLinux\"` with the comment that \"the r1 major `#[serde(rename_all = \\\"kebab-case\\\")]` was reverted as unauthorized\". A builder following the cited precedent emits `\"Unknown\"` against a value pinned to `\"unknown\"` in three places, and the JSON row ends up mixing `\"namespace\":\"unknown\"` with `\"platform\":\"SteamLinux\"` without that being a stated, deliberate divergence.",
+            "fix": "Delete \"mirroring `Platform`'s pattern\" and state the deliberate divergence from it (and that the closed-enum JSON spelling in this row is now mixed)."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → Shared grammar and bound (\"surveyed-title rationale per ADR-024, with A16's caveat\") vs Specs, fixtures, ledger (\"with the substituted rationale\")",
+            "problem": "The same constant is given two different published rationales; the README is 024-L3's one stated home, so its wording is the contract while the code doc comment cites a clause the README drops.",
+            "fix": "Write the rationale once and reuse it in both places, stating whether 024-B1's \"one octet above the longest surveyed store display title\" clause is carried (with A16's caveat) or replaced."
+          },
+          {
+            "severity": "nit",
+            "location": "Rollout item 2 — \"Same commit as the constant bump so code and spec text cannot drift (024-L3)\"",
+            "problem": "Commit-level atomicity is required for constant-plus-specs, yet item 4 (discovery, including \"the eight re-pinned test files\", four of which live in `apps/discovery-cli/tests/`) is sequenced ahead of item 5 (the CLI's `Namespace` column and JSON shape), so no intermediate commit satisfies `cargo test --workspace --locked`.",
+            "fix": "One clause: items 4 and 5 land as one commit, or state that the gates are branch-level and only items 1+2 are commit-atomic."
+          }
+        ]
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/design-review-correctness-r1c0.md",
+      "durationMs": 489243,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e103a40daffeAqQRSjszIwJMwb",
+      "agent": "review/design-compatibility",
+      "at": 1795024307448,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Compatibility matrix — \"Third-party schema readers | Unknown | Built against the 63-octet text they refuse 64–128-octet ids until they re-read the amended specs\"",
+            "problem": "A compatibility-matrix row whose status is `unknown` is a major finding under checklist item 1; the row commits to no status. The proposal's own material permits a commitment: 024-L3 makes the amendment relaxation-only (documents valid under the 63-octet text stay valid at 128) and A7 shows no shipped document exceeds 63 today, so every known artifact is accepted by both old-text and new-text readers; divergence is confined to future ids no known consumer produces.",
+            "fix": "Replace the \"Unknown\" status with a definite one — e.g. \"Yes, with a known behaviour change\" — and keep the existing note: old-text readers reject only 64–128-octet ids, of which zero ship at merge. That is a committed status replacing an uncommitted one; the mitigations stay unchanged."
+          },
+          {
+            "severity": "major",
+            "location": "Test strategy #11 — \"Platform: the whole suite runs unchanged on the Linux and Windows CI matrix\" (with matrix rows Windows \"Yes, with named gaps\" and macOS \"Yes\")",
+            "problem": "The named CI matrix does not exist and nothing in the run creates it: every job in the repo's workflows runs ubuntu-latest (check.yml `rust` and `orchestration` jobs; advisories.yml), and the Windows leg of the gate is a cross-compile `cargo check --target x86_64-pc-windows-msvc` that performs no code generation or linking — no test binary ever runs on Windows. Rollout item 7 pins the gates per `.github/workflows/check.yml` and no rollout item adds a Windows runner, so the Windows platform test is unexecutable as written and the Windows \"Yes\" support claim carries no runtime verification. Checklist item 7 fails again for macOS: the matrix claims \"Yes\" but no Test strategy item names a macOS platform test.",
+            "fix": "One of two edits: (a) add `windows-latest` (and `macos-latest`, if the Yes claims stand) legs to check.yml as a named rollout item and keep #11's wording; or (b) rewrite #11 to the real gate — full suite on Linux, Windows compile-verified via the existing MSVC `cargo check` leg, derivation/collision/refusal outcomes platform-independent — and downgrade the Windows and macOS matrix rows' statuses to that verification level."
+          },
+          {
+            "severity": "minor",
+            "location": "Compatibility matrix — \"`tools/orchestration` (Node) | Not affected | No slug-grammar surface there\"",
+            "problem": "The stated basis is false as written: tools/orchestration/src/pipeline/types.ts:287 defines `SLUG_RE = /^[a-z0-9][a-z0-9-]*$/`, the pipeline-internal run-identity `nnn-slug` grammar. The \"Not affected\" conclusion holds (distinct grammar that admits a leading digit, rides no shared product slug bound, reads nothing in the changed surface), but anyone grepping \"slug\" in that package will find the constant and read the row's basis as refuted.",
+            "fix": "Restate the row's basis as: \"the pipeline-internal `nnn-slug` run-identity grammar is a distinct grammar that rides no shared product slug bound; no code there reads the changed surface\"."
+          }
+        ]
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/design-review-compatibility-r1c0.md",
+      "durationMs": 230825,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e1036bafaffeaZ2MgeVJaohDZm",
+      "agent": "review/design-security",
+      "at": 1795024406414,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "CLI boundary and output — \"dropped, with one stderr line `error: refused game with invalid slug: <escape_and_truncate(value)>` and no path (024-L1)\"",
+            "problem": "\"and no path\" overstates the mechanism if read as \"no path-shaped text can appear on this line\": escape_and_truncate (verified crates/core/src/error.rs:172-186) escapes control characters and truncates at 80 chars but passes '/' and '.' through, so a hostile plugin that puts path-shaped text in the slug field has that text echoed back (escaped, bounded). The guarantees actually provided are: single-line, bounded, escaped echo of the plugin's own value, and no install path emitted by the CLI.",
+            "fix": "Reword the clause to \"and no CLI-sourced path; the echo is the escaped, length-bounded value only\" — one sentence, no new mechanism."
+          }
+        ]
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/design-review-security-r1c0.md",
+      "durationMs": 98781,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e10353866ffe8Te1xE8KAcma7h",
+      "agent": "review/design-performance",
+      "at": 1795024665093,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → \"Emission, refusal and collisions — `crates/discovery`\", read with the Risks row \"Collision-suffix probe loop repeats bound checks many times\" — \"probe count is bounded by distinct-name count, no measurable cost today\"",
+            "problem": "The stated bound is per name, not per run. As specified, every colliding name restarts its probe at `base-2` and walks the claimed set, so n distinct display names sharing one base cost about n^2/2 candidate constructions, each a fresh String plus an is_slug_name and bound check. Nothing in the design caps rows a plugin may return — unlike the sibling budgets the new constant joins (MAX_MANIFEST_ROWS = 256 et al.) — so the multiplier is whatever the host's appmanifest_*.acf count is. Minor because this is a hand-run bulk CLI scan, never an event path (no event/keystroke path exists in the tree; the only binary is apps/discovery-cli), and realistic n keeps the term invisible.",
+            "fix": "Replace the row's mitigation with the honest shape — aggregate probes are O(n^2) in one plugin run's distinct-name count, n bounded only by the host's manifest-file count — or store a next-free-suffix counter on each base entry of the assigned-slug map so a collision consumes one candidate instead of rescanning claimed ones, making the pass linear. Either keeps one mechanism and adds no constant."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → \"Specs, fixtures, ledger\" — \"`schemas/README.md` gains the bound's one stated home, a bullet in the exported budget family: `MAX_SLUG_OCTETS = 128`\"",
+            "problem": "Every existing entry in that family (schemas/README.md:99-125) carries an explicit aggregate-cost clause: ADR-013's ends \"the shared 1 MiB / 16-deep budgets still bind first\", ADR-014's states \"adds no aggregate cap … MAX_CHAIN_DEPTH × MAX_DOCUMENT_BYTES (32 MiB)\", ADR-015's gives 64 × 16 predicate moves. The design specifies the bullet's rationale, the RFC 1035 supersession sentence and the eleven→twelve fix, but no composition clause — even though this entry doubles an existing bound on values that appear inside every capped array that adversarial-guard section governs.",
+            "fix": "Add one clause to the bullet in ADR-013's words: the doubling adds no aggregate byte ceiling because MAX_DOCUMENT_BYTES / MAX_NESTING_DEPTH still bind first. No new mechanism, one sentence in the stated home."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → \"Derivation — `crates/discovery/src/slug.rs`\" — \"ASCII case-fold (`A-Z`→`a-z`); fold precomposed Latin via a private `fold_latin_base` …; map every remaining character outside `[a-z0-9]` to `-`; collapse `-` runs; trim `-` at both ends; prefix a leading digit with `g-`\"",
+            "problem": "Read as steps, this is five to six full-string passes over input no field-level cap constrains: read_text_file caps an ACF at 1 MiB (steam_common.rs:282) but not the `name` value inside it, and the bound is deliberately applied only after the whole slug exists (\"Length is **not** truncated anywhere\"). Today's normalize_slug already allocates four intermediate Strings per name (crates/discovery/src/slug.rs:1-35), so this is not a regression — but the canonical rewrite is the moment to pin the shape.",
+            "fix": "One clause: derive_slug folds case, folds Latin, maps, and collapses runs in a single char loop into one String builder, with trim and the `g-` prefix done as slices/prepend rather than rewrites, so a name of any length costs one buffer."
+          }
+        ]
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/design-review-performance-r1c0.md",
+      "durationMs": 258629,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e1032c988ffe7OEF7o6KIykvCO",
+      "agent": "review/design-complexity",
+      "at": 1795024729928,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/design-review-complexity-r1c0.md",
+      "durationMs": 164003,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e1030487cffeR2IvkPnHXSk7Zx",
+      "agent": "design/designer",
+      "at": 1795024947356,
+      "reply": {
+        "changed": true,
+        "summary": "All ten open findings consumed by changing the design, not appending: Derivation now folds precomposed Latin to its lower-case ASCII base before the ASCII case-fold (Options (c) and Test strategy #1 follow, so `Åpen`→`apen`); the action-ids spec amendment covers the refusal-example clause (\"a 64-octet segment\"→\"a segment past the shared bound\", A3 extended to :58) and names `action_ids.rs` as the fixture-literal re-pin site in Test strategy #6 and Rollout 1; plugin-side refusals are now stated as count-only into `skipped` (whose message only fires when nothing was emitted, steam_common.rs:101), leaving 024-L1's named refusal to the CLI boundary, and the Goals echo line was reverted rather than reworded; Identity shape drops the false `Platform` serde precedent and states the deliberate divergence from the pinned `\"SteamLinux\"`; the bound's rationale exists once, in the README bullet, with `placement.rs` copying it and 024-B1's surveyed-title clause replaced, not repeated (A16); Rollout states commit granularity (items 1+2, items 4+5 one commit, rest branch-level), replacing the stale same-commit clause; Test strategy #11 and the Windows/macOS matrix rows now describe the real gate (Linux suite, Windows cross-compile check, no macOS leg), the third-party-schema-reader row commits to \"Yes, with a known behaviour change\" (relaxation-only, zero >63 ids at merge), and the orchestration row cites the distinct pipeline-internal `SLUG_RE` grammar as its basis; deletions paid for the placement.rs duplicate rationale, the item-2 commit clause and a trimmed initial log entry, and the diff is net positive (+27) because ten findings across nine sections each required a substantive rewrite while only two passages were removable outright.",
+        "commitMessage": "docs: revise 024 slug-identity proposal for round-1 design findings"
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/proposal-revise-r1.md",
+      "durationMs": 217333,
+      "nudges": 0,
+      "docName": "02-proposal.md",
+      "docLines": 372,
+      "docLinesAdded": 80,
+      "docLinesRemoved": 53
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e102cf719ffeVrKuCUFoSCPLUO",
+      "agent": "review/design-correctness",
+      "at": 1795025131640,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → Emission, refusal and collisions — \"they increment the existing `skipped` counter (whose message counts files, so a refused row counts there as a skipped row)\"",
+            "problem": "The count-only closure is accepted, but the new parenthetical bakes in a conflation that misreports in the one case the counter is ever user-visible: the counter's only surface is the steam_common.rs:101 error, whose message reads \"N file(s) skipped as unreadable or malformed\". When every game a plugin finds is refused for an un-derivable name — exactly the case ADR-024's Consequences foresee (\"a game whose display name and install directory are both non-Latin gets refused at discovery\") — the diagnostic fires and attributes readable, well-formed files to \"unreadable or malformed\", naming neither a game nor the actual cause.",
+            "fix": "In this bullet, split the fired message's counts (e.g. \"M file(s) skipped as unreadable or malformed; K game(s) refused\") or drop the \"unreadable or malformed\" attribution from the combined count."
+          }
+        ]
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/design-review-correctness-r1c1.md",
+      "durationMs": 184171,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e102cf719ffddyIkTl3QsRsabO",
+      "agent": "review/design-compatibility",
+      "at": 1795025064690,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/design-review-compatibility-r1c1.md",
+      "durationMs": 117218,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e102a2748ffeIEQKobidhxAMld",
+      "agent": "review/design-security",
+      "at": 1795025228721,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/design-review-security-r1c2.md",
+      "durationMs": 96962,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e102a2747ffephGGoCgeNJOMEP",
+      "agent": "review/design-performance",
+      "at": 1795025259079,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → \"Emission, refusal and collisions — `crates/discovery`\", read with the unchanged Risks row \"Collision-suffix probe loop repeats bound checks many times\" — \"probe count is bounded by distinct-name count, no measurable cost today\"",
+            "problem": "re-raised from r1, unaddressed and unrebutted by the Revision log; the c2 diff did not touch this section's collision pass. The bound is per name, not per run: each colliding name restarts at `base-2` and walks the claimed set, so n distinct display names sharing one base cost roughly n^2/2 candidate constructions, each a fresh String plus an is_slug_name and bound check. `crates/discovery` carries only MAX_FILE_BYTES = keyvalues::MAX_DOCUMENT_BYTES (steam_common.rs:282), a whole-file cap, and the design caps no plugin row count, so the multiplier is the host's appmanifest_*.acf count. Minor, because this stays a hand-run bulk CLI scan (the only binary is apps/discovery-cli; no event path exists) and realistic n keeps the term invisible.",
+            "fix": "Replace the row's mitigation with the honest shape — aggregate probes are O(n^2) in one plugin run's distinct-name count, n bounded only by the host's manifest-file count — or store a next-free-suffix counter on each base entry of the assigned-slug map so a collision consumes one candidate instead of rescanning claimed ones. Either keeps one mechanism and adds no constant."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → \"Specs, fixtures, ledger\" — \"a bullet in the exported budget family, `MAX_SLUG_OCTETS = 128`, the shared bound for every slug-grammar id; sibling of `MAX_NATIVE_NAME_OCTETS` (A8) …\"",
+            "problem": "re-raised from r1; the revised bullet still specifies no aggregate-cost clause, although every neighbouring entry in that family carries one (schemas/README.md: \"the shared 1 MiB / 16-deep budgets still bind first\"; MAX_CHAIN_DEPTH × MAX_DOCUMENT_BYTES; 64 × 16 predicate moves). This entry doubles an existing bound on values appearing inside arrays those budgets govern. One c2 revision widens the gap: the bullet is now \"the single rationale text that `placement.rs`'s doc comment copies verbatim\", so the omission propagates from the README into the exported constant's documentation in code.",
+            "fix": "Add one clause to the bullet in ADR-013's words: the doubling adds no aggregate byte ceiling because MAX_DOCUMENT_BYTES / MAX_NESTING_DEPTH still bind first. One sentence in the stated home, no new mechanism."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → \"Derivation — `crates/discovery/src/slug.rs`\" — \"in order: fold precomposed Latin via a private `fold_latin_base(char) -> Option<char>` match table … then ASCII case-fold (`A-Z`→`a-z`); then map every remaining character outside `[a-z0-9]` to `-`; collapse `-` runs; trim `-` at both ends; prefix a leading digit with `g-`\"",
+            "problem": "re-raised from r1; the c2 reorder (Latin table before case-fold, lower-case bases) is cost-neutral — the table is a compile-time char match consulted once per char either way — but the step list is still readable as five to six full-string passes over input no field-level cap constrains, with the bound applied only after the whole slug exists (\"Length is **not** truncated anywhere\"). Not a regression: today's normalize_slug already allocates four intermediate Strings per name.",
+            "fix": "One clause: derive_slug folds Latin, folds case, maps, and collapses runs in a single char loop into one String builder, with trim and the `g-` prefix done as slices/prepend rather than rewrites, so a name of any length costs one buffer."
+          }
+        ]
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/design-review-performance-r1c2.md",
+      "durationMs": 127317,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e1028ac47ffey0v6dNiVMymiSz",
+      "agent": "review/design-complexity",
+      "at": 1795025319729,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/design-review-complexity-r1c2.md",
+      "durationMs": 90952,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-final",
+      "round": 0,
+      "sessionID": "ses_e10274896ffeRTqZwV2xfqHp9P",
+      "agent": "design/editor",
+      "at": 1795025532430,
+      "reply": {
+        "ambiguities": [],
+        "commitMessage": "docs: apply final language pass to the game-slug identity proposal"
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/proposal-final-r0.md",
+      "durationMs": 212620,
+      "nudges": 0,
+      "docName": "02-proposal.md",
+      "docLines": 373,
+      "docLinesAdded": 35,
+      "docLinesRemoved": 34
+    },
+    {
+      "stage": "editorial-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e102409aeffe5EJCDUm9ApAKwX",
+      "agent": "review/design-correctness",
+      "at": 1795025587088,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/editorial-review-correctness-r2.md",
+      "durationMs": 54555,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e102409aeffdKEWeKEI0s2FytR",
+      "agent": "review/design-compatibility",
+      "at": 1795025621351,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/editorial-review-compatibility-r2.md",
+      "durationMs": 88817,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:security",
+      "round": 2,
+      "sessionID": "ses_e10233465ffeG0gnP5s5U7WkIX",
+      "agent": "review/design-security",
+      "at": 1795025649598,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/editorial-review-security-r2.md",
+      "durationMs": 62452,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:performance",
+      "round": 2,
+      "sessionID": "ses_e1022ae94ffef3Q65kiBTO1tjJ",
+      "agent": "review/design-performance",
+      "at": 1795025677818,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/editorial-review-performance-r2.md",
+      "durationMs": 56429,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:complexity",
+      "round": 2,
+      "sessionID": "ses_e1022403effevmzuHdNsZVrQra",
+      "agent": "review/design-complexity",
+      "at": 1795025693915,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/editorial-review-complexity-r2.md",
+      "durationMs": 44287,
+      "nudges": 0
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_e102192e9ffeYEcvTCg7xsHJtl",
+      "agent": "code/test-engineer",
+      "at": 1795026876656,
+      "reply": {
+        "testsAdded": 45,
+        "commitMessage": "test: pin ADR-024 slug derivation, namespace field, 128-octet bound and CLI row shape"
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/test-authoring-r0.md",
+      "durationMs": 1182656,
+      "nudges": 0
+    },
+    {
+      "stage": "implement",
+      "round": 0,
+      "sessionID": "ses_e100f86c5ffer1MV6JdjX1eRVd",
+      "agent": "code/coder",
+      "at": 1795028190101,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "feat: adopt ADR-024 slug identity, shared 128-octet bound, namespace field and five-column CLI",
+        "moves": [
+          {
+            "from": "schemas/action-ids/v1/fixtures/invalid/segment-past-63-octets.toml",
+            "to": "schemas/action-ids/v1/fixtures/invalid/segment-past-cap.toml"
+          }
+        ]
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/implement-r0.md",
+      "durationMs": 1313335,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e0ffb41e8ffeZu7APs2V9ZDv9N",
+      "agent": "code/test-engineer",
+      "at": 1795028442095,
+      "reply": {
+        "commitMessage": "test: repair slug_tests E0716 and emission_tests useless_conversion flagged by the ADR-024 code review; keep the 129-octet fixture pin strict to the design",
+        "moves": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/test-update-r0.md",
+      "durationMs": 236985,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e0ff7688effeCYZmGpKoax1QnM",
+      "agent": "code/coder",
+      "at": 1795028803246,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "fix: re-pin segment-past-cap.toml's fault to exactly 129 octets",
+        "moves": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/fix-r0.md",
+      "durationMs": 345881,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e0ff1e992ffejr2wwMw57DBAIv",
+      "agent": "code/test-engineer",
+      "at": 1795028925045,
+      "reply": {
+        "commitMessage": "test(discovery): pin the unmapped-hyphen derivation for ø per 024-C2",
+        "moves": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/test-update-r0.md",
+      "durationMs": 107493,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e0ff00e24ffe7HrOuSSdX6TgK2",
+      "agent": "codereview/code-correctness",
+      "at": 1795029498840,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "blocker",
+            "location": "docs/adrs/013-game-manifests.md:114 (file absent from the diff range)",
+            "problem": "The proposal's Goals, its 'Specs, fixtures, ledger' section, and ADR-024 Rollout 5 require the `013-L5` unit line to gain an `amended-by 024-B1` annotation per `021-L4`. The branch never touches `docs/adrs/013-game-manifests.md`, and at HEAD the 013-L5 line carries no `amended-by` annotation. A branch that raises the shared bound and amends four published contracts would merge with the amended unit's ledger row un-annotated; no gate test reads the ledger, so nothing else forces this to land.",
+            "fix": "Append the `amended-by 024-B1` annotation to the `013-L5` unit line in `docs/adrs/013-game-manifests.md` so it is inside the run's diff range (013's prose and `013-R1` untouched). If `docs/adrs/` is outside the build stage's ownership, the runner — which owns these commits per the proposal — must make the edit part of this run before completion."
+          },
+          {
+            "severity": "major",
+            "location": "schemas/action-ids/v1/spec.md:54; schemas/policy/v1/spec.md:40 and ~:92; schemas/manifests/v1/spec.md:54; schemas/profile/v2/spec.md:38 and :71",
+            "problem": "The proposal mandates that in the four amended specs 'the number and the RFC 1035 derivation become a cross-reference to the README bullet' — 024-L3: 'cross-references it instead of restating the number' — and the new README bullet (copied verbatim into placement.rs's doc comment) asserts the four 'now cross-reference this bullet instead of carrying a number of its own'. All four specs still publish the literal: 'at most `MAX_SLUG_OCTETS` = 128 octets'. The README/placement claim is false against the shipped corpus, and a future bound amendment would leave four published '128' literals to rot — the constant drift 024-B1's one-stated-home rule exists to prevent.",
+            "fix": "Drop the `= 128` gloss from all six sentences, e.g. 'at most `MAX_SLUG_OCTETS` octets — the shared bound `schemas/README.md` states once (`024-B1`)'. The profile/v2 `derives` row in this same diff already uses the number-free form."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/action.rs:38-56 and :257-277; crates/core/src/document.rs:1259-1265; crates/core/src/manifest.rs:538-543",
+            "problem": "The proposal's only mandate for these refusal messages was that strings embedding the number be built with `format!` from the exported constant. The implementation also restructures core's public InvalidValue message shapes: `SEGMENT_EDGE_RULE` folded into a reworded `SEGMENT_SHAPE_RULE`, `invalid_id`'s echo moved from leading to trailing position, a new `segment_bound_rule`/`invalid_segment` split, and bound-refusal messages reordered to lead with the number. Accepted/rejected sets are unchanged and the new shapes are pinned by tests, but the change to the rejection-text surface is wider than the design asked for.",
+            "fix": "No code change sought: record the message-order restructure as a declared deviation in `03-build-notes.md` if it is not already recorded there."
+          }
+        ]
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/code-review-correctness-r1c0.md",
+      "durationMs": 559566,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e0ff00e23ffeWhQqd45cDPanSB",
+      "agent": "codereview/code-compatibility",
+      "at": 1795029523403,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "apps/discovery-cli/tests/cli_slug_refusal_tests.rs:33 (`const SLUG_BOUND: usize = 128`), :113 (`fn is_slug_shaped`), :25-26 (justifying note)",
+            "problem": "The CLI-side boundary pin retypes the shared bound as a file-local constant and re-implements the slug grammar by hand, on the stated premise that the crate's tests have no bindforge-core dependency. That premise is false in this change: apps/discovery-cli/Cargo.toml:8-11 adds `bindforge-core = { workspace = true }`, and a package's [dependencies] are available to its tests/ targets — the same route crates/discovery/tests/slug_tests.rs:23 and game_tests.rs:131-140 already use for `bindforge_core::{MAX_SLUG_OCTETS, is_slug_name}`. The pin that proves 'every slug reaching a rendering is inside the shared bound' therefore asserts a number production no longer reads (main.rs:89-96 reads the constant), so the next bound amendment — the event 024-L3 explicitly plans for — leaves this conformance-style pin enforcing 128 while the CLI enforces the new value; the hand-rolled predicate drifts the same way and is a second grammar in the tree, which the proposal's Options section rejected for discovery.",
+            "fix": "Delete SLUG_BOUND and is_slug_shaped and assert against bindforge_core::MAX_SLUG_OCTETS and bindforge_core::is_slug_name, as the discovery suites do; remove the note that justifies the copy."
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/tests/cli_slug_refusal_tests.rs:258 and :328",
+            "problem": "Both assertions hard-code the Linux answer to a cfg-dependent choice: apps/discovery-cli/src/main.rs:58-65 feeds --steam-root to SteamLinuxPlugin on non-Windows and SteamWindowsPlugin on Windows, so the expected `error: plugin steam-linux failed: ` prefix and the `steam-linux` Platform cell are platform-specific outcomes, while Test strategy #11 states no test asserts a platform-specific outcome. Nothing breaks in today's CI (no Windows or macOS test leg), so this is a forward hazard for the verification level the matrix's Windows row eventually wants, and it follows the pre-existing pattern in cli_tests.rs rather than introducing one.",
+            "fix": "Derive the expected plugin name (or accept either spelling) and note in the file header that these two assertions ride the Linux leg only."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/discovery/src/slug.rs:19",
+            "problem": "The fold table's coverage comment lists `ł` twice in its stroke-letter sample — (`ł`, `đ`, `ħ`, `ŧ`, `ł`) — where the fifth entry was presumably `ŀ` (U+0140) or `Ł` (U+0141). That comment is the stated coverage boundary Test strategy #1 pins, so its sample set should name the real code points; the match ranges themselves are correct.",
+            "fix": "Correct the duplicated code point in the doc comment."
+          }
+        ]
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/code-review-compatibility-r1c0.md",
+      "durationMs": 584128,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e0fe7841cffeGDrivveIwWVn5s",
+      "agent": "codereview/code-security",
+      "at": 1795029833933,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/code-review-security-r1c0.md",
+      "durationMs": 335031,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e0fe7242cffeo3hpNQBZ4M8Ssk",
+      "agent": "codereview/code-performance",
+      "at": 1795029679176,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/code-review-performance-r1c0.md",
+      "durationMs": 155712,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e0fe4c3a2ffeRuHM6akO8YnPLr",
+      "agent": "codereview/code-testing",
+      "at": 1795029970736,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "apps/discovery-cli/src/main.rs:88-102 (CLI emit-boundary filter and `error: refused game with invalid slug:` echo); Test strategy #9 at docs/designs/024-game-slug-identity/02-proposal.md:288-290",
+            "problem": "Test strategy #9 promises that a plugin row violating the grammar or bound is dropped by the CLI \"with one named stderr refusal containing the escaped echo, while valid rows still render\". No test asserts that behaviour at any layer. Every CLI test in cli_slug_refusal_tests.rs (138, 181, 233) drives the binary through scratch Steam roots, so the row is refused earlier inside steam_common::discovered_game and never reaches main.rs's new filter; the file's own header (cli_slug_refusal_tests.rs:5-19) states the injection seam does not exist because the binary builds its own two plugins. A grep for `refused game with invalid slug` finds only the eprintln itself and a doc-comment mention in crates/core/tests/error.rs:87. The branch is dead code with zero assertions: printing to stdout instead of stderr, echoing install_path instead of slug, omitting escape_and_truncate, or moving the filter behind render_table/serde_json::to_string would each break 024-L1's boundary guarantee for third-party plugins and still leave all four gate legs green (the runner's captured `test result: ok. 0 passed` line is exactly this binary's unit-test target, which holds no tests).",
+            "fix": "Hoist the inline retain closure into a named function in main.rs (e.g. `fn refuse_invalid_slugs(games: &mut Vec<DiscoveredGame>) -> Vec<String>` returning the formatted `error: refused game with invalid slug: <escape_and_truncate(slug)>` lines) and assert it from a `#[cfg(test)] mod tests` inside main.rs — the target exists and currently reports 0 passed — over hand-built rows (invalid grammar, one octet past MAX_SLUG_OCTETS, one valid): the valid row survives, each invalid row is dropped, and each refusal line is the exact named prefix plus the escaped value with no install path. Keep the existing subprocess tests for the end-to-end half."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/discovery/src/steam_common.rs:325 (`*skipped += before - games.len()` in resolve_collisions); crates/discovery/tests/collision_tests.rs:159-188",
+            "problem": "Test strategy #4's clause \"a name with no in-bound candidate is refused and counted\" is only half pinned. collision_tests.rs:159 asserts the refused row is removed but keeps a third in-bound row alive, which is exactly the case that hides the counter: `skipped` is printed only by the diagnostic at steam_common.rs:107, guarded by `games.is_empty()`, and a collision refusal can never empty the vector (the byte-order-first name for any base always keeps its in-bound base). resolve_collisions is private, so no test reaches the counter either; the counting statement has no observable consequence and no assertion.",
+            "fix": "Make the delta observable and pinned — expose resolve_collisions (or a thin pub(crate) wrapper) under `#[cfg(test)]` and unit-test it over a hand-built Vec<DiscoveredGame> asserting `skipped` grows by exactly the refused count — or, if the count is deliberately unobservable at this seam, record that in 03-build-notes.md and drop collision_tests.rs:14-16's claim that the counter is pinned at the emission seam, so the run record does not overstate the coverage."
+          },
+          {
+            "severity": "minor",
+            "location": "apps/discovery-cli/tests/cli_slug_refusal_tests.rs:25-33 (`const SLUG_BOUND: usize = 128` and its \"no bindforge-core dependency\" comment), used at lines 113-122, 139-144, 182-183",
+            "problem": "The suite retypes the shared bound as a literal 128 on a premise this diff invalidated: the comment says \"this crate's tests deliberately keep no `bindforge-core` dependency\", but apps/discovery-cli/Cargo.toml gains `bindforge-core = { workspace = true }` in this change, and crates/discovery/tests/ already reads bindforge_core::MAX_SLUG_OCTETS from a plain [dependencies] entry in its test targets. 024-B1 states the bound is to be \"referenced rather than retyped\", and a bound-amendment test that hard-codes the number four times is the second home ADR-024 exists to remove; the stated rationale is now false.",
+            "fix": "Replace SLUG_BOUND with bindforge_core::MAX_SLUG_OCTETS in this test target (add a [dev-dependencies] entry if a bin-only package's test target does not see the regular dependency) and delete the stale premise from the module comment. The independent `is_slug_shaped` grammar oracle can stay — a black-box oracle is not a retyped budget constant."
+          }
+        ]
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/code-review-testing-r1c0.md",
+      "durationMs": 291427,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e0fe0508bffe9DgS3mTDJJp0ue",
+      "agent": "code/coder",
+      "at": 1795030455257,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "fix: split slug-bound refusals at load seams and scope the README bound claim to enforced ids",
+        "moves": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/fix-r1.md",
+      "durationMs": 484398,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 1,
+      "sessionID": "ses_e0fd8b23affefkIrususcUlqTO",
+      "agent": "code/test-engineer",
+      "at": 1795030676139,
+      "reply": {
+        "commitMessage": "test(core): pin load-seam bound refusals and the geometry no-bound per the r1 findings",
+        "moves": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/test-update-r1.md",
+      "durationMs": 206013,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e0fd55443ffeeMivKxGAOp95uk",
+      "agent": "codereview/code-correctness",
+      "at": 1795030962441,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "blocker",
+            "location": "docs/adrs/013-game-manifests.md:114-116 (file absent from the branch diff, main...HEAD)",
+            "problem": "The ledger amendment the proposal requires three times (02-proposal.md:31 Goals, :226-228 'Specs, fixtures, ledger', :322-323 Rollout 3) and that ADR-024 Rollout 5 makes a rollout item of this run still has not landed. At HEAD the 013-L5 unit line carries no `amended-by 024-B1` annotation, and `git diff --stat main...HEAD` lists 45 changed files, none of them an ADR; the revision under review did not touch it either. A branch that raises the shared bound and amends four published contracts would merge with the amended unit's ledger row un-annotated, and no gate test reads the ledger, so nothing else forces it to land.",
+            "fix": "Append the `amended-by 024-B1` annotation to the `013-L5` unit line in docs/adrs/013-game-manifests.md (013's prose and `013-R1` stay untouched per proposal :227-228) as part of this run; the runner owns these commits per proposal :228. If docs/adrs/ is outside the build stage's path ownership, the runner must land the edit before completion — prose in a design artifact does not satisfy it."
+          },
+          {
+            "severity": "major",
+            "location": "schemas/README.md:126-135; crates/core/src/placement.rs:67-81 (doc comment of the exported MAX_SLUG_OCTETS); propagated into schemas/policy/v1/spec.md:92-94; pinned by crates/core/tests/placement.rs:320-357",
+            "problem": "This revision removes the keyboard geometry name from the bound's coverage: the README bullet — the bound's one stated home per 024-L3 and proposal :206-212, copied verbatim into the constant's doc comment — now asserts 'A keyboard geometry name rides the grammar but states no length in its own entry table, so no length is enforced on it either; the bound stops where a format's spec stops.' ADR-024 024-B1 (docs/adrs/024-game-slug-identity.md:97-100) enumerates 'a geometry name' among the ids the shared bound rides. The proposal authorizes no such narrowing: no assumption-register row for the premise ADR-024's Context (:22-26) gets wrong, no revision-log entry, no test-strategy item — yet crates/core/tests/placement.rs:332 now pins `a_geometry_name_past_the_shared_slug_bound_loads_as_known_current_behaviour`, converting the gap into asserted behavior. I confirmed the descriptive half is accurate (placement.rs:155-161 and document.rs:1681 check only is_slug_name; keyboard-geometry/v1/spec.md states no length), which is the point: the one stated home of the bound now publishes a scope that contradicts the budget unit this run implements, with no ledger trace or ADR note, and placement.rs:83-89 still says the bound 'is applied beside it by each entry's own rule' for the three entry kinds sharing the grammar.",
+            "fix": "Reconcile the ADR with the corpus instead of restating the budget two ways: either enforce the exported bound on the geometry name at the two load sites and keep the bullet's original enumeration (recognizing, per 024-L3, that this is a tightening and so rides a schema major rather than this in-place amendment), or keep the code and record the divergence where it is authoritative — say in the README/placement text that this is narrower than 024-B1's enumeration and why, name the follow-up that would cap it at a major, and have the ADR owner annotate 024-B1. If the latter, declare it in 03-build-notes.md; this seat may not read that file, so if it is undeclared there this is a blocker under checklist item 3, and the placement.rs pin should cite the licensing ADR unit rather than 'the accepted code-review r1 resolution'."
+          },
+          {
+            "severity": "major",
+            "location": "schemas/manifests/v1/spec.md:54; schemas/profile/v2/spec.md:38 and :71; schemas/policy/v1/spec.md:40 and :92-93; schemas/action-ids/v1/spec.md:54-56",
+            "problem": "The proposal (:213-219) mandates that in the four amended specs 'the number and the RFC 1035 derivation become a cross-reference to the README bullet', and 024-L3 requires each format spec to cross-reference the bound 'instead of restating the number'. All six bound sentences still publish the literal ('at most `MAX_SLUG_OCTETS` = 128 octets' at manifests:54, profile:38, policy:40; 'capped at `MAX_SLUG_OCTETS` = 128 octets' at profile:71; 'past the shared `MAX_SLUG_OCTETS` = 128-octet bound' at policy:92-93; 'is at most `MAX_SLUG_OCTETS` = 128 octets' at action-ids:54), and action-ids:55-56 still restates the superseded RFC 1035 §2.3.1 derivation. Meanwhile the README bullet (:133-136) and the constant's doc comment (placement.rs:74-75) claim the four 'now cross-reference this bullet instead of carrying a number of its own' — false against the shipped corpus. The revision's only spec edit (policy/v1:92-94) dropped a co-rider phrase and left the number, so the constant drift 024-B1's one-stated-home rule exists to prevent remains: four published 128 literals for a future amendment to rot.",
+            "fix": "Drop the `= 128` gloss from all six sentences, e.g. 'at most `MAX_SLUG_OCTETS` octets — the shared bound `schemas/README.md` states once (`024-B1`)', and drop the RFC 1035 clause from action-ids/v1:55-56 in favor of the cross-reference. The number-free form already used at profile/v2:39 and manifests/v1:56 is the model."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/document.rs:1232-1243 (check_pin); crates/core/src/policy.rs:50-65 (load_policy); on top of round-1 sites crates/core/src/action.rs:38-56 and :257-277, crates/core/src/document.rs:1262-1281, crates/core/src/manifest.rs:529-546",
+            "problem": "The proposal's only mandate for these refusal strings was that a message embedding the number be built with `format!` from the exported constant (:125-127). The implementation keeps splitting fault kinds and reordering message shapes, and this revision adds two more bound arms with shapes no contract asks for: policy.rs 'a policy id is at most 128 octets: `<id>`', and in check_pin a bound arm that bypasses the local `fault` wrapper, so a past-bound `for` head is refused as 'a manifest id is at most 128 octets: `<head>`' and no longer names the value as a manifest pin or echoes the whole pin its sibling arms frame. Accepted/rejected sets are unchanged (both arms refuse the same inputs, grammar before bound, before any file read) and the new shapes are pinned by crates/core/tests/policy.rs:874-919 and crates/core/tests/chain_ops.rs:692-716, so this is a widened rejection-text surface rather than a behavior break.",
+            "fix": "No code change sought: record the refusal-message restructure (now across action.rs, manifest.rs, document.rs x2 and policy.rs, including check_pin's loss of the pin-level framing) as a declared deviation in 03-build-notes.md, or restore the '`<text>` is not a manifest pin: …' frame around the new bound message so it names the entry like its siblings."
+          }
+        ]
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/code-review-correctness-r1c1.md",
+      "durationMs": 271640,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e0fd55442ffeAk9QgqoLtYaxaP",
+      "agent": "codereview/code-testing",
+      "at": 1795030972631,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "apps/discovery-cli/src/main.rs:88-102 (inline retain filter and `error: refused game with invalid slug:` echo); Test strategy #9 at docs/designs/024-game-slug-identity/02-proposal.md:288-290",
+            "problem": "Open from r1, not addressed by this fix round: the range 0ee2eee..HEAD touches only crates/core and schemas, and no test asserts the CLI emit-boundary filter at any layer. A grep for `refused game with invalid slug` finds only the eprintln itself (main.rs:99) and a doc-comment mention in crates/core/tests/error.rs:87; there is no `#[cfg(test)]` module anywhere in apps/discovery-cli (gate leg `test result: ok. 0 passed` is consistent). All three subprocess tests in cli_slug_refusal_tests.rs drive scratch Steam roots, so invalid rows are refused earlier at steam_common::discovered_game and never reach main.rs; the suite header (lines 5-19) now documents the seam as absent but #9 in the unchanged proposal still promises the row dropped `by the CLI with one named stderr refusal containing the escaped echo, while valid rows still render`. Printing to stdout, echoing install_path, omitting escape_and_truncate, or moving the filter behind render_table/serde_json::to_string would each pass the entire suite while breaking 024-L1's boundary guarantee for third-party dyn DiscoveryPlugin rows — the only rows this branch exists to catch. Checklist item 3 (previously-rejected major gains a catching test) is unmet.",
+            "fix": "Hoist the inline retain closure into a named function in main.rs (e.g. `fn refuse_invalid_slugs(games: &mut Vec<DiscoveredGame>) -> Vec<String>` returning the formatted `error: refused game with invalid slug: <escape_and_truncate(slug)>` lines) and assert it from a `#[cfg(test)] mod tests` inside main.rs over hand-built rows (grammar-invalid, one octet past MAX_SLUG_OCTETS, one valid): the valid row survives, each invalid row is dropped, each refusal line is the exact named prefix plus the escaped value with no install path. Keep the existing subprocess tests for the end-to-end half."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/discovery/src/steam_common.rs:323-325 (`*skipped += before - games.len()` in private resolve_collisions); crates/discovery/tests/collision_tests.rs:14-16",
+            "problem": "Open from r1, not addressed: Test strategy #4's clause \"a name with no in-bound candidate is refused and counted\" is still only half pinned. collision_tests.rs:158-188 keeps two in-bound rows alive, so the counter delta has no observable consequence (the `skipped` diagnostic at steam_common.rs:107-120 is guarded by games.is_empty(), which a collision refusal alone can never trigger). resolve_collisions remains private with no #[cfg(test)] hook. The header's claim (14-16) that \"the counter itself is pinned at the emission seam in emission_tests.rs\" overstates coverage: emission_tests.rs exercises construction-seam refusals and asserts only the substring \"skipped\" (lines 149-154, 207-210), never a count, never through the collision pass.",
+            "fix": "Expose resolve_collisions (or a thin pub(crate) wrapper) under #[cfg(test)] and unit-test it over a hand-built Vec<DiscoveredGame> asserting `skipped` grows by exactly the refused count — or amend collision_tests.rs:14-16 so the run record does not assert coverage that does not exist."
+          },
+          {
+            "severity": "minor",
+            "location": "apps/discovery-cli/tests/cli_slug_refusal_tests.rs:33 (`const SLUG_BOUND: usize = 128`), used at 115, 139-144, 182-183; premise comment at 25-27",
+            "problem": "Open from r1, not addressed: the module comment still asserts \"this crate's tests deliberately keep no `bindforge-core` dependency\", but apps/discovery-cli/Cargo.toml:10 now carries bindforge-core in [dependencies] (main.rs reads is_slug_name and MAX_SLUG_OCTETS from it), and Cargo makes [dependencies] visible to the package's test targets without any new entry — the stated premise is false and no Cargo change is required. 024-B1 requires the bound to be \"referenced rather than retyped\"; hard-coding 128 in four places recreates the second home ADR-024 exists to remove.",
+            "fix": "Replace SLUG_BOUND with bindforge_core::MAX_SLUG_OCTETS in this test target and delete the stale two-sentence note at lines 25-27. The independent is_slug_shaped grammar oracle may stay — a black-box oracle is not a retyped budget constant."
+          }
+        ]
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/code-review-testing-r1c1.md",
+      "durationMs": 281827,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e0fd106edffe0GHT7HooME5J76",
+      "agent": "code/coder",
+      "at": 1795031356583,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "fix: cross-reference the slug bound in the four specs, declare the geometry-name scope gap, and pin the CLI and collision refusal paths per code review r1",
+        "moves": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/fix-r1.md",
+      "durationMs": 383867,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 1,
+      "sessionID": "ses_e0fcaf127ffePi9VkTHMJrcS9X",
+      "agent": "code/test-engineer",
+      "at": 1795031493160,
+      "reply": {
+        "commitMessage": "test: read the slug bound from the export and re-cite the r1-resolved pins",
+        "moves": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/test-update-r1.md",
+      "durationMs": 121624,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e0fc8dd69ffe31gzCqgQg7uf6u",
+      "agent": "codereview/code-correctness",
+      "at": 1795031752747,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "blocker",
+            "location": "docs/adrs/013-game-manifests.md:114-116 (file appears in neither main...HEAD's source/test pathspec nor this revision's 11 files)",
+            "problem": "F1, carried unaddressed from round 1. The ledger amendment this design mandates three times — Goals (02-proposal.md:31), 'Specs, fixtures, ledger' (:226-228), Rollout 3 (:322-323) — and that ADR-024 Rollout 5 (docs/adrs/024-game-slug-identity.md:142-143) makes a rollout item of this run still has not landed. At HEAD `grep -n amended-by docs/adrs/013-game-manifests.md` returns no match, and the `013-L5` unit line still reads only 'Name agreement: the game directory's name must equal the `id` entry byte-for-byte … → spec: Table data, Load-time validation.' The c2 revision did not touch it. So the branch that raises the shared bound and amends four published contracts — manifests/v1's `id` row is already annotated `013-L5` `024-B1` (schemas/manifests/v1/spec.md:54) — would be recorded complete with the amended ledger unit un-annotated, and no gate test reads the ledger, so the green gate record does not cover it. Violates correctness checklist 1 (a named deliverable that does not exist) and 7 (prior-round blocker not addressed).",
+            "fix": "Land the `amended-by 024-B1` annotation on the `013-L5` unit line in docs/adrs/013-game-manifests.md before completion, leaving 013's prose and `013-R1` untouched as history (02-proposal.md:227-228). Per :228 and ADR-005 the commits are the runner's: if docs/adrs/ is outside the build stage's path ownership, the runner applies the edit at a stage boundary. Prose in a design artifact does not discharge it."
+          },
+          {
+            "severity": "minor",
+            "location": "schemas/README.md:131-139; crates/core/src/placement.rs:71-79 and :95-98 (is_slug_name doc comment); residual of docs/adrs/024-game-slug-identity.md:97-100",
+            "problem": "F2, downgraded from round 1's major: the revision took the second option this seat offered — the code is kept and the divergence is now recorded where it is authoritative, in the bound's one stated home and its verbatim copy in the constant's doc comment, with the reason (capping would newly refuse documents keyboard-geometry/v1 has always accepted; a tightening rides a schema major per 024-L3), and the pin at crates/core/tests/placement.rs:323-333 now cites 024-B1 and the bullet's clause rather than 'the accepted code-review r1 resolution'. Two legs of the new sentence are unbacked: the bullet calls capping geometry names 'that format's named follow-up' and is_slug_name's comment 'the deferred follow-up it states', but no register names it — the proposal's Deferred (:336-353) carries only the Windows reserved-device-name refusal ('no follow-up yet'), and no ADR in docs/adrs/ and no docs/tasks/ entry mentions a geometry-name length cap, so a conformance reader is pointed at a follow-up with no handle or owner. And ADR-024 024-B1 still enumerates 'a geometry name' unqualified among 'the single shared bound every slug-grammar id rides', which this run's completion accepts as written while the corpus and the reference implementation enforce a narrower scope (is_slug_name has no length test at placement.rs:100-110; the geometry sites at placement.rs:118, placement.rs:165 and document.rs:1681 check grammar only).",
+            "fix": "Give the follow-up a referent and cite it: one line in 03-build-notes.md's deferred list (or a docs/tasks/ stub) naming 'cap keyboard-geometry/v1 geometry names at MAX_SLUG_OCTETS at that format's next major', referenced from the README bullet instead of the self-referential 'that format's named follow-up'. Have the ADR owner annotate 024-B1, or record the narrower enforced scope in its acceptance note, so the accepted unit and the corpus state one scope."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/core/src/document.rs:1232-1243 (check_pin); crates/core/src/policy.rs:50-65 (load_policy) — unchanged by this revision",
+            "problem": "F3, carried forward unchanged from round 1. The proposal's only mandate for these refusal strings was that a message embedding the number be built with `format!` from the exported constant (:125-127), which both sites honor (document.rs:1241, policy.rs:61), but the implementation also splits fault kinds and reorders message shapes no contract asks for: a past-bound `for` head is refused as 'a manifest id is at most 128 octets: `<head>`', bypassing the local `fault` wrapper its sibling arms use, so it no longer names the value as a manifest pin or echoes the whole pin. Accepted/rejected sets are unchanged (grammar before bound, before any file read) and the shapes are pinned by crates/core/tests/policy.rs:874-919 and crates/core/tests/chain_ops.rs:692-716, so this is a widened rejection-text surface rather than a behavior break. Whether it is declared as a deviation could not be checked here: 03-build-notes.md is outside this seat's input set, the one property of checklist item 3 this pass could not establish.",
+            "fix": "No code change sought: either confirm the refusal-message restructure (across action.rs, manifest.rs, document.rs x2 and policy.rs, including check_pin's loss of the pin-level framing) as a declared deviation in 03-build-notes.md, or restore the '`<text>` is not a manifest pin: …' frame around the new bound message so it names the entry like its siblings."
+          }
+        ]
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/code-review-correctness-r1c2.md",
+      "durationMs": 245087,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e0fc8dd69ffdkSwQDPcnCJeFwv",
+      "agent": "codereview/code-testing",
+      "at": 1795031704046,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/src/main.rs:206-313 (#[cfg(test)] mod tests); crates/discovery/src/steam_common.rs:430-508 (#[cfg(test)] mod tests)",
+            "problem": "The two new in-source test modules — the only pins of design 024 Test strategy #9's filter half and #4's counter clause — carry no `// proves: design 024's Test strategy #N` marker at the test or module. The citations live only in the neighbouring suites' module headers (apps/discovery-cli/tests/cli_slug_refusal_tests.rs:20-25, crates/discovery/tests/collision_tests.rs:14-19), which a later reader editing the in-source modules will not see. The repo convention is an explicit marker at the test (roughly 450 existing `// proves` markers across apps/ and crates/), so strategy-to-test traceability for these two clauses now depends on prose in a different file.",
+            "fix": "Add one marker per test (or one per module) in the same wording the suites use, e.g. `// proves: design 024's Test strategy #9 (Chosen design: CLI boundary) — the emit filter drops the row and answers one named, escaped line` above the main.rs tests, and `// proves: design 024's Test strategy #4 (collision pass) — skipped grows by the refused row count` above the steam_common tests."
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/src/main.rs:81-84 (call site in main) vs. main.rs:115-127 (refuse_invalid_slugs)",
+            "problem": "The filter function is pinned, but nothing pins that main's list path calls it: deleting or bypassing `for line in refuse_invalid_slugs(&mut all_games) { eprintln!(\"{line}\") }` leaves every suite green, because the shipped plugins refuse invalid rows one seam earlier (steam_common.rs:245-247) so the subprocess tests in cli_slug_refusal_tests.rs never exercise that call site. This is the known residual of the fix shape this seat prescribed in r1 (function-level unit tests plus the existing end-to-end half), so it is recorded as a nit rather than reopened as the r1 major.",
+            "fix": "If a later round touches this seam, give main a test-reachable seam for the emit step — e.g. a `#[cfg(test)] pub(crate) fn list_games(plugins: &[&dyn DiscoveryPlugin]) -> (Vec<DiscoveredGame>, Vec<String>)` that main and an in-source test both call, so a test drives the whole path with a hand-built plugin row and asserts the refusal reaches the returned stderr lines. No change required now."
+          }
+        ]
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/code-review-testing-r1c2.md",
+      "durationMs": 196385,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e0fc51f99ffeYGQpyxFWZt1iHW",
+      "agent": "code/coder",
+      "at": 1795032021728,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "fix: register the geometry-name cap follow-up as DF-024-1 and cite it from the bound's stated home",
+        "moves": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/fix-r1.md",
+      "durationMs": 268867,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e0fc0c902ffeuidnA525E15DX2",
+      "agent": "codereview/code-correctness",
+      "at": 1795032156702,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "blocker",
+            "location": "docs/adrs/013-game-manifests.md:114-116 (file is in neither main...HEAD's 45-file source/test pathspec, nor this revision's 2 files, nor the working tree)",
+            "problem": "F1, carried unaddressed for a third pass. The ledger amendment this design mandates three times — Goals (02-proposal.md:31), 'Specs, fixtures, ledger' (:226-228), Rollout 3 (:322-323) — and that ADR-024 Rollout 5 (docs/adrs/024-game-slug-identity.md:142-143) makes a rollout item of this run has still not landed. The c3 revision touched only crates/core/src/placement.rs (doc comments) and schemas/README.md. At HEAD the 013-L5 unit line still reads only 'Name agreement: the game directory's name must equal the `id` entry byte-for-byte … → spec: Table data, Load-time validation.', with no `amended-by` and no `024-B1` string anywhere in the file (verified by direct read plus a whole-file pattern search), and `git diff HEAD -- docs/adrs` and `git diff --cached -- docs/adrs` are both empty. The branch that raises the shared bound and amends four published contracts — schemas/manifests/v1/spec.md's `id` row already carries `013-L5` `024-B1` — would be recorded complete with the amended unit's row un-annotated in a `ledger: yes` ADR, and no gate leg reads the ledger, so the green gate record does not cover it. Violates correctness checklist 1 (named deliverable does not exist) and 7 (prior-round blocker not addressed).",
+            "fix": "Land the `amended-by 024-B1` annotation on the 013-L5 unit line before completion, leaving 013's prose and 013-R1 untouched (02-proposal.md:227-228). The commits are the runner's (:228, ADR-005) and stage ownership bars the build stage from docs/adrs/**, so this is a runner action at a stage boundary as this seat's round-1 fix prescribed; recording it as a hand-off in 03-build-notes.md is correct bookkeeping but does not discharge it."
+          },
+          {
+            "severity": "minor",
+            "location": "docs/adrs/024-game-slug-identity.md:97-100; disclosed at schemas/README.md:131-137 and crates/core/src/placement.rs:71-77",
+            "problem": "F2 residual — the substantive half is discharged by this revision: the self-referential 'that format's named follow-up' is replaced in all three places this seat named by a handle with a real referent, `DF-024-1` (schemas/README.md:138-139; placement.rs:78-81 and :100-101), and the referent exists and matches what the citations promise (03-build-notes.md:261-273, 'cap keyboard-geometry/v1 geometry names at MAX_SLUG_OCTETS at that format's next major'), with the README bullet and the constant's doc comment still verbatim copies of one another. What remains: 024-B1's own text still enumerates 'a geometry name' among the ids the shared bound rides, while the implementation enforces no length on it (is_slug_name carries no bound; crates/core/tests/placement.rs:334-335 proves a 129-character geometry name loads), and the pipeline flips this ADR proposed → accepted on completion, so the accepted unit and the shipped corpus state two scopes, reconciled only one hop away in the README bullet.",
+            "fix": "Runner/ADR-owner action, outside the build stage's ownership like F1: annotate 024-B1 with the narrower enforced scope, or record the divergence in the acceptance note written when the ADR flips, so the accepted unit and the corpus state one scope. No code change sought; the disclosure on the bullet's face is why this is minor, not major."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/placement.rs:330",
+            "problem": "The pin's doc comment still names the follow-up 'the bullet's named follow-up' — the exact phrasing this revision retired everywhere else in favour of the `DF-024-1` handle. Nothing dangles wrongly (the comment spells out the follow-up's content), but the one place an implementer must edit when DF-024-1 lands is the only place that does not carry the handle the revision introduced.",
+            "fix": "Cite `DF-024-1` in that comment too, in the same edit that takes the pin over when the cap lands."
+          }
+        ]
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/code-review-correctness-r1c3.md",
+      "durationMs": 119548,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e0faae891ffeaZIQ7i3KiSdeOi",
+      "agent": "code/coder",
+      "at": 1795033657689,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "fix: re-wrap the bound bullet's DF-024-1 clause and record the r1c3 dispositions",
+        "moves": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/fix-r1.md",
+      "durationMs": 186714,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 1,
+      "sessionID": "ses_e0fa7d470ffe9YVl6YKqrSVyzh",
+      "agent": "code/test-engineer",
+      "at": 1795033993903,
+      "reply": {
+        "commitMessage": "test(core): gate the 013-L5 ledger amendment and the README rider set, and re-pin the past-bound geometry name to refusal per Test strategy #13/#14",
+        "moves": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/test-update-r1.md",
+      "durationMs": 321257,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e0fa2b2edffe5fRJsOwPaPpIQe",
+      "agent": "code/coder",
+      "at": 1795034205656,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "docs: record the red ledger-annotation gate capture and this round's four-leg re-run in 024 build notes",
+        "moves": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/fix-r1.md",
+      "durationMs": 196743,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e0f9f78c0ffeu5q37CxWdtifvg",
+      "agent": "code/coder",
+      "at": 1795034601804,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "fix: enforce MAX_SLUG_OCTETS on a geometry name in load_geometry",
+        "moves": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/fix-r1.md",
+      "durationMs": 381392,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 1,
+      "sessionID": "ses_e0f996ee6ffej2JcE5IRV6yHYL",
+      "agent": "code/test-engineer",
+      "at": 1795034924765,
+      "reply": {
+        "commitMessage": "test: align policy-id bound comment with the shipped full-rider scope",
+        "moves": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/test-update-r1.md",
+      "durationMs": 308640,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e0f947fecffeghNPb3V7MPjAPH",
+      "agent": "code/coder",
+      "at": 1795035223017,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "docs: refresh 024 build notes for the 20:48:59 gate capture and the 013-L5 runner hand-off",
+        "moves": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/fix-r1.md",
+      "durationMs": 283577,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e0f8ff252ffezgebsIBrgPYlJP",
+      "agent": "code/coder",
+      "at": 1795035439063,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "docs: record gate-fix round r3 posture for the runner-owned ledger annotation",
+        "moves": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/fix-r1.md",
+      "durationMs": 201225,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e0f8653a5ffe3J0ryuTLxMOEE1",
+      "agent": "code/coder",
+      "at": 1795037669520,
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/fix-r1.md",
+      "durationMs": 1801139,
+      "nudges": 0,
+      "failure": "stage-timeout"
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e0f6ad761ffe674uVCVY3IJAMY",
+      "agent": "code/coder",
+      "at": 1795037854914,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "docs: record gate-fix round r5 re-verification of the green gate at c4c849b8",
+        "moves": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/fix-attempt2-r1.md",
+      "durationMs": 185354,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e0f67c877ffeAR1HcZ6wtcIorh",
+      "agent": "codereview/code-correctness",
+      "at": 1795038085619,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/placement.rs:90-93 (with :87-88 and crates/core/src/document.rs:1680-1686; related prose at schemas/README.md:131-135 and schemas/keyboard-geometry/v1/spec.md:45,93)",
+            "problem": "The rewritten is_slug_name doc closes 'so the bound applies wherever the grammar does', but the same comment two lines earlier names an application of the grammar where the bound does not ride: 'applied to a document's geometry entry' — parse_keyboard_geometry checks that entry with is_slug_name only (document.rs:1681), reachable through the public parse/parse_file seam. The asymmetry is deliberate and behaviorally sound via load_geometry (name capped before the join; entry held equal to the capped stem) and matches the un-amended keyboard-geometry/v1 entry table, which ADR-024 024-B1's amendment list leaves alone and 024-L3 rides a tightening past. But the universal clause is false as stated, and the README bullet's 'The bound rides beside the grammar at every one of these ids' is carried only by its own pre-join grounding clause. The previous comment stated the narrower scope explicitly; this revision universalized it.",
+            "fix": "Prose only: qualify the clause to the load seams the design mandates — e.g. 'so the bound rides beside the grammar at every load seam that takes one of these ids — the document's geometry entry is guarded by the grammar and held to the capped name by the file-stem agreement' — or drop the universal clause. The proposal-mandated sentence (full rider set, no narrowing) is unaffected either way. No code change: bounding the entry check inside parse would newly refuse documents keyboard-geometry/v1's published table accepts, the 024-L3 violation the earlier deferral existed to avoid."
+          },
+          {
+            "severity": "nit",
+            "location": "schemas/README.md:131-135 vs crates/core/src/placement.rs:71-74",
+            "problem": "The proposal requires the README bullet's rationale text to be copied into the constant's doc comment verbatim (02-proposal.md:214-215); this identity held through round 1 and c3. This revision rewrote the same sentence in both places with a deliberate lexical split — 'the reference implementation checks a geometry name against it beside the grammar check' vs 'load_geometry checks a geometry name against it beside the is_slug_name check'. Semantically identical, but the one-copy property now holds only up to this sentence.",
+            "fix": "Align one copy to the other in the next edit that touches either (or have the README adopt the function-named spelling), restoring the verbatim property the design states."
+          }
+        ]
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/code-review-correctness-r1c4.md",
+      "durationMs": 215613,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e0f647dc7ffePhgtK9S5ncprjz",
+      "agent": "codereview/code-compatibility",
+      "at": 1795038332836,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "apps/discovery-cli/tests/cli_slug_refusal_tests.rs:117 (`fn is_slug_shaped`, used at :216-217)",
+            "problem": "Carried from r1, partially resolved: the fix converted SLUG_BOUND to a reference to bindforge_core::MAX_SLUG_OCTETS and deleted the false no-dependency premise, but the hand-rolled predicate remains a second grammar in the tree — and it is not equivalent to production: is_slug_name (crates/core/src/placement.rs:95-105) permits `--` and a trailing `-` and forbids a leading digit, while the test predicate does the reverse on all three counts. The increment did not break anything here; the grammar-duplication half of the r1 finding simply survives.",
+            "fix": "Replace is_slug_shaped with bindforge_core::is_slug_name plus the (now-referenced) MAX_SLUG_OCTETS bound, as the discovery suites do."
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/tests/cli_slug_refusal_tests.rs:262 and :332",
+            "problem": "Unchanged by the increment (line-shifted from r1's :258/:328): the `error: plugin steam-linux failed: ` prefix and the `steam-linux` Platform cell hard-code the Linux answer to a cfg-dependent plugin choice in apps/discovery-cli/src/main.rs. Harmless on today's Linux-only CI (Test strategy #11's posture), a forward hazard for the matrix's Windows verification level.",
+            "fix": "Derive the expected plugin name (or accept either spelling) and note in the file header that these assertions ride the Linux leg only."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/discovery/src/slug.rs:19",
+            "problem": "Unchanged by this diff: the fold table's coverage doc comment still lists `ł` twice in its stroke-letter sample where the fifth entry should be `ŀ`/`Ł`; the match ranges are correct but the comment is the stated coverage boundary Test strategy #1 pins.",
+            "fix": "Correct the duplicated code point in the doc comment."
+          }
+        ]
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/code-review-compatibility-r1c5.md",
+      "durationMs": 247097,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e0f647dc7ffdZG00Z3izIbo3TK",
+      "agent": "codereview/code-security",
+      "at": 1795038302860,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/code-review-security-r1c5.md",
+      "durationMs": 217120,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e0f612d61ffeHLgL4oQ184dw57",
+      "agent": "codereview/code-performance",
+      "at": 1795038371605,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/code-review-performance-r1c5.md",
+      "durationMs": 68643,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e0f60b851ffeFWEC4JZDPWEA8H",
+      "agent": "codereview/code-testing",
+      "at": 1795038552669,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/tests/ledger_annotations.rs:205-213 (is_bound_sentence), with :102-109 and :187-203",
+            "problem": "The new Test strategy #13(b) literal-number check is keyword-gated: a chunk is treated as a bound sentence only if it contains `MAX_SLUG_OCTETS`, `shared bound` or `slug bound`, so a bound statement phrased without any of those tokens — the realistic regression this gate exists to refuse, e.g. a re-added spec row cell reading \"at most 128 octets\" beside a slug-grammar mention — is never classified and the literal-`63`/`128` assertion never runs on it, leaving the gate green. The chunker at :187-203 widens both failure directions over markdown tables: whitespace is rejoined and the only cut is \". \", so consecutive table rows (which end in `|`) merge into one chunk; a later row edit that shifts a break can pull another budget's literal (`MAX_NATIVE_NAME_OCTETS`, `generated-by`) into a bound chunk for a spurious failure, or push a restated bound number out of one for a silent pass.",
+            "fix": "Widen the classification and de-keyword the negative half: also treat a chunk as being about this bound when it pairs a slug-grammar/id mention with an `octets` cap phrase (\"is at most … octets\", \"past … octets\"), or additionally assert that no chunk in the four spec.md files carries a standalone `63`/`128` token unless the same chunk names one of the other budgets' constants. Terminating chunks on table-row boundaries (`| … |`) removes the over-inclusive half."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/ledger_annotations.rs:93-101",
+            "problem": "The cross-reference half of #13(b) is existential (`bound.iter().any(...)`), while its own `proves:` line cites the design's acceptance wording \"each bound sentence names `MAX_SLUG_OCTETS` and points at `schemas/README.md`\". By the file's own predicate the shipped corpus already contains bound sentences satisfying neither token (schemas/action-ids/v1/spec.md's \"`segment-past-cap.toml`'s segment one octet past the shared bound …\" chunk), so an `all` reading fails today and the cite overstates what is asserted: one un-cross-referenced bound sentence per file passes.",
+            "fix": "State the intended quantifier in the `proves:` line (each of the four states the bound in *a* sentence that cross-references the README bullet), or restrict the universal check to chunks that state a cap and drop prose mentions from `is_bound_sentence`."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/placement.rs:335-395 (a_geometry_name_past_the_shared_slug_bound_is_refused_beside_the_grammar)",
+            "problem": "The re-pinned Test strategy #14 test pins the refusal's variant and its negative properties (no path, no document content, one printable line) but never asserts that the message names the bound it broke, i.e. interpolates the exported constant — unlike every other numeric-bound refusal in core (crates/core/tests/policy.rs:907-912, crates/core/tests/action.rs:251-259, crates/core/tests/slug_bound_corpus.rs:144-150). The new arm in crates/core/src/placement.rs:168-174 deliberately mirrors load_policy's message shape, and that deliberate shape is the one property of the new branch no test holds: a reworded message that drops or hard-codes the number keeps the suite green.",
+            "fix": "Mirror the policy leg beside the existing negative assertions: `assert!(detail.contains(&bindforge_core::MAX_SLUG_OCTETS.to_string()), \"the bound fault names the bound it broke, built from the exported constant: `{detail}`\");`"
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/src/main.rs:206-313 (#[cfg(test)] mod tests); crates/discovery/src/steam_common.rs:430-508 (#[cfg(test)] mod tests)",
+            "problem": "Carried from r1, unchanged by this increment (neither file is in the reviewed range): the two in-source test modules — the only pins of Test strategy #9's filter half and #4's counter clause — still carry no `// proves: design 024's Test strategy #N` marker at the test or module, so strategy-to-test traceability for those two clauses still lives only in the neighbouring suites' headers (apps/discovery-cli/tests/cli_slug_refusal_tests.rs:5, crates/discovery/tests/collision_tests.rs:4), which a reader editing the in-source modules will not see.",
+            "fix": "One marker per test (or per module) in the wording the suites use, e.g. `// proves: design 024's Test strategy #9 (Chosen design: CLI boundary) — the emit filter drops the row and answers one named, escaped line` above the main.rs tests, and `// proves: design 024's Test strategy #4 (collision pass) — skipped grows by the refused row count` above the steam_common tests."
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/src/main.rs:81-84 (call site in main) vs. main.rs:115-129 (refuse_invalid_slugs)",
+            "problem": "Carried from r1, unchanged by this increment: nothing pins that main's list path calls the filter — deleting or bypassing the `for line in refuse_invalid_slugs(&mut all_games) { eprintln!(\"{line}\") }` loop leaves every suite green, because the shipped plugins refuse invalid rows one seam earlier (crates/discovery/src/steam_common.rs:245-247) so the subprocess tests never reach that call site. This is the known residual of the function-level-plus-end-to-end split this seat prescribed in r1, recorded as a nit rather than reopened.",
+            "fix": "If a later round touches this seam, give main a test-reachable seam for the emit step — e.g. a `#[cfg(test)] pub(crate) fn list_games(plugins: &[&dyn DiscoveryPlugin]) -> (Vec<DiscoveredGame>, Vec<String>)` that main and an in-source test both call, so a test drives the whole path with a hand-built plugin row. No change required now."
+          }
+        ]
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/code-review-testing-r1c5.md",
+      "durationMs": 219771,
+      "nudges": 0
+    },
+    {
+      "stage": "doc-sync",
+      "round": 1,
+      "sessionID": "ses_e0f5d5d64ffezlMiLNXc4CzU76",
+      "agent": "ops/doc-sync",
+      "at": 1795038714383,
+      "reply": {
+        "drifted": true,
+        "commitMessage": "docs: record 024-game-slug-identity as-built drift in proposal and build notes"
+      },
+      "transcript": "docs/designs/024-game-slug-identity/transcripts/doc-sync-r1.md",
+      "durationMs": 161625,
+      "nudges": 0
+    }
+  ],
+  "gateLog": [
+    {
+      "gate": "sourceAdmissible",
+      "round": 0,
+      "proceed": true,
+      "reason": "ADR is proposed and complete",
+      "at": 1795023350385
+    },
+    {
+      "gate": "ledger-join",
+      "round": 0,
+      "proceed": false,
+      "reason": "ledger join: 1 finding(s) in the corpus docs/adrs/024-game-slug-identity.md:111 unit-unhandled 024-R1 carries no handle anywhere in the corpus",
+      "at": 1795023350403
+    },
+    {
+      "gate": "escalate",
+      "round": 0,
+      "proceed": false,
+      "reason": "ledger join refused: ledger join: 1 finding(s) in the corpus docs/adrs/024-game-slug-identity.md:111 unit-unhandled 024-R1 carries no handle anywhere in the corpus",
+      "at": 1795023350403
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: correctness, compatibility",
+      "at": 1795024729981
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c2 pending: security, performance, complexity",
+      "at": 1795025131693
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1795025319781
+    },
+    {
+      "gate": "editorial-review",
+      "round": 2,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1795025693969
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1795028205070
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1795028457320
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1795028817509
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1795028939218
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: correctness, testing",
+      "at": 1795029970792
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1795030470070
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1795030690737
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c2 pending: correctness, testing",
+      "at": 1795030972684
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1795031371464
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1795031507595
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c3 pending: correctness",
+      "at": 1795031752799
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1795032037104
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c4 pending: correctness",
+      "at": 1795032156753
+    },
+    {
+      "gate": "escalate",
+      "round": 0,
+      "proceed": false,
+      "reason": "code review: correctness dissents and the fix-round backstop is exhausted (5/5)",
+      "at": 1795032156755
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1795033672573
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1795034008817
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1795034220340
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1795034616072
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1795034939400
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1795035237794
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1795035453775
+    },
+    {
+      "gate": "stageFailure",
+      "round": 1,
+      "proceed": false,
+      "reason": "fix: stage-timeout",
+      "at": 1795037669522
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1795037869946
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c5 pending: compatibility, security, performance, testing",
+      "at": 1795038085677
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1795038552723
+    },
+    {
+      "gate": "ledger-join",
+      "round": 0,
+      "proceed": true,
+      "reason": "the ledger join holds: every handle resolves, every unit is handled",
+      "at": 1795038714448
+    },
+    {
+      "gate": "done",
+      "round": 0,
+      "proceed": true,
+      "reason": "pipeline complete",
+      "at": 1795038714449
+    }
+  ],
+  "startedAt": 1795023350361,
+  "updatedAt": 1795038714449,
+  "flow": "full",
+  "baseRef": "e786de8f6820d71dbe919300e247f72bd59ef7f3",
+  "designCycle": 3,
+  "designStamp": "c326ff4ae38c21d4e72f1bd2bc2f7c164c913292",
+  "seats": {
+    "design": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "c326ff4ae38c21d4e72f1bd2bc2f7c164c913292",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → Emission, refusal and collisions — \"they increment the existing `skipped` counter (whose message counts files, so a refused row counts there as a skipped row)\"",
+            "problem": "The count-only closure is accepted, but the new parenthetical bakes in a conflation that misreports in the one case the counter is ever user-visible: the counter's only surface is the steam_common.rs:101 error, whose message reads \"N file(s) skipped as unreadable or malformed\". When every game a plugin finds is refused for an un-derivable name — exactly the case ADR-024's Consequences foresee (\"a game whose display name and install directory are both non-Latin gets refused at discovery\") — the diagnostic fires and attributes readable, well-formed files to \"unreadable or malformed\", naming neither a game nor the actual cause.",
+            "fix": "In this bullet, split the fired message's counts (e.g. \"M file(s) skipped as unreadable or malformed; K game(s) refused\") or drop the \"unreadable or malformed\" attribution from the combined count."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "c326ff4ae38c21d4e72f1bd2bc2f7c164c913292",
+        "dissents": 1,
+        "findings": []
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "c326ff4ae38c21d4e72f1bd2bc2f7c164c913292",
+        "dissents": 0,
+        "findings": []
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "c326ff4ae38c21d4e72f1bd2bc2f7c164c913292",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → \"Emission, refusal and collisions — `crates/discovery`\", read with the unchanged Risks row \"Collision-suffix probe loop repeats bound checks many times\" — \"probe count is bounded by distinct-name count, no measurable cost today\"",
+            "problem": "re-raised from r1, unaddressed and unrebutted by the Revision log; the c2 diff did not touch this section's collision pass. The bound is per name, not per run: each colliding name restarts at `base-2` and walks the claimed set, so n distinct display names sharing one base cost roughly n^2/2 candidate constructions, each a fresh String plus an is_slug_name and bound check. `crates/discovery` carries only MAX_FILE_BYTES = keyvalues::MAX_DOCUMENT_BYTES (steam_common.rs:282), a whole-file cap, and the design caps no plugin row count, so the multiplier is the host's appmanifest_*.acf count. Minor, because this stays a hand-run bulk CLI scan (the only binary is apps/discovery-cli; no event path exists) and realistic n keeps the term invisible.",
+            "fix": "Replace the row's mitigation with the honest shape — aggregate probes are O(n^2) in one plugin run's distinct-name count, n bounded only by the host's manifest-file count — or store a next-free-suffix counter on each base entry of the assigned-slug map so a collision consumes one candidate instead of rescanning claimed ones. Either keeps one mechanism and adds no constant."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → \"Specs, fixtures, ledger\" — \"a bullet in the exported budget family, `MAX_SLUG_OCTETS = 128`, the shared bound for every slug-grammar id; sibling of `MAX_NATIVE_NAME_OCTETS` (A8) …\"",
+            "problem": "re-raised from r1; the revised bullet still specifies no aggregate-cost clause, although every neighbouring entry in that family carries one (schemas/README.md: \"the shared 1 MiB / 16-deep budgets still bind first\"; MAX_CHAIN_DEPTH × MAX_DOCUMENT_BYTES; 64 × 16 predicate moves). This entry doubles an existing bound on values appearing inside arrays those budgets govern. One c2 revision widens the gap: the bullet is now \"the single rationale text that `placement.rs`'s doc comment copies verbatim\", so the omission propagates from the README into the exported constant's documentation in code.",
+            "fix": "Add one clause to the bullet in ADR-013's words: the doubling adds no aggregate byte ceiling because MAX_DOCUMENT_BYTES / MAX_NESTING_DEPTH still bind first. One sentence in the stated home, no new mechanism."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → \"Derivation — `crates/discovery/src/slug.rs`\" — \"in order: fold precomposed Latin via a private `fold_latin_base(char) -> Option<char>` match table … then ASCII case-fold (`A-Z`→`a-z`); then map every remaining character outside `[a-z0-9]` to `-`; collapse `-` runs; trim `-` at both ends; prefix a leading digit with `g-`\"",
+            "problem": "re-raised from r1; the c2 reorder (Latin table before case-fold, lower-case bases) is cost-neutral — the table is a compile-time char match consulted once per char either way — but the step list is still readable as five to six full-string passes over input no field-level cap constrains, with the bound applied only after the whole slug exists (\"Length is **not** truncated anywhere\"). Not a regression: today's normalize_slug already allocates four intermediate Strings per name.",
+            "fix": "One clause: derive_slug folds Latin, folds case, maps, and collapses runs in a single char loop into one String builder, with trim and the `g-` prefix done as slices/prepend rather than rewrites, so a name of any length costs one buffer."
+          }
+        ]
+      },
+      "complexity": {
+        "verdict": "approve",
+        "stamp": "c326ff4ae38c21d4e72f1bd2bc2f7c164c913292",
+        "dissents": 0,
+        "findings": []
+      }
+    },
+    "code": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "c9b33a7f9caf70814de00fa0bdd8fa52d3a8fb1f",
+        "dissents": 4,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/src/placement.rs:90-93 (with :87-88 and crates/core/src/document.rs:1680-1686; related prose at schemas/README.md:131-135 and schemas/keyboard-geometry/v1/spec.md:45,93)",
+            "problem": "The rewritten is_slug_name doc closes 'so the bound applies wherever the grammar does', but the same comment two lines earlier names an application of the grammar where the bound does not ride: 'applied to a document's geometry entry' — parse_keyboard_geometry checks that entry with is_slug_name only (document.rs:1681), reachable through the public parse/parse_file seam. The asymmetry is deliberate and behaviorally sound via load_geometry (name capped before the join; entry held equal to the capped stem) and matches the un-amended keyboard-geometry/v1 entry table, which ADR-024 024-B1's amendment list leaves alone and 024-L3 rides a tightening past. But the universal clause is false as stated, and the README bullet's 'The bound rides beside the grammar at every one of these ids' is carried only by its own pre-join grounding clause. The previous comment stated the narrower scope explicitly; this revision universalized it.",
+            "fix": "Prose only: qualify the clause to the load seams the design mandates — e.g. 'so the bound rides beside the grammar at every load seam that takes one of these ids — the document's geometry entry is guarded by the grammar and held to the capped name by the file-stem agreement' — or drop the universal clause. The proposal-mandated sentence (full rider set, no narrowing) is unaffected either way. No code change: bounding the entry check inside parse would newly refuse documents keyboard-geometry/v1's published table accepts, the 024-L3 violation the earlier deferral existed to avoid."
+          },
+          {
+            "severity": "nit",
+            "location": "schemas/README.md:131-135 vs crates/core/src/placement.rs:71-74",
+            "problem": "The proposal requires the README bullet's rationale text to be copied into the constant's doc comment verbatim (02-proposal.md:214-215); this identity held through round 1 and c3. This revision rewrote the same sentence in both places with a deliberate lexical split — 'the reference implementation checks a geometry name against it beside the grammar check' vs 'load_geometry checks a geometry name against it beside the is_slug_name check'. Semantically identical, but the one-copy property now holds only up to this sentence.",
+            "fix": "Align one copy to the other in the next edit that touches either (or have the README adopt the function-named spelling), restoring the verbatim property the design states."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "c9b33a7f9caf70814de00fa0bdd8fa52d3a8fb1f",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "apps/discovery-cli/tests/cli_slug_refusal_tests.rs:117 (`fn is_slug_shaped`, used at :216-217)",
+            "problem": "Carried from r1, partially resolved: the fix converted SLUG_BOUND to a reference to bindforge_core::MAX_SLUG_OCTETS and deleted the false no-dependency premise, but the hand-rolled predicate remains a second grammar in the tree — and it is not equivalent to production: is_slug_name (crates/core/src/placement.rs:95-105) permits `--` and a trailing `-` and forbids a leading digit, while the test predicate does the reverse on all three counts. The increment did not break anything here; the grammar-duplication half of the r1 finding simply survives.",
+            "fix": "Replace is_slug_shaped with bindforge_core::is_slug_name plus the (now-referenced) MAX_SLUG_OCTETS bound, as the discovery suites do."
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/tests/cli_slug_refusal_tests.rs:262 and :332",
+            "problem": "Unchanged by the increment (line-shifted from r1's :258/:328): the `error: plugin steam-linux failed: ` prefix and the `steam-linux` Platform cell hard-code the Linux answer to a cfg-dependent plugin choice in apps/discovery-cli/src/main.rs. Harmless on today's Linux-only CI (Test strategy #11's posture), a forward hazard for the matrix's Windows verification level.",
+            "fix": "Derive the expected plugin name (or accept either spelling) and note in the file header that these assertions ride the Linux leg only."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/discovery/src/slug.rs:19",
+            "problem": "Unchanged by this diff: the fold table's coverage doc comment still lists `ł` twice in its stroke-letter sample where the fifth entry should be `ŀ`/`Ł`; the match ranges are correct but the comment is the stated coverage boundary Test strategy #1 pins.",
+            "fix": "Correct the duplicated code point in the doc comment."
+          }
+        ]
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "c9b33a7f9caf70814de00fa0bdd8fa52d3a8fb1f",
+        "dissents": 0,
+        "findings": []
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "c9b33a7f9caf70814de00fa0bdd8fa52d3a8fb1f",
+        "dissents": 0,
+        "findings": []
+      },
+      "testing": {
+        "verdict": "approve",
+        "stamp": "c9b33a7f9caf70814de00fa0bdd8fa52d3a8fb1f",
+        "dissents": 2,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/core/tests/ledger_annotations.rs:205-213 (is_bound_sentence), with :102-109 and :187-203",
+            "problem": "The new Test strategy #13(b) literal-number check is keyword-gated: a chunk is treated as a bound sentence only if it contains `MAX_SLUG_OCTETS`, `shared bound` or `slug bound`, so a bound statement phrased without any of those tokens — the realistic regression this gate exists to refuse, e.g. a re-added spec row cell reading \"at most 128 octets\" beside a slug-grammar mention — is never classified and the literal-`63`/`128` assertion never runs on it, leaving the gate green. The chunker at :187-203 widens both failure directions over markdown tables: whitespace is rejoined and the only cut is \". \", so consecutive table rows (which end in `|`) merge into one chunk; a later row edit that shifts a break can pull another budget's literal (`MAX_NATIVE_NAME_OCTETS`, `generated-by`) into a bound chunk for a spurious failure, or push a restated bound number out of one for a silent pass.",
+            "fix": "Widen the classification and de-keyword the negative half: also treat a chunk as being about this bound when it pairs a slug-grammar/id mention with an `octets` cap phrase (\"is at most … octets\", \"past … octets\"), or additionally assert that no chunk in the four spec.md files carries a standalone `63`/`128` token unless the same chunk names one of the other budgets' constants. Terminating chunks on table-row boundaries (`| … |`) removes the over-inclusive half."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/ledger_annotations.rs:93-101",
+            "problem": "The cross-reference half of #13(b) is existential (`bound.iter().any(...)`), while its own `proves:` line cites the design's acceptance wording \"each bound sentence names `MAX_SLUG_OCTETS` and points at `schemas/README.md`\". By the file's own predicate the shipped corpus already contains bound sentences satisfying neither token (schemas/action-ids/v1/spec.md's \"`segment-past-cap.toml`'s segment one octet past the shared bound …\" chunk), so an `all` reading fails today and the cite overstates what is asserted: one un-cross-referenced bound sentence per file passes.",
+            "fix": "State the intended quantifier in the `proves:` line (each of the four states the bound in *a* sentence that cross-references the README bullet), or restrict the universal check to chunks that state a cap and drop prose mentions from `is_bound_sentence`."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/core/tests/placement.rs:335-395 (a_geometry_name_past_the_shared_slug_bound_is_refused_beside_the_grammar)",
+            "problem": "The re-pinned Test strategy #14 test pins the refusal's variant and its negative properties (no path, no document content, one printable line) but never asserts that the message names the bound it broke, i.e. interpolates the exported constant — unlike every other numeric-bound refusal in core (crates/core/tests/policy.rs:907-912, crates/core/tests/action.rs:251-259, crates/core/tests/slug_bound_corpus.rs:144-150). The new arm in crates/core/src/placement.rs:168-174 deliberately mirrors load_policy's message shape, and that deliberate shape is the one property of the new branch no test holds: a reworded message that drops or hard-codes the number keeps the suite green.",
+            "fix": "Mirror the policy leg beside the existing negative assertions: `assert!(detail.contains(&bindforge_core::MAX_SLUG_OCTETS.to_string()), \"the bound fault names the bound it broke, built from the exported constant: `{detail}`\");`"
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/src/main.rs:206-313 (#[cfg(test)] mod tests); crates/discovery/src/steam_common.rs:430-508 (#[cfg(test)] mod tests)",
+            "problem": "Carried from r1, unchanged by this increment (neither file is in the reviewed range): the two in-source test modules — the only pins of Test strategy #9's filter half and #4's counter clause — still carry no `// proves: design 024's Test strategy #N` marker at the test or module, so strategy-to-test traceability for those two clauses still lives only in the neighbouring suites' headers (apps/discovery-cli/tests/cli_slug_refusal_tests.rs:5, crates/discovery/tests/collision_tests.rs:4), which a reader editing the in-source modules will not see.",
+            "fix": "One marker per test (or per module) in the wording the suites use, e.g. `// proves: design 024's Test strategy #9 (Chosen design: CLI boundary) — the emit filter drops the row and answers one named, escaped line` above the main.rs tests, and `// proves: design 024's Test strategy #4 (collision pass) — skipped grows by the refused row count` above the steam_common tests."
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/src/main.rs:81-84 (call site in main) vs. main.rs:115-129 (refuse_invalid_slugs)",
+            "problem": "Carried from r1, unchanged by this increment: nothing pins that main's list path calls the filter — deleting or bypassing the `for line in refuse_invalid_slugs(&mut all_games) { eprintln!(\"{line}\") }` loop leaves every suite green, because the shipped plugins refuse invalid rows one seam earlier (crates/discovery/src/steam_common.rs:245-247) so the subprocess tests never reach that call site. This is the known residual of the function-level-plus-end-to-end split this seat prescribed in r1, recorded as a nit rather than reopened.",
+            "fix": "If a later round touches this seam, give main a test-reachable seam for the emit step — e.g. a `#[cfg(test)] pub(crate) fn list_games(plugins: &[&dyn DiscoveryPlugin]) -> (Vec<DiscoveredGame>, Vec<String>)` that main and an in-source test both call, so a test drives the whole path with a hand-built plugin row. No change required now."
+          }
+        ]
+      }
+    }
+  },
+  "lastReviewPass": {
+    "phase": "code",
+    "round": 1,
+    "cycle": 5,
+    "seats": [
+      "compatibility",
+      "security",
+      "performance",
+      "testing"
+    ]
+  },
+  "reviseNoChange": false,
+  "gateEvidence": {
+    "at": 1795037869945,
+    "green": true,
+    "legs": [
+      {
+        "command": "npm run check",
+        "cwd": "tools/orchestration",
+        "exit": 0,
+        "tail": "npm notice run @bindforge/orchestration@1.0.0 precheck npm notice run npm install  up to date, audited 178 packages in 2s  45 packages are looking for funding   run `npm fund` for details  10 moderate severity vulnerabilities  To address issues that do not require attention, run:   npm audit fix  To address all issues (including breaking changes), run:   npm audit fix --force  Run `npm audit` for details. npm warn install-scripts 1 package had install scripts blocked because they are not covered by allowScripts: npm warn install-scripts   esbuild@0.28.2 (postinstall: node install.js) npm warn install-scripts npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow. npm notice run @bindforge/orchestration@1.0.0 check npm notice run npm run lint && npm run format:check && npm run test npm notice run @bindforge/orchestration@1.0.0 lint npm notice run eslint . npm notice run @bindforge/orchestration@1.0.0 format:check npm notice run prettier --check . Checking formatting... All matched files use Prettier code style! npm notice run @bindforge/orchestration@1.0.0 test npm notice run vitest run          dmesg(1) may have more information after failed mount system call.   Test Files  61 passed (61)       Tests  692 passed | 2 skipped (694)    Start at  16:37:40    Duration  8.10s (tests 92%, import 7%, transform 1%)      Isolate  61 workers spawned · ~75ms startup each (spawn + environment, per file)              at least ~497ms faster with isolate: false — reuses workers across files instead of one per file [2 tail line(s) dropped by the record's citation rule]"
+      },
+      {
+        "command": "cargo fmt --all -- --check",
+        "cwd": ".",
+        "exit": 0,
+        "tail": ""
+      },
+      {
+        "command": "cargo clippy --workspace --all-targets -- -D warnings",
+        "cwd": ".",
+        "exit": 0,
+        "tail": "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.04s"
+      },
+      {
+        "command": "cargo test --workspace --locked",
+        "cwd": ".",
+        "exit": 0,
+        "tail": "[40199 characters elided by the gate tail cap]. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s       Running tests/cli_output_polish_tests.rs (target/debug/build/discovery-cli/6baeaa5867e93b03/out/cli_output_polish_tests-6baeaa5867e93b03)  running 4 tests test test_cli_list_table_is_the_header_block_when_no_games_are_found ... ok test test_cli_list_reports_a_plugin_failure_on_one_stderr_line ... ok test test_cli_list_table_columns_align_under_a_separator ... ok test test_help_lists_the_json_flag_at_every_level ... ok  test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s       Running tests/cli_slug_refusal_tests.rs (target/debug/build/discovery-cli/1ace125c7ba0d38c/out/cli_slug_refusal_tests-1ace125c7ba0d38c)  running 4 tests test a_scratch_root_renders_the_same_five_columns_with_a_prefix_free_slug ... ok test a_root_whose_only_row_has_no_slug_source_fails_without_echoing_that_row ... ok test a_slug_at_the_bound_renders_and_one_octet_past_it_does_not ... ok test every_slug_the_json_rendering_prints_is_a_valid_id_inside_the_bound ... ok  test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s       Running tests/cli_tests.rs (target/debug/build/discovery-cli/458d6475e117d1e1/out/cli_tests-458d6475e117d1e1)  running 3 tests test test_cli_list_json_empty_for_missing_steam_root ... ok test test_cli_list_json_format ... ok test test_cli_list_format ... ok  test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests bindforge_core  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests bindforge_transforms  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests discovery  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      }
+    ]
+  },
+  "codeCycle": 6,
+  "codeStamp": "c9b33a7f9caf70814de00fa0bdd8fa52d3a8fb1f",
+  "extensionSessions": 2,
+  "extensionRounds": 2
+}

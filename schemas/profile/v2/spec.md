@@ -35,8 +35,8 @@ space unambiguously.
 |---|---|---|---|
 | `format` | string | yes | must be `profile` |
 | `version` | string | yes | the grammar major this document is written against (`v2`) |
-| `id` | string | yes | the link's identifier: slug grammar, ≤ 63 octets |
-| `derives` | array of strings | no | ancestor chain, nearest first, default empty; each element slug grammar, ≤ 63 octets. At `v2` a `patch` carries exactly one element and a `base` none |
+| `id` | string | yes | the link's identifier: slug grammar, at most `MAX_SLUG_OCTETS` octets — the shared bound `schemas/README.md` states once |
+| `derives` | array of strings | no | ancestor chain, nearest first, default empty; each element slug grammar, at most the same shared `MAX_SLUG_OCTETS` bound. At `v2` a `patch` carries exactly one element and a `base` none |
 | `kind` | string | yes | `base` or `patch`; a base stands alone, a patch modifies the link below it |
 | `for` | string | yes | `"<manifest-slug>@<revision>"`: the manifest this link applies to — design 013's canonical identity, `revision` ≥ 1 |
 | `set` | array of strings | no | each element `"<action-id> <input-id>"`: bind that action to that input, replacing any existing binding |
@@ -68,7 +68,8 @@ Each rule below has a named fixture.
 - **Pin.** `for` splits at its one `@`: the head is slug grammar, the tail a
   decimal integer ≥ 1 — the shipped manifest `revision-zero` refusal shape.
 - **Id grammars.** `id` and each `derives` element are slug-grammar checked
-  (`[a-z][a-z0-9-]*`) and capped at 63 octets, because a `v2` id is a chain
+  (`[a-z][a-z0-9-]*`) and capped at `MAX_SLUG_OCTETS` octets — the shared bound
+  `schemas/README.md` states once (`024-B1`), because a `v2` id is a chain
   lookup key and a file name: `profile-id ↔ file-name` equality must be
   case-unique. Malformed ids refuse as `InvalidValue`, the id echoed through
   the escape-and-truncate path.

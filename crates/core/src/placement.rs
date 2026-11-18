@@ -64,14 +64,35 @@ impl KeyboardGeometry {
     }
 }
 
+/// `MAX_SLUG_OCTETS = 128` is the shared length bound for every id that rides
+/// the slug grammar (`[a-z][a-z0-9-]*`) — a manifest `id`, a manifest `codec` or
+/// preset id, a `profile/v2` `id` or `derives` element, a `policy/v1` `id`, a
+/// keyboard geometry name, and one action-id segment, which keeps its stricter
+/// shape rules and borrows only this number. The bound rides beside the grammar
+/// at every one of these ids: `load_geometry` checks a geometry name against it
+/// beside the `is_slug_name` check, before the name is joined onto a directory,
+/// so no rider is enforced more narrowly than `024-B1` enumerates it.
+/// The bound supersedes the DNS-label limit RFC 1035 §2.3.1 publishes, which
+/// these specs used to state for themselves: each of the four now
+/// cross-references this bullet instead of carrying a number of its own. The
+/// value is the sibling of `MAX_NATIVE_NAME_OCTETS = 128` — one legal path
+/// component on every platform this product names — and the amendment is
+/// relaxation only: an id valid under the 63-octet text stays valid.
+/// `schemas/README.md` is this bound's one stated home; this is its one
+/// exported home.
+pub const MAX_SLUG_OCTETS: usize = 128;
+
 /// The slug grammar: `[a-z][a-z0-9-]*`. Named for what it is now that three
 /// entry kinds share it — a geometry name, a manifest `id`, and a manifest
 /// `codec` or preset id (ADR-013) — and applied to a document's `geometry`
 /// entry, and to the name a caller hands `load_geometry` *before* it is
 /// joined onto a directory, which is what keeps a `..` or a separator from
-/// ever asking the filesystem for a path.
+/// ever asking the filesystem for a path. It carries no length bound of its
+/// own: the shared [`MAX_SLUG_OCTETS`] rides beside it for every id that
+/// constant's document enumerates — a geometry name among them — so the
+/// bound applies wherever the grammar does.
 #[must_use]
-pub(crate) fn is_slug_name(name: &str) -> bool {
+pub fn is_slug_name(name: &str) -> bool {
     let bytes = name.as_bytes();
     let Some((first, rest)) = bytes.split_first() else {
         return false;
@@ -129,17 +150,31 @@ impl PlacementCheck {
 /// Load one keyboard geometry from the TOML file `<name>.toml` sitting directly
 /// in one `schemas/keyboard-geometry/v<N>/` version directory.
 ///
-/// `name` is matched against the `[a-z][a-z0-9-]*` grammar *before* it is
-/// joined onto `dir`, so a name that arrived from somewhere else — a `..`, a
-/// separator, an uppercase spelling — is refused without asking the filesystem
-/// anything and without naming a path. The loaded document's `geometry` entry
-/// must agree with the file stem, as a reach table's `hand` entry must agree
-/// with its own.
+/// `name` is matched against the `[a-z][a-z0-9-]*` grammar, and against the
+/// shared [`MAX_SLUG_OCTETS`] bound, *before* it is joined onto `dir`, so a
+/// name that arrived from somewhere else — a `..`, a separator, an uppercase
+/// spelling — is refused without asking the filesystem anything and without
+/// naming a path, and a grammar-valid name past the bound is refused the same
+/// way because a keyboard geometry name rides the bound (`024-B1`). The loaded
+/// document's `geometry` entry must agree with the file stem, as a reach
+/// table's `hand` entry must agree with its own.
 pub fn load_geometry(dir: &Path, name: &str) -> Result<KeyboardGeometry, CoreError> {
     if !is_slug_name(name) {
         return Err(CoreError::InvalidValue {
             key: "geometry".to_string(),
             message: format!("`{name}` is not a geometry name: expected `[a-z][a-z0-9-]*`"),
+        });
+    }
+    if name.len() > MAX_SLUG_OCTETS {
+        // The bound leads and the offender follows, as in every other
+        // slug-bound refusal (`load_policy`): the echoed name is by definition
+        // past the bound, so an echo-first message would truncate the number
+        // away. A keyboard geometry name rides `MAX_SLUG_OCTETS` (`024-B1`), so
+        // the bound is checked here beside the grammar, before the join.
+        let message = format!("a geometry name is at most {MAX_SLUG_OCTETS} octets: `{name}`");
+        return Err(CoreError::InvalidValue {
+            key: "geometry".to_string(),
+            message,
         });
     }
     let file_name = format!("{name}.toml");

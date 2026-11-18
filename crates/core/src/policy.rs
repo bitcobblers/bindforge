@@ -28,13 +28,8 @@ use std::path::Path;
 
 use crate::document::{Document, Policy, check_dir_version, parse_file};
 use crate::error::CoreError;
+use crate::placement::MAX_SLUG_OCTETS;
 use crate::placement::is_slug_name;
-
-/// The octet bound a policy id rides, the same DNS-label bound the profile and
-/// manifest grammars borrow. It is spelled here because the load-time check
-/// runs before any document is read, exactly as `manifest` states it for its own
-/// pre-read check; the parse applies the same pair of rules from `document`.
-const MAX_SLUG_OCTETS: usize = 63;
 
 /// The slug grammar, spelled the way the other loaders spell it in a refusal.
 const SLUG_RULE: &str = "expected `[a-z][a-z0-9-]*`";
@@ -52,8 +47,18 @@ const SLUG_RULE: &str = "expected `[a-z][a-z0-9-]*`";
 /// reach table's `hand` entry must agree with theirs, and the declared major
 /// must equal the directory's segment.
 pub fn load_policy(dir: &Path, id: &str) -> Result<Policy, CoreError> {
-    if !is_slug_name(id) || id.len() > MAX_SLUG_OCTETS {
+    if !is_slug_name(id) {
         let message = format!("a policy id is a slug: {SLUG_RULE}");
+        return Err(CoreError::InvalidValue {
+            key: "id".to_string(),
+            message,
+        });
+    }
+    if id.len() > MAX_SLUG_OCTETS {
+        // The bound leads and the offender follows, as in every other
+        // slug-bound refusal: the echoed id is by definition past the bound,
+        // so an echo-first message would truncate the number away.
+        let message = format!("a policy id is at most {MAX_SLUG_OCTETS} octets: `{id}`");
         return Err(CoreError::InvalidValue {
             key: "id".to_string(),
             message,

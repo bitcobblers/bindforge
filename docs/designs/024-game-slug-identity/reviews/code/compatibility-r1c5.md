@@ -1,0 +1,34 @@
+# Code review — compatibility seat, round 1, ratification pass (c5)
+
+- Diff reviewed: `git diff 0ee2eeeb7992f470561763e45e56261f503e64ae..HEAD -- ':(exclude)docs/designs'`
+- Inputs: the diff, `02-proposal.md`, `docs/adrs/024-game-slug-identity.md`, the runner's gate record (green at 2026-11-18T21:37:49.945Z: `npm run check`, `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --locked` all exit 0), and my r1 findings.
+- Pass type: ratification. Scope: confirm the post-approval revisions did not break what this seat approved at r1.
+
+## What the increment changed (from a compatibility angle)
+
+1. **`apps/discovery-cli/src/main.rs`** — the emission-boundary filter extracted verbatim into `refuse_invalid_slugs(&mut Vec<DiscoveredGame>) -> Vec<String>`, plus an in-binary `#[cfg(test)]` unit module. This is exactly the shape Test strategy #9 mandates ("extractable named function ... rows in, kept rows out, refusals collected ... asserts it directly in an in-binary test module"). Refusal-line text and its position before both the JSON and table renderings are byte-identical to the r1-approved code, so the `024-L1` behavior this seat approved is preserved.
+2. **`apps/discovery-cli/tests/cli_slug_refusal_tests.rs`** — `SLUG_BOUND` now *references* `bindforge_core::MAX_SLUG_OCTETS` instead of retyping `128`, and the false "no bindforge-core dependency" note is deleted. This resolves the number-drift half of my r1 F1 in the direction 024-L3's one-stated-home rule wants: a bound amendment now moves this pin with production. The hand-rolled `is_slug_shaped` remains (carried finding below).
+3. **`crates/core/src/{document,policy,placement}.rs`** — the load-seam fault-kind split: a grammar-valid offender past the bound is now refused with a bound-naming message interpolating the exported constant (`check_pin`, `load_policy`), and `load_geometry` gains the bound check beside the grammar, before the join. The geometry bound check is exactly what proposal lines 121–127 and Test strategy #14 require of the `024-B1` geometry-name rider, and the proposal's escalation record (line 413) names this as the reversal of the geometry-name narrowing. The tightening only reaches names strictly past 128 octets — outside the "one legal path component on every platform this product names" family — so no shipped or spec-valid id regresses; the amendment stays relaxation-only in every reachable case. The fault-kind change is the accepted r1 finding's fix, with `crates/core/tests/{chain_ops,policy,placement}.rs` pinning message shape (one bounded printable line, no path disclosure, constant-interpolated number).
+4. **`crates/core/tests/ledger_annotations.rs`** (new) — the corpus-reading gate for Test strategy #13 (a/b/c), repo root via `common::repo_root()`, all paths built with `PathBuf::join`, no string concatenation, no host probing, writes nothing. Platform-portable and runs everywhere the workspace suite runs; checklist item 7 satisfied for it.
+5. **`crates/discovery/src/steam_common.rs`** — in-source unit tests for the private `024-L2` collision pass over hand-built rows, with the `collision_tests.rs` header re-pointed accordingly (the r1 F2 resolution). Platform-neutral logic asserted; the `Platform::SteamLinux` cells are inert fixture fields, not asserted outcomes.
+6. **`docs/adrs/013-game-manifests.md`, `schemas/*`** — the `013-L5` `amended-by 024-B1` ledger row; the four spec bound sentences shed their literal `= 128`; `action-ids/v1/spec.md` sheds the RFC 1035 derivation; the README bound bullet keeps the number (its one stated home) and states the geometry-name enforcement claim. This moves the tree *toward* the 024-L3 single-home rule: a third-party reader following the specs now reads one number in one place. No format's validity semantics change.
+
+## Compatibility checklist disposition
+
+1. **Platform code vs the Compatibility matrix** — pass. The increment adds no OS-specific code; matrix rows (Linux yes; Windows compile-verified with named gap; macOS yes, no CI leg) are untouched. The carried `steam-linux` hard-coding nit is unchanged and remains a Linux-leg-only forward hazard (Test strategy #11's "no test asserts a platform-specific outcome" holds today because CI is Linux-only).
+2. **Node floor** — N/A (no JS/TS in this diff).
+3. **Paths** — pass. All new path handling (`ledger_annotations.rs`, the test scratch dirs, the loaders) uses `PathBuf::join`/`format!` of a single component after grammar+bound checks; the loaders' pre-join refusal order is preserved and *strengthened* (bound joins grammar at `load_geometry`), keeping case-insensitive-filesystem safety.
+4. **Guarded platform imports** — N/A; no platform-only modules introduced.
+5. **Locale/layout reality** — pass. No change touches the fold table or non-ASCII derivation; those paths were untouched by this increment (the `slug.rs` doc-comment nit persists, unfixed and out of this diff).
+6. **Native dependencies** — none introduced.
+7. **Test platform claims** — pass. `ledger_annotations.rs` and the two in-source unit modules are platform-independent and run on the Linux leg with the rest of the workspace; no new platform-specific assertions.
+
+## Carried findings (from r1; not broken by the increment, not newly introduced)
+
+- **minor** — `apps/discovery-cli/tests/cli_slug_refusal_tests.rs:117` (`fn is_slug_shaped`, used at :216-217). Partial resolution of r1 F1: the bound number is now referenced, but the hand-rolled grammar predicate remains a second grammar in the tree — and it is not equivalent to production (`is_slug_name`, `crates/core/src/placement.rs:95-105`, permits `--` and a trailing `-` and forbids a leading digit; the test predicate does the reverse on all three counts). Fix unchanged in kind: replace it with `bindforge_core::is_slug_name` (plus the referenced bound) now that the premise for the copy is gone. Kept minor: the emitted rows are derived lowercase slugs, so today the assertion is simply stricter than needed, not wrong.
+- **nit** — `apps/discovery-cli/tests/cli_slug_refusal_tests.rs:262`, `:332` (formerly :258/:328). Hard-coded `steam-linux` prefix/Platform cell still ride the Linux leg only. Unchanged by the increment.
+- **nit** — `crates/discovery/src/slug.rs:19`. Duplicated `ł` in the fold-coverage doc comment; file untouched by this diff, so the r1 nit stands.
+
+## Verdict
+
+The post-approval revisions implement the accepted fixes (seam fault-kind split, geometry rider enforcement, single-home bound pins, `refuse_invalid_slugs` extraction per Test #9) without breaking the `024-L1` emission-boundary behavior, the collision semantics, the loader path-safety order, or the compatibility-matrix claims this seat approved at r1. No new blocker or major findings. Approve.

@@ -1,0 +1,11 @@
+# The `id` is the game directory's name and the left half of every profile's
+# manifest pin, so it rides the shared slug bound `MAX_SLUG_OCTETS` — stated
+# once in `schemas/README.md`. A discovered slug must be adoptable by a manifest
+# byte-for-byte, so the two formats share one cap; this id is grammatically a
+# slug and one octet past the bound, so it refuses on length alone.
+format = "manifests"
+version = "v1"
+id = "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+revision = 1
+codec = "unreal-engine-5"
+actions = ["move.steer-left Turn left"]

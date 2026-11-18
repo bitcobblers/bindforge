@@ -1,0 +1,9 @@
+# A segment is at most `MAX_SLUG_OCTETS` — the shared slug bound, stated once in
+# `schemas/README.md` and cross-referenced by every format's spec. This one is
+# one octet past it: every character is legal, the length is the only fault, and
+# the refusal names the bound it enforced rather than pasting the id back.
+format = "action-ids"
+version = "v1"
+discrete-lateral = []
+continuous-lateral = []
+none = ["move.sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss"]

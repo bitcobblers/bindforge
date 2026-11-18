@@ -1,0 +1,164 @@
+diff --git a/tmp/bindforge-editorial-game-slug-identity-r2.md b/home/mike/.local/share/opencode/worktree/f852d4/024-game-slug-identity/docs/designs/024-game-slug-identity/02-proposal.md
+index c326ff4a..0b330eab 100644
+--- a/tmp/bindforge-editorial-game-slug-identity-r2.md
++++ b/home/mike/.local/share/opencode/worktree/f852d4/024-game-slug-identity/docs/designs/024-game-slug-identity/02-proposal.md
+@@ -8,10 +8,10 @@ provisional slug `unknown/<kebab(display_name)>` that can never be a product id,
+ because every product identifier rides one shared slug grammar (`[a-z][a-z0-9-]*`)
+ that excludes `/` by design. This design makes a discovered game's `slug` a
+ single-segment id that already passes that grammar and the shared length bound,
+-moves the namespace into its own `DiscoveredGame` field, and raises the shared
+-bound from 63 to 128 octets with one stated home and one exported constant,
+-amending `013-L5` in the ledger. No matching or resolver code ships here; that is
+-`024-R1`'s reservation to ADR-025.
++and moves the namespace into its own `DiscoveredGame` field. It raises the
++shared bound from 63 to 128 octets with one stated home and one exported
++constant, amending `013-L5` in the ledger. No matching or resolver code ships
++here; that is `024-R1`'s reservation to ADR-025.
+ 
+ ## Goals / Non-goals
+ 
+@@ -21,8 +21,9 @@ amending `013-L5` in the ledger. No matching or resolver code ships here; that i
+     bound-valid, adoptable-byte-for-byte slug or a named refusal.
+   - Carry the namespace as a separate closed field (`unknown` is its only v1
+     value) in `DiscoveredGame`, table, and JSON output.
+-  - Enforce grammar-and-bound before any `DiscoveredGame` leaves a plugin or the
+-    CLI, with refusals echoed only through core's escape-and-truncate renderer.
++  - Enforce the grammar and the bound before any `DiscoveredGame` leaves a
++    plugin or the CLI, with refusals echoed only through core's
++    escape-and-truncate renderer.
+   - Implement the deterministic per-run collision-suffix rule (`-2`, `-3`, …).
+   - Move the shared bound to 128 as one exported constant in `crates/core`,
+     amend the four published specs in place to cross-reference it, and re-pin
+@@ -79,8 +80,8 @@ cannot both be literally true (A5). (a) Add `unicode-normalization` — rejected
+ accents to `-` ("Pokémon" → `pok-mon`), the readability loss the clause exists
+ to prevent. (c) Implement a bounded std-only fold table: every precomposed letter
+ in Latin-1 Supplement and Latin Extended-A whose Unicode canonical decomposition
+-base is a single ASCII Latin letter maps to its lower-case ASCII base; nothing is
+-transliterated multi-character (no `ß`→`ss`, no `æ`→`ae`), and every unmapped
++base is a single ASCII Latin letter maps to its lower-case ASCII base; nothing
++maps to more than one character (no `ß`→`ss`, no `æ`→`ae`), and every unmapped
+ character outside `[a-z0-9]` becomes `-`, which is also what NFKD-with-dropped-
+ marks yields for every non-Latin base. Chosen: (c); it is the smallest reading
+ under which both clauses hold, at the cost of exotic blocks (e.g. Latin Extended
+@@ -88,16 +89,16 @@ Additional) folding accents to `-` (A15; pinned by Test strategy #1).
+ 
+ **Collision suffix vs the length bound.** `024-L2` re-checks suffixed slugs
+ against the bound but does not say what happens at the bound. (a) WordPress-style
+-base truncation before appending the suffix — rejected: truncation is the lossy
++base truncation before appending the suffix — rejected: truncation is the lossy,
+ against-the-display-name move ADR-024 rejected as the long-title answer, and
+ keeping it even at the 128 edge invites the same disambiguation debt the ADR
+ refused to push onto the resolver. (b) Reserve headroom (derive bases only to
+ 124) — rejected: it silently shortens every near-cap slug to pay for a collision
+ the corpus has never shown (A6). (c) Try suffixes `-2`, `-3`, …; accept the first
+ candidate that is unclaimed and still within the bound; if none fits, refuse the
+-game through the same named-refusal path as an un-derivable name. Chosen: (c) —
+-refusal is already the ADR's answer for a name that cannot be slugged, and the
+-surveyed corpus makes the case hypothetical (A6).
++game through the same named-refusal path used for an un-derivable name. Chosen:
++(c) — refusal is already the ADR's answer for a name that cannot be slugged,
++and the surveyed corpus makes the case hypothetical (A6).
+ 
+ **Windows reserved names.** (a) Refuse the reserved-device set (A12) inside the
+ shared grammar now, fixing slugs, manifest ids, geometry names and profile ids at
+@@ -119,10 +120,10 @@ re-opened here.
+   rationale of its own, only the README bullet's text (Specs, fixtures, ledger).
+ - `lib.rs`: `pub use placement::{is_slug_name, MAX_SLUG_OCTETS};` — this is the
+   twelfth exported constant, and `lib.rs` stays the only export list.
+-- Delete the private `MAX_SLUG_OCTETS` in `policy.rs`, `manifest.rs` and
+-  `document.rs` and the private `MAX_SEGMENT_OCTETS` in `action.rs` (A2); all
+-  four sites reference the exported constant. Where a refusal message embeds the
+-  number (e.g. `action.rs` `SEGMENT_SHAPE_RULE` "1-63 octets"), the string is
++- `policy.rs`, `manifest.rs` and `document.rs`: delete their private
++  `MAX_SLUG_OCTETS`; `action.rs`: delete its private `MAX_SEGMENT_OCTETS` (A2).
++  All four sites reference the exported constant. Where a refusal message embeds
++  the number (e.g. `action.rs` `SEGMENT_SHAPE_RULE` "1-63 octets"), the string is
+   built with `format!` from the constant so a future amendment has one source.
+ - `error.rs`: `one_line` becomes `pub fn escape_and_truncate(raw: &str) -> String`
+   and is re-exported from `lib.rs`, so `024-L1`'s echo discipline has one
+@@ -136,8 +137,8 @@ re-opened here.
+   gains `"namespace":"unknown"` — a deliberate divergence from `Platform`, which
+   carries no serde attribute and pins as `"SteamLinux"`
+   (`apps/discovery-cli/tests/cli_tests.rs:186-189`), so this row's closed-enum
+-  spelling is mixed by decision and the value to build is `"unknown"`; the shape
+-  change rides the re-pinned CLI fixtures (see Test strategy #5, #8).
++  spelling is mixed by decision, and the value to build is `"unknown"`; the
++  shape change rides the re-pinned CLI fixtures (see Test strategy #5, #8).
+ 
+ ### Derivation — `crates/discovery/src/slug.rs`
+ 
+@@ -164,16 +165,16 @@ strategy #12). In its place, the canonical `024-C2` algorithm:
+ 
+ - `Cargo.toml` gains `bindforge-core = { workspace = true }`.
+ - `steam_common::discovered_game` becomes fallible: it derives the slug (with the
+-  install-dir fallback), checks the final value with
++  install-directory fallback), checks the final value against
+   `bindforge_core::is_slug_name` and the bound before constructing the row
+-  (defence in depth — derivation is grammar-correct by construction except for
+-  length), and returns `None` on refusal so the game is never added. Plugin-side
+-  refusals are count-only: they increment the existing `skipped` counter (whose
+-  message counts files, so a refused row counts there as a skipped row) and are
+-  never echoed per row — that counter's "unreadable or malformed" diagnostic
+-  fires only when a plugin emitted nothing at all (`steam_common.rs:101`), and
+-  024-L1's named per-game refusal is the CLI-boundary line of the next section,
+-  alone.
++  (defence in depth — the derivation is grammar-correct by construction except
++  for length), and returns `None` on refusal so the game is never added.
++  Plugin-side refusals are count-only: they increment the existing `skipped`
++  counter (whose message counts files, so a refused row counts there as a
++  skipped row) and are never echoed per row — that counter's "unreadable or
++  malformed" diagnostic fires only when a plugin emitted nothing at all
++  (`steam_common.rs:101`), and `024-L1`'s named per-game refusal is the
++  CLI-boundary line of the next section alone.
+ - `steam_common` gains a collision pass, run once per plugin over all rows that
+   plugin's `discover()` collected (after all its libraries are scanned), before
+   the `Vec` is returned: iterate distinct display names in byte order, keeping an
+@@ -195,7 +196,7 @@ strategy #12). In its place, the canonical `024-C2` algorithm:
+   including future third-party plugins — passes the same `is_slug_name` + bound
+   check; an invalid row is refused: dropped, with one stderr line
+   `error: refused game with invalid slug: <escape_and_truncate(value)>` and no
+-  path (024-L1); valid rows still print.
++  path (`024-L1`); valid rows still print.
+ - `COLUMNS` becomes `["Slug", "Namespace", "Display Name", "Install Path", "Platform"]`
+   (namespace beside the slug per Rollout item 1); `row_cells` adds
+   `game.namespace.to_string()`; widths stay `chars().count()`-measured.
+@@ -213,9 +214,9 @@ strategy #12). In its place, the canonical `024-C2` algorithm:
+   `schemas/action-ids/v1` `spec.md` sentences (A3) are amended in place: the
+   number and the RFC 1035 derivation become a cross-reference to the README
+   bullet, and the action-ids refusal example loses its literal length — "a
+-  64-octet segment" becomes "a segment past the shared bound", naming the renamed
+-  `segment-past-cap.toml`. The action-id segment keeps its stricter shape rules
+-  (letter first, letter or digit last) and borrows only the bound number.
++  64-octet segment" becomes "a segment past the shared bound" and names the
++  renamed `segment-past-cap.toml`. The action-id segment keeps its stricter shape
++  rules (letter first, letter or digit last) and borrows only the bound number.
+ - Fixtures: `id-past-cap.toml` in `schemas/policy/v1/` and `schemas/profile/v2/`
+   re-pin from 64 to 129 octets (literal and prose);
+   `segment-past-63-octets.toml` in `schemas/action-ids/v1/` becomes
+@@ -251,7 +252,7 @@ strategy #12). In its place, the canonical `024-C2` algorithm:
+ 
+ ## Test strategy
+ 
+-1. Unit: `derive_slug` table — the survey cases reproduce exactly (the 64-octet
++1. Unit: `derive_slug` table — the survey cases are reproduced exactly (the 64-octet
+    `warhammer-40-000-darktide-…` slug; `g-7-days-to-die`, `g-8bitboy`,
+    `g-8-bit-armies`; `nier-automata` from `NieR:Automata™`); diacritic folding
+    (`é`→`e`, `ü`→`u`, `ñ`→`n`, and upper-case `Å`→`a`, `É`→`e`); no transliteration (`ø`, `æ`, `ß` each become
+@@ -304,7 +305,7 @@ strategy #12). In its place, the canonical `024-C2` algorithm:
+ ## Rollout
+ 
+ Merged to `main` as one branch; the runner owns the commits, in dependency order.
+-Commit granularity: items 1+2 are one commit (024-L3) and items 4+5 another (a
++Commit granularity: items 1+2 are one commit (`024-L3`) and items 4+5 another (a
+ row's field set and the CLI's rendering of it are one change); the rest are
+ branch-level, with item 7's gates run at branch scope. No data migration: the
+ shipped corpus holds no ids to rewrite (A7), and `namespace` defaults to
+@@ -334,7 +335,7 @@ shipped corpus holds no ids to rewrite (A7), and `namespace` defaults to
+ 
+ ## Deferred / out of scope
+ 
+-- Resolver that maps an `unknown`-namespaced slug onto a real manifest id, and
++- A resolver that maps an `unknown`-namespaced slug onto a real manifest id, and
+   rename stability across store renames — ADR-025 (reserved, `024-R1`).
+ - `publisher` namespace: its derivation, grammar, and any namespace value beyond
+   `unknown` — ADR-025.

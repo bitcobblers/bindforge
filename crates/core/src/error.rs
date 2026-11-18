@@ -10,7 +10,8 @@
 //!
 //! A rejection message is also a log line, and every string it can carry
 //! comes from the document being rejected: a declared `format`, a declared
-//! `version`, an entry key, a hand value. Those go through `one_line` before
+//! `version`, an entry key, a hand value. Those go through
+//! [`escape_and_truncate`] before
 //! they are written, so one hostile upload cannot forge extra log lines or
 //! inflate log volume. A local filesystem path stays out of the message
 //! entirely — `source_path` is how a server-side log asks for it.
@@ -106,7 +107,7 @@ impl fmt::Display for CoreError {
                 write!(
                     f,
                     "malformed document on line {line}: {}",
-                    one_line(message)
+                    escape_and_truncate(message)
                 )
             }
             CoreError::NotUtf8 => write!(f, "document is not valid UTF-8"),
@@ -114,7 +115,7 @@ impl fmt::Display for CoreError {
                 write!(
                     f,
                     "document is missing the required `{}` entry",
-                    one_line(key)
+                    escape_and_truncate(key)
                 )
             }
             CoreError::UnsupportedVersion {
@@ -131,7 +132,7 @@ impl fmt::Display for CoreError {
             } => write!(
                 f,
                 "document declares unsupported version `{}`; supported versions: {}",
-                one_line(declared),
+                escape_and_truncate(declared),
                 supported.join(", ")
             ),
             CoreError::UnknownFormat {
@@ -140,11 +141,16 @@ impl fmt::Display for CoreError {
             } => write!(
                 f,
                 "document declares unknown format `{}`; supported formats: {}",
-                one_line(declared),
+                escape_and_truncate(declared),
                 supported.join(", ")
             ),
             CoreError::InvalidValue { key, message } => {
-                write!(f, "`{}` is invalid: {}", one_line(key), one_line(message))
+                write!(
+                    f,
+                    "`{}` is invalid: {}",
+                    escape_and_truncate(key),
+                    escape_and_truncate(message)
+                )
             }
             CoreError::Cycle => write!(f, "chain derives from itself"),
             CoreError::ChainTooDeep => {
@@ -154,10 +160,14 @@ impl fmt::Display for CoreError {
                 )
             }
             CoreError::ChainLinkMissing { id } => {
-                write!(f, "chain link `{}` is missing", one_line(id))
+                write!(f, "chain link `{}` is missing", escape_and_truncate(id))
             }
             CoreError::Io { path: _, message } => {
-                write!(f, "could not read a contract file: {}", one_line(message))
+                write!(
+                    f,
+                    "could not read a contract file: {}",
+                    escape_and_truncate(message)
+                )
             }
         }
     }
@@ -169,7 +179,15 @@ impl fmt::Display for CoreError {
 /// `\n` inside a quoted string, so an unescaped value could otherwise put a
 /// second, timestamp-shaped line into the hub's log and echo a whole
 /// parse-budget-sized value back at whoever reads the rejection.
-fn one_line(raw: &str) -> String {
+///
+/// It is the one echo renderer the workspace has (ADR-024): every rejection
+/// `bindforge-core` makes runs its payload through it, and `apps/discovery-cli`
+/// renders its own named refusals through the same export, so a value arriving
+/// from outside the product — a document, or a third-party plugin's slug — can
+/// never put a second line or a path on an operator's terminal whatever it
+/// carries.
+#[must_use]
+pub fn escape_and_truncate(raw: &str) -> String {
     let mut out = String::new();
     for (index, c) in raw.chars().enumerate() {
         if index >= MESSAGE_VALUE_CHARS {

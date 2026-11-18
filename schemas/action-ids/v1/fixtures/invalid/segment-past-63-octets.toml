@@ -1,8 +1,0 @@
-# A segment is at most 63 octets — the DNS-label bound RFC 1035 §2.3.1
-# publishes. This one is 64: every character is legal, the length is the only
-# fault, and the refusal truncates the id it echoes rather than pasting it back.
-format = "action-ids"
-version = "v1"
-discrete-lateral = []
-continuous-lateral = []
-none = ["move.abcdefghabcdefghabcdefghabcdefghabcdefghabcdefghabcdefghabcdefgh"]

@@ -51,9 +51,9 @@ one line, and why a `#` inside a quoted array element is data, never a comment.
 |---|---|---|---|
 | `format` | string | yes | must be `manifests` — `013-C1` |
 | `version` | string | yes | the major this document is written against (`v1`) — `013-C1` |
-| `id` | string | yes | the game slug (`[a-z][a-z0-9-]*`, at most 63 octets), byte-equal to the `data/manifests/<id>/` directory name — `013-L5` |
+| `id` | string | yes | the game slug (`[a-z][a-z0-9-]*`, at most `MAX_SLUG_OCTETS` octets — the shared bound `schemas/README.md` states once), byte-equal to the `data/manifests/<id>/` directory name — `013-L5` `024-B1` |
 | `revision` | integer | yes | the data revision, `>= 1`, monotone per game (see Identity and revision) — `013-L4` |
-| `codec` | string | yes | the codec family id (slug grammar, at most 63 octets); the id space is reserved here, implementations are ADR-017 — `013-C3 013-R1` |
+| `codec` | string | yes | the codec family id (slug grammar, at most the same shared `MAX_SLUG_OCTETS` bound); the id space is reserved here, implementations are ADR-017 — `013-C3 013-R1` |
 | `fingerprint` | string | no | `"sha256-<base64>"`, the digest of the config this manifest was read from; absent means never read against a config — `013-C5` |
 | `actions` | array of strings | yes | each element `"<action-id> <native-name>"`; may be empty — `013-C3 013-C6` |
 | `exclusive-groups` | array of strings | no | each element `"<input-id> <input-id>[ <input-id>…]"`, 2..=16 members; at most 64 groups — `013-C3 013-B2 013-B3` |

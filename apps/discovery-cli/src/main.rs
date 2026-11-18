@@ -28,8 +28,14 @@ enum Commands {
     },
 }
 
-/// The table's columns, left to right (ADR-022).
-const COLUMNS: [&str; 4] = ["Slug", "Display Name", "Install Path", "Platform"];
+/// The table's columns, left to right (ADR-022, widened by ADR-024's namespace).
+const COLUMNS: [&str; 5] = [
+    "Slug",
+    "Namespace",
+    "Display Name",
+    "Install Path",
+    "Platform",
+];
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
@@ -72,6 +78,11 @@ fn main() -> ExitCode {
                 }
             }
 
+            // ADR-024's emission boundary: see `refuse_invalid_slugs`.
+            for line in refuse_invalid_slugs(&mut all_games) {
+                eprintln!("{line}");
+            }
+
             if cli.json {
                 // Compact, byte-stable output; a serialization failure is a
                 // clean error path, never a panic.
@@ -91,7 +102,33 @@ fn main() -> ExitCode {
     }
 }
 
-/// One rendered table row: the four column cells, in [`COLUMNS`] order.
+/// ADR-024's emission boundary (`024-L1`): every row that reaches a rendering —
+/// from any `dyn DiscoveryPlugin`, including a future third-party one — carries
+/// a slug in the shared grammar and inside the shared bound. An invalid row is
+/// dropped from `games` and answered by one named refusal line quoting the
+/// escaped and truncated slug and no install path, while the valid rows of the
+/// same run still render. The shipped plugins refuse such a row one seam
+/// earlier, so this check is the last line, not the only one.
+///
+/// Returns the exact stderr lines (unprefixed by any newline) so the refusal
+/// text is one named, testable value rather than an inline `eprintln`.
+fn refuse_invalid_slugs(games: &mut Vec<DiscoveredGame>) -> Vec<String> {
+    let mut refusals: Vec<String> = Vec::new();
+    games.retain(|game| {
+        let valid = bindforge_core::is_slug_name(&game.slug)
+            && game.slug.len() <= bindforge_core::MAX_SLUG_OCTETS;
+        if !valid {
+            refusals.push(format!(
+                "error: refused game with invalid slug: {}",
+                bindforge_core::escape_and_truncate(&game.slug)
+            ));
+        }
+        valid
+    });
+    refusals
+}
+
+/// One rendered table row: the five column cells, in [`COLUMNS`] order.
 type Row = [String; COLUMNS.len()];
 
 /// The rendered widths of each column, in [`COLUMNS`] order.
@@ -116,10 +153,11 @@ fn render_table(games: &[DiscoveredGame]) -> String {
     lines.join("\n")
 }
 
-/// The four cells of one game's row.
+/// The cells of one game's row, in [`COLUMNS`] order.
 fn row_cells(game: &DiscoveredGame) -> Row {
     [
         game.slug.clone(),
+        game.namespace.to_string(),
         game.display_name.clone(),
         game.install_path.display().to_string(),
         game.platform.to_string(),
@@ -163,4 +201,113 @@ fn render_row(cells: &Row, widths: &Widths) -> String {
         .collect::<Vec<String>>()
         .join("")
         + "|"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DiscoveredGame, refuse_invalid_slugs};
+    use discovery::game::{Namespace, Platform};
+    use std::path::PathBuf;
+
+    /// One hand-built row for the emit-boundary tests. The install path is a
+    /// distinctive constant so a refusal line can be asserted clean of it.
+    fn row(slug: &str) -> DiscoveredGame {
+        DiscoveredGame {
+            slug: slug.to_string(),
+            namespace: Namespace::Unknown,
+            display_name: "Some Game".to_string(),
+            install_path: PathBuf::from("/install/paths-must-not-leak-here/game"),
+            platform: Platform::SteamLinux,
+            codec_id: None,
+        }
+    }
+
+    const PREFIX: &str = "error: refused game with invalid slug: ";
+    const LEAK_CANARY: &str = "paths-must-not-leak-here";
+
+    #[test]
+    fn a_valid_row_survives_and_draws_no_refusal() {
+        let mut games = vec![row("valid-game")];
+        let refusals = refuse_invalid_slugs(&mut games);
+        assert!(refusals.is_empty(), "a valid row must not be refused");
+        assert_eq!(
+            games.iter().map(|g| g.slug.as_str()).collect::<Vec<_>>(),
+            ["valid-game"]
+        );
+    }
+
+    #[test]
+    fn a_grammar_invalid_row_is_dropped_with_the_named_escaped_line() {
+        // Uppercase and a space are outside the slug grammar; the renderer
+        // passes them through unchanged, so the exact line is pinned whole.
+        let mut games = vec![row("Bad Slug")];
+        let refusals = refuse_invalid_slugs(&mut games);
+        assert!(games.is_empty(), "the invalid row must be dropped");
+        assert_eq!(refusals, [format!("{PREFIX}Bad Slug")]);
+    }
+
+    #[test]
+    fn a_refusal_echo_is_escaped_and_never_carries_a_second_line_or_path() {
+        // A newline inside the slug must reach stderr as a `\uXXXX` escape,
+        // never as a second line, and no line may name the install path.
+        let mut games = vec![row("evil\nslug")];
+        let refusals = refuse_invalid_slugs(&mut games);
+        assert_eq!(refusals, [format!("{PREFIX}evil\\u000aslug")]);
+        for line in &refusals {
+            assert!(!line.contains('\n'), "one refusal is one line: {line:?}");
+            assert!(
+                !line.contains(LEAK_CANARY),
+                "a refusal names no path: {line:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_slug_one_octet_past_the_shared_bound_is_refused_not_truncated_into_a_row() {
+        let past_cap = "a".repeat(bindforge_core::MAX_SLUG_OCTETS + 1);
+        let mut games = vec![row(&past_cap)];
+        let refusals = refuse_invalid_slugs(&mut games);
+        assert!(games.is_empty(), "a past-bound slug never renders");
+        // The bound itself is referenced, not retyped; the echo is exactly the
+        // shared renderer's output for the slug, prefixed by the one name.
+        assert_eq!(
+            refusals,
+            [format!(
+                "{PREFIX}{}",
+                bindforge_core::escape_and_truncate(&past_cap)
+            )]
+        );
+        assert!(refusals[0].starts_with(PREFIX));
+    }
+
+    #[test]
+    fn valid_rows_survive_while_the_invalid_ones_of_the_same_run_refused() {
+        let past_cap = "a".repeat(bindforge_core::MAX_SLUG_OCTETS + 1);
+        let mut games = vec![
+            row("Bad Slug"),
+            row("valid-game"),
+            row("evil\nslug"),
+            row("another-valid"),
+            row(&past_cap),
+        ];
+        let refusals = refuse_invalid_slugs(&mut games);
+        assert_eq!(
+            games.iter().map(|g| g.slug.as_str()).collect::<Vec<_>>(),
+            ["valid-game", "another-valid"]
+        );
+        assert_eq!(refusals.len(), 3);
+        assert_eq!(refusals[0], format!("{PREFIX}Bad Slug"));
+        assert_eq!(refusals[1], format!("{PREFIX}evil\\u000aslug"));
+        assert_eq!(
+            refusals[2],
+            format!("{PREFIX}{}", bindforge_core::escape_and_truncate(&past_cap))
+        );
+        for line in &refusals {
+            assert!(!line.contains('\n'), "one refusal is one line: {line:?}");
+            assert!(
+                !line.contains(LEAK_CANARY),
+                "a refusal names no path: {line:?}"
+            );
+        }
+    }
 }

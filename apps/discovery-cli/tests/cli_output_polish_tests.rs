@@ -108,8 +108,8 @@ fn test_cli_list_table_columns_align_under_a_separator() {
     let offsets = pipe_offsets(lines[0]);
     assert_eq!(
         offsets.len(),
-        5,
-        "four columns render five delimiters: {:?}",
+        6,
+        "five columns render six delimiters — ADR-024 adds the `Namespace` column: {:?}",
         lines[0]
     );
     for line in &lines {
@@ -124,7 +124,7 @@ fn test_cli_list_table_columns_align_under_a_separator() {
     // the body rows occupy.
     assert_is_separator(lines[1]);
     let runs = separator_runs(lines[1]);
-    assert_eq!(runs.len(), 4, "one dash run per column: {:?}", lines[1]);
+    assert_eq!(runs.len(), 5, "one dash run per column: {:?}", lines[1]);
     for (run, gap) in runs.iter().zip(gaps(&offsets)) {
         assert_eq!(
             run.chars().count(),
@@ -140,7 +140,7 @@ fn test_cli_list_table_columns_align_under_a_separator() {
     let header = cells(lines[0]);
     let rows: Vec<Vec<String>> = lines[2..].iter().map(|line| cells(line)).collect();
     for row in &rows {
-        assert_eq!(row.len(), 4, "every row has exactly four cells: {row:?}");
+        assert_eq!(row.len(), 5, "every row has exactly five cells: {row:?}");
         assert!(
             row.iter()
                 .all(|cell| cell.starts_with(' ') && cell.ends_with(' ')),
@@ -154,7 +154,12 @@ fn test_cli_list_table_columns_align_under_a_separator() {
         );
     }
     let column_gaps: Vec<usize> = gaps(&offsets);
-    for index in 0..4 {
+    assert_eq!(
+        column_gaps.len(),
+        5,
+        "the six delimiters enclose five columns"
+    );
+    for index in 0..5 {
         let widest = rows
             .iter()
             .map(|row| row[index].trim().chars().count())
@@ -168,16 +173,24 @@ fn test_cli_list_table_columns_align_under_a_separator() {
         );
     }
 
-    // And those four rows are the four fixture games.
+    // And those four rows are the four fixture games, rendered with ADR-024's
+    // prefix-free `Slug` cell beside a `Namespace` cell of `unknown`.
     assert_eq!(
-        stdout.matches("unknown/").count(),
-        4,
-        "the table must contain exactly the four fixture rows"
+        rows.iter()
+            .map(|row| (row[0].trim(), row[1].trim()))
+            .collect::<Vec<(&str, &str)>>(),
+        vec![
+            ("example-game", "unknown"),
+            ("mixed-case-game", "unknown"),
+            ("nameless-install", "unknown"),
+            ("secondary-title", "unknown"),
+        ],
+        "the table must contain exactly the four fixture rows, each with its own namespace cell"
     );
     for line in &lines[2..] {
         assert!(
-            line.contains("unknown/"),
-            "every body row is a fixture row: {line:?}"
+            !line.contains("unknown/"),
+            "no body row may spell a slug as `unknown/…`: {line:?}"
         );
     }
 }
@@ -209,8 +222,14 @@ fn test_cli_list_table_is_the_header_block_when_no_games_are_found() {
     let header = cells(lines[0]);
     assert_eq!(
         header.iter().map(|cell| cell.trim()).collect::<Vec<&str>>(),
-        vec!["Slug", "Display Name", "Install Path", "Platform"],
-        "the header names the four ADR-022 columns"
+        vec![
+            "Slug",
+            "Namespace",
+            "Display Name",
+            "Install Path",
+            "Platform"
+        ],
+        "the header names the five columns ADR-024 renders: the slug beside its namespace"
     );
     assert_is_separator(lines[1]);
     assert_eq!(

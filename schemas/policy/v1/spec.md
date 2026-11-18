@@ -37,7 +37,7 @@ unambiguously, and a row's field count is fixed by its kind.
 |---|---|---|---|
 | `format` | string | yes | must be `policy` |
 | `version` | string | yes | the grammar major this document is written against (`v1`) |
-| `id` | string | yes | the policy's identifier: slug grammar (`[a-z][a-z0-9-]*`), ≤ 63 octets — it is the file stem `load_policy` joins and the name a produced base carries in `generated-by` |
+| `id` | string | yes | the policy's identifier: slug grammar (`[a-z][a-z0-9-]*`), at most `MAX_SLUG_OCTETS` octets — the shared bound `schemas/README.md` states once (`024-B1`) — it is the file stem `load_policy` joins and the name a produced base carries in `generated-by` |
 | `transforms` | array of strings | yes | the ordered stack, `1..=MAX_POLICY_TRANSFORMS` (64) elements, each one transform row; **array order is application order** — order is data |
 
 Any other entry is rejected, naming the entry. The entry set is closed on
@@ -89,9 +89,10 @@ Fixtures: `transform-unknown-kind.toml`, `transform-empty-row.toml`,
   `MAX_RELOCATE_TARGETS` (16) targets, no repeats. Fixtures:
   `relocate-target-unknown-input.toml`, `relocate-target-past-cap.toml`.
 
-A policy `id` outside the slug grammar or over 63 octets is refused: the same
-rule a geometry name, a manifest id, and a profile id ride, because this id is
-also a file name and must stay case-unique on a case-insensitive filesystem.
+A policy `id` outside the slug grammar or past the shared `MAX_SLUG_OCTETS`
+bound (`schemas/README.md` states it once; `024-B1`) is refused: the same rule
+a manifest id and a profile id ride, because this id is also a file name and
+must stay case-unique on a case-insensitive filesystem.
 Fixtures: `id-uppercase.toml`, `id-past-cap.toml`.
 
 `fixtures/valid/` ships the shapes a reader must accept: a one-row stack

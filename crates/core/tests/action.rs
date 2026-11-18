@@ -171,12 +171,14 @@ fn assert_names_the_supported_majors(err: &CoreError, document: &str, supported:
 }
 
 /// proves: Test strategy #1 — the grammar accepts the ids the design names as
-/// well-formed, up to the 63-octet segment bound borrowed from RFC 1035 §2.3.1,
+/// well-formed, up to the shared `MAX_SLUG_OCTETS` segment bound that design 024
+/// folds into the one exported constant (128 octets, up from the 63 the RFC 1035
+/// §2.3.1 sentence used to state),
 /// and returns each one byte-exact: comparison is exact, so there is no case
 /// folding and no canonicalization to undo.
 #[test]
 fn accepts_a_well_formed_two_segment_id() {
-    let long_id = format!("move.{}", "a".repeat(63));
+    let long_id = format!("move.{}", "a".repeat(bindforge_core::MAX_SLUG_OCTETS));
 
     for id in [
         "move.strafe-left",
@@ -198,11 +200,12 @@ fn accepts_a_well_formed_two_segment_id() {
 /// proves: Test strategy #1 — one case per rejection rule: an uppercase segment,
 /// a non-ASCII letter, a leading digit, a leading or trailing hyphen, an
 /// underscore, an empty segment, a single-segment id, a three-segment id, a
-/// 64-octet segment, and the empty string. Each is a rejection, never a
+/// segment one past the shared bound, and the empty string. Each is a rejection,
+/// never a
 /// canonicalization, and the refusal is the model's `InvalidValue`.
 #[test]
 fn rejects_an_id_that_breaks_the_segment_grammar() {
-    let long_id = format!("move.{}", "a".repeat(64));
+    let long_id = format!("move.{}", "a".repeat(bindforge_core::MAX_SLUG_OCTETS + 1));
 
     for (id, fault) in [
         ("Move.Forward", "an uppercase first segment"),
@@ -226,7 +229,7 @@ fn rejects_an_id_that_breaks_the_segment_grammar() {
         ("", "the empty string"),
         (
             long_id.as_str(),
-            "a 64-octet segment, one past the RFC 1035 §2.3.1 bound",
+            "a segment one past the shared `MAX_SLUG_OCTETS` bound",
         ),
     ] {
         let err = ActionId::parse(id).expect_err(&format!("`{id}` — {fault} — must be refused"));
@@ -236,6 +239,29 @@ fn rejects_an_id_that_breaks_the_segment_grammar() {
              contract, got {err:?}"
         );
     }
+}
+
+/// proves: design 024's Test strategy #6 + Chosen design (Shared grammar and bound)
+/// — a segment-shape refusal that states the bound states it from the exported
+/// constant: the number in the message is `MAX_SLUG_OCTETS` (128 from ADR-024), and
+/// the pre-amendment `63 octets` sentence is gone, so a future amendment has one
+/// source rather than a stale literal in a refusal.
+#[test]
+fn a_segment_bound_refusal_names_the_bound_it_interpolates_from_the_constant() {
+    let long_id = format!("move.{}", "a".repeat(bindforge_core::MAX_SLUG_OCTETS + 1));
+    let err = ActionId::parse(&long_id)
+        .expect_err("a segment one past MAX_SLUG_OCTETS must be refused at the bound");
+    let message = err.to_string();
+
+    assert!(
+        message.contains(&bindforge_core::MAX_SLUG_OCTETS.to_string()),
+        "the refusal must name the shared bound ({}) it enforces, got `{message}`",
+        bindforge_core::MAX_SLUG_OCTETS
+    );
+    assert!(
+        !message.contains("63 octets"),
+        "the refusal must not carry the superseded 63-octet literal, got `{message}`"
+    );
 }
 
 /// proves: Test strategy #2 — axis kind is total: `name()` spells the three

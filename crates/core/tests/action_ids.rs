@@ -104,7 +104,10 @@ const NAMESPACE_COUNTS: [(&str, usize); 7] = [
 ];
 
 /// The corpus Chosen design names. Each invalid fixture carries one fault and is
-/// named after it (`toml-test`'s rule), so the corpus itself is checkable.
+/// named after it (`toml-test`'s rule), so the corpus itself is checkable. Design
+/// 024 renames `segment-past-63-octets.toml` to `segment-past-cap.toml`, because its
+/// segment now sits one octet past the shared `MAX_SLUG_OCTETS` bound rather than a
+/// number the fixture spells.
 const VALID_FIXTURES: [&str; 3] = [
     "basic-registry.toml",
     "empty-axis-arrays.toml",
@@ -121,7 +124,7 @@ const INVALID_FIXTURES: [&str; 14] = [
     "underscore-id.toml",
     "unprefixed-id.toml",
     "third-segment.toml",
-    "segment-past-63-octets.toml",
+    "segment-past-cap.toml",
     "duplicate-id.toml",
     "non-string-element.toml",
     "non-ascii-id.toml",

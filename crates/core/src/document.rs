@@ -64,7 +64,7 @@ use crate::action::{ActionId, ActionRegistry, AxisKind, registry_from_entries};
 use crate::error::CoreError;
 use crate::input::{InputId, InputNamespace};
 use crate::manifest::{Manifest, manifest_from_entries};
-use crate::placement::{GradeBound, is_slug_name};
+use crate::placement::{GradeBound, MAX_SLUG_OCTETS, is_slug_name};
 use crate::reach::{Hand, InputGrade, ReachClass};
 use crate::toml::{self, Value};
 
@@ -212,12 +212,6 @@ pub const MAX_POLICY_TRANSFORMS: usize = 64;
 /// constraint already relates, and it bounds the predicate's move list: one row
 /// evaluates at most this many `(source, target)` moves (design 015, A13).
 pub const MAX_RELOCATE_TARGETS: usize = 16;
-
-/// The octet bound a v2 profile `id`, each `derives` element, and each pin's
-/// manifest half share with the slug grammar — the DNS-label bound RFC 1035
-/// §2.3.1 publishes, the same one the action-id and manifest grammars borrow,
-/// so no unbounded string rides a displayed refusal.
-const MAX_SLUG_OCTETS: usize = 63;
 
 /// The slug grammar those ids ride, named in the refusal so a document says
 /// which grammar it broke — the same spelling `placement::is_slug_name` checks.
@@ -1235,8 +1229,17 @@ fn check_pin(text: &str) -> Result<(), CoreError> {
     if tail.contains('@') {
         return Err(fault("the pin splits at its one `@`".to_string()));
     }
-    if !is_slug_name(head) || head.len() > MAX_SLUG_OCTETS {
+    if !is_slug_name(head) {
         return Err(fault(format!("`{head}` is not a manifest id: {SLUG_RULE}")));
+    }
+    if head.len() > MAX_SLUG_OCTETS {
+        // A grammar-valid head that is one octet too many breaks the bound,
+        // not the character class: name the rule it broke, bound leading, as
+        // every other slug-bound refusal does.
+        return Err(CoreError::InvalidValue {
+            key: "for".to_string(),
+            message: format!("a manifest id is at most {MAX_SLUG_OCTETS} octets: `{head}`"),
+        });
     }
     let Ok(revision) = tail.parse::<i64>() else {
         let reason = format!("`{tail}` is not a decimal integer at least 1");
@@ -1250,11 +1253,12 @@ fn check_pin(text: &str) -> Result<(), CoreError> {
 }
 
 /// The id grammar a v2 profile `id`, each `derives` element, and each
-/// `seeded-from` ride: the shipped slug grammar plus the DNS-label octet bound.
-/// A v2 id is a chain lookup key and a file name, which is why v1's "not empty"
-/// is tightened here and stays tightened nowhere else (A14, A15). `chain_ops`
-/// holds a caller-supplied fresh id to the same rule, so one definition binds
-/// every id a chain can carry.
+/// `seeded-from` ride: the shipped slug grammar plus the shared
+/// `MAX_SLUG_OCTETS` bound ADR-024 states once in `placement`. A v2 id is a
+/// chain lookup key and a file name, which is why v1's "not empty" is tightened
+/// here and stays tightened nowhere else (A14, A15). `chain_ops` holds a
+/// caller-supplied fresh id to the same rule, so one definition binds every id a
+/// chain can carry.
 pub(crate) fn check_profile_slug(key: &str, value: &str) -> Result<(), CoreError> {
     if !is_slug_name(value) {
         let message = format!("`{value}` is not a slug: {SLUG_RULE}");
@@ -1264,7 +1268,10 @@ pub(crate) fn check_profile_slug(key: &str, value: &str) -> Result<(), CoreError
         });
     }
     if value.len() > MAX_SLUG_OCTETS {
-        let message = format!("`{value}` is longer than the {MAX_SLUG_OCTETS} octet label bound");
+        // The bound leads and the offender follows: the renderer truncates an
+        // echoed value at 80 characters, so a value already past the bound would
+        // otherwise hide the number it broke.
+        let message = format!("an id label is at most {MAX_SLUG_OCTETS} octets: `{value}`");
         return Err(CoreError::InvalidValue {
             key: key.to_string(),
             message,

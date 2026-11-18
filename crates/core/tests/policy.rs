@@ -11,7 +11,7 @@
 //! v2 scale, a target outside the closed input vocabulary, an extra field on
 //! `swap-polarity`, any argument on `swap-mouse-buttons`, the four malformed-tag
 //! shapes, a missing / empty / past-cap `transforms` array, and an uppercase or
-//! 64-octet `id` (A1, A15, A19, A22, A24).
+//! past-the-shared-slug-bound `id` (A1, A15, A19, A22, A24).
 //!
 //! proves: design 015's Test strategy #2 — `parse(serialize(parse(text)))`
 //! equals the first parse for every valid policy document: the `transforms`
@@ -607,9 +607,15 @@ fn refuses_a_transform_stack_past_max_policy_transforms() {
 }
 
 /// proves: design 015's Test strategy #1 (`id-uppercase.toml`,
-/// `id-past-cap.toml`) + A15 — the policy `id` rides the shared slug grammar
-/// `[a-z][a-z0-9-]*` and the 63-octet cap, the same one a geometry name, a
-/// manifest id and a profile id ride: it is also the file stem `load_policy`
+/// `id-past-cap.toml`) + A15, with the cap re-pinned by design 024's Test strategy
+/// #6 — the policy `id` rides the shared slug grammar
+/// `[a-z][a-z0-9-]*` and the shared `MAX_SLUG_OCTETS` cap, which ADR-024 raises from
+/// 63 to 128 octets, the same one a manifest id and a profile id ride: the
+/// `schemas/README.md` bullet states that bound once for the full rider set
+/// `024-B1` enumerates, and it applies wherever the grammar does — a keyboard
+/// geometry name is capped beside the grammar in `load_geometry` (Test strategy
+/// #14), and no scope narrowing may drop a rider. It is also the file
+/// stem `load_policy`
 /// joins and the name a produced base carries in `generated-by`, so the grammar
 /// check is what keeps it a file name on a case-insensitive filesystem.
 #[test]
@@ -632,11 +638,16 @@ fn refuses_a_policy_id_outside_the_slug_grammar_or_past_the_octet_cap() {
         assert_message_shape(&err);
     }
 
-    let at_cap = "p".repeat(63);
+    let at_cap = "p".repeat(bindforge_core::MAX_SLUG_OCTETS);
     if let Err(err) = bindforge_core::parse(&policy_doc(&at_cap, &["swap-mouse-buttons"])) {
-        panic!("a 63-octet slug is at the cap and must parse; it was refused: {err}");
+        panic!(
+            "a slug of exactly MAX_SLUG_OCTETS ({}) octets is at the cap and must parse; it was \
+             refused: {err}",
+            bindforge_core::MAX_SLUG_OCTETS
+        );
     }
-    let err = value_refusal(&policy_doc(&"p".repeat(64), &["swap-mouse-buttons"]));
+    let past_cap = "p".repeat(bindforge_core::MAX_SLUG_OCTETS + 1);
+    let err = value_refusal(&policy_doc(&past_cap, &["swap-mouse-buttons"]));
     assert_refusal_names(&err, &["id"]);
 }
 
@@ -859,6 +870,50 @@ fn a_policy_id_outside_the_slug_grammar_is_refused_before_any_file_is_read() {
     assert!(
         !detail.contains("outside.toml"),
         "the refusal must not name the file the traversal would have read, got `{detail}`"
+    );
+    assert_message_shape(&err);
+}
+
+/// proves: design 015's Test strategy #3 with design 024's Test strategy #6 and the
+/// accepted code-review r1 finding — `load_policy` splits its two slug faults by
+/// kind: a grammar-valid `id` one octet past `MAX_SLUG_OCTETS` is refused at the
+/// load seam naming the *bound* it broke (interpolated from the exported constant,
+/// inside the renderer's cut), not the grammar rule the offender satisfies — and,
+/// like the grammar arm, before any file is read.
+#[test]
+fn load_policy_names_the_shared_bound_for_a_grammar_valid_id_one_octet_past_it() {
+    let scratch = ScratchDir::new("policy-name-bound");
+    let dir = scratch.path().join("v1");
+    let past_cap = "p".repeat(bindforge_core::MAX_SLUG_OCTETS + 1);
+    // The file the join would reach if the bound arm let the name through: written
+    // here only so the refusal below proves it never opened it.
+    scratch.write(
+        &format!("v1/{past_cap}.toml"),
+        &policy_doc(&past_cap, &["swap-mouse-buttons"]),
+    );
+
+    let Err(err) = bindforge_core::load_policy(&dir, &past_cap) else {
+        panic!(
+            "a grammar-valid `id` one octet past MAX_SLUG_OCTETS ({}) must be refused at \
+             the load seam",
+            bindforge_core::MAX_SLUG_OCTETS
+        );
+    };
+    assert!(
+        matches!(err, CoreError::InvalidValue { .. }),
+        "an over-bound policy `id` is a value-level refusal (A9), got {err:?}"
+    );
+    let detail = err.to_string();
+    assert!(
+        detail.contains(&bindforge_core::MAX_SLUG_OCTETS.to_string()),
+        "the bound fault names the bound it broke ({}, built from the exported constant), \
+         not the grammar rule the offender satisfies: `{detail}`",
+        bindforge_core::MAX_SLUG_OCTETS
+    );
+    assert!(
+        !detail.contains(&scratch.path().display().to_string()),
+        "a refusal for a bad `id` must not disclose the local path the loader resolved \
+         (A14), got `{detail}`"
     );
     assert_message_shape(&err);
 }

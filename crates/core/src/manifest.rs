@@ -34,6 +34,7 @@ use crate::action::{ActionId, ActionRegistry};
 use crate::document::{Document, parse_file, string_array, string_entry, string_value};
 use crate::error::CoreError;
 use crate::input::InputId;
+use crate::placement::MAX_SLUG_OCTETS;
 use crate::placement::is_slug_name;
 use crate::toml::Value;
 
@@ -55,12 +56,6 @@ pub const MAX_GROUP_MEMBERS: usize = 16;
 /// what bounds a refusal that has to echo the name, so one hostile row cannot
 /// inflate log volume past the message bound.
 pub const MAX_NATIVE_NAME_OCTETS: usize = 128;
-
-/// The length bound an `id`, `codec`, or preset id shares with the slug
-/// grammar: the DNS-label bound RFC 1035 §2.3.1 publishes, the same one the
-/// action-id segment grammar already borrows, so no unbounded string rides a
-/// displayed refusal.
-const MAX_SLUG_OCTETS: usize = 63;
 
 /// The closed fingerprint algorithm set, in its one member: `sha256-` then
 /// standard base64 decoding to exactly 32 octets. Algorithm agility is a
@@ -531,9 +526,9 @@ fn check_row_count(key: &str, length: usize) -> Result<(), CoreError> {
 }
 
 /// The slug grammar an `id`, a `codec` id, and each preset id ride —
-/// `is_slug_name` plus the DNS-label length bound the action-id grammar
-/// already borrows. The refusal echoes the offender; `CoreError`'s rendering
-/// escapes and truncates what it echoes.
+/// `is_slug_name` plus the shared `MAX_SLUG_OCTETS` bound ADR-024 states once in
+/// `placement`. The refusal names the bound and then echoes the offender;
+/// `CoreError`'s rendering escapes and truncates what it echoes.
 fn check_slug(key: &str, value: &str) -> Result<(), CoreError> {
     if !is_slug_name(value) {
         let message = format!("`{value}` is not a slug: expected `[a-z][a-z0-9-]*`");
@@ -543,7 +538,10 @@ fn check_slug(key: &str, value: &str) -> Result<(), CoreError> {
         });
     }
     if value.len() > MAX_SLUG_OCTETS {
-        let message = format!("`{value}` is longer than the {MAX_SLUG_OCTETS} octet label bound");
+        // The bound leads and the offender follows: the renderer truncates an
+        // echoed value at 80 characters, so a value already past the bound would
+        // otherwise hide the number it broke.
+        let message = format!("an id label is at most {MAX_SLUG_OCTETS} octets: `{value}`");
         return Err(CoreError::InvalidValue {
             key: key.to_string(),
             message,

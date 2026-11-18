@@ -50,13 +50,19 @@ agreed to. A length bound on the arrays is the shared parse budget
 ## Id grammar
 
 An id is exactly two `.`-separated segments. Each segment opens with an ASCII
-lowercase letter, then holds only `a-z`, `0-9`, and `-`, closes with a letter
-or a digit, and is at most 63 octets — the DNS-label bound RFC 1035 §2.3.1
-publishes, restricted to lowercase and taken exactly. Comparison is byte-exact:
-no case folding, no Unicode normalization, no canonicalization of any kind, so
+lowercase letter, then holds only `a-z`, `0-9`, and `-`, closes with a letter or
+a digit, and is at most `MAX_SLUG_OCTETS` octets — the shared slug bound
+`schemas/README.md` states once (`024-B1`), whose bullet carries the superseded
+DNS-label derivation so this format states no number or origin of its own. The
+bound is shared rather than per-format: an id segment, a manifest `id`, a
+profile `id` and a discovered game slug are the same kind of name, and a
+discovered slug must stay adoptable by a manifest byte-for-byte. Comparison is
+byte-exact: no case folding, no Unicode normalization, no canonicalization of
+any kind, so
 two spellings never name one action. `Move.Forward`, `move.strafe_left`,
-`move..steer`, `steer-left`, `move.steer.left`, and a 64-octet segment are each
-a refusal, and each has a fixture under `fixtures/invalid/` naming it.
+`move..steer`, `steer-left`, `move.steer.left`, and `segment-past-cap.toml`'s
+segment one octet past the shared bound are each a refusal, and each has a
+fixture under `fixtures/invalid/` naming it.
 
 A single-segment name is a malformed id, not an unregistered one: there is no
 unprefixed id in this namespace, and an unregistered id is simply absent from

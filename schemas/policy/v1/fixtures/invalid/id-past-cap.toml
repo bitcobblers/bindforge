@@ -1,7 +1,8 @@
-# 64 octets — one past the 63-octet slug cap every id that doubles as a file
-# name rides. The cap is what keeps a document name short enough to sit beside
-# its chain and to be echoed, truncated, in a refusal.
+# One octet past `MAX_SLUG_OCTETS` — the shared slug bound every id that doubles
+# as a file name rides, stated once in `schemas/README.md` and cross-referenced
+# by each format's spec. The bound is what keeps a document name short enough to
+# sit beside its chain and to be echoed, truncated, in a refusal.
 format = "policy"
 version = "v1"
-id = "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+id = "ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
 transforms = ["swap-mouse-buttons"]
