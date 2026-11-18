@@ -71,9 +71,9 @@ impl DiscoveryPlugin for SteamLinuxPlugin {
         }
 
         // §7's one error path, its three clauses spelled out: at least one root
-        // was selected, zero games were emitted, and at least one file or
-        // library was skipped as unreadable or malformed. The message names the
-        // selected roots and the skip count and nothing else — no file contents.
+        // was selected, zero games were emitted, and at least one file was
+        // skipped as unreadable or malformed. The message names the selected
+        // roots and the count of skipped files and nothing else — no contents.
         if !self.roots.is_empty() && games.is_empty() && skipped > 0 {
             let roots: Vec<String> = self
                 .roots
@@ -81,7 +81,7 @@ impl DiscoveryPlugin for SteamLinuxPlugin {
                 .map(|root| root.display().to_string())
                 .collect();
             return Err(DiscoveryError::PluginError(format!(
-                "steam-linux: no games discovered from {} selected root(s) [{}]; {} entries skipped as unreadable or malformed",
+                "steam-linux: no games discovered from {} selected root(s) [{}]; {} file(s) skipped as unreadable or malformed",
                 self.roots.len(),
                 roots.join(", "),
                 skipped
