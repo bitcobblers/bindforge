@@ -2,7 +2,10 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::PathBuf;
 
+/// A game's launch platform. The serialized form is the kebab-case name
+/// `Display` below prints and ADR-022 documents (`steam-linux`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum Platform {
     SteamLinux,
     SteamWindows,

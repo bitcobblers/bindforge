@@ -1,8 +1,7 @@
 use clap::{Parser, Subcommand};
 use discovery::engine::DiscoveryEngine;
-use discovery::game::DiscoveredGame;
-use discovery::plugin::DiscoveryPlugin;
-use discovery::registry::DiscoveryError;
+use discovery::steam_linux::SteamLinuxPlugin;
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "discovery")]
@@ -19,26 +18,24 @@ enum Commands {
         /// Outputs a JSON array of DiscoveredGame objects.
         #[arg(long)]
         json: bool,
+        /// Steam root(s) to scan instead of probing this host. Repeatable.
+        #[arg(long = "steam-root")]
+        steam_root: Vec<PathBuf>,
     },
-}
-
-struct DummyPlugin;
-impl DiscoveryPlugin for DummyPlugin {
-    fn name(&self) -> &'static str {
-        "dummy-plugin"
-    }
-    fn discover(&self) -> Result<Vec<DiscoveredGame>, DiscoveryError> {
-        Ok(vec![])
-    }
 }
 
 fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::List { json } => {
+        Commands::List { json, steam_root } => {
             let mut engine = DiscoveryEngine::new();
-            engine.register_plugin(Box::new(DummyPlugin));
+            let plugin = if steam_root.is_empty() {
+                SteamLinuxPlugin::from_host()
+            } else {
+                SteamLinuxPlugin::from_roots(steam_root.iter().cloned())
+            };
+            engine.register_plugin(Box::new(plugin));
 
             let all_games = engine.discover_all().unwrap();
 
