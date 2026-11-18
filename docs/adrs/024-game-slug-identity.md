@@ -141,6 +141,9 @@ Rollout:
    accept 128 and refuse 129. `024-B1 024-L3`
 5. `013-L5` gains its `amended-by` annotation naming `024-B1`, per `021-L4`.
    `024-B1`
+6. The deferral is recorded: the run ships no matching code, and the build
+   note states that an `unknown`-namespaced slug stays provisional until the
+   reserved ADR-025 resolver adopts it. `024-R1`
 
 ## Alternatives considered
 
