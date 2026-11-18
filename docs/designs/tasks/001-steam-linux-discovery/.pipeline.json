@@ -8,13 +8,13 @@
     "path": "docs/tasks/T-001-steam-linux-discovery.md"
   },
   "status": "running",
-  "lastStage": "test-update",
+  "lastStage": "fix",
   "designRound": 4,
   "codeRound": 0,
   "designBudgetUsed": 3,
-  "codeBudgetUsed": 0,
+  "codeBudgetUsed": 1,
   "editorialDone": false,
-  "testsGreen": false,
+  "testsGreen": true,
   "testsNeedUpdate": false,
   "stageFailures": {},
   "stageCommits": [
@@ -28,7 +28,8 @@
     "b054ac3a38ba59cfa860867dfe32b518289b322b",
     "b8381ced0735143253d74fa4cab9bf88e933a4df",
     "2bc4c2eb599547ea517b118486640bcfec6d0895",
-    "fba0321c2066ff765b2545753a1df1a200e2e884"
+    "fba0321c2066ff765b2545753a1df1a200e2e884",
+    "b2adcc9cce43f69fde5b54186f8199cbbeba25ac"
   ],
   "forceNext": null,
   "results": [
@@ -693,6 +694,21 @@
       "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/test-update-r0.md",
       "durationMs": 87002,
       "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e132a3d18ffejzayClaly8fklV",
+      "agent": "code/coder",
+      "at": 1794975070436,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "fix(orchestration): restore the ADR-016 transcripts fence and the documented 12-min light stage timeout",
+        "moves": []
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/fix-r0.md",
+      "durationMs": 275907,
+      "nudges": 0
     }
   ],
   "gateLog": [
@@ -737,10 +753,24 @@
       "proceed": false,
       "reason": "npm run check + cargo gate red",
       "at": 1794974794464
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1794975085396
+    },
+    {
+      "gate": "restart-boundary",
+      "round": 0,
+      "proceed": true,
+      "reason": "stage fix changed 1 harness file(s) this runner executes or renders: tools/orchestration/src/pipeline/flows.ts — not a failure: the run pauses here so a fresh process imports and renders the committed tree (pipeline resume 001-steam-linux-discovery)",
+      "at": 1794975085398
     }
   ],
   "startedAt": 1794969708852,
-  "updatedAt": 1794974794464,
+  "updatedAt": 1794975085398,
   "flow": "full",
   "baseRef": "4caa688933b2969f569f6126dddb713180c7c410",
   "designCycle": 3,
@@ -825,14 +855,14 @@
   },
   "reviseNoChange": false,
   "gateEvidence": {
-    "at": 1794974794464,
-    "green": false,
+    "at": 1794975085395,
+    "green": true,
     "legs": [
       {
         "command": "npm run check",
         "cwd": "tools/orchestration",
-        "exit": 1,
-        "tail": "[1539 characters elided by the gate tail cap]en (ADR-016 Decision 3) (2)      × denies a command naming a run record 5ms        dmesg(1) may have more information after failed mount system call.  ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯   FAIL  tests/pipeline/agent-shell.test.ts > run-record shell fence and the own-report re-open (ADR-016 Decision 3) > denies a command naming a run record AssertionError: code/coder.md: ls docs/designs/002-x/transcripts/research-r0.md: expected 'allow' to be 'deny' // Object.is equality  Expected: \"deny\" Received: \"allow\"   ❯ tests/pipeline/agent-shell.test.ts:394:70     392|       const rules = shellRules(agent);     393|       for (const command of commands) {     394|         expect(resolveShell(rules, command), `${agent}: ${command}`).t…        |                                                                      ^     395|       }     396|     }  ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯   FAIL  tests/pipeline/flows.test.ts > configFor: the light budgets > applies the light partial and leaves the lane knob last AssertionError: expected 900000 to be 720000 // Object.is equality  - Expected + Received  - 720000 + 900000   ❯ tests/pipeline/flows.test.ts:104:32     102|     expect(cfg.maxReviews).toEqual({ design: 0, code: 6 });     103|     expect(cfg.maxPassesPerRound).toBe(3);     104|     expect(cfg.stageTimeoutMs).toBe(12 * 60_000);        |                                ^     105|     expect(cfg.planMaxLines).toBe(80);     106|     expect(cfg.reviewSeats?.code).toEqual(LIGHT_SEATS);  ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯    Test Files  2 failed | 59 passed (61)       Tests  2 failed | 690 passed | 2 skipped (694)    Start at  23:06:25    Duration  8.18s (tests 92%, import 7%, transform 1%)      Isolate  61 workers spawned · ~75ms startup each (spawn + environment, per file)              at least ~495ms faster with isolate: false — reuses workers across files instead of one per file [1 tail line(s) dropped by the record's citation rule]"
+        "exit": 0,
+        "tail": "npm notice run @bindforge/orchestration@1.0.0 precheck npm notice run npm install  up to date, audited 178 packages in 2s  45 packages are looking for funding   run `npm fund` for details  15 vulnerabilities (9 moderate, 6 high)  To address issues that do not require attention, run:   npm audit fix  To address all issues (including breaking changes), run:   npm audit fix --force  Run `npm audit` for details. npm warn install-scripts 1 package had install scripts blocked because they are not covered by allowScripts: npm warn install-scripts   esbuild@0.28.2 (postinstall: node install.js) npm warn install-scripts npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow. npm notice run @bindforge/orchestration@1.0.0 check npm notice run npm run lint && npm run format:check && npm run test npm notice run @bindforge/orchestration@1.0.0 lint npm notice run eslint . npm notice run @bindforge/orchestration@1.0.0 format:check npm notice run prettier --check . Checking formatting... All matched files use Prettier code style! npm notice run @bindforge/orchestration@1.0.0 test npm notice run vitest run          dmesg(1) may have more information after failed mount system call.   Test Files  61 passed (61)       Tests  692 passed | 2 skipped (694)    Start at  23:11:16    Duration  8.04s (tests 92%, import 7%)      Isolate  61 workers spawned · ~74ms startup each (spawn + environment, per file)              at least ~490ms faster with isolate: false — reuses workers across files instead of one per file [2 tail line(s) dropped by the record's citation rule]"
       },
       {
         "command": "cargo fmt --all -- --check",
@@ -844,14 +874,21 @@
         "command": "cargo clippy --workspace --all-targets -- -D warnings",
         "cwd": ".",
         "exit": 0,
-        "tail": "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s"
+        "tail": "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s"
       },
       {
         "command": "cargo test --workspace --locked",
         "cwd": ".",
         "exit": 0,
-        "tail": "[30762 characters elided by the gate tail cap]ibraries_in_root_never_returns_compatdata_paths ... ok test parse_manifest_falls_back_to_installdir_when_name_is_absent ... ok test parse_manifest_falls_back_to_installdir_when_name_is_empty ... ok test libraries_in_root_returns_root_and_secondary_canonicalized_sorted_and_deduped ... ok test discover_fixture_root_yields_the_four_expected_games ... ok test parse_manifest_reads_appstate_and_keys_case_insensitively ... ok test discover_never_emits_compatdata_paths_or_decoy_games ... ok test parse_manifest_rejects_document_without_appstate_section ... ok test parse_manifest_rejects_manifest_with_neither_name_nor_installdir ... ok test parse_manifest_rejects_unparseable_text ... ok test discover_output_honours_the_game_output_contract ... ok test plugin_name_is_steam_linux ... ok test parse_manifest_rejects_unusable_installdir ... ok  test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s       Running unittests src/main.rs (target/debug/build/discovery-cli/c4e1d480b1d86eb6/out/discovery_cli-c4e1d480b1d86eb6)  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s       Running tests/cli_tests.rs (target/debug/build/discovery-cli/28b80873fe5198a2/out/cli_tests-28b80873fe5198a2)  running 3 tests test test_cli_list_json_empty_for_missing_steam_root ... ok test test_cli_list_format ... ok test test_cli_list_json_format ... ok  test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests bindforge_core  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests bindforge_transforms  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests discovery  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        "tail": "[30762 characters elided by the gate tail cap]ibraries_in_root_never_returns_compatdata_paths ... ok test parse_manifest_falls_back_to_installdir_when_name_is_absent ... ok test parse_manifest_falls_back_to_installdir_when_name_is_empty ... ok test parse_manifest_reads_appstate_and_keys_case_insensitively ... ok test libraries_in_root_returns_root_and_secondary_canonicalized_sorted_and_deduped ... ok test parse_manifest_rejects_document_without_appstate_section ... ok test discover_fixture_root_yields_the_four_expected_games ... ok test discover_never_emits_compatdata_paths_or_decoy_games ... ok test parse_manifest_rejects_manifest_with_neither_name_nor_installdir ... ok test parse_manifest_rejects_unparseable_text ... ok test discover_output_honours_the_game_output_contract ... ok test plugin_name_is_steam_linux ... ok test parse_manifest_rejects_unusable_installdir ... ok  test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s       Running unittests src/main.rs (target/debug/build/discovery-cli/c4e1d480b1d86eb6/out/discovery_cli-c4e1d480b1d86eb6)  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s       Running tests/cli_tests.rs (target/debug/build/discovery-cli/28b80873fe5198a2/out/cli_tests-28b80873fe5198a2)  running 3 tests test test_cli_list_json_empty_for_missing_steam_root ... ok test test_cli_list_json_format ... ok test test_cli_list_format ... ok  test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests bindforge_core  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests bindforge_transforms  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests discovery  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
       }
     ]
+  },
+  "restartRequired": {
+    "stage": "fix",
+    "paths": [
+      "tools/orchestration/src/pipeline/flows.ts"
+    ],
+    "at": 1794975070497
   }
 }
