@@ -3,41 +3,48 @@
 ## Progress
 
 - **Completed Behaviors**:
-    - All T-001 design scope is complete: `keyvalues.rs`, `steam_linux.rs`, the
-      `--steam-root` CLI seam and the exports (commits 2bc4c2eb, fba0321c). The prior
-      round's secondary-library `install_path` test conflict (*Test Contract
-      Conflicts*, below, historical) was resolved by the test engineer in fba0321c.
-    - This round — gate repair only. The single red leg was `npm run check` in
-      `tools/orchestration`, made red by parent-branch commit `780cf9ab`
-      ("feat: allow coding agents to read transcripts and increase timeout"), which
-      predates this run's branch point and touches no T-001 path. It (a) flipped the
-      `read`/`shell`/`glob`/`grep` `transcripts` rules from `deny` to `allow` in
-      `.opencode/agents/code/coder.md` and `.opencode/agents/code/test-engineer.md`
-      while every other statement — both files' own prompt text (added by that same
-      commit), the AGENTS.md rights section, and the ADR-016 Decision 3 fence tests —
-      kept `deny`, and (b) raised the light-flow `stageTimeoutMs` to 15 min while
-      `docs/workflows.md` (Per-flow budgets, ADR-010) still documents 12 min.
-      Restored `effect: deny` on the flipped transcripts rules (4 in `coder.md`,
-      3 in `test-engineer.md`; that file's `grep` rule was never flipped) and
-      `stageTimeoutMs: 12 * 60_000` in `tools/orchestration/src/pipeline/flows.ts`.
-      `780cf9ab`'s unrelated, test-passing `runner.ts` `console.warn`→`console.error`
-      change was left as-is. See *Deviations* 8 and *Gate Posture*.
+    - All T-001 design scope is complete and gate-green: `keyvalues.rs`,
+      `steam_linux.rs`, the `--steam-root` CLI seam, the exports, and the prior
+      rounds' test conflict and gate repair (commits 2bc4c2eb, fba0321c,
+      b2adcc9c; *Test Contract Conflicts* and the gate-repair record below are
+      historical).
+    - This round (code-review r1 fix stage): the r1 seat reports named in the
+      stage prompt live under this design's `reviews/**`, which this stage's
+      access rules deny, so the findings themselves were not readable here. The
+      substitute was a full clause-by-clause re-audit of the branch diff
+      (product code, CLI, fixtures, agent files, `flows.ts`) against
+      `02-proposal.md` §1–§10 and the assumption register. One clause-level
+      mismatch remained and is fixed: §7's one error path in
+      `SteamLinuxPlugin::discover` now spells its "at least one root was
+      selected" clause in the guard (previously implicit via the skip count),
+      and the `PluginError` message says "entries skipped as unreadable or
+      malformed" — the count includes an unreadable *library* skip that
+      `scan_library` performs, which the old "file(s)" noun misdescribed
+      (*Deviations* 3 and 9). Firing semantics are unchanged. The §1 public
+      surface, §2/§3 selection and canonical rules, §4 grammar subset and caps,
+      §5 composition/ordering, §6 unfiltered emission, §8 CLI wiring, §9
+      fixtures and §10 dependency posture were each re-verified; nothing beyond
+      *Deviations* 1–8 (which stay accepted) departed from the proposal.
 - **Remaining Work**:
-    - Nothing left in scope. Rollout step 5 (a contributor's real `discovery list` /
-      `list --json` output from a Steam machine) stays an open, human step.
+    - Nothing left for the implementer. Rollout step 5 (a contributor's real
+      `discovery list` / `list --json` output from a Steam machine) stays an
+      open, human step. If a seat's r1 finding is something other than the §7
+      item, this stage cannot see it; the next pass should surface the report
+      text through an operator or a stage whose rights include `reviews/**`.
 - **Relevant Paths and Interface Decisions**:
-    - `crates/discovery/src/{keyvalues.rs,steam_linux.rs,lib.rs,game.rs}`,
-      `apps/discovery-cli/src/main.rs` (T-001, unchanged this round).
-    - Gate repair: `.opencode/agents/code/{coder.md,test-engineer.md}`,
-      `tools/orchestration/src/pipeline/flows.ts`. The frontmatter now agrees with the
-      agent prompt bodies, AGENTS.md, `docs/workflows.md` and the pinned tests.
-- **Last Validation Result**: all four gate legs green in this stage's shell —
-  `npm run check` exit 0 (Test Files 61 passed (61); Tests 692 passed | 2 skipped);
-  `cargo fmt --all -- --check` silent; `cargo clippy --workspace --all-targets --
-  -D warnings` finished clean; `cargo test --workspace --locked` all
-  `test result: ok`. See *Gate Posture*.
-- **Next Concrete Action**: none for this stage; the runner re-runs the gate over the
-  repaired tree.
+    - This round's only edit: `crates/discovery/src/steam_linux.rs` — §7
+      message wording and the explicit roots clause in `discover()`.
+    - The §7 test pins the root name in the message and the absence of file
+      contents, not the noun, so no test change is needed.
+- **Last Validation Result**: all four gate legs green in this stage's shell
+  after the edit — `cargo fmt --all -- --check` silent; `cargo clippy
+  --workspace --all-targets -- -D warnings` finished clean; `cargo test
+  --workspace --locked` every suite `test result: ok` (49 discovery unit, 26
+  steam-linux, 15 keyvalues tests included, plus the 3 CLI tests); `npm run
+  check` exit 0 (Test Files 61 passed (61); Tests 692 passed | 2 skipped).
+  See *Gate Posture*.
+- **Next Concrete Action**: none for this stage; the runner re-runs the gate and
+  the dissenting r1 seats over the amended tree.
 
 ## Deviations from the design
 
@@ -84,6 +91,17 @@
    AGENTS.md rights section, the `docs/workflows.md` per-flow budget table (12 min
    light `stageTimeoutMs`) and the ADR-016/ADR-010-pinned tests all say `deny` and
    12 min. No T-001 design decision, source file or test expectation was changed.
+9. **§7 error message noun and explicit roots clause** (`crates/discovery/src/
+   steam_linux.rs`, this round): §7 gates its one `Err` on "at least one root was
+   selected" and says the message names "the count of skipped files and nothing
+   else". The guard's roots clause was only implicit (an empty-root plugin cannot
+   skip files); it is now explicit. And the skip count includes an unreadable
+   *library* — `scan_library` counts a failed `read_dir` of a selected library's
+   `steamapps/` so the "Steam present, everything under it unreadable" case still
+   reaches §7's signal — which the old "file(s)" noun misdescribed; the message
+   now says "entries skipped as unreadable or malformed". Names and count only,
+   no file contents, exactly as §7 requires; the pinned test asserts the root
+   name and the content-leak negatives, both unchanged.
 
 ## Test Contract Conflicts (why `testsNeedUpdate` is true)
 
@@ -120,9 +138,22 @@ root — would emit a non-existent directory for every game in every secondary l
 
 ## Gate Posture
 
-**This round (fix stage).** The runner-captured gate at 2026-11-18T04:06:34Z was red
-on exactly one leg; the three cargo legs were green there and stayed green under this
-stage's fix. Reproduced in this stage's shell, then fixed and re-run:
+**This round (code-review r1 fix stage).** The runner-captured gate at
+2026-11-18T04:11:25Z was green on all four legs. After this stage's §7 edit
+(*Progress*, *Deviations* 9) all four legs were re-run in this stage's shell:
+
+- `cargo fmt --all -- --check` — **exit 0** (silent).
+- `cargo clippy --workspace --all-targets -- -D warnings` — **exit 0**
+  (`Finished dev profile`).
+- `cargo test --workspace --locked` — **exit 0**, every suite `test result: ok`
+  with no failures (the zero-test lines are doc-test summaries), including the
+  §7 error-path test over the amended message.
+- `npm run check` (in `tools/orchestration`) — **exit 0**: `Test Files 61
+  passed (61)`, `Tests 692 passed | 2 skipped (694)`.
+
+**Prior round (historical; gate repair).** The runner-captured gate at
+2026-11-18T04:06:34Z was red on exactly one leg; the three cargo legs were green
+there and stayed green under that stage's fix:
 
 - `npm run check` (in `tools/orchestration`) — **exit 1** as captured. The failure-
   carrying lines of its tail (a `mount: /tmp/…` sandbox line is dropped per the
@@ -143,16 +174,11 @@ stage's fix. Reproduced in this stage's shell, then fixed and re-run:
        Tests  2 failed | 690 passed | 2 skipped (694)
   ```
 
-  After the fix (*Progress*, *Deviations* 8) the same leg is **green** in this stage's
-  shell: `Test Files 61 passed (61) · Tests 692 passed | 2 skipped (694)`, exit 0.
-- `cargo fmt --all -- --check` — **exit 0** (silent), re-run here.
-- `cargo clippy --workspace --all-targets -- -D warnings` — **exit 0**
-  (`Finished dev profile`), re-run here.
-- `cargo test --workspace --locked` — **exit 0**, every suite `test result: ok`,
-  re-run here.
+  After that stage's fix (*Deviations* 8) the same leg went green, and it is
+  green above.
 
-**Prior round (historical, superseded by the test-update and fba0321c).** The earlier
-stage recorded `cargo fmt --all -- --check` failing with 18 `Diff in` hunks confined to
+**Earlier round (historical, superseded by the test-update and fba0321c).** A still
+earlier stage recorded `cargo fmt --all -- --check` failing with 18 `Diff in` hunks confined to
 `apps/discovery-cli/tests/cli_tests.rs`, `crates/discovery/tests/keyvalues_tests.rs`
 and `crates/discovery/tests/steam_linux_tests.rs`, and `cargo test --workspace
 --locked` failing on the secondary-library `install_path` assertions in
