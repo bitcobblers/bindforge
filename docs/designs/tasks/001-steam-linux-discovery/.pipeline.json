@@ -8,7 +8,7 @@
     "path": "docs/tasks/T-001-steam-linux-discovery.md"
   },
   "status": "running",
-  "lastStage": "test-update",
+  "lastStage": "code-review",
   "designRound": 4,
   "codeRound": 1,
   "designBudgetUsed": 3,
@@ -34,7 +34,8 @@
     "77e24c72f9ed0c5347a891337d36029ba9fa4eb6",
     "02edb876116398ce264a98db39160ef0a6c91d8c",
     "752096e9a851843caca904c18f36c0ab06710779",
-    "c9fb37b7ab8c5313f61368fddba3cb93ea8a339b"
+    "c9fb37b7ab8c5313f61368fddba3cb93ea8a339b",
+    "349d1f6861e179f69e96dd569fd769c0443347d2"
   ],
   "forceNext": null,
   "results": [
@@ -1179,6 +1180,52 @@
       "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/code-review-testing-r1c2.md",
       "durationMs": 135646,
       "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 1,
+      "sessionID": "ses_e13066b05ffehhgsqdHAJpwITq",
+      "agent": "codereview/code-security",
+      "at": 1794977245283,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/discovery/src/steam_linux.rs:287-316 (read_text_file; VDF read path at steam_linux.rs:170) — carried unchanged from r1, untouched by the c3 fixes",
+            "problem": "Carried forward from round 1; the ratification diff does not touch this code, so the finding stands exactly as approved: the 1 MiB per-file cap is decided from a pre-read std::fs::metadata length and applied with std::fs::read. For special files (/dev/zero, /dev/urandom) metadata().len() is 0, so a symlink at the fixed <root>/steamapps/libraryfolders.vdf path passes the cap gate and fs::read pulls an unbounded stream into memory (hang/OOM of `discovery list`); the manifest leg is gated by is_file() (steam_linux.rs:218) but the VDF leg is not. The metadata-then-read split is also a TOCTOU: a file grown past the cap between probe and read is fully allocated before parse rejects it. This weakens the design's per-file bound (§4, Risks '1 MiB per file') for non-regular files; kept minor because exploiting it needs write access inside a scanned root's steamapps/ and the impact is DoS of a read-only CLI, with no content leakage (§7 messages carry no file contents).",
+            "fix": "Bind the read to the opened handle instead of pre-read metadata: File::open, verify file.metadata()?.is_file(), then Read::take(MAX_FILE_BYTES as u64 + 1) and treat a limit-hit as an oversize skip. This makes the cap hold for every file type and closes the growth race; at minimum add an is_file() gate to the libraryfolders.vdf read reached at steam_linux.rs:170."
+          }
+        ]
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/code-review-security-r1c3.md",
+      "durationMs": 103229,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 1,
+      "sessionID": "ses_e13066b05ffdZ6GWB4FxNaPZot",
+      "agent": "codereview/code-performance",
+      "at": 1794977247291,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "crates/discovery/src/steam_linux.rs:68",
+            "problem": "Carried unchanged from r1: discover() still applies the canonical path rule twice to every library — libraries_in_root_with_skips ends with canonical_paths (canonicalize + steamapps is_dir + sort + de-dupe per root, :162), and discover() runs canonical_paths again over the concatenated set (:68, body :322). Each library pays two realpath calls and two steamapps stats per scan. The post-approval revisions did not touch this; line number shifted +2 from the r1 report only."
+          },
+          {
+            "severity": "nit",
+            "location": "crates/discovery/src/steam_linux.rs:218",
+            "problem": "Carried unchanged from r1: each candidate appmanifest_*.acf is still stat'd twice before being opened — path.is_file() in scan_library (:218), then std::fs::metadata for the 1 MiB size cap in read_text_file (:291), then std::fs::read (:299). Hundreds of manifests on a real install means hundreds of redundant stats. The post-approval revisions did not touch this; line number shifted +2 from the r1 report only."
+          }
+        ]
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/code-review-performance-r1c3.md",
+      "durationMs": 105234,
+      "nudges": 0
     }
   ],
   "gateLog": [
@@ -1279,10 +1326,17 @@
       "proceed": true,
       "reason": "npm run check + cargo gate green",
       "at": 1794976868659
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c3 pending: security, performance",
+      "at": 1794977141999
     }
   ],
   "startedAt": 1794969708852,
-  "updatedAt": 1794977141944,
+  "updatedAt": 1794977247291,
   "flow": "full",
   "baseRef": "4caa688933b2969f569f6126dddb713180c7c410",
   "designCycle": 3,
@@ -1355,46 +1409,40 @@
     },
     "code": {
       "correctness": {
-        "verdict": "request-changes",
-        "stamp": "77e24c72f9ed0c5347a891337d36029ba9fa4eb6",
+        "verdict": "approve",
+        "stamp": "c9fb37b7ab8c5313f61368fddba3cb93ea8a339b",
         "dissents": 2,
         "findings": [
           {
-            "severity": "major",
-            "location": "crates/discovery/src/game.rs:8",
-            "problem": "r1c0 finding UNADDRESSED: the branch still adds #[serde(rename_all = \"kebab-case\")] to Platform, which main lacks (git show main:crates/discovery/src/game.rs has no serde attribute) and which the current proposal still forbids — Context:14 'no change to ... Platform', Non-goals:35, and §8:262's 'JSON shape are unchanged' are all unamended, and the Revision log lists only r0 entries. apps/discovery-cli/tests/cli_tests.rs:121 still hard-codes 'steam-linux', so the coupled test still passes only because of this change, altering the serialized DiscoveredGame.platform value from main's 'SteamLinux'. The only fix in this dissent diff (77e24c72) touches just the §7 error guard; it neither reverts the attribute nor amends the proposal. Kept major, not blocker, per r1c0 rationale: no live consumer regression (DummyPlugin emitted nothing), the alignment with ADR-022/Display is defensible, and whether 03-build-notes.md declares the deviation is unverifiable from permitted inputs.",
-            "fix": "Revert the serde attribute and assert platform == \"SteamLinux\" in cli_tests.rs:121 to keep T-001 purely additive, OR amend proposal Context/Non-goals/§8 to declare and authorize kebab-case serialization and record the deviation in 03-build-notes.md; silence does not close this."
+            "severity": "nit",
+            "location": "crates/discovery/src/steam_linux.rs:84",
+            "problem": "752096e9 restored §7's wording, changing \"{} entries skipped\" to \"{} file(s) skipped\", which now matches §7:246 (\"the count of skipped files\") literally — the right call — but the counter it prints is not file-only. scan_library at :201-206 adds 1 when read_dir(<library>/steamapps) fails, and canonical_paths' gate at :328 admits a steamapps directory that exists but is unreadable (is_dir() is true for mode 000), so an unreadable library is reported as a skipped file. §7's first paragraph lists \"an unreadable library\" as its own skip-and-continue case, so in that case both the count's category and the trigger's stated \"at least one file was skipped\" witness are slightly wider than the message claims. No behavioural harm: the error still fires, still names the roots, carries no contents, and no test or caller parses the string (steam_linux_tests.rs:460-475 asserts only that the message names the root and carries no file contents).",
+            "fix": "Either split the counter into file skips and directory skips and print both (\"{} file(s)/{} dir(s) skipped\"), or count only files into §7's counter and report an unreadable library separately; 77e24c72's \"entries\" wording also satisfied this, so a wording or a counting change both close it."
           },
           {
             "severity": "nit",
             "location": "crates/discovery/src/steam_linux.rs:275-282",
-            "problem": "Carried from r1c0, unchanged by this diff: usable_install_dir still refuses interior NUL bytes beyond §5's stated rejection set (absent, empty, '.', '..', absolute, contains '/'). The new comment now argues it by §5's '..' rationale; harmless hardening.",
-            "fix": "Either fold the NUL refusal into §5's rejection list in a later proposal touch, or leave as-is; no behavioral harm."
+            "problem": "Carried from r1c0 and unchanged by this diff (the justifying comment at :270-274 is unchanged too): usable_install_dir still refuses interior NUL bytes beyond §5's stated rejection set (absent, empty, '.', '..', absolute, contains '/'). Harmless hardening beyond the design's enumerated list.",
+            "fix": "Either fold the NUL refusal into §5's rejection list at the next proposal touch, or leave as-is; no behavioral harm."
           }
         ]
       },
       "compatibility": {
-        "verdict": "request-changes",
-        "stamp": "77e24c72f9ed0c5347a891337d36029ba9fa4eb6",
+        "verdict": "approve",
+        "stamp": "c9fb37b7ab8c5313f61368fddba3cb93ea8a339b",
         "dissents": 2,
         "findings": [
           {
-            "severity": "major",
-            "location": "crates/discovery/src/game.rs:7-8 (`#[serde(rename_all = \"kebab-case\")]` on `Platform`), with the coupled expectation at apps/discovery-cli/tests/cli_tests.rs:121",
-            "problem": "Carried from round 1 and still open: the revision under review touches only crates/discovery/src/steam_linux.rs:73-89, so `git diff main...HEAD -- crates/discovery/src/game.rs` still shows this branch as the author of the serde rename, and no `#[serde(alias = ...)]` was added. apps/discovery-cli/src/main.rs:43 serializes the enum via serde_json, so the `--json` channel emits \"steam-linux\"/\"steam-windows\" where the base enum's default identifiers gave \"SteamLinux\"/\"SteamWindows\", and Deserialize now refuses the old spelling. The current 02-proposal.md still states the opposite in three places — Context:14-15 (\"no change to `DiscoveredGame`, `Platform`\"), Non-goals:35, §8:262 (\"the table header and JSON shape are unchanged\") — reinforced by Rollout:376-377 (\"no output format, schema or data-model change, so nothing downstream migrates\"), and the Revision log records no authorization. It is still unpinned at its own layer: crates/discovery/tests/game_tests.rs:1-19 has no serde assertion, … [elided by the checkpoint cap]",
-            "fix": "Either drop the derive attribute from this additive task and assert \"SteamLinux\" at cli_tests.rs:121, or make the break deliberate and survivable: keep the kebab form, add `#[serde(alias = \"SteamLinux\")]`/`#[serde(alias = \"SteamWindows\")]`, pin both spellings in a serde round-trip test in crates/discovery/tests/game_tests.rs, record the serialized form in ADR-022 or a schemas/ spec, and correct §8:262 with Context:14-15 / Non-goals:35 in the same change."
+            "severity": "nit",
+            "location": "crates/discovery/src/steam_linux.rs:275-282 (`usable_install_dir`) read against 02-proposal.md §5:216-218 and the Risks row at :306",
+            "problem": "Carried from round 1 and untouched by this revision (77e24c72..HEAD changes neither the guard nor §5): the guard refuses blank, '\\0', '.', '..', absolute and contains('/'), but still not a backslash, while the doc comment at 270-274 keeps the extended NUL rationale. §5:216-218 and Risks:306 still give the reject set as \"absent, empty, `.`, `..`, absolute, or contains `/`\", so the code refuses one thing the spec does not list (NUL) and the spec's traversal rationale still covers only one of two separator spellings. Inert on the only supported platform, since a backslash is an ordinary filename byte on Linux and the Compatibility matrix rows :315-327 admit no Windows path into this field, so it remains a nit rather than a platform defect.",
+            "fix": "Add `&& !install_dir.contains('\\\\')` and extend §5's and :306's reject lists, or state in §5 that the emitted install_path is a Linux path by contract; in either case add the NUL clause the code already enforces to §5:216-218 and Risks:306 so the guard and the specification are one statement."
           },
           {
             "severity": "nit",
-            "location": "crates/discovery/src/steam_linux.rs:275-282 (`usable_install_dir`)",
-            "problem": "Carried from round 1 and not addressed: the guard refuses blank, '\\0', '.', '..', absolute and contains('/'), but still not a backslash; the doc comment at 270-274 was extended to justify the NUL clause instead. §5:216-218 and the Risks row at :306 still give the reject set as \"absent, empty, `.`, `..`, absolute, or contains `/`\", so §5 and the code are now unaligned in both directions (the code refuses NUL, the spec does not list it; the spec's traversal rationale covers only one of two separator spellings). Inert on the only supported platform, since a backslash is an ordinary filename byte on Linux, so this stays a nit.",
-            "fix": "Add `&& !install_dir.contains('\\\\')` and extend §5's and :306's reject lists, or state in §5 that the emitted install_path is a Linux path by contract; in either case align §5 with the NUL refusal the code already enforces."
-          },
-          {
-            "severity": "nit",
-            "location": "crates/discovery/src/steam_linux.rs:83-88 (PluginError message tail, reworded to \"N entries skipped as unreadable or malformed\") read against 02-proposal.md §7:244-246",
-            "problem": "New in this revision: §7 is the only description of the §7 error message's content (\"names the selected roots and the count of skipped files and nothing else\"), and the reworded string now disagrees with it about the unit counted. The code is the more truthful side — the same counter also absorbs a malformed libraryfolders.vdf (steam_linux.rs:173-176) and a library whose steamapps directory cannot be read (steam_linux.rs:201-206) — so nothing must migrate, but the printed string, the code comment at 73-76 (\"file or library\") and §7 (\"files\") are now three different statements of one contract. No test pins either wording (crates/discovery/tests/steam_linux_tests.rs:471-489 asserts only that the message names the root and leaks no contents), which is why the green gate cannot see the divergence.",
-            "fix": "Amend §7:246 to \"the count of skipped entries (files, libraries or VDFs)\" so the document names what the code counts, or revert the message tail to \"file(s)\" if §7's word is the ratified contract; make the string, the code comment and §7 one statement."
+            "location": "crates/discovery/src/steam_linux.rs:77-88 (reworded error clause and the 73-76 comment) read against 02-proposal.md §7:238-246",
+            "problem": "Residual of the round-1 message-wording nit, which was otherwise closed as prescribed: with the printed noun settled back to \"file(s)\" and the comment now saying \"at least one file was skipped\", the counter the message prints is still incremented by non-file skips — the unreadable `<library>/steamapps` directory at 201-206 and the unreadable read_dir entry at 209-211 — so a scan whose only skip was a directory prints \"1 file(s) skipped as unreadable or malformed\". §7:238-240 itself lists \"an unreadable library\" as a skip category, so the counter follows the document and only the printed noun is narrower than what was counted; no test pins the noun (crates/discovery/tests/steam_linux_tests.rs:464-492 asserts only that the message names the root and leaks no contents), so no consumer can be depending on it.",
+            "fix": "Pick one noun for the string, the 73-76 comment and §7: keep §7's ratified word and narrow the counting — count directory-level skips into a separate clause (e.g. \"N file(s), M library(ies) skipped\") and mirror it in §7:244-246 — or amend §7:246 to \"skipped entries (files or libraries)\" and let the message say \"entries\" again."
           }
         ]
       },
@@ -1429,63 +1477,57 @@
         ]
       },
       "testing": {
-        "verdict": "request-changes",
-        "stamp": "77e24c72f9ed0c5347a891337d36029ba9fa4eb6",
+        "verdict": "approve",
+        "stamp": "c9fb37b7ab8c5313f61368fddba3cb93ea8a339b",
         "dissents": 2,
         "findings": [
           {
-            "severity": "major",
-            "location": "crates/discovery/src/game.rs:5-8 (asserted only at apps/discovery-cli/tests/cli_tests.rs:121)",
-            "problem": "OPEN from r1, unaddressed by this revision: the diff's `#[serde(rename_all = \"kebab-case\")]` on `Platform` still contradicts the current 02-proposal.md — Context:14-15 (\"no change to `DiscoveredGame`, `Platform`\"), Non-goals:35, §8:262 (\"the table header and JSON shape are unchanged\") — and the guard layer is unchanged: crates/discovery/tests/game_tests.rs (19 lines at HEAD) still has no serde assertion, so the suite still cannot distinguish a ratified rename from an accidental derive edit, cannot catch a revert of the derive or a further rename, and nothing tests deserialization of the old \"SteamLinux\" spelling. Checklist item 3 (each previously rejected major now has a test that would have caught it) fails: the revision touched only the steam_linux.rs §7 hunk, no test or game.rs change.",
-            "fix": "Make the contract explicit at its own layer: either drop the derive attribute from this additive task and assert \"SteamLinux\" at cli_tests.rs:121, or keep the ADR-022-aligned kebab form and add a cited test in crates/discovery/tests/game_tests.rs pinning both directions (`serde_json::to_value(Platform::SteamLinux) == \"steam-linux\"` plus a round-trip, with `#[serde(alias = \"SteamLinux\")]`/`\"SteamWindows\"` if prior output must keep deserializing), correcting §8:262's \"JSON shape ... unchanged\" in the same change."
+            "severity": "minor",
+            "location": "crates/discovery/src/steam_linux.rs:61-71 (cross-root de-dup at line 68); crates/discovery/tests/steam_linux_tests.rs:32,454,465 and apps/discovery-cli/tests/cli_tests.rs:84,150 (every call passes one root)",
+            "problem": "OPEN from r1, unchanged by this revision: §2's canonical statement that all selected roots' libraries form one set per discover() call (\"no library is ever scanned twice, including by two roots sharing one\") has no test; only the within-one-root \"0\" → \"..\" de-dup is pinned. Dropping the canonical_paths(libraries) call at line 68 (keeping per-root dedup at line 162) keeps every test green while duplicating rows for a ~/.steam/root plus real-root host, and no CLI test passes --steam-root twice.",
+            "fix": "Add a unit test with from_roots([fixture(\"minimal\"), fixture(\"minimal/secondary\")]) asserting exactly the same four rows with no duplicate unknown/secondary-title, plus one CLI test passing --steam-root twice over the same fixture tree and asserting the unchanged four-row table."
           },
           {
             "severity": "minor",
-            "location": "crates/discovery/tests/steam_linux_tests.rs (missing test); property at crates/discovery/src/steam_linux.rs:62-70",
-            "problem": "OPEN from r1, unchanged by the revision: §2's canonical statement that all selected roots' libraries form one set per `discover()` call (\"no library is ever scanned twice, including by two roots sharing one\") has no test; only the within-one-root `\"0\" → \"..\"` de-dup is pinned. Hoisting `canonical_paths` to a per-root call would keep every test green while duplicating rows for a `~/.steam/root` plus real-root host, and no CLI test passes `--steam-root` twice.",
-            "fix": "Add a unit test with `from_roots([fixture(\"minimal\"), fixture(\"minimal/secondary\")])` asserting exactly the same four rows with no duplicate `unknown/secondary-title`, plus one CLI test passing `--steam-root` twice over the same fixture tree and asserting the unchanged four-row table."
+            "location": "crates/discovery/src/steam_linux.rs:91 (sort key); crates/discovery/tests/fixtures/steam/ (four distinct slugs)",
+            "problem": "OPEN from r1, unchanged by the revision: §5's \"Identical slugs from two libraries stay two rows\" and the install_path tie-break of the (slug, install_path) sort are still untested — the fixture yields four distinct slugs, so the integration test exercises only the slug component; a slug-only sort or slug de-duping passes the suite.",
+            "fix": "Add a checked-in appmanifest_900006.acf under minimal/secondary/steamapps/ with \"name\" \"Example Game\" (same name, other library) and extend the #8 integration expectation to five rows with unknown/example-game appearing twice in install_path order."
           },
           {
             "severity": "minor",
-            "location": "crates/discovery/src/steam_linux.rs:91 (sort key); crates/discovery/tests/fixtures/steam/",
-            "problem": "OPEN from r1, unchanged by the revision: §5's \"Identical slugs from two libraries stay two rows\" and the `install_path` tie-break of the `(slug, install_path)` sort are still untested — the fixture yields four distinct slugs, so the integration test exercises only the slug component; a slug-only sort or slug de-duping passes the suite.",
-            "fix": "Add a checked-in `appmanifest_900006.acf` under `minimal/secondary/steamapps/` with `\"name\" \"Example Game\"` (same name, other library) and extend the #8 integration expectation to five rows with `unknown/example-game` appearing twice in install_path order."
+            "location": "crates/discovery/src/steam_linux.rs (scan_library/discovered_game) and the fixture set (every manifest carries \"StateFlags\" \"4\", e.g. minimal/steamapps/appmanifest_900001.acf:6)",
+            "problem": "OPEN from r1, unchanged by the revision: §6's accepted cost — Proton builds and the Steam Linux Runtime appearing in discovery list as rows (Risks: likelihood High) — is still unpinned; every fixture manifest carries StateFlags \"4\" and a game-like name, so adding a StateFlags bit test or name denylist keeps all tests green and silently reverses the §6 policy.",
+            "fix": "Add one fixture manifest with a non-ready StateFlags (e.g. \"6\") and a runtime-shaped installdir, and assert in the #8 integration test that it is still emitted, cited // proves: Chosen design §6."
           },
           {
             "severity": "minor",
-            "location": "crates/discovery/src/steam_linux.rs (`scan_library`/`discovered_game`) and the fixture set",
-            "problem": "OPEN from r1, unchanged by the revision: §6's accepted cost — Proton builds and the Steam Linux Runtime appearing in `discovery list` as rows (Risks: likelihood High) — is still unpinned; every fixture manifest carries `\"StateFlags\" \"4\"` and a game-like name, so adding a StateFlags bit test or name denylist keeps all tests green.",
-            "fix": "Add one fixture manifest with a non-ready `StateFlags` (e.g. `\"StateFlags\" \"6\"`) and a runtime-shaped `installdir`, and assert in the #8 integration test that it is still emitted, cited `// proves: Chosen design §6`."
+            "location": "crates/discovery/src/keyvalues.rs:21,77 (MAX_DOCUMENT_BYTES) and crates/discovery/src/steam_linux.rs:287-298 (read_text_file size gate)",
+            "problem": "OPEN from r1, unchanged by the revision: the 1 MiB per-file cap (§4's entire per-file work bound, A16) has zero test coverage on both legs — no test parses an oversize document and no test reads a file above the cap; inverting either comparison breaks no test. Correction to my r1 wording: the drift half was overstated — steam_linux.rs:290 already restates keyvalues::MAX_DOCUMENT_BYTES by reference, so the constants cannot drift; the remaining gap is pure coverage (the cap is not in the numbered Test strategy, so this is §4 coverage, not checklist item 1).",
+            "fix": "Add cited unit tests: parse on a 1 MiB + 1 byte document returns a KeyValueError, and a read_text_file/§7-error-count expectation for an oversize manifest via the env!(\"CARGO_TARGET_TMPDIR\") escape hatch."
           },
           {
             "severity": "minor",
-            "location": "crates/discovery/src/keyvalues.rs (MAX_DOCUMENT_BYTES) and crates/discovery/src/steam_linux.rs (read_text_file)",
-            "problem": "OPEN from r1, unchanged by the revision: the 1 MiB read cap exists twice and neither leg is covered — no test parses an oversize document and no fixture approaches the size; inverting a comparison or drifting either constant breaks no test, though §4 makes these constants the entire per-file work bound (A16).",
-            "fix": "Add a cited unit test that `parse` on a 1 MiB + 1 byte document returns a `KeyValueError`, and assert `MAX_DOCUMENT_BYTES` equals the shared parse-budget constant §4 says it restates, so the two cannot drift."
-          },
-          {
-            "severity": "minor",
-            "location": "crates/discovery/src/steam_linux.rs:154-160 (`libraries_in_root_with_skips`, absolute `path` branch)",
-            "problem": "OPEN from r1, unchanged by the revision: the `path.is_absolute()` arm — the shape every real `libraryfolders.vdf` uses and the Compatibility matrix's \"libraries on arbitrary mounts — Yes\" row — is never exercised; the fixture VDF carries only relative paths. A change in library-path resolution would pass silently.",
-            "fix": "Use the escape hatch §9 sanctions: under `env!(\"CARGO_TARGET_TMPDIR\")` build a one-library tree with a `steamapps/` directory and a `libraryfolders.vdf` whose numeric block carries that absolute path, then assert `libraries_in_root` returns it as-is."
+            "location": "crates/discovery/src/steam_linux.rs:154-160 (libraries_in_root_with_skips, absolute path branch); crates/discovery/tests/fixtures/steam/minimal/steamapps/libraryfolders.vdf (relative paths only)",
+            "problem": "OPEN from r1, unchanged by the revision: the path.is_absolute() arm — the shape every real libraryfolders.vdf uses and the Compatibility matrix's \"libraries on arbitrary mounts — Yes\" row — is never exercised; no test uses CARGO_TARGET_TMPDIR. A change in library-path resolution would pass silently.",
+            "fix": "Use the escape hatch §9 sanctions: under env!(\"CARGO_TARGET_TMPDIR\") build a one-library tree with a steamapps/ directory and a libraryfolders.vdf whose numeric block carries that absolute path, then assert libraries_in_root returns it as-is."
           },
           {
             "severity": "nit",
-            "location": "crates/discovery/src/steam_linux.rs (`usable_install_dir`)",
-            "problem": "OPEN from r1, unchanged by the revision: the `contains('\\0')` refusal goes beyond §5's enumerated rejection set and remains the only guard in that function with no test case.",
-            "fix": "Add `\"\\0\"` (and a whitespace-only value) to the existing `for bad in [...]` list in parse_manifest_rejects_unusable_installdir so the extra refusal is a stated expectation."
+            "location": "crates/discovery/src/steam_linux.rs:277 (usable_install_dir); crates/discovery/tests/steam_linux_tests.rs:113",
+            "problem": "OPEN from r1, unchanged by the revision: the contains('\\0') refusal goes beyond §5's enumerated rejection set and remains the only guard in that function with no test case.",
+            "fix": "Add \"\\0\" (and a whitespace-only value) to the existing for bad in [\"\", \".\", \"..\", \"/abs/path\", \"sub/dir\"] list in parse_manifest_rejects_unusable_installdir so the extra refusal is a stated expectation."
           },
           {
             "severity": "nit",
             "location": "crates/discovery/src/steam_linux.rs:84 (§7 message); crates/discovery/tests/steam_linux_tests.rs:464-492",
-            "problem": "OPEN from r1 and worsened by this revision: §7's skip-count component is still unasserted, and the revision changed the one user-visible string §7 prescribes — `{} file(s) skipped as unreadable or malformed` → `{} entries skipped as unreadable or malformed` — with no test change. No test pins the count, the count-bearing noun, or any message wording beyond the root name, so the drift from §7's stated \"count of skipped files\" to \"entries\" is an unpinned contract change and further wording edits stay silent. A bug reporting the wrong count still passes.",
-            "fix": "In discover_of_all_broken_root_returns_plugin_error_naming_root_without_contents, assert the message contains the expected skip count (`; 2 ` for the all-broken fixture: two malformed manifests) and pin the fixed message tail, cited `// proves: Chosen design §7`."
+            "problem": "Half-resolved: this revision reverted the r1 wording drift ({} entries skipped → {} file(s) skipped), restoring §7:246's \"count of skipped files\". Still open: no test pins the skip count, the file(s) noun, or any message wording beyond the root name, so a bug reporting the wrong skip count still passes.",
+            "fix": "In discover_of_all_broken_root_returns_plugin_error_naming_root_without_contents, assert the message contains the expected skip count for the all-broken fixture and pin the fixed message tail, cited // proves: Chosen design §7."
           },
           {
             "severity": "nit",
-            "location": "crates/discovery/src/steam_linux.rs:77 (`!self.roots.is_empty()` clause added by this revision)",
-            "problem": "NEW from the changed code: the added clause cannot change behavior — `skipped` is only incremented inside the `if !self.roots.is_empty()` scan block at lines 61-71, so `skipped > 0` already entails a selected root; the roots-empty + skipped>0 combination that would distinguish it is unconstructible, so no test can exercise it. That makes it an untestable addition (checklist item 7) while the new comment claims it spells out a §7 clause the suite cannot verify.",
-            "fix": "Either drop the redundant clause (the scan-block guard plus `skipped > 0` already encode the three §7 clauses) or make the roots-selected precondition real (e.g. count skipped roots) so a test can pin each clause."
+            "location": "crates/discovery/src/steam_linux.rs:77 (!self.roots.is_empty() clause; comment reworded by this revision, clause kept)",
+            "problem": "OPEN from r1, unchanged by this revision: the clause cannot change behavior — skipped is only incremented inside the if !self.roots.is_empty() scan block at lines 61-71, so skipped > 0 already entails a selected root; the roots-empty + skipped>0 combination that would distinguish it is unconstructible, so no test can exercise it. That makes it an untestable addition (checklist item 7) while the comment claims it spells out a §7 clause the suite cannot verify.",
+            "fix": "Either drop the redundant clause (the scan-block guard plus skipped > 0 already encode the three §7 clauses) or make the roots-selected precondition real (e.g. count skipped roots) so a test can pin each clause."
           }
         ]
       }
@@ -1494,7 +1536,7 @@
   "lastReviewPass": {
     "phase": "code",
     "round": 1,
-    "cycle": 1,
+    "cycle": 2,
     "seats": [
       "correctness",
       "compatibility",
@@ -1532,6 +1574,6 @@
       }
     ]
   },
-  "codeCycle": 2,
+  "codeCycle": 3,
   "codeStamp": "c9fb37b7ab8c5313f61368fddba3cb93ea8a339b"
 }
