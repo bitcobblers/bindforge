@@ -50,10 +50,21 @@ fn test_cli_list_format() {
     ] {
         assert!(stdout.contains(slug), "table must contain the {slug} row");
     }
-    for name in ["Example Game", "Mixed Case Game", "Nameless Install", "Secondary Title"] {
-        assert!(stdout.contains(name), "table must contain the {name} display name");
+    for name in [
+        "Example Game",
+        "Mixed Case Game",
+        "Nameless Install",
+        "Secondary Title",
+    ] {
+        assert!(
+            stdout.contains(name),
+            "table must contain the {name} display name"
+        );
     }
-    assert!(!stdout.contains("prefix-decoy"), "compatdata decoys must never appear in the table");
+    assert!(
+        !stdout.contains("prefix-decoy"),
+        "compatdata decoys must never appear in the table"
+    );
     assert_eq!(
         stdout.matches("unknown/").count(),
         4,
@@ -79,24 +90,49 @@ fn test_cli_list_json_format() {
         .expect("`list --json` must print a JSON array of DiscoveredGame objects");
     assert_eq!(games.len(), 4, "exactly the four fixture games");
 
+    // §5/A2: each row's `install_path` composes from the library that holds its
+    // manifest, so the secondary library's game carries the `<root>/secondary` prefix.
     let expected = [
-        ("unknown/example-game", "Example Game", "Example Game"),
-        ("unknown/mixed-case-game", "Mixed Case Game", "Mixed Case Game"),
-        ("unknown/nameless-install", "Nameless Install", "Nameless Install"),
-        ("unknown/secondary-title", "Secondary Title", "Secondary Title"),
+        ("unknown/example-game", "Example Game", "Example Game", ""),
+        (
+            "unknown/mixed-case-game",
+            "Mixed Case Game",
+            "Mixed Case Game",
+            "",
+        ),
+        (
+            "unknown/nameless-install",
+            "Nameless Install",
+            "Nameless Install",
+            "",
+        ),
+        (
+            "unknown/secondary-title",
+            "Secondary Title",
+            "Secondary Title",
+            "secondary",
+        ),
     ];
-    for (game, (slug, display_name, install_dir)) in games.iter().zip(expected) {
+    for (game, (slug, display_name, install_dir, library)) in games.iter().zip(expected) {
         let obj = game.as_object().expect("each game is a JSON object");
         assert_eq!(obj.len(), 5, "DiscoveredGame has exactly five fields");
         assert_eq!(obj["slug"], slug);
         assert_eq!(obj["display_name"], display_name);
         assert_eq!(obj["platform"], "steam-linux");
         assert!(obj["codec_id"].is_null(), "codec_id must be null");
-        let want = root.join("steamapps").join("common").join(install_dir);
+        let library_root = if library.is_empty() {
+            root.clone()
+        } else {
+            canonical(&root.join(library))
+        };
+        let want = library_root
+            .join("steamapps")
+            .join("common")
+            .join(install_dir);
         assert_eq!(
             obj["install_path"],
             want.to_string_lossy().as_ref(),
-            "install_path must be the composed steamapps/common path under the canonical fixture root"
+            "install_path must be the composed steamapps/common path under the canonicalized library that holds the manifest"
         );
     }
 }
@@ -105,6 +141,11 @@ fn test_cli_list_json_format() {
 // for a `--steam-root` that does not exist.
 #[test]
 fn test_cli_list_json_empty_for_missing_steam_root() {
-    let stdout = run_list(&["list", "--json", "--steam-root", "/bindforge-no-such-steam-root"]);
+    let stdout = run_list(&[
+        "list",
+        "--json",
+        "--steam-root",
+        "/bindforge-no-such-steam-root",
+    ]);
     assert_eq!(stdout.trim(), "[]");
 }

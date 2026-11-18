@@ -25,19 +25,29 @@ fn parses_quoted_and_bare_tokens_in_declaration_order() {
                 }\n";
     let doc = match parse(text) {
         Ok(doc) => doc,
-        Err(e) => panic!("well-formed KeyValues must parse (line {}: {})", e.line, e.message),
+        Err(e) => panic!(
+            "well-formed KeyValues must parse (line {}: {})",
+            e.line, e.message
+        ),
     };
     assert_eq!(keys(&doc.children), ["AppState"]);
     assert!(matches!(doc.children[0].1, Value::Section(_)));
 
-    let app = doc.get_section("AppState").expect("AppState must be a section");
+    let app = doc
+        .get_section("AppState")
+        .expect("AppState must be a section");
     assert_eq!(keys(&app.children), ["appid", "name", "UserConfig"]);
     assert_eq!(app.get_str("appid"), Some("900001"));
     assert_eq!(app.get_str("name"), Some("Example Game"));
     // A key whose value is a section has no string value.
-    assert!(app.get_str("UserConfig").is_none(), "a section value has no string value");
+    assert!(
+        app.get_str("UserConfig").is_none(),
+        "a section value has no string value"
+    );
 
-    let user = app.get_section("UserConfig").expect("UserConfig must be a nested section");
+    let user = app
+        .get_section("UserConfig")
+        .expect("UserConfig must be a nested section");
     assert_eq!(user.get_str("language"), Some("english"));
 }
 
@@ -47,7 +57,10 @@ fn preserves_declaration_order_of_top_level_children() {
     let text = "\"gamma\" \"3\"\n\"alpha\" \"1\"\n\"beta\" \"2\"\n";
     let doc = match parse(text) {
         Ok(doc) => doc,
-        Err(e) => panic!("top-level pairs must parse (line {}: {})", e.line, e.message),
+        Err(e) => panic!(
+            "top-level pairs must parse (line {}: {})",
+            e.line, e.message
+        ),
     };
     assert_eq!(keys(&doc.children), ["gamma", "alpha", "beta"]);
 }
@@ -73,7 +86,10 @@ fn get_section_matches_keys_case_insensitively() {
     let text = "\"AppState\"\n{\n\t\"installdir\"\t\t\"Example Game\"\n}\n";
     let doc = match parse(text) {
         Ok(doc) => doc,
-        Err(e) => panic!("a single section must parse (line {}: {})", e.line, e.message),
+        Err(e) => panic!(
+            "a single section must parse (line {}: {})",
+            e.line, e.message
+        ),
     };
     for query in ["AppState", "appstate", "APPSTATE"] {
         let section = doc
@@ -107,7 +123,9 @@ fn parses_line_comments() {
         Ok(doc) => doc,
         Err(e) => panic!("line comments must parse (line {}: {})", e.line, e.message),
     };
-    let app = doc.get_section("AppState").expect("AppState must be a section");
+    let app = doc
+        .get_section("AppState")
+        .expect("AppState must be a section");
     assert_eq!(app.get_str("name"), Some("Example Game"));
 }
 
@@ -130,7 +148,9 @@ fn parses_crlf_line_endings() {
         Ok(doc) => doc,
         Err(e) => panic!("CRLF input must parse (line {}: {})", e.line, e.message),
     };
-    let app = doc.get_section("AppState").expect("AppState must be a section");
+    let app = doc
+        .get_section("AppState")
+        .expect("AppState must be a section");
     assert_eq!(app.get_str("name"), Some("CRLF Game"));
 }
 
@@ -224,7 +244,10 @@ fn enforces_sixteen_level_nesting_cap() {
         }
         text
     };
-    assert!(parse(&nested(16)).is_ok(), "16 nesting levels is the cap and must be accepted");
+    assert!(
+        parse(&nested(16)).is_ok(),
+        "16 nesting levels is the cap and must be accepted"
+    );
     match parse(&nested(17)) {
         Ok(_) => panic!("17 nesting levels must be rejected"),
         Err(e) => assert!(e.line > 0, "the error must carry a line number"),

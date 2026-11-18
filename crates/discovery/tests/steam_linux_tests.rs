@@ -9,12 +9,16 @@ use discovery::game::{DiscoveredGame, Platform};
 use discovery::plugin::DiscoveryPlugin;
 use discovery::registry::DiscoveryError;
 use discovery::slug::normalize_slug;
-use discovery::steam_linux::{SteamLinuxPlugin, host_candidates, libraries_in_root, parse_manifest};
+use discovery::steam_linux::{
+    SteamLinuxPlugin, host_candidates, libraries_in_root, parse_manifest,
+};
 use std::path::{Path, PathBuf};
 
 /// A checked-in fixture root under `tests/fixtures/steam/`.
 fn fixture(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/steam").join(name)
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/steam")
+        .join(name)
 }
 
 /// The plugin's canonical path rule emits canonical paths; tests compare against
@@ -119,14 +123,18 @@ fn parse_manifest_rejects_unusable_installdir() {
 #[test]
 fn parse_manifest_rejects_unparseable_text() {
     let text = "\"AppState\"\n{\n\t\"name\" \"Example Game\"\n"; // unbalanced braces
-    assert!(parse_manifest(text).is_none(), "a manifest that fails to parse must be skipped");
+    assert!(
+        parse_manifest(text).is_none(),
+        "a manifest that fails to parse must be skipped"
+    );
 }
 
 // proves: Test strategy #2 (Chosen design §5) — a KeyValues document without an
 // `AppState` section yields None.
 #[test]
 fn parse_manifest_rejects_document_without_appstate_section() {
-    let text = "\"NotAppState\"\n{\n\t\"name\" \"Example Game\"\n\t\"installdir\" \"Example Game\"\n}\n";
+    let text =
+        "\"NotAppState\"\n{\n\t\"name\" \"Example Game\"\n\t\"installdir\" \"Example Game\"\n}\n";
     assert!(
         parse_manifest(text).is_none(),
         "a document without an AppState section must be skipped"
@@ -315,7 +323,10 @@ fn host_candidates_of_empty_or_relative_home_is_empty() {
 // proves: Chosen design §1 — the plugin registers under the name "steam-linux".
 #[test]
 fn plugin_name_is_steam_linux() {
-    assert_eq!(SteamLinuxPlugin::from_roots(Vec::new()).name(), "steam-linux");
+    assert_eq!(
+        SteamLinuxPlugin::from_roots(Vec::new()).name(),
+        "steam-linux"
+    );
 }
 
 // proves: Test strategy #8 — the minimal fixture root yields exactly four games
@@ -370,17 +381,27 @@ fn discover_output_honours_the_game_output_contract() {
         .iter()
         .map(|g| (g.slug.as_str(), g.install_path.as_path()))
         .collect();
-    for (slug, install_dir) in [
-        ("unknown/example-game", "Example Game"),
-        ("unknown/mixed-case-game", "Mixed Case Game"),
-        ("unknown/nameless-install", "Nameless Install"),
-        ("unknown/secondary-title", "Secondary Title"),
+    // §5/A2: `install_path` composes from the library that holds the manifest,
+    // so the secondary library's game carries the `<root>/secondary` prefix.
+    for (slug, library, install_dir) in [
+        ("unknown/example-game", "", "Example Game"),
+        ("unknown/mixed-case-game", "", "Mixed Case Game"),
+        ("unknown/nameless-install", "", "Nameless Install"),
+        ("unknown/secondary-title", "secondary", "Secondary Title"),
     ] {
-        let expected = root.join("steamapps").join("common").join(install_dir);
+        let library_root = if library.is_empty() {
+            root.clone()
+        } else {
+            canonical(&root.join(library))
+        };
+        let expected = library_root
+            .join("steamapps")
+            .join("common")
+            .join(install_dir);
         assert_eq!(
             by_slug.get(slug).copied(),
             Some(expected.as_path()),
-            "install_path for {slug} must be the composed steamapps/common path (emitted even though it does not exist)"
+            "install_path for {slug} must be the canonical library's steamapps/common path (emitted even though it does not exist)"
         );
     }
 
@@ -390,7 +411,10 @@ fn discover_output_honours_the_game_output_contract() {
         .collect();
     let mut sorted = keys.clone();
     sorted.sort();
-    assert_eq!(keys, sorted, "output must be ordered by (slug, install_path)");
+    assert_eq!(
+        keys, sorted,
+        "output must be ordered by (slug, install_path)"
+    );
 }
 
 // proves: Test strategy #4 (A4) — nothing under `compatdata/` ever appears in
@@ -399,7 +423,11 @@ fn discover_output_honours_the_game_output_contract() {
 #[test]
 fn discover_never_emits_compatdata_paths_or_decoy_games() {
     let games = minimal_games();
-    assert_eq!(games.len(), 4, "only the four fixture games may be discovered");
+    assert_eq!(
+        games.len(),
+        4,
+        "only the four fixture games may be discovered"
+    );
     for game in &games {
         assert!(
             !game.install_path.to_string_lossy().contains("compatdata"),
