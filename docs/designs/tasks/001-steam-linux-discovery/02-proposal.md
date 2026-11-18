@@ -49,7 +49,7 @@ settles each one that traces to T-001's Decision clauses; the rest are listed in
 | A6 | The only escapes Steam writes inside quoted values are `\\` and `\"`. | unverified | https://github.com/frankea/Whisky/blob/e51bd9f6/WhiskyKit/Sources/WhiskyKit/Steam/VDFParser.swift (no Valve grammar exists) |
 | A7 | These two file kinds contain no `#base` directive, `[$WIN32]`-style conditional or other construct the reader is designed to reject. | unverified | no statement of what the Linux client writes was found (01-research.md:352-357) |
 | A8 | Steam roots are found under the home directory (native plus `~/.steam/*`), `$XDG_DATA_HOME/Steam`, the Flatpak `~/.var/app/com.valvesoftware.Steam` tree and the Snap `~/snap/steam/common` tree; a directory is a root when it has a `steamapps` directory. | verified | https://raw.githubusercontent.com/WilliamVenner/steamlocate-rs/master/src/locate/linux.rs |
-| A9 | `std::env::home_dir()` yields the home directory (on Unix `$HOME`, else the passwd entry), and a relative `$XDG_DATA_HOME` is invalid and must be ignored. | verified | https://doc.rust-lang.org/std/env/fn.home_dir.html, https://specifications.freedesktop.org/basedir-spec/latest/ |
+| A9 | On the pinned 1.85.0 floor `std::env::home_dir()` is `#[deprecated]` (removed only in 1.87.0) and returns `Some("")` for a set-but-empty `$HOME`; so `home` is read from `std::env::var_os("HOME")`, and unset or empty means no home directory. A relative `$XDG_DATA_HOME` is invalid and must be ignored. | verified | https://doc.rust-lang.org/1.85.0/std/env/fn.home_dir.html, https://specifications.freedesktop.org/basedir-spec/latest/ |
 | A10 | A Flatpak install can name library paths that exist only inside the sandbox, or on mounts the discovery user cannot read. | verified | https://docs.flatpak.org/en/latest/sandbox-permissions.html |
 | A11 | `ReadDir` yields entries in unspecified order, so any stable output needs an explicit sort. | verified | https://doc.rust-lang.org/std/fs/struct.ReadDir.html |
 | A12 | `libraryfolders.vdf` also exists in a pre-2021 shape that a modern-shape-only reader parses to zero libraries. | verified | https://docs.rs/aurelia-steam/latest/aurelia/library/fn.library_folder_paths.html |
@@ -141,16 +141,18 @@ pub fn parse_manifest(text: &str) -> Option<AppManifest>;   // None = skip this 
 ```
 
 No `new()` / `Default` impl: a bare `pub fn new()` would trip clippy's `new_without_default` under
-`-D warnings` (A18), and both constructors say more than `new()` does. Every `pub` item above is exercised
-by a test in *Test strategy*; the rest (scan loop, composition, comparison key) stays private. The plugin
-holds its roots because `discover(&self)` takes no arguments (A17).
+`-D warnings` (A18), and both constructors say more than `new()` does. Every `pub` item above except
+`from_host()` is exercised by a test in *Test strategy* — #5 pins its candidate list through the pure
+`host_candidates` and *Rollout* #5 checks its host probe. The rest (scan loop, composition, comparison
+key) stays private. The plugin holds its roots because `discover(&self)` takes no arguments (A17).
 
 ### 2. Root selection
 
 `from_host()` builds its candidate list with the pure `host_candidates(home, env)` — so the list is unit
-testable without touching the environment — and probes it. `home` comes from `std::env::home_dir()` (A9);
-when it returns `None`, the candidate list is empty and the plugin discovers nothing. Candidates, in this
-order, each kept only if `<candidate>/steamapps` is a directory (A8):
+testable without touching the environment — and probes it. `home` comes from `std::env::var_os("HOME")`;
+unset, empty, or relative means no home directory: empty candidates, `Ok(vec![])` (§7). `std::env::home_dir()`
+is deprecated on the pinned 1.85 floor and is not called, keeping the `-D warnings` gate clean (A9).
+Candidates, in this order, each kept only if `<candidate>/steamapps` is a directory (A8):
 
 1. `$XDG_DATA_HOME/Steam`, default `$HOME/.local/share/Steam`; a set-but-relative `XDG_DATA_HOME` is
    ignored per the base-directory spec (A9).
@@ -160,12 +162,12 @@ order, each kept only if `<candidate>/steamapps` is a directory (A8):
    `$SNAP_USER_DATA/steam/common` when that variable is set (Snap).
 
 **Canonical path rule (canonical statement, referenced below):** every set of directories the plugin
-scans — roots from the candidate list, and library paths within a root — is built by canonicalizing each
-entry, dropping entries that fail to canonicalize or that lack the required `steamapps` directory, then
-sorting, then de-duplicating. `std::fs::canonicalize` resolves the symlink aliases (`~/.steam/root` →
-the real root) and the `"0" → root` duplicate that libraryfolders.vdf normally contains, so no library is
-ever scanned twice. The emitted `install_path` keeps the canonical library prefix; nothing the plugin
-emits carries an unresolved `..`.
+scans — roots from the candidate list, and the library paths of all selected roots as one set per
+`discover()` call — is built by canonicalizing each entry, dropping entries that fail to canonicalize or
+that lack the required `steamapps` directory, then sorting, then de-duplicating. `std::fs::canonicalize`
+resolves symlink aliases (`~/.steam/root` → the real root) and the `"0" → root` duplicate, so no library
+is ever scanned twice, including by two roots sharing one. Emitted `install_path`s keep the canonical
+library prefix; nothing the plugin emits carries an unresolved `..`.
 
 `from_roots()` skips `host_candidates` and the existence probe, taking caller-supplied roots through the
 canonical path rule. It is the seam tests and `--steam-root` use; `from_host()` is a thin wrapper over it.
@@ -174,9 +176,10 @@ canonical path rule. It is the seam tests and `--steam-root` use; `from_host()` 
 
 `libraries_in_root(root)` returns, through the canonical path rule:
 
-- `<root>/steamapps` itself, always. This is the root-as-library inclusion the second scanner in
-  01-research.md:103-106 uses, and it is what makes a `libraryfolders.vdf` that parses to zero libraries —
-  the legacy shape (A12) or a hand-edited file — a degraded result instead of the silent-zero bug.
+- `<root>` itself, always — a library is the *parent* of its `steamapps/` (A2), so a root is a library. This
+  is the root-as-library inclusion the second scanner in 01-research.md:103-106 uses, and it is what makes
+  a `libraryfolders.vdf` that parses to zero libraries — the legacy shape (A12) or a hand-edited file — a
+  degraded result instead of the silent-zero bug.
 - every `path` from `<root>/steamapps/libraryfolders.vdf`: the `libraryfolders` section (case-insensitive)
   is walked for numeric-keyed blocks (A3); a `path` is used as-is when absolute and otherwise joined to
   the directory holding the VDF; empty values are dropped. The relative case is not hypothetical in this
@@ -196,8 +199,9 @@ surveyed readers share. `children` keeps declaration order and `get_str` is case
 `KeyValueError { line, message }`: unbalanced braces, an unterminated string, a `[` conditional or `#base`
 line — constructs assumed absent from these files (A7) — and any section nested deeper than 16 levels.
 Input is `&str`; the caller reads bytes and skips a file that is not valid UTF-8 rather than aborting a
-scan. Files larger than 1 MiB are skipped as malformed (A16): the reader's work is bounded per file rather
-than by a wall-clock target, since no scan-latency baseline exists to budget against
+scan. Files larger than 1 MiB are skipped as malformed; both caps restate the repo's shared parse budget
+(`schemas/reach-classes/v1/spec.md`) as plugin-local constants, since `crates/discovery` takes no
+`bindforge-core` edge (A16). Work is bounded per file, not wall-clock: no scan-latency baseline exists
 (01-research.md:319-324).
 
 ### 5. Manifest to `DiscoveredGame`
@@ -236,11 +240,11 @@ and the scan continues. With no roots (no Steam, or no home directory) `discover
 `Ok(vec![])` — "not installed here" is not an error, because A14 turns any error into one `{:?}` line on
 stderr that a `--json` consumer must wade through.
 
-The single `Err` case: at least one root was selected but **no** library under any selected root could be
-scanned. Then `discover()` returns `DiscoveryError::PluginError(msg)`, where `msg` names the selected roots
-and the count of files skipped as unreadable or malformed and nothing else — no file contents. That is
-enough for the engine's debug line to tell "Steam present, everything under it unreadable" apart from
-"nothing installed", and it stays on stderr, out of the stdout stream a `--json` consumer parses.
+The single `Err` case: at least one root was selected, **zero** games were emitted, and at least one file
+was skipped as unreadable or malformed. Then `discover()` returns `DiscoveryError::PluginError(msg)`,
+where `msg` names the selected roots and the count of skipped files and nothing else — no file contents.
+That is enough for the engine's debug line to tell "Steam present, everything under it unreadable" apart
+from "nothing installed", and it stays on stderr, out of the stdout stream a `--json` consumer parses.
 
 ### 8. CLI wiring (`apps/discovery-cli`)
 
@@ -253,8 +257,8 @@ enough for the engine's debug line to tell "Steam present, everything under it u
 
 In the `List` arm, `steam_root.is_empty()` selects `SteamLinuxPlugin::from_host()`, otherwise
 `SteamLinuxPlugin::from_roots(steam_root.iter().cloned())`, registered in place of the deleted
-`DummyPlugin` — its only user is this arm (A17), and it asserts nothing a fixture run does not. The
-printing code is untouched, so the table header and JSON shape are unchanged.
+`DummyPlugin` — its only user is this arm (A17), and its `DiscoveryPlugin` import goes with it rather
+than being re-imported. The printing code is untouched, so the table header and JSON shape are unchanged.
 
 ### 9. Fixtures
 
@@ -264,7 +268,7 @@ Read-only, checked-in, one tree used by both packages — the crate's tests dire
 ```
 crates/discovery/tests/fixtures/steam/minimal/
 ├── steamapps/
-│   ├── libraryfolders.vdf                  # modern shape: "0" → ".", "1" → "../secondary"
+│   ├── libraryfolders.vdf                  # modern shape: "0" → "..", "1" → "../secondary"
 │   ├── appmanifest_900001.acf              # AppState with name + installdir "Example Game"
 │   ├── appmanifest_900002.acf              # no name; installdir "Nameless Install"
 │   ├── appmanifest_900003.acf              # "NAME" "Mixed Case Game", "INSTALLDIR", "stateflags"
@@ -277,10 +281,10 @@ crates/discovery/tests/fixtures/steam/minimal/
     └── appmanifest_900100.acf              # the secondary library's one game ("Secondary Title")
 ```
 
-Four games survive from this tree; the `"0" → "."` entry exercises root/library de-duping and the
-relative `"1"` entry exercises the join rule portably. AppIDs are synthetic: the number appears only in
-the filename, which is the filename Steam uses, and the design never reads it. Existing crate tests keep
-the `crates/discovery/tests/<module>_tests.rs` layout, adding `keyvalues_tests.rs` and
+Four games survive from this tree; the `"0" → ".."` entry exercises root/library de-duping and the
+relative `"1"` entry exercises the join rule portably. AppIDs are synthetic: they appear only in
+filenames, which the design never reads. Existing crate tests keep the
+`crates/discovery/tests/<module>_tests.rs` layout, adding `keyvalues_tests.rs` and
 `steam_linux_tests.rs`. No test writes to the filesystem; a later round that needs a writable tree has
 `env!("CARGO_TARGET_TMPDIR")` (A19) before reaching for a dev-dependency.
 
@@ -289,8 +293,8 @@ the `crates/discovery/tests/<module>_tests.rs` layout, adding `keyvalues_tests.r
 No new dependency: `crates/discovery/Cargo.toml` and `apps/discovery-cli/Cargo.toml` gain nothing, so
 `Cargo.lock` stays byte-identical (A15) and `cargo test --workspace --locked` (A18) needs no re-lock.
 `crates/discovery/Cargo.toml` keeps its literal `version`/`edition` fields — switching it to
-`version.workspace = true` is unrelated churn (*Deferred*). `#[path]`-free, `unsafe`-free, no `std`
-feature flags required on the 1.85 floor (A15).
+`version.workspace = true` is unrelated churn (*Deferred*). `#[path]`-free, `unsafe`-free, and on the
+pinned 1.85 floor (A15) no `std` feature flags and no `deprecated` lint to work around (A9).
 
 ## Risks
 
@@ -317,7 +321,7 @@ feature flags required on the 1.85 floor (A15).
 | Linux, Steam not installed / no home directory | Yes | `Ok(vec![])`, no error, no stderr output (§7). |
 | Linux, pre-2021 `libraryfolders.vdf`, or legacy `SteamApps` spelling (A20) | Partial | The root's own `steamapps` is still scanned; secondary libraries and a legacy-spelled directory are not discovered. |
 | CI `rust` job (`ubuntu-latest`, no Steam, no network) | Yes | A18; the suite is hermetic through `from_roots` + fixtures, so no test depends on the runner's home directory. |
-| Windows | No | `SteamWindowsPlugin` is ADR-022's Windows clause, not T-001; `keyvalues.rs` is written platform-neutral to be reusable. |
+| Windows | No | `SteamWindowsPlugin` is ADR-022's Windows clause, not T-001. |
 | macOS | No | Outside ADR-022's v1 scope. |
 | Steam Deck | No | Excluded by ADR-022 (docs/adrs/022-game-discovery.md:21). |
 
@@ -331,15 +335,16 @@ feature flags required on the 1.85 floor (A15).
 2. Unit (`parse_manifest`): name + installdir yields both fields; a manifest with no `name` yields
    `display_name == installdir`; a manifest with neither, one with `installdir` of `..` / `/abs/path` /
    `sub/dir`, and one that fails to parse all yield `None`.
-3. Unit (`libraries_in_root`, fixture): the primary library and `../secondary` are both returned,
-   canonicalized, sorted, and the `"0" → "."` entry adds no duplicate (§2's canonical path rule); a root
-   with no `steamapps` directory yields an empty list; a root whose `libraryfolders.vdf` is absent still
-   yields its own `steamapps`.
+3. Unit (`libraries_in_root`, fixture): the root itself and `<root>/secondary` are both returned,
+   canonicalized, sorted, and the `"0" → ".."` entry adds no duplicate against the always-included root
+   (§2's canonical path rule); a root with no `steamapps` directory yields an empty list; a root whose
+   `libraryfolders.vdf` is absent still yields the root itself.
 4. Unit (fixture decoys, `libraries_in_root` plus plugin output): no path under `compatdata/` is ever returned by
    `libraries_in_root`, and nothing under it appears in plugin output (A4).
 5. Unit (`host_candidates`, pure): with `home = /home/t` and an empty environment the list is exactly the
    ordered `$HOME` candidates of §2; setting `XDG_DATA_HOME` replaces candidate 1, a relative
-   `XDG_DATA_HOME` does not (A9); setting `SNAP_USER_DATA` replaces the Snap trio's base.
+   `XDG_DATA_HOME` does not (A9); setting `SNAP_USER_DATA` replaces the Snap trio's base; an empty or
+   relative `home` yields the empty list.
 6. Unit (output contract, fixture root): every returned game has `platform == Platform::SteamLinux`,
    `codec_id == None` and `slug == normalize_slug(display_name)`; `install_path` ends with
    `steamapps/common/<installdir>` (A2) and starts with the canonicalized fixture root; the vector is
@@ -406,24 +411,26 @@ feature flags required on the 1.85 floor (A15).
 ## Revision log
 
 - r0: q1 root policy — chose the full A8 candidate list (native + Flatpak + Snap) with all valid roots
-  scanned; *Chosen design §2*.
+  scanned; `home` is `std::env::var_os("HOME")` — unset, empty, or relative means no roots — since
+  `home_dir()` is `#[deprecated]` on the pinned 1.85 floor (r3); *Chosen design §2, A9, §10*.
 - r0: q2, q3 test seam and fixtures — added `from_roots` / `--steam-root` and a checked-in read-only
   fixture tree; no `tempfile`, CLI tests switched to `CARGO_BIN_EXE_*`; *§8, §9, Test strategy #9*.
 - r0: q4, q5, q6, q7 dependency, grammar, escaping, key case — hand-rolled `keyvalues.rs` with an explicit
   accepted/rejected subset, `\\`/`\"` unescaped (A6), case-insensitive first-match lookup; *§1, §4*.
-- r0: q8, q14 legacy shape and which VDF copy — one fixed VDF path per root, root's own `steamapps` always
-  scanned, sets canonicalized/sorted/de-duped; the legacy shape itself deferred; *§2, §3*.
+- r0: q8, q14 legacy shape and which VDF copy — one fixed VDF path per root, the root itself always
+  scanned as a library, sets canonicalized/sorted/de-duped; the legacy shape deferred; *§2, §3*.
 - r0: q9, q10 non-game filter and `StateFlags` — emitted unfiltered in v1, recorded as an accepted visible
   cost; the policy itself deferred; *§6, Risks, Deferred*.
 - r0: q11 absent `name` — falls back to `installdir`; a manifest with neither is skipped; *§5*.
 - r0: q12 path composition and validation — composed unconditionally, `installdir` rejected on
   `.`/`..`/absolute/`/`, library paths validated by canonicalization plus the `steamapps` gate; *§2, §5*.
-- r0: q13, q16 failure policy and error surface — skip-and-continue with one `Err` case, `Ok(vec![])` when
-  nothing is installed, `DiscoveryError` and the engine left unchanged; *§7, Deferred*.
+- r0: q13, q16 failure policy and error surface — skip-and-continue with one `Err` case (zero games
+  emitted and at least one file skipped), `Ok(vec![])` when nothing is installed, `DiscoveryError` and
+  the engine left unchanged; *§7, Deferred*.
 - r0: q15 ordering and `DummyPlugin` — output sorted by `(slug, install_path)`, `DummyPlugin` deleted, no
   cross-plugin de-duping; *§5, §8*.
 - r0: q17 performance budget — no external baseline exists, so the budget is per file (1 MiB, 16 levels),
   not per scan; wall-clock tuning deferred; *§4, Deferred*.
-- r0: q18 Windows reuse — `keyvalues.rs` carries no Linux or Steam knowledge so a later Windows plugin
-  reuses it without a public-surface change; *§1, Compatibility matrix*.
+- r0: q18 Windows reuse — `keyvalues.rs` carries no Linux or Steam knowledge, kept as a property of the
+  code, not as a promised cross-plugin API for the un-filed Windows plugin; *§1, Compatibility matrix*.
 - r0: q19 legacy `SteamApps` spelling — not accepted, kept as assumption A20 and deferred; *A20, Deferred*.
