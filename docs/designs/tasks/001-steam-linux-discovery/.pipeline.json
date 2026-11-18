@@ -8,7 +8,7 @@
     "path": "docs/tasks/T-001-steam-linux-discovery.md"
   },
   "status": "running",
-  "lastStage": "",
+  "lastStage": "research",
   "designRound": 0,
   "codeRound": 0,
   "designBudgetUsed": 0,
@@ -17,12 +17,33 @@
   "testsGreen": false,
   "testsNeedUpdate": false,
   "stageFailures": {},
-  "stageCommits": [],
+  "stageCommits": [
+    "45f9036d97e784a4ff8b41c1fd0a60da00bb65c4"
+  ],
   "forceNext": null,
-  "results": [],
+  "results": [
+    {
+      "stage": "research",
+      "round": 0,
+      "sessionID": "ses_e137500bfffek6gm1VSbHnp8Z0",
+      "agent": "research/researcher",
+      "at": 1794970169929,
+      "reply": {
+        "summary": "Rewrote docs/designs/tasks/001-steam-linux-discovery/01-research.md for T-001 (Linux Steam discovery plugin), re-verifying the repo seam first-hand — the two-method DiscoveryPlugin trait, five-field DiscoveredGame with Platform::SteamLinux, normalize_slug, the error-swallowing DiscoveryEngine, DummyPlugin-only CLI, the 32-package Cargo.lock with no VDF parser or tempfile, and the CLI test that asserts `[]` — and re-fetching every external citation this run. Format evidence is consistent: ACF text KeyValues rooted at AppState carrying appid/name/StateFlags/installdir, composition rule <library>/steamapps/common/<installdir>, and StateFlags bit 4 = StateFullyInstalled per the Lutris table. New evidence added over the prior pass: three current Rust scanners (fragcap-steam, steamie-core, yandere-core) that hand-roll a small KeyValues reader instead of taking keyvalues-parser+pest, the pre-2021 vs modern libraryfolders.vdf shapes that already caused a silent-zero-libraries bug, per-game Proton prefix directories holding look-alike libraryfolders.vdf copies, and divergent backslash-escape handling across implementations. Lenses applied: prior art, platform notes (root candidate list, Flatpak sandbox visibility, arbitrary mounts, Rust 1.85/edition-2024 and --locked gate), and security landscape under Risks & unknowns (install_path as a privilege hand-off, whole-scan blast radius, diagnostic leakage). The designer's decisions are enumerated as 19 open questions: root policy, test seam and fixtures, dependency posture, grammar subset and escaping, non-game filtering, StateFlags and missing-name handling, path validation, per-file failure policy, ordering/dedup, error taxonomy, and performance budget.",
+        "commitMessage": "docs: research Linux Steam discovery plugin for T-001"
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/research-r0.md",
+      "durationMs": 275162,
+      "nudges": 0,
+      "docName": "01-research.md",
+      "docLines": 420,
+      "docLinesAdded": 420,
+      "docLinesRemoved": 0
+    }
+  ],
   "gateLog": [],
   "startedAt": 1794969708852,
-  "updatedAt": 1794969708884,
+  "updatedAt": 1794970170007,
   "flow": "full",
   "baseRef": "4caa688933b2969f569f6126dddb713180c7c410"
 }
