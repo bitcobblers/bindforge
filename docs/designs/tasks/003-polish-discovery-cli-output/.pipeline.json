@@ -1,0 +1,252 @@
+{
+  "version": 1,
+  "slug": "polish-discovery-cli-output",
+  "nnn": "003",
+  "branch": "pipeline/003-polish-discovery-cli-output",
+  "source": {
+    "kind": "task",
+    "path": "docs/tasks/T-003-polish-discovery-cli-output.md"
+  },
+  "status": "done",
+  "lastStage": "code-review",
+  "designRound": 0,
+  "codeRound": 1,
+  "designBudgetUsed": 0,
+  "codeBudgetUsed": 0,
+  "editorialDone": false,
+  "testsGreen": true,
+  "testsNeedUpdate": false,
+  "stageFailures": {},
+  "stageCommits": [
+    "25c88f241fd532dbaa7cd87562d4d52e314b64f9",
+    "72f3b7fc0eb5a76f493fecd610425dc572b55530",
+    "251fd3a629609eefdd3bb16b692d7d406d7cab82"
+  ],
+  "forceNext": null,
+  "results": [
+    {
+      "stage": "plan",
+      "round": 0,
+      "sessionID": "ses_e114b6a04ffePPUXahtBXAjkk9",
+      "agent": "design/planner",
+      "at": 1795006268114,
+      "reply": {
+        "commitMessage": "docs: add T-003 plan for discovery CLI output polish"
+      },
+      "transcript": "docs/designs/tasks/003-polish-discovery-cli-output/transcripts/plan-r0.md",
+      "durationMs": 93273,
+      "nudges": 0,
+      "docName": "02-proposal.md",
+      "docLines": 75,
+      "docLinesAdded": 75,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "implement",
+      "round": 0,
+      "sessionID": "ses_e1149fcf5ffeg8iBnxXlmQzm5l",
+      "agent": "code/coder",
+      "at": 1795006513897,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "feat(discovery-cli): align the list table and exit non-zero on plugin failure",
+        "moves": []
+      },
+      "transcript": "docs/designs/tasks/003-polish-discovery-cli-output/transcripts/implement-r0.md",
+      "durationMs": 245702,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e1145ff9affeO1hHYc7FO6QtBT",
+      "agent": "codereview/code-correctness",
+      "at": 1795006699573,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/src/main.rs:145",
+            "problem": "render_separator emits width + 1 dashes per column while proposal §1 says \"width + 2 dashes per column\". width + 1 is the value that actually satisfies the sentence's binding requirement (identical | byte offsets): a body column occupies 1 space + width padded chars between delimiters, so width + 2 dashes would shift every following | one byte and break the pinned alignment. The code meets the invariant; the proposal's dash count is the arithmetic slip.",
+            "fix": "No code change. Record the one-word deviation from the proposal's dash count in 03-build-notes.md (or correct the clause editorially). Declaration could not be verified here because 03-build-notes.md is outside this seat's allowed inputs."
+          }
+        ]
+      },
+      "transcript": "docs/designs/tasks/003-polish-discovery-cli-output/transcripts/code-review-correctness-r1c0.md",
+      "durationMs": 169883,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 1,
+      "sessionID": "ses_e1145ff9affdcQ995pIZG9b9Dc",
+      "agent": "codereview/code-testing",
+      "at": 1795006695527,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/src/main.rs:80-81",
+            "problem": "The JSON serialization Err arm (one-line stderr message + ExitCode::FAILURE) has no test pin and cannot be exercised through the CLI's surface, since serializing Vec<DiscoveredGame> is infallible in scope (checklist #7 defensive branch).",
+            "fix": "Acceptable as-is: the proposal mandates no panic path and its Test plan lists no pin for this branch. Add a pin only if an injection seam ever makes it reachable."
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/tests/cli_tests.rs:95-98",
+            "problem": "The header-padding assertion (cell.chars().count() > column.chars().count() + 1) holds only because every column's widest cell in the current fixture is a body cell; a correct renderer would fail it if a future fixture change made a header the widest cell of its column.",
+            "fix": "Assert padding relative to column widths recomputed from the observed rows, or rely on the data-independent offset/gap-fill pins already in cli_output_polish_tests.rs; optional given the strict pins there."
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/tests/cli_output_polish_tests.rs:263",
+            "problem": "The failure test hard-codes 'error: plugin steam-linux failed:' and the steam-linux root-scan error path, making it Linux-runner-specific. Consistent with the proposal's Test plan and the existing suite (cli_tests.rs:189 pins SteamLinux) and with ubuntu-only CI, so no CI impact today.",
+            "fix": "If CI ever runs tests on Windows, gate with #[cfg(unix)] or derive the expected plugin name per target cfg."
+          }
+        ]
+      },
+      "transcript": "docs/designs/tasks/003-polish-discovery-cli-output/transcripts/code-review-testing-r1c0.md",
+      "durationMs": 165837,
+      "nudges": 0
+    }
+  ],
+  "gateLog": [
+    {
+      "gate": "sourceAdmissible",
+      "round": 0,
+      "proceed": true,
+      "reason": "task is pending and complete",
+      "at": 1795006174664
+    },
+    {
+      "gate": "taskDependencies",
+      "round": 0,
+      "proceed": true,
+      "reason": "2 dependency(ies) satisfied",
+      "at": 1795006174667
+    },
+    {
+      "gate": "ledger-join",
+      "round": 0,
+      "proceed": true,
+      "reason": "the ledger join holds: every handle resolves, every unit is handled",
+      "at": 1795006174673
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1795006529623
+    },
+    {
+      "gate": "code-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1795006699627
+    },
+    {
+      "gate": "ledger-join",
+      "round": 0,
+      "proceed": true,
+      "reason": "the ledger join holds: every handle resolves, every unit is handled",
+      "at": 1795006699632
+    },
+    {
+      "gate": "done",
+      "round": 0,
+      "proceed": true,
+      "reason": "pipeline complete",
+      "at": 1795006699632
+    }
+  ],
+  "startedAt": 1795006174632,
+  "updatedAt": 1795006699632,
+  "flow": "light",
+  "baseRef": "092bdc29a602fd9711bf77eb039e9e1391a50969",
+  "gateEvidence": {
+    "at": 1795006529622,
+    "green": true,
+    "legs": [
+      {
+        "command": "npm run check",
+        "cwd": "tools/orchestration",
+        "exit": 0,
+        "tail": "npm notice run @bindforge/orchestration@1.0.0 precheck npm notice run npm install  up to date, audited 178 packages in 2s  45 packages are looking for funding   run `npm fund` for details  15 vulnerabilities (9 moderate, 6 high)  To address issues that do not require attention, run:   npm audit fix  To address all issues (including breaking changes), run:   npm audit fix --force  Run `npm audit` for details. npm warn install-scripts 1 package had install scripts blocked because they are not covered by allowScripts: npm warn install-scripts   esbuild@0.28.2 (postinstall: node install.js) npm warn install-scripts npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow. npm notice run @bindforge/orchestration@1.0.0 check npm notice run npm run lint && npm run format:check && npm run test npm notice run @bindforge/orchestration@1.0.0 lint npm notice run eslint . npm notice run @bindforge/orchestration@1.0.0 format:check npm notice run prettier --check . Checking formatting... All matched files use Prettier code style! npm notice run @bindforge/orchestration@1.0.0 test npm notice run vitest run          dmesg(1) may have more information after failed mount system call.   Test Files  61 passed (61)       Tests  692 passed | 2 skipped (694)    Start at  07:55:20    Duration  8.70s (tests 89%, import 7%, transform 4%)      Isolate  61 workers spawned · ~72ms startup each (spawn + environment, per file)              at least ~478ms faster with isolate: false — reuses workers across files instead of one per file [2 tail line(s) dropped by the record's citation rule]"
+      },
+      {
+        "command": "cargo fmt --all -- --check",
+        "cwd": ".",
+        "exit": 0,
+        "tail": ""
+      },
+      {
+        "command": "cargo clippy --workspace --all-targets -- -D warnings",
+        "cwd": ".",
+        "exit": 0,
+        "tail": "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.07s"
+      },
+      {
+        "command": "cargo test --workspace --locked",
+        "cwd": ".",
+        "exit": 0,
+        "tail": "[33720 characters elided by the gate tail cap] failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s       Running unittests src/main.rs (target/debug/build/discovery-cli/c4e1d480b1d86eb6/out/discovery_cli-c4e1d480b1d86eb6)  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s       Running tests/cli_dual_plugin_tests.rs (target/debug/build/discovery-cli/b2a193a0ecbdae9b/out/cli_dual_plugin_tests-b2a193a0ecbdae9b)  running 2 tests test test_empty_windows_plugin_adds_nothing_beside_a_populated_linux_plugin ... ok test test_cli_list_host_probe_is_quiet_and_empty_without_steam ... ok  test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s       Running tests/cli_output_polish_tests.rs (target/debug/build/discovery-cli/5d22a8d53b661e2b/out/cli_output_polish_tests-5d22a8d53b661e2b)  running 3 tests test test_cli_list_reports_a_plugin_failure_on_one_stderr_line ... ok test test_cli_list_table_is_the_header_block_when_no_games_are_found ... ok test test_cli_list_table_columns_align_under_a_separator ... ok  test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s       Running tests/cli_tests.rs (target/debug/build/discovery-cli/28b80873fe5198a2/out/cli_tests-28b80873fe5198a2)  running 3 tests test test_cli_list_json_empty_for_missing_steam_root ... ok test test_cli_list_format ... ok test test_cli_list_json_format ... ok  test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests bindforge_core  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests bindforge_transforms  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests discovery  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      }
+    ]
+  },
+  "codeCycle": 1,
+  "codeStamp": "72f3b7fc0eb5a76f493fecd610425dc572b55530",
+  "seats": {
+    "code": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "72f3b7fc0eb5a76f493fecd610425dc572b55530",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/src/main.rs:145",
+            "problem": "render_separator emits width + 1 dashes per column while proposal §1 says \"width + 2 dashes per column\". width + 1 is the value that actually satisfies the sentence's binding requirement (identical | byte offsets): a body column occupies 1 space + width padded chars between delimiters, so width + 2 dashes would shift every following | one byte and break the pinned alignment. The code meets the invariant; the proposal's dash count is the arithmetic slip.",
+            "fix": "No code change. Record the one-word deviation from the proposal's dash count in 03-build-notes.md (or correct the clause editorially). Declaration could not be verified here because 03-build-notes.md is outside this seat's allowed inputs."
+          }
+        ]
+      },
+      "testing": {
+        "verdict": "approve",
+        "stamp": "72f3b7fc0eb5a76f493fecd610425dc572b55530",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/src/main.rs:80-81",
+            "problem": "The JSON serialization Err arm (one-line stderr message + ExitCode::FAILURE) has no test pin and cannot be exercised through the CLI's surface, since serializing Vec<DiscoveredGame> is infallible in scope (checklist #7 defensive branch).",
+            "fix": "Acceptable as-is: the proposal mandates no panic path and its Test plan lists no pin for this branch. Add a pin only if an injection seam ever makes it reachable."
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/tests/cli_tests.rs:95-98",
+            "problem": "The header-padding assertion (cell.chars().count() > column.chars().count() + 1) holds only because every column's widest cell in the current fixture is a body cell; a correct renderer would fail it if a future fixture change made a header the widest cell of its column.",
+            "fix": "Assert padding relative to column widths recomputed from the observed rows, or rely on the data-independent offset/gap-fill pins already in cli_output_polish_tests.rs; optional given the strict pins there."
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/tests/cli_output_polish_tests.rs:263",
+            "problem": "The failure test hard-codes 'error: plugin steam-linux failed:' and the steam-linux root-scan error path, making it Linux-runner-specific. Consistent with the proposal's Test plan and the existing suite (cli_tests.rs:189 pins SteamLinux) and with ubuntu-only CI, so no CI impact today.",
+            "fix": "If CI ever runs tests on Windows, gate with #[cfg(unix)] or derive the expected plugin name per target cfg."
+          }
+        ]
+      }
+    }
+  },
+  "lastReviewPass": {
+    "phase": "code",
+    "round": 1,
+    "cycle": 0,
+    "seats": [
+      "correctness",
+      "testing"
+    ]
+  }
+}

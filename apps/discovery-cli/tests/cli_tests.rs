@@ -33,15 +33,80 @@ fn run_list(args: &[&str]) -> String {
     String::from_utf8_lossy(&output.stdout).into_owned()
 }
 
-// proves: Test strategy #9 (Chosen design §8) — `list --steam-root <fixture>`
-// prints the table header and exactly the four expected fixture rows; the
-// compatdata decoys never appear.
+/// The cells of one rendered table line, split at its `|` delimiters. Each
+/// cell keeps the padding spaces the renderer wrote for it (T-003 §1).
+fn cells(line: &str) -> Vec<String> {
+    let inner = line
+        .strip_prefix('|')
+        .and_then(|rest| rest.strip_suffix('|'))
+        .unwrap_or(line);
+    inner.split('|').map(str::to_string).collect()
+}
+
+/// The byte offsets of the `|` delimiters of one rendered table line (T-003 §1:
+/// an aligned table gives every line the same list of offsets).
+fn pipe_offsets(line: &str) -> Vec<usize> {
+    line.bytes()
+        .enumerate()
+        .filter(|(_, byte)| *byte == b'|')
+        .map(|(offset, _)| offset)
+        .collect()
+}
+
+// proves: Test strategy #9 (Chosen design §8), as polished by T-003 §1 —
+// `list --steam-root <fixture>` prints the padded table header and exactly the
+// four expected fixture rows, with every header cell padded right to its
+// column's width; the compatdata decoys never appear.
 #[test]
 fn test_cli_list_format() {
     let root = fixture_root();
     let stdout = run_list(&["list", "--steam-root", root.to_str().expect("utf-8 path")]);
 
-    assert!(stdout.contains("| Slug | Display Name | Install Path | Platform |"));
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert_eq!(
+        lines.len(),
+        6,
+        "the table is the header, the separator, and exactly four rows:\n{stdout}"
+    );
+
+    // T-003 §1: cells are padded, so the old unpadded header string is gone and
+    // every header cell carries padding beyond its single leading space.
+    assert!(
+        !stdout.contains("| Slug | Display Name | Install Path | Platform |"),
+        "the header must be padded to its columns' widths:\n{}",
+        lines[0]
+    );
+    let header_cells = cells(lines[0]);
+    assert_eq!(
+        header_cells.len(),
+        4,
+        "the header names exactly four columns"
+    );
+    for (cell, column) in
+        header_cells
+            .iter()
+            .zip(["Slug", "Display Name", "Install Path", "Platform"])
+    {
+        assert_eq!(
+            cell.trim(),
+            column,
+            "the header must name the {column} column"
+        );
+        assert!(
+            cell.starts_with(' ') && cell.chars().count() > column.chars().count() + 1,
+            "the {column} header cell must be padded to its column width, got {cell:?}"
+        );
+    }
+    // T-003 §1: the padded cells line up, so every rendered line has its `|`
+    // characters at the same byte offsets.
+    for line in &lines[1..] {
+        assert_eq!(
+            pipe_offsets(line),
+            pipe_offsets(lines[0]),
+            "every rendered line must share the header's `|` offsets: {line:?}"
+        );
+    }
+
     for slug in [
         "unknown/example-game",
         "unknown/mixed-case-game",

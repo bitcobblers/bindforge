@@ -1,6 +1,6 @@
 ---
 doc_type: task
-status: pending
+status: completed
 date: 2026-11-18
 type: enhancement
 functional_area: application
