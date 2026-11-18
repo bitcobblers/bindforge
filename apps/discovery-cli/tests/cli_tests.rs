@@ -118,7 +118,10 @@ fn test_cli_list_json_format() {
         assert_eq!(obj.len(), 5, "DiscoveredGame has exactly five fields");
         assert_eq!(obj["slug"], slug);
         assert_eq!(obj["display_name"], display_name);
-        assert_eq!(obj["platform"], "steam-linux");
+        // Chosen design §8 / Context: T-001 changes no serialized shape, so
+        // `platform` keeps serde's default variant-name spelling (the r1 major
+        // `#[serde(rename_all = "kebab-case")]` was reverted as unauthorized).
+        assert_eq!(obj["platform"], "SteamLinux");
         assert!(obj["codec_id"].is_null(), "codec_id must be null");
         let library_root = if library.is_empty() {
             root.clone()

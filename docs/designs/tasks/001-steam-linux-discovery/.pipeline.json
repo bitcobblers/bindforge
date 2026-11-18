@@ -8,14 +8,14 @@
     "path": "docs/tasks/T-001-steam-linux-discovery.md"
   },
   "status": "running",
-  "lastStage": "code-review",
+  "lastStage": "fix",
   "designRound": 4,
   "codeRound": 1,
   "designBudgetUsed": 3,
-  "codeBudgetUsed": 3,
+  "codeBudgetUsed": 4,
   "editorialDone": false,
-  "testsGreen": true,
-  "testsNeedUpdate": false,
+  "testsGreen": false,
+  "testsNeedUpdate": true,
   "stageFailures": {},
   "stageCommits": [
     "45f9036d97e784a4ff8b41c1fd0a60da00bb65c4",
@@ -32,7 +32,8 @@
     "b2adcc9cce43f69fde5b54186f8199cbbeba25ac",
     "ad330589ba4c76f94e9e8f2737fcefb9e6d4c424",
     "77e24c72f9ed0c5347a891337d36029ba9fa4eb6",
-    "02edb876116398ce264a98db39160ef0a6c91d8c"
+    "02edb876116398ce264a98db39160ef0a6c91d8c",
+    "752096e9a851843caca904c18f36c0ab06710779"
   ],
   "forceNext": null,
   "results": [
@@ -1031,6 +1032,21 @@
       "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/code-review-testing-r1c1.md",
       "durationMs": 101177,
       "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 1,
+      "sessionID": "ses_e130f2513ffej9O5I9bLOQWwl8",
+      "agent": "code/coder",
+      "at": 1794976762984,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "fix: revert unauthorized Platform serde rename and restore §7 message wording",
+        "moves": []
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/fix-r1.md",
+      "durationMs": 192859,
+      "nudges": 0
     }
   ],
   "gateLog": [
@@ -1117,10 +1133,17 @@
       "proceed": false,
       "reason": "dissent pass c2 pending: correctness, compatibility, testing",
       "at": 1794976570086
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1794976777170
     }
   ],
   "startedAt": 1794969708852,
-  "updatedAt": 1794976570086,
+  "updatedAt": 1794976777170,
   "flow": "full",
   "baseRef": "4caa688933b2969f569f6126dddb713180c7c410",
   "designCycle": 3,
@@ -1341,14 +1364,14 @@
   },
   "reviseNoChange": false,
   "gateEvidence": {
-    "at": 1794976276470,
-    "green": true,
+    "at": 1794976777169,
+    "green": false,
     "legs": [
       {
         "command": "npm run check",
         "cwd": "tools/orchestration",
         "exit": 0,
-        "tail": "npm notice run @bindforge/orchestration@1.0.0 precheck npm notice run npm install  up to date, audited 178 packages in 2s  45 packages are looking for funding   run `npm fund` for details  15 vulnerabilities (9 moderate, 6 high)  To address issues that do not require attention, run:   npm audit fix  To address all issues (including breaking changes), run:   npm audit fix --force  Run `npm audit` for details. npm warn install-scripts 1 package had install scripts blocked because they are not covered by allowScripts: npm warn install-scripts   esbuild@0.28.2 (postinstall: node install.js) npm warn install-scripts npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow. npm notice run @bindforge/orchestration@1.0.0 check npm notice run npm run lint && npm run format:check && npm run test npm notice run @bindforge/orchestration@1.0.0 lint npm notice run eslint . npm notice run @bindforge/orchestration@1.0.0 format:check npm notice run prettier --check . Checking formatting... All matched files use Prettier code style! npm notice run @bindforge/orchestration@1.0.0 test npm notice run vitest run          dmesg(1) may have more information after failed mount system call.   Test Files  61 passed (61)       Tests  692 passed | 2 skipped (694)    Start at  23:31:07    Duration  8.18s (tests 93%, import 7%)      Isolate  61 workers spawned · ~74ms startup each (spawn + environment, per file)              at least ~493ms faster with isolate: false — reuses workers across files instead of one per file [2 tail line(s) dropped by the record's citation rule]"
+        "tail": "npm notice run @bindforge/orchestration@1.0.0 precheck npm notice run npm install  up to date, audited 178 packages in 2s  45 packages are looking for funding   run `npm fund` for details  15 vulnerabilities (9 moderate, 6 high)  To address issues that do not require attention, run:   npm audit fix  To address all issues (including breaking changes), run:   npm audit fix --force  Run `npm audit` for details. npm warn install-scripts 1 package had install scripts blocked because they are not covered by allowScripts: npm warn install-scripts   esbuild@0.28.2 (postinstall: node install.js) npm warn install-scripts npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow. npm notice run @bindforge/orchestration@1.0.0 check npm notice run npm run lint && npm run format:check && npm run test npm notice run @bindforge/orchestration@1.0.0 lint npm notice run eslint . npm notice run @bindforge/orchestration@1.0.0 format:check npm notice run prettier --check . Checking formatting... All matched files use Prettier code style! npm notice run @bindforge/orchestration@1.0.0 test npm notice run vitest run          dmesg(1) may have more information after failed mount system call.   Test Files  61 passed (61)       Tests  692 passed | 2 skipped (694)    Start at  23:39:28    Duration  7.98s (tests 92%, import 7%)      Isolate  61 workers spawned · ~73ms startup each (spawn + environment, per file)              at least ~485ms faster with isolate: false — reuses workers across files instead of one per file [2 tail line(s) dropped by the record's citation rule]"
       },
       {
         "command": "cargo fmt --all -- --check",
@@ -1360,13 +1383,13 @@
         "command": "cargo clippy --workspace --all-targets -- -D warnings",
         "cwd": ".",
         "exit": 0,
-        "tail": "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s"
+        "tail": "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.05s"
       },
       {
         "command": "cargo test --workspace --locked",
         "cwd": ".",
-        "exit": 0,
-        "tail": "[30762 characters elided by the gate tail cap]in_root_without_libraryfolders_vdf_still_yields_the_root ... ok test parse_manifest_extracts_name_and_installdir ... ok test discover_never_emits_compatdata_paths_or_decoy_games ... ok test parse_manifest_falls_back_to_installdir_when_name_is_absent ... ok test discover_output_honours_the_game_output_contract ... ok test parse_manifest_falls_back_to_installdir_when_name_is_empty ... ok test libraries_in_root_returns_root_and_secondary_canonicalized_sorted_and_deduped ... ok test parse_manifest_reads_appstate_and_keys_case_insensitively ... ok test parse_manifest_rejects_document_without_appstate_section ... ok test parse_manifest_rejects_manifest_with_neither_name_nor_installdir ... ok test parse_manifest_rejects_unparseable_text ... ok test plugin_name_is_steam_linux ... ok test parse_manifest_rejects_unusable_installdir ... ok  test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s       Running unittests src/main.rs (target/debug/build/discovery-cli/c4e1d480b1d86eb6/out/discovery_cli-c4e1d480b1d86eb6)  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s       Running tests/cli_tests.rs (target/debug/build/discovery-cli/28b80873fe5198a2/out/cli_tests-28b80873fe5198a2)  running 3 tests test test_cli_list_json_empty_for_missing_steam_root ... ok test test_cli_list_format ... ok test test_cli_list_json_format ... ok  test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests bindforge_core  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests bindforge_transforms  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests discovery  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        "exit": 101,
+        "tail": "[30779 characters elided by the gate tail cap]e_and_installdir ... ok test libraries_in_root_without_libraryfolders_vdf_still_yields_the_root ... ok test discover_never_emits_compatdata_paths_or_decoy_games ... ok test parse_manifest_falls_back_to_installdir_when_name_is_absent ... ok test discover_output_honours_the_game_output_contract ... ok test parse_manifest_reads_appstate_and_keys_case_insensitively ... ok test parse_manifest_rejects_document_without_appstate_section ... ok test libraries_in_root_returns_root_and_secondary_canonicalized_sorted_and_deduped ... ok test parse_manifest_falls_back_to_installdir_when_name_is_empty ... ok test parse_manifest_rejects_manifest_with_neither_name_nor_installdir ... ok test parse_manifest_rejects_unparseable_text ... ok test parse_manifest_rejects_unusable_installdir ... ok test plugin_name_is_steam_linux ... ok  test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s       Running unittests src/main.rs (target/debug/build/discovery-cli/c4e1d480b1d86eb6/out/discovery_cli-c4e1d480b1d86eb6)  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s       Running tests/cli_tests.rs (target/debug/build/discovery-cli/28b80873fe5198a2/out/cli_tests-28b80873fe5198a2)  running 3 tests test test_cli_list_json_empty_for_missing_steam_root ... ok test test_cli_list_format ... ok test test_cli_list_json_format ... FAILED  failures:  ---- test_cli_list_json_format stdout ----  thread 'test_cli_list_json_format' (4014350) panicked at apps/discovery-cli/tests/cli_tests.rs:121:9: assertion `left == right` failed   left: String(\"SteamLinux\")  right: \"steam-linux\" note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace   failures:     test_cli_list_json_format  test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s  error: test failed, to rerun pass `-p discovery-cli --test cli_tests`"
       }
     ]
   },
