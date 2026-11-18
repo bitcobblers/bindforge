@@ -8,17 +8,18 @@
     "path": "docs/tasks/T-001-steam-linux-discovery.md"
   },
   "status": "running",
-  "lastStage": "research",
-  "designRound": 0,
+  "lastStage": "proposal",
+  "designRound": 3,
   "codeRound": 0,
-  "designBudgetUsed": 0,
+  "designBudgetUsed": 3,
   "codeBudgetUsed": 0,
   "editorialDone": false,
   "testsGreen": false,
   "testsNeedUpdate": false,
   "stageFailures": {},
   "stageCommits": [
-    "45f9036d97e784a4ff8b41c1fd0a60da00bb65c4"
+    "45f9036d97e784a4ff8b41c1fd0a60da00bb65c4",
+    "8376382788b2d3ec9fdbfeae16f24c1c6582fb75"
   ],
   "forceNext": null,
   "results": [
@@ -39,11 +40,387 @@
       "docLines": 420,
       "docLinesAdded": 420,
       "docLinesRemoved": 0
+    },
+    {
+      "stage": "proposal",
+      "round": 0,
+      "sessionID": "ses_e1370cd5bffeqWqrUh8q7ebI8w",
+      "agent": "design/designer",
+      "at": 1794970417585,
+      "reply": {
+        "commitMessage": "docs: propose Linux Steam discovery plugin design for T-001"
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/proposal-r0.md",
+      "durationMs": 247533,
+      "nudges": 0,
+      "docName": "02-proposal.md",
+      "docLines": 429,
+      "docLinesAdded": 429,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e136d0608ffebIzmnB0M5Sbg0F",
+      "agent": "review/design-correctness",
+      "at": 1794970606315,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "blocker",
+            "location": "Chosen design §3 Library selection — \"- `<root>/steamapps` itself, always.\"",
+            "problem": "The root-as-library inclusion returns a directory one level below what every other section treats as a 'library'. §3's closing line ('`appmanifest_*.acf` files are read only as entries directly inside a selected library's `steamapps/`'), §5's composition (`l.join(\"steamapps\").join(\"common\")`), A2, and the Goals bullet ('a guaranteed scan of each root's own `steamapps/`') all require a library entry to *contain* `steamapps/`, and §2's canonical path rule drops entries lacking one. As written `<root>/steamapps` requires `<root>/steamapps/steamapps`, so it is dropped or scanned at the wrong place, the root's own manifests are never read, and the design's defence against the A12 silent-zero bug is inert. Confirmed against A2/A3's own source (steamlocate-rs/src/library.rs: `Library::from_dir` reads `path.join(\"steamapps\")`; `resolve_app_dir` = path/steamapps/common/<installdir>). Failure scenario: a single-library native install (`~/.local/share/Steam`, no secondary library) yields zero rows, violating T-001's Done-when 'Running `discovery list` on a Linux machine with Steam correctly identifies installed games', and Test strategy #8 ('returns exactly four games') and #3 are unsatisfiable as specified.",
+            "fix": "Make the inclusion \"`<root>` itself, always\" and state in §3 that entries returned by `libraries_in_root` are library roots each containing a `steamapps/` directory, replacing the current off-by-one entry so §2's gate, §3's scan rule and §5's join describe the same directory level."
+          },
+          {
+            "severity": "major",
+            "location": "§9 Fixtures — \"# modern shape: \\\"0\\\" → \\\".\\\", \\\"1\\\" → \\\"../secondary\\\"\"",
+            "problem": "The `\"0\"` entry contradicts §3's join rule ('otherwise joined to the directory holding the VDF' = `<root>/steamapps`), so `\".\"` resolves to `<root>/steamapps`, not `<root>`; only `\"1\" → \"../secondary\"` is written against that base. The `\"0\"` entry therefore contributes nothing that survives the `steamapps` gate, and §9's claim that 'the `\"0\" → \".\"` entry exercises root/library de-duping' plus Test strategy #3's 'adds no duplicate' assertion test nothing.",
+            "fix": "Keep the join base as the VDF's directory and write the fixture entries as `\"0\" → \"..\"` and `\"1\" → \"../secondary\"`, replacing the current `\".\"`; `\"..\"` canonicalizes to the same directory as §3's root inclusion, which is the de-duping the section claims to exercise, and makes the primary library's manifests reachable."
+          },
+          {
+            "severity": "major",
+            "location": "§7 Failure policy and the one error path vs Test strategy #7 — \"The single `Err` case: at least one root was selected but **no** library under any selected root could be scanned.\"",
+            "problem": "The predicate is about libraries being unscannable, and §7's skip list already places 'a manifest that fails to parse' on the continue side; Test strategy #7 pins the opposite case ('a root that has a `steamapps` directory whose entries are all unparseable returns exactly one `Err(DiscoveryError::PluginError(_))`'). There the library scanned successfully and yielded nothing, so §7 returns `Ok(vec![])` and the design's own test fails. §7's error text ('the count of files skipped as unreadable or malformed') points the other way again. The alternative reading ('no games emitted from a selected root') would make a legitimately empty install an error, which §7's 'nothing installed' sentence forbids. Risks row 4 names Test #7 as the mitigation for 'a degraded scan prints nothing', so silently changing either side loses the mitigation.",
+            "fix": "Restate the predicate over candidate files: 'at least one library was selected, at least one `appmanifest_*.acf` was found under it, every one was skipped as unreadable/non-UTF-8/unparseable, and no game was emitted', keeping 'no manifests at all' on the `Ok(vec![])` side, so §7 and Test #7 describe one condition."
+          },
+          {
+            "severity": "major",
+            "location": "§2 Root selection and assumption A9 — \"`home` comes from `std::env::home_dir()` (A9)\"",
+            "problem": "On the pinned toolchain (`rust-toolchain.toml` channel 1.85.0) `std::env::home_dir` still carries `#[deprecated(since = \"1.29.0\")]`: the 1.85.0 reference page shows the deprecation banner and the 1.85.0 release notes defer removal to a later release (undeprecated in 1.87 per the `home` crate). The call site emits a `deprecated` warning, and A18's gate `.github/workflows/check.yml:31` (`cargo clippy --workspace --all-targets -- -D warnings`) turns it into a hard failure, so §10's 'gates pass' and Test strategy #10 are false as written. A9 is marked `verified` against the unversioned doc page, which no longer shows the deprecation and so does not support the pinned-toolchain fact the design depends on.",
+            "fix": "Replace the sentence with `std::env::var_os(\"HOME\")` (documenting that the passwd fallback is not used on the pinned floor), or keep `home_dir()` behind a named `#[allow(deprecated)]` with a reason; either way record the pinned-toolchain deprecation status as its own assumption row instead of folding it into A9."
+          },
+          {
+            "severity": "minor",
+            "location": "§9 Fixtures vs Test strategy #3 and #7 — \"Read-only, checked-in, one tree used by both packages\"",
+            "problem": "Three roots the tests assert are absent from the fixture tree, and §9 forbids creating them at runtime ('No test writes to the filesystem'): #3's 'a root with no `steamapps` directory yields an empty list', #3's 'a root whose `libraryfolders.vdf` is absent still yields its own `steamapps`', and #7's 'a root that has a `steamapps` directory whose entries are all unparseable' — the latter is the only pin for §7's single error path.",
+            "fix": "Extend the §9 tree with two more roots under `fixtures/steam/` — `empty/` (no `steamapps`) and `broken/steamapps/` holding two truncated `appmanifest_*.acf` — and cite them from Test strategy #3 and #7."
+          },
+          {
+            "severity": "nit",
+            "location": "§1 Modules and public surface — \"Every `pub` item above is exercised by a test in *Test strategy*\"",
+            "problem": "`SteamLinuxPlugin::from_host()` is exercised by no test (deliberately: Test #10 states 'no test reads the developer's home directory'), and `name()` returning `\"steam-linux\"` is asserted nowhere.",
+            "fix": "Scope the sentence to 'every `pub` item except `from_host()`, the thin wrapper over the `host_candidates` + probe pair Test #5 pins', or add a `name()` assertion to Test #8."
+          },
+          {
+            "severity": "nit",
+            "location": "§9 Fixtures — \"the crate's tests directly, the CLI's through `env!(\\\"CARGO_MANIFEST_DIR\\\")` (A19)\"",
+            "problem": "A19 yields the root of the test's own package, so from `apps/discovery-cli` the shared tree is reached only by a `../../crates/discovery/tests/…` hop the section never states; read as 'the fixture root' it produces a path that does not exist.",
+            "fix": "Name the join explicitly: `env!(\"CARGO_MANIFEST_DIR\") + \"/../../crates/discovery/tests/fixtures/steam/minimal\"`."
+          }
+        ]
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/design-review-correctness-r1c0.md",
+      "durationMs": 188632,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e136a2509ffeaHW27VhJDGgnpm",
+      "agent": "review/design-compatibility",
+      "at": 1794970760219,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "blocker",
+            "location": "Chosen design §3 Library selection within a root, with §5 Manifest to `DiscoveredGame` — quote: \"`<root>/steamapps` itself, always.\" with \"install_path = l.join(\"steamapps\").join(\"common\").join(m.install_dir)\"",
+            "problem": "The document uses \"library\" in two mutually exclusive senses. §3's closing sentence (\"`appmanifest_*.acf` files are read only as entries directly inside a selected library's `steamapps/`\"), §5's join, and §2's canonical path rule (library paths are \"dropp[ed] ... that lack the required `steamapps` directory\") all treat a returned entry as a library root, but the always-included entry `<root>/steamapps` is the steamapps directory itself. As written: that entry fails §2's own gate unless `<root>/steamapps/steamapps` exists, so the always-scan that Risks row 2 and A12 lean on to avoid the silent-zero bug silently drops the root's own library; if the gate is instead read as not applying, the root's manifests are read from `<root>/steamapps/steamapps/appmanifest_*.acf`, a path no real Steam tree has, and the emitted install_path is one level too deep. The §9 fixture (manifests directly in `steamapps/`) then yields one game, not the four Test strategy #8 asserts, while #6's \"ends with `steamapps/common/<installdir>`\" passes vacuously and hides it. Consequence for compatibility: the matrix row \"Linux, native Steam under `$HOME` ... | Yes\" and the task's Done-when clause \"Running `discovery list` on a Linux machine with Steam correctly identifies installed games\" (docs/tasks/T-001-steam-linux-discovery.md:24) fail for the common single-library install.",
+            "fix": "Pick one convention in §3: `libraries_in_root` returns library roots (each containing a `steamapps/` directory), and the always-included entry is `root` itself, gated on `root/steamapps` being a directory; §2's gate and §5's join then stay as written. Update §9's fixture VDF entries to `\"0\" → \"..\"` and `\"1\" → \"../../secondary\"` (joined to the VDF's own directory `<fixture>/steamapps`), which keeps \"0\" exercising root/library de-duping and \"1\" exercising the relative join."
+          },
+          {
+            "severity": "major",
+            "location": "Chosen design §2 Root selection — quote: \"`home` comes from `std::env::home_dir()` (A9)\" (with §10 Dependencies and gates, Test strategy #10, A9/A15/A18)",
+            "problem": "On the toolchain this repo pins (rust-toolchain.toml channel 1.85.0), `std::env::home_dir` is still `#[deprecated(since = \"1.29.0\", note = \"This function's behavior may be unexpected on Windows. Consider using a crate from crates.io instead.\")]` (verified in library/std/src/env.rs at the 1.85.0 tag); the un-deprecation the 1.85.0 release notes promised landed only later. A call from `crates/discovery` therefore emits the warn-by-default `deprecated` lint, and .github/workflows/check.yml:31 runs `cargo clippy --workspace --all-targets -- -D warnings`, so Test strategy #10, Rollout step 3 and the matrix's \"CI `rust` job ... | Yes\" row cannot pass as designed; §10/A15 (no new dependency, byte-identical Cargo.lock) rule out the crates.io replacement the note asks for. Same clause, smaller mismatch: A9 cites the current std docs (\"$HOME ... if it is set (and not an empty string)\"), while 1.85.0's text says \"including to an empty string\", so an empty $HOME yields Some(\"\") and every §2 candidate becomes a CWD-relative path that can pass the steamapps gate against an unrelated directory.",
+            "fix": "Replace that clause with `home` = `std::env::var_os(\"HOME\")`, treating unset-or-empty as \"no home\" (empty candidate list, so §7 returns `Ok(vec![])`), leaving `host_candidates(home, env)` and its test unchanged; a bare `#[allow(deprecated)]` clears the lint but leaves the empty-$HOME behaviour."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design §2 Canonical path rule, with Compatibility matrix row \"Linux, native Steam under `$HOME` (incl. `~/.steam/*`) | Yes\" — quote: \"`std::fs::canonicalize` resolves the symlink aliases (`~/.steam/root` → the real root) ... so no library is ever scanned twice\"",
+            "problem": "That Yes row depends on de-duping the ~/.steam/steam, ~/.steam/root and ~/.steam/debian-installation aliases of a single install (§2 candidate 2), but Test strategy #3 pins only the VDF `\"0\" → \".\"` case, and §9's \"No test writes to the filesystem\" bars a symlink fixture, so the alias property the row claims is never asserted (checklist item 7: a platform test per supported row).",
+            "fix": "Name a test that passes the same directory to `from_roots` in two spellings that canonicalize identically (the fixture root and `<fixture>/steamapps/..`) and asserts the game count is unchanged — no symlink, no filesystem write."
+          },
+          {
+            "severity": "minor",
+            "location": "Compatibility matrix row \"Linux, libraries on arbitrary mounts (`/run/media/…`, `/mnt/…`, ZFS) | Yes\" — quote: \"Absolute `path` values are accepted as-is\"",
+            "problem": "No test in Test strategy exercises the absolute branch of §3's path rule: #3 covers only the relative `../secondary` entry, and §9 states a checked-in fixture \"cannot contain this machine's absolute paths\", so the one code path that makes this row Yes is untested (checklist item 7).",
+            "fix": "Add a pure `pub fn library_path(vdf_dir: &Path, value: &str) -> Option<PathBuf>` to §1's surface holding §3's stated rule (absolute as-is, else join to the VDF's directory, drop empty), have `libraries_in_root` call it, and assert both branches in Test strategy #3 — reachable from the crates/discovery/tests/ integration tests the design keeps, consistent with §1's \"Every `pub` item above is exercised by a test\". Otherwise downgrade the row to Partial."
+          }
+        ]
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/design-review-compatibility-r1c0.md",
+      "durationMs": 153870,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e1367cbdfffeNjShl7Xdbsc9Qy",
+      "agent": "review/design-security",
+      "at": 1794970857343,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "§4 KeyValues reader + §8 CLI wiring — \"`keyvalues::parse` accepts, for both file kinds: whitespace-separated tokens; quoted and bare keys and values\" / \"The printing code is untouched, so the table header and JSON shape are unchanged.\"",
+            "problem": "The accepted subset constrains structure (braces, depth, conditionals, file size) but never the character class inside a key or value, and no per-value length cap exists beyond the 1 MiB file cap. §5 copies name/installdir verbatim, and the sole consumer prints them raw: apps/discovery-cli/src/main.rs:48-57 interpolates display_name and install_path.display() into a pipe-delimited stdout table. A manifest name carrying 0x1b gives terminal-escape injection into the user's terminal and any captured log; a value carrying a newline forges table rows; a ~1 MiB single-token name is printed whole. Valid-UTF-8 control characters pass both the &str gate and the grammar; the --json path is safe only incidentally (serde escapes control chars). These are not merely \"the user's own files\": name is written by the Steam client from server-supplied store metadata, and §3 accepts arbitrary absolute library paths, so a manifest on a world-writable auto-mounted library gets read and printed. This plugin is the first data source ever to feed that printer (DummyPlugin returned vec![]).",
+            "fix": "In §4 add the missing clause to the explicit subset: a key or value containing any control character other than tab, or exceeding a named per-value length cap, is a positioned KeyValueError; add the matching case to Test strategy #1. Leaves §8's printer untouched and keeps the public surface unchanged."
+          },
+          {
+            "severity": "major",
+            "location": "Rollout step 5 — \"together with one real `appmanifest_*.acf` and the machine's `libraryfolders.vdf` if they can be shared\"",
+            "problem": "Instructs a contributor to paste raw host files into 03-build-notes.md, a checked-in artifact in a public repo (unretractable once committed), with \"if they can be shared\" as the only guard and no redaction requirement. Both file kinds carry personal data: absolute paths encoding the account name and machine layout, and libraryfolders.vdf's apps map, which is the owner's complete installed-app inventory. The task's Done-when asks only that discovery list correctly identify games on a real machine (docs/tasks/T-001-steam-linux-discovery.md:24); the pasting is the design's own addition, so the exposure is discretionary and owned here.",
+            "fix": "Make the step capture a redacted capture: replace the home prefix and username with a placeholder, drop the apps map and any label values, keep only the structural shape and the keys the reader must handle — stated inside the step so the contributor follows the scrub rather than deciding per-file."
+          },
+          {
+            "severity": "minor",
+            "location": "Context / Assumption register — \"adds the first implementation — `SteamLinuxPlugin`, which reads library folders from `libraryfolders.vdf`, enumerates `appmanifest_*.acf`\"",
+            "problem": "No line classifies the two data sources, though every later control (§2 canonicalization, §4 caps, §5 installdir rejects) implicitly depends on that classification. The Risks table calls them only \"user-editable files\", which understates the surface and leaves the caps and rejects reading as robustness choices, so a later \"convenience\" relaxation looks harmless.",
+            "fix": "Add one assumption-register row (or one Context sentence) classifying libraryfolders.vdf and appmanifest_*.acf as untrusted external input — user-writable on disk and, for name/installdir, written by the client from store metadata — whose strings reach the CLI's unescaped printer."
+          },
+          {
+            "severity": "minor",
+            "location": "§4 KeyValues reader — \"Files larger than 1 MiB are skipped as malformed (A16): the reader's work is bounded per file\"",
+            "problem": "The enforcement point is unspecified, and the neighbouring text describes the opposite order (\"the caller reads bytes and skips a file that is not valid UTF-8\", i.e. read-everything-then-decide). A read-then-check implementation defeats the cap it claims: peak memory equals the file's real size, and a non-regular entry named appmanifest_*.acf (FIFO or device node in a library directory) is read to completion or blocks the scan, with §7's skip-and-continue turning the block into a hang. Neither §4 nor Test strategy says only regular files are opened.",
+            "fix": "State in §4 that the caller checks symlink_metadata's file type and st_size, opens regular files only, and bounds the read itself (Read::take(1MiB + 1)), so the cap holds regardless of whether the size field is truthful."
+          },
+          {
+            "severity": "nit",
+            "location": "§3 Library selection within a root — \"a `path` is used as-is when absolute and otherwise joined to the directory holding the VDF\"",
+            "problem": "Accepting an absolute path from an untrusted VDF is required by the Compatibility matrix row for libraries on arbitrary mounts, so this is not a defect; what is missing is the recorded blast radius, so the absence of a confinement rule reads as an oversight.",
+            "fix": "One sentence: a hostile path can only make the plugin open files named appmanifest_*.acf directly inside a directory that already has a steamapps directory, read-only, surfacing contents only as display_name/install_path — the reason no confinement rule is imposed."
+          },
+          {
+            "severity": "nit",
+            "location": "§8 CLI wiring / Rollout step 4 — \"`install_path = l.join(\"steamapps\").join(\"common\").join(m.install_dir)`\"",
+            "problem": "The checklist question \"what leaves the machine when bindings are shared\" has no answer anywhere in the document, including Deferred: install_path embeds the host's account name and library layout, and this design is what puts it on the machine-readable --json handoff downstream tooling consumes.",
+            "fix": "Add one Deferred line assigning the decision — whether install_path may be embedded unredacted in a shared binding file — to the sharing/codec design."
+          }
+        ]
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/design-review-security-r1c0.md",
+      "durationMs": 97096,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e1366507effeoDxw306CG7Ycns",
+      "agent": "review/design-performance",
+      "at": 1794970934086,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design §2 \"Canonical path rule (canonical statement, referenced below)\" — \"every set of directories the plugin scans — roots from the candidate list, and library paths within a root — is built by canonicalizing each entry … then sorting, then de-duplicating … so no library is ever scanned twice\"",
+            "problem": "De-duping happens per set, and the library sets are built per root, so no library path is ever compared across roots. Two distinct canonical roots (native $XDG_DATA_HOME/Steam plus the Flatpak ~/.var/app/com.valvesoftware.Steam/.local/share/Steam probed in §2) each read their own libraryfolders.vdf and can name the same library directory — a shared absolute path, or a Flatpak-side symlink that canonicalizes to the native library and so passes the steamapps gate in both sets. That library's steamapps/ is then read_dir'ed twice and every appmanifest_*.acf in it opened and parsed twice, and the result vector carries exact duplicate (slug, install_path) rows; §5's \"Identical slugs from two libraries stay two rows\" does not cover duplicates from one library reached by two roots. The stated \"never scanned twice\" property cannot be established from the mechanism as written.",
+            "fix": "Build the library set once across all selected roots — append each root's own steamapps plus every VDF path entry into a single list and apply the canonical path rule once to that union, replacing the clause \"and library paths within a root\" (equivalently, thread a HashSet<PathBuf> of already-scanned canonical libraries through the root loop) — and extend Test strategy #3 to assert two roots sharing one library yield that library once."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design §4 \"KeyValues reader\" — \"Input is `&str`; the caller reads bytes and skips a file that is not valid UTF-8 rather than aborting a scan. Files larger than 1 MiB are skipped as malformed (A16): the reader's work is bounded per file\"",
+            "problem": "The size bound is stated as a property of a reader over &str, which is equally satisfied by reading the whole file and checking its length afterwards; nothing in the text says the bound is applied before the bytes are read. Likewise file type is unconstrained: a FIFO or device node (or symlink to one) named appmanifest_*.acf directly inside a library's steamapps/ would block the read indefinitely, and a multi-gigabyte regular file matching the glob is fully allocated before the cap rejects it. The per-file bound that §4's rationale and the Risks row (\"Both caps are single named constants\") rest on is therefore not established by the specified sequence.",
+            "fix": "State that the file-open path gates on fs::metadata first — skip unless is_file() and len() <= 1 MiB — so the 1 MiB cap is enforced before any bytes are read rather than as a post-read length check, and count that skip in the §7 skipped-file tally."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design §4 \"KeyValues reader\" — \"the caller reads bytes and skips a file that is not valid UTF-8\"",
+            "problem": "As worded this prescribes fs::read plus a separate UTF-8 validation: one full-file Vec<u8> allocation and a second full copy into a String, once per manifest in every library, where fs::read_to_string reads straight into the String and validates in place.",
+            "fix": "Name fs::read_to_string as the read call, mapping its InvalidData arm to the existing skip, so the wording does not mandate the extra allocation and copy."
+          }
+        ]
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/design-review-performance-r1c0.md",
+      "durationMs": 76720,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 3,
+      "sessionID": "ses_e13537aabffeI8hE16MTY1KRqH",
+      "agent": "review/design-compatibility",
+      "at": 1794972369329,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Assumption register A9 and Chosen design §2 Root selection — \"`home` comes from `std::env::home_dir()` (A9)\"; §10 — \"`#[path]`-free, `unsafe`-free, no `std` feature flags required on the 1.85 floor (A15)\"",
+            "problem": "On the toolchain this repo pins the call is deprecated, so the design's own gate claim is false as written. rust-toolchain.toml pins channel 1.85.0, and library/std/src/env.rs at tag 1.85.0 carries `#[deprecated(since = \"1.29.0\", note = \"This function's behavior may be unexpected on Windows. ...\")] pub fn home_dir() -> Option<PathBuf>`; the undeprecation landed after the floor (Rust 1.86.0 notes: \"Undeprecate env::home_dir\"). A9's \"verified\" basis is the unversioned doc.rust-lang.org/std/env/fn.home_dir.html — current stable, which no longer shows the deprecation — so the register records a verification against a newer toolchain than the one CI uses. Concretely: the first `cargo clippy --workspace --all-targets -- -D warnings` run (the Clippy step of the `rust` job, A18) fails on the `deprecated` lint at that one call site, and §10's dependency posture forecloses the usual outs — \"`crates/discovery/Cargo.toml` and `apps/discovery-cli/Cargo.toml` gain nothing, so `Cargo.lock` stays byte-identical\" rules out `dirs`/`home`, and a toolchain bump is outside T-001.",
+            "fix": "State the call-site decision in §2 in one clause: call `std::env::home_dir()` under a scoped `#[allow(deprecated)]` on `from_host()`, noting the lint is an artifact of the 1.85.0 floor (on Unix that function is exactly `$HOME`, else the passwd entry, which is all §2 needs) — or drop the std call and read `std::env::var_os(\"HOME\")` with a documented empty-value rule, which is the same text the empty-`$HOME` finding needs. Then correct A9's basis to the versioned 1.85.1 page so the register records the floor it was verified against, and add the `deprecated` lint to §10's posture sentence rather than leaving \"no `std` feature flags required on the 1.85 floor\" as the whole account of the floor."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design §2 Root selection — \"`home` comes from `std::env::home_dir()` (A9); when it returns `None`, the candidate list is empty and the plugin discovers nothing\"",
+            "problem": "That is the only guard on the one path input the design takes from the environment, and on the pinned toolchain it is not the guard the wording implies: 1.85.0 documents home_dir() as returning the value of HOME \"if it is set (including to an empty string)\", so a container, service or cron context with `HOME=` yields Some(\"\") rather than None. §2's candidates then become `.local/share/Steam`, `.steam/steam`, `.steam/root`, `.var/app/com.valvesoftware.Steam/…`, `snap/steam/common/…` — relative paths — and both the \"kept only if `<candidate>/steamapps` is a directory\" probe and the canonical path rule resolve them against the process working directory, so `discovery list` from a directory that happens to contain a `.steam/steam/steamapps` tree treats that tree as an installed Steam root. This contradicts the Compatibility matrix row \"Linux, Steam not installed / no home directory | Yes | `Ok(vec![])`, no error, no stderr output (§7)\", and it is the one place where the discipline §2 already applies to the neighbouring env input is missing: candidate 1 gets \"a set-but-relative `XDG_DATA_HOME` is ignored per the base-directory spec (A9)\".",
+            "fix": "Extend §2's rule by one clause to this input: `host_candidates` returns an empty candidate list when `home` is empty or relative. Name the case in Test strategy #5 next to the existing \"a relative `XDG_DATA_HOME` does not (A9)\" assertion. `host_candidates` is already pure and already asserted path-by-path, so no new seam, filesystem write, or dependency is introduced."
+          },
+          {
+            "severity": "minor",
+            "location": "Compatibility matrix row \"Linux, libraries on arbitrary mounts (`/run/media/…`, `/mnt/…`, ZFS) | Yes | Absolute `path` values are accepted as-is; an unmounted library is skipped, not fatal\", read against Test strategy #3 and §3 — \"a `path` is used as-is when absolute and otherwise joined to the directory holding the VDF\"",
+            "problem": "This is the only `Yes` matrix row whose distinguishing mechanism no named test exercises, which is exactly what checklist item 7 asks for. §3's rule has two branches and the fixture reaches only the relative one: §9's libraryfolders.vdf holds `\"0\" → \".\"` and `\"1\" → \"../secondary\"`, Test strategy #3 asserts exactly those two, and §9 explains why the absolute branch cannot appear in a checked-in file (\"a checked-in fixture cannot contain this machine's absolute paths\"). A fabricated absolute value cannot cover it either, because the canonical path rule's `steamapps`-directory gate would drop it and the assertion would pass without reaching \"accepted as-is\". The `--steam-root` seam does not close the gap either — it supplies roots, which bypass `libraries_in_root`'s VDF branch. The row's second clause (\"an unmounted library is skipped, not fatal\") is unclaimed too: #7's two cases are a nonexistent root and an all-unparseable `steamapps`.",
+            "fix": "Make the branch a pure function in §1's public surface — `pub fn resolve_library_path(vdf_dir: &Path, value: &str) -> Option<PathBuf>` — with `libraries_in_root` calling it, replacing the status quo where the branch lives inline and can only be reached through a machine-specific file. Then extend Test strategy #3 with the two assertions the row needs on nameable values: an absolute value such as `/bindforge-abs/Media/SteamLibrary` resolves to itself, and `\"1\"` under `tests/fixtures/steam/minimal/steamapps` resolves inside the fixture. This also matches §1's existing rule that \"every `pub` item above is exercised by a test in *Test strategy*\"."
+          },
+          {
+            "severity": "nit",
+            "location": "Test strategy #8 — \"returns exactly four games — `unknown/example-game`, `unknown/mixed-case-game`, `unknown/nameless-install`, `unknown/secondary-title`\" (and #6's \"`slug == normalize_slug(display_name)`\")",
+            "problem": "Every display name the suite pins is ASCII, so nothing in the run records what a Linux user with an accented or non-Latin store name gets. normalize_slug (crates/discovery/src/slug.rs:1-35) tests characters with `char::is_alphanumeric`, so such names do survive into the slug instead of collapsing to `unknown/` with an empty tail — good behaviour, but it is an accident of the existing helper rather than an expectation this design pins, on the one input (§5's `display_name`) that a real Steam install supplies in the user's locale.",
+            "fix": "Give one fixture manifest an accented `name` (e.g. `\"Les Misérables\"`), add its row to #8's expected list, and its `unknown/les-misérables` slug to #6's output contract. The slug format stays ADR-022's deferred concern; this only pins that non-ASCII names do not degrade to `unknown/`."
+          }
+        ]
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/design-review-compatibility-r3c0.md",
+      "durationMs": 277420,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 3,
+      "sessionID": "ses_e134f3e25ffeY862O8EOuM79d2",
+      "agent": "review/design-security",
+      "at": 1794972474233,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design §4 KeyValues reader — \"Files larger than 1 MiB are skipped as malformed (A16): the reader's work is bounded per file\"",
+            "problem": "The 1 MiB cap's enforcement point is unspecified. An implementation that reads the file and then measures it allocates the whole file before the cap fires, so the stated 'bounded per file' property does not hold for a huge or sparse file in a library's steamapps/.",
+            "fix": "Replace the bare skip sentence with the mechanism named: compare fs::metadata(path)?.len() against the 1 MiB constant before loading contents (or cap the read at 1 MiB plus BOM), and count the over-cap skip in §7's skipped-file tally."
+          }
+        ]
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/design-review-security-r3c0.md",
+      "durationMs": 104810,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 3,
+      "sessionID": "ses_e13537aadffecJuqQ4mIH3yaz2",
+      "agent": "review/design-correctness",
+      "at": 1794972510938,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "blocker",
+            "location": "Chosen design §3 Library selection within a root — \"`<root>/steamapps` itself, always\" + \"a `path` is used as-is when absolute and otherwise joined to the directory holding the VDF\" + \"`appmanifest_*.acf` files are read only as entries directly inside a selected library's `steamapps/`\" (cross-refs: §2 Canonical path rule \"the `\"0\" → root` duplicate\", §5 install_path composition, §9 Fixtures \"Four games survive from this tree\", Test strategy #3/#6/#8)",
+            "problem": "The three rules place a \"library\" at two different levels, so the fixture and the anti-silent-zero guarantee cannot both hold. Since manifests are enumerated at `<library>/steamapps/` and install_path is `l/steamapps/common/<installdir>` (A2, and the cited steamlocate library.rs — `Library::from_dir` reads `path.join(\"steamapps\")`, `resolve_app_dir` appends `steamapps/common` — confirms a library is the parent of steamapps/), the always-included entry must be `<root>`, not `<root>/steamapps`. Consequences as written: (a) `<root>/steamapps` fails §2's own gate (\"dropping entries … that lack the required `steamapps` directory\", i.e. it demands `<root>/steamapps/steamapps`), so the guaranteed scan of the root's own steamapps is dropped — Test #3's \"a root whose `libraryfolders.vdf` is absent still yields its own `steamapps`\" and Risks row 2's mitigation both fail; (b) in the fixture, `\"0\" → \".\"` joined to the VDF's directory resolves to `<root>/steamapps` (one level too deep) while `\"1\" → \"../secondary\"` resolves to `<root>/secondary` (right level), so no single join rule satisfies both — evaluated literally the tree yields one game (appmanifest_900100), not the four that §9 and Test #8 assert; (c) §2's claim that canonicalization de-dupes the `\"0\" → root` entry is false under §3, which never puts `<root>` in the set, and the fixture hides this only because it spells `\"0\"` as the steamapps directory while the cited source shows real files store `\"path\" \"/path/to/first/library\"`.",
+            "fix": "State one level: libraries are library folders (parents of steamapps/); the always-included entry is `<root>` itself, and §2's root gate (`<root>/steamapps` is a directory) is what guarantees the scan; join relative `path` values to `<root>` (the VDF directory's parent) and change the fixture's `\"1\"` entry to `\"secondary\"` so both entries resolve under that single rule portably. §9, Test #3/#6/#8 and §2's de-dupe sentence then hold as written."
+          },
+          {
+            "severity": "major",
+            "location": "§2 Root selection — \"`home` comes from `std::env::home_dir()` (A9)\" and Assumption register A9 (\"verified\", basis https://doc.rust-lang.org/std/env/fn.home_dir.html)",
+            "problem": "On the toolchain this repo pins (rust-toolchain.toml channel = 1.85.0) `std::env::home_dir` still carries `#[deprecated(since = \"1.29.0\")]`; the deprecation was removed only in 1.87.0 (rust-lang/rust#137327), and the 1.85.0 docs page shows \"Deprecated since 1.29.0\". Any call site emits `use of deprecated function`, which `cargo clippy --workspace --all-targets -- -D warnings` (A18, .github/workflows/check.yml:31, and Test strategy #10's own gate) turns into a build failure. A9's basis is the current-stable docs page, which no longer shows the banner, so the row is not supported for the pinned toolchain.",
+            "fix": "Read home via `std::env::var_os(\"HOME\")`, treating absent/empty as \"no home directory\" (which §7 already maps to `Ok(vec![])`) — no dependency, so A15 holds — or keep the call behind `#[allow(deprecated)]`; re-cite A9 to https://doc.rust-lang.org/1.85.0/std/env/fn.home_dir.html and note that on 1.85.0 `HOME=\"\"` yields `Some(\"\")`, leaving relative candidates that only the canonicalize gate removes."
+          },
+          {
+            "severity": "major",
+            "location": "§7 Failure policy and the one error path — \"at least one root was selected but **no** library under any selected root could be scanned\" vs Test strategy #7 — \"a root that has a `steamapps` directory whose entries are all unparseable returns exactly one `Err(DiscoveryError::PluginError(_))`\"",
+            "problem": "§7's own first paragraph files \"a manifest that fails to parse\" under skipped files and reserves the error for libraries that could not be scanned, so code implementing §7 literally returns `Ok(vec![])` for the very scenario Test #7 demands an `Err` for (the steamapps directory was scanned; its manifests just failed to parse). The all-unreadable-library case that does satisfy §7 cannot be produced from a read-only checked-in fixture (§9: \"No test writes to the filesystem\", and a mode change would not survive checkout). Therefore Risks row 4's claim that \"*Test strategy* #7 pins both sides\" is unimplemented, and \"Steam present, every manifest broken\" still prints nothing.",
+            "fix": "Restate the trigger as: at least one root was selected, zero games were emitted, and at least one file was skipped as unreadable or malformed. This matches the message §7 already specifies (it counts skipped files), makes Test #7's all-unparseable fixture the Err side, and leaves the Ok(vec![]) side unchanged (no roots, nonexistent root, Steam installed with no games → zero skipped files)."
+          },
+          {
+            "severity": "minor",
+            "location": "§1 Modules and public surface — \"Every `pub` item above is exercised by a test in *Test strategy*\"",
+            "problem": "`SteamLinuxPlugin::from_host()` is the one public item that no test in Test strategy calls, and the document concedes this itself in Risks row 5: \"`from_host()` cannot be unit-tested\", with `host_candidates` asserted instead. The blanket sentence contradicts that row.",
+            "fix": "Qualify it: \"every `pub` item except `from_host()`, whose candidate list is asserted path-by-path through `host_candidates` (Test strategy #5) and whose probe is §2's root gate\"."
+          },
+          {
+            "severity": "minor",
+            "location": "§2 Canonical path rule — \"then sorting, then de-duplicating\" … \"so no library is ever scanned twice\"",
+            "problem": "The rule is scoped to \"every set of directories the plugin scans\", i.e. one set per root, so a library registered by two separately selected roots (native plus Flatpak/Snap installs pointing at the same /run/media/… or /mnt/… library — the multi-layout case the A8 candidate list exists for) is selected twice and every game in it is emitted twice as identical rows in both the table and `--json`; the \"never scanned twice\" sentence is false as stated.",
+            "fix": "Apply the canonical path rule to the union of library paths across all selected roots (one de-duped set per `discover()` call, assembled in the private scan loop) rather than one set per root; Test #3's per-root `libraries_in_root` assertions are unaffected."
+          },
+          {
+            "severity": "nit",
+            "location": "§8 CLI wiring (`apps/discovery-cli`) — \"registered in place of the deleted `DummyPlugin`\"",
+            "problem": "`DummyPlugin` is the only user of `use discovery::plugin::DiscoveryPlugin;` (apps/discovery-cli/src/main.rs:4); removing it leaves an unused import, which fails the `-D warnings` gate, since register_plugin's `Box<dyn DiscoveryPlugin>` argument supplies the trait-object type without the import.",
+            "fix": "One clause: \"`DummyPlugin` and its `DiscoveryPlugin` import are removed together, and the trait is not re-imported\"."
+          }
+        ]
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/design-review-correctness-r3c0.md",
+      "durationMs": 419034,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 3,
+      "sessionID": "ses_e134da480ffeVtAmKBuqRqtikd",
+      "agent": "review/design-performance",
+      "at": 1794972635544,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design §2 Root selection, canonical path rule — \"every set of directories the plugin scans — roots from the candidate list, and library paths within a root — is built by canonicalizing each entry, ... then sorting, then de-duplicating. ... so no library is ever scanned twice.\"",
+            "problem": "The rule de-dupes each set per root, so the absolute claim does not follow: one external library listed in the libraryfolders.vdf of two coexisting selected roots (a layout the Compatibility matrix itself supports: native + Flatpak/Snap coexist) is scanned twice, duplicating read+parse IO and emitting two byte-identical (slug, install_path) rows because the canonical library prefix makes the paths equal.",
+            "fix": "Build the libraries-to-scan set as the union across all selected roots before scanning, run through the same canonicalize/sort/de-dupe rule; replace the per-root 'library paths within a root' set in the canonical statement with the cross-root union."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design §4 KeyValues reader — \"the caller reads bytes and skips a file that is not valid UTF-8 rather than aborting a scan. Files larger than 1 MiB are skipped as malformed (A16): the reader's work is bounded per file\"",
+            "problem": "The 1 MiB cap is not tied to the IO step: the natural reading of 'reads bytes' then checking validity/size (fs::read_to_string and test) slurps the whole file first, so an unbounded read precedes the cap and the stated per-file boundedness — the design's substitute for a wall-clock budget — is not guaranteed by the text.",
+            "fix": "Pin the cap at IO in one sentence: a file whose fs::metadata len exceeds the 1 MiB constant is skipped without being opened; this replaces the unspecified read-then-check order as the size-gate."
+          }
+        ]
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/design-review-performance-r3c0.md",
+      "durationMs": 161239,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 3,
+      "sessionID": "ses_e134d1522ffeP0N80xTS8IL5uL",
+      "agent": "review/design-complexity",
+      "at": 1794972749779,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Assumption register A9 + Chosen design §2 Root selection — \"`std::env::home_dir()` yields the home directory (on Unix `$HOME`, else the passwd entry)\" / \"`home` comes from `std::env::home_dir()` (A9)\"",
+            "problem": "On the toolchain this repo pins (rust-toolchain.toml channel = \"1.85.0\"), std::env::home_dir carries the banner \"Deprecated since 1.29.0: … Consider using a crate from crates.io instead\" (the attribute was removed only in 1.87.0), so the call in from_host() emits the warn-by-default `deprecated` lint, which .github/workflows/check.yml:31 (`cargo clippy --workspace --all-targets -- -D warnings`) promotes to an error. The design's gate claims therefore cannot all hold: either §10's \"`Cargo.lock` stays byte-identical\" + Test strategy #10 + Rollout #3's \"no lock diff\" check fail, or the zero-dependency posture fails, or an undeclared `#[allow(deprecated)]` escape hatch appears at implementation time. A9's cited evidence is today's std doc page, which post-dates the undeprecation and does not describe the pinned floor.",
+            "fix": "In §2 and A9 name `std::env::var(\"HOME\")` as the source of `home` — `host_candidates(home, env)` already models that shape, so no new mechanism appears, Cargo.lock stays byte-identical, and §7's existing \"no home directory → `Ok(vec![])`\" branch covers the unset case (only the passwd fallback is given up). Alternatively keep home_dir() but state here that its single call site carries `#[allow(deprecated)]` with a comment naming the 1.87 floor that retires it; if `dirs` is chosen instead, amend §10, A15, Test #10 and Rollout #3 in the same edit."
+          },
+          {
+            "severity": "minor",
+            "location": "§4 KeyValues reader + §10 Dependencies and gates — \"Files larger than 1 MiB are skipped as malformed (A16)\" and Risks' \"Both caps are single named constants\"",
+            "problem": "These caps are not this design's own numbers: they are the repo's documented shared parse budget (\"larger than 1 MiB or nested deeper than 16 levels are rejected before parsing\" in every schemas/*/spec.md), already implemented as MAX_DOCUMENT_BYTES / MAX_NESTING_DEPTH in crates/core/src/toml.rs:36-39. The proposal re-declares the pair as plugin-local numbers with no cross-reference and no word on why crates/discovery does not take the bindforge-core edge to reuse them, so a reviewer cannot tell whether the match is intentional and the next budget change has two unlinked copies.",
+            "fix": "One sentence in §4 tying both caps to the documented budget (\"the schemas/README.md parse budget restated as plugin-local constants, because crates/discovery deliberately has no bindforge-core dependency\"), which also records the reuse decision §10's no-new-dependency posture rests on. Do not add the dependency for this — it would break §10's byte-identical-lock claim for two constants."
+          },
+          {
+            "severity": "minor",
+            "location": "§1 Modules and public surface — \"Every `pub` item above is exercised by a test in *Test strategy*; the rest (scan loop, composition, comparison key) stays private\"",
+            "problem": "That sentence is the stated justification for a 13-item public surface, and it is false for one item: `SteamLinuxPlugin::from_host()` is pub but no test calls it — Test strategy #5 tests the pure `host_candidates`, #7/#8 use `from_roots`, and #10 states \"no test reads the developer's home directory\". The only production entry point (§8's default path, Rollout #4's \"Default on merge\") sits outside the suite while being cited as covered.",
+            "fix": "Amend the sentence to name the exception: \"every pub item except `from_host()`, whose candidate list #5 pins and whose host probe Rollout #5 checks manually\" — rather than justifying public surface with a coverage claim the test list does not support."
+          },
+          {
+            "severity": "nit",
+            "location": "§1 (\"`keyvalues.rs` — platform-neutral, no Steam knowledge\") + Compatibility matrix Windows row — \"`keyvalues.rs` is written platform-neutral to be reusable\"",
+            "problem": "The reuse rationale points at a consumer that does not exist (Deferred: \"`SteamWindowsPlugin` … no task filed\"), i.e. speculative justification for public API surface, when the actual reason the module must be pub is the crate's existing external-integration-test convention (crates/discovery/tests/{slug,registry,plugin,game}_tests.rs).",
+            "fix": "State the test-convention reason in §1 and keep the platform-neutral wording as a property of the code rather than as a promised cross-plugin API."
+          }
+        ]
+      },
+      "transcript": "docs/designs/tasks/001-steam-linux-discovery/transcripts/design-review-complexity-r3c0.md",
+      "durationMs": 238802,
+      "nudges": 0
     }
   ],
   "gateLog": [],
   "startedAt": 1794969708852,
-  "updatedAt": 1794970170007,
+  "updatedAt": 1794972749779,
   "flow": "full",
-  "baseRef": "4caa688933b2969f569f6126dddb713180c7c410"
+  "baseRef": "4caa688933b2969f569f6126dddb713180c7c410",
+  "designCycle": 0,
+  "designStamp": "b08c55894c68e616e5536c73cc7a9921db842309"
 }
