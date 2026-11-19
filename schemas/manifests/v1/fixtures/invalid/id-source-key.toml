@@ -1,0 +1,13 @@
+# A discovery lookup key is never a manifest `id`: the `<source>/<external-id>`
+# spelling a discovered Steam row carries is exempt from the slug grammar by
+# design (`025-B1`) and is kept out of every manifest, profile, and path
+# component (`025-L5`). The grammar refuses the `/`, so the id below is refused —
+# a source key can identify an install on its own machine and nothing anywhere
+# else. A manifest's id is the curated `game_id` a user confirmed, not a key a
+# scanner invented (ADR-025).
+format = "manifests"
+version = "v1"
+id = "steam/900001"
+revision = 1
+codec = "steam"
+actions = ["move.steer-left Turn left"]

@@ -13,18 +13,24 @@
 //! `steam_windows` can use and re-export them, and nothing outside the crate
 //! reaches them.
 
-use crate::game::{DiscoveredGame, Namespace, Platform};
+use crate::game::{DiscoveredGame, Platform, Source, friendly_name};
 use crate::keyvalues::{self, Value};
 use crate::plugin::DiscoveryPlugin;
 use crate::registry::DiscoveryError;
-use crate::slug::derive_slug;
-use bindforge_core::{MAX_SLUG_OCTETS, is_slug_name};
-use std::collections::{BTreeMap, BTreeSet};
+use bindforge_core::MAX_DISCOVERY_SLUG_OCTETS;
 use std::path::{Path, PathBuf};
 
-/// A parsed `appmanifest_*.acf`, reduced to the two fields discovery emits.
+/// The widest appid the emission seam accepts: Steam's own ids are decimal, and
+/// 20 digits is the largest value a 64-bit id can hold, so anything longer is
+/// not an appid at all (`025-C1`).
+const MAX_APPID_DIGITS: usize = 20;
+
+/// A parsed `appmanifest_*.acf`, reduced to the three fields discovery emits.
+/// ADR-025 adds `appid`: it is the row's identity source, the value the lookup
+/// key is composed from, and a manifest without a usable one is refused here.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppManifest {
+    pub appid: String,
     pub display_name: String,
     pub install_dir: String,
 }
@@ -94,10 +100,10 @@ impl<T: SteamTarget> DiscoveryPlugin for SteamCore<T> {
             for library in canonical_paths(libraries) {
                 scan_library(&library, &self.target, &mut games, &mut skipped);
             }
-            // One game, one slug (`024-L2`): the pass is scoped to this plugin's
-            // own rows, and runs before the skip diagnostic below so a refusal
-            // here is counted like a refusal at the emission seam.
-            resolve_collisions(&mut games, &mut skipped);
+            // No collision pass runs: distinct installs of one Steam source carry
+            // distinct AppIDs, so the keys leave this seam unique by construction,
+            // and friendly-name duplicates are by design (`025-L3`). The
+            // `(slug, install_path)` sort below is all the ordering there is.
         }
 
         // §7's one error path, its three clauses spelled out: at least one root
@@ -213,7 +219,7 @@ fn scan_library<T: SteamTarget>(
         };
         match parse_manifest(&text, target) {
             // A row whose identity cannot be built is a refusal of this file, so
-            // it counts here too (ADR-024): count-only, never echoed per row.
+            // it counts here too (ADR-025): count-only, never echoed per row.
             Some(manifest) => match discovered_game(library, &manifest, target) {
                 Some(game) => games.push(game),
                 None => *skipped += 1,
@@ -226,28 +232,27 @@ fn scan_library<T: SteamTarget>(
 /// Builds the emitted row for `manifest` in `library` (Chosen design §5, A2).
 /// The `platform` field is the only one the target changes (§2).
 ///
-/// ADR-024 makes this the plugin's identity gate: the slug is derived from the
-/// display name, falling back to the install directory, and the result must
-/// satisfy the shared grammar and bound before the row is built at all — the
-/// derivation is grammar-correct by construction except for length, so the
-/// predicate here is defence in depth. `None` is the named refusal: the caller
-/// counts the row into `skipped` and emits nothing, and no invented slug (such as
-/// the retired bare `unknown/`) ever becomes an identity. Length is never
-/// truncated, so an over-bound title is refused rather than cut into a different
-/// game.
+/// ADR-025 makes this the plugin's identity gate, and the gate is bound-only: the
+/// slug is `Source::Steam.lookup_key(&appid)` — the one spelling constructor — and
+/// the only thing refused here is a key past
+/// [`bindforge_core::MAX_DISCOVERY_SLUG_OCTETS`]. The shared grammar is *not*
+/// checked, because `steam/123` fails it by design (`025-L3`); the appid read in
+/// [`parse_manifest`] already caps the key far inside the bound, so this check is
+/// defence in depth. `None` is the count-only refusal: the caller counts the file
+/// into `skipped` and emits nothing, and no invented key (a file name's number, a
+/// name-derived spelling) ever becomes an identity. Length is never truncated.
 fn discovered_game<T: SteamTarget>(
     library: &Path,
     manifest: &AppManifest,
     target: &T,
 ) -> Option<DiscoveredGame> {
-    let slug =
-        derive_slug(&manifest.display_name).or_else(|| derive_slug(&manifest.install_dir))?;
-    if !is_slug_name(&slug) || slug.len() > MAX_SLUG_OCTETS {
+    let slug = Source::Steam.lookup_key(&manifest.appid);
+    if slug.len() > MAX_DISCOVERY_SLUG_OCTETS {
         return None;
     }
     Some(DiscoveredGame {
+        friendly_name: friendly_name(&manifest.display_name),
         slug,
-        namespace: Namespace::Unknown,
         display_name: manifest.display_name.clone(),
         // Emitted whether or not the directory exists; `library` is canonical,
         // and `install_dir` is validated by `parse_manifest`.
@@ -260,91 +265,47 @@ fn discovered_game<T: SteamTarget>(
     })
 }
 
-/// ADR-024's collision pass (`024-L2`): one display name, one slug, within one
-/// plugin's own rows.
+/// Extracts the display name, install directory and appid of one
+/// `appmanifest_*.acf`.
 ///
-/// The pass walks the distinct display names in byte order keeping the slugs
-/// already handed out. The first name to claim a base slug keeps it; a later name
-/// whose derivation is claimed takes the first free candidate `base-2`,
-/// `base-3`, …, skipping candidates another name already holds so a suffixed slug
-/// cannot collide with a different name's base. A name with no candidate inside
-/// `MAX_SLUG_OCTETS` is refused: it is dropped and counted into `skipped`, exactly
-/// like a row the derivation could not name. Rows that share a display name share
-/// its assigned slug, so one game seen in two libraries keeps one identity while
-/// the `(slug, install_path)` ordering at the call site keeps the two rows apart.
-///
-/// `games` is rewritten in place: surviving rows carry their assigned slug, and
-/// the refused rows are removed.
-fn resolve_collisions(games: &mut Vec<DiscoveredGame>, skipped: &mut usize) {
-    // Each distinct display name, in byte order, with the base slug its rows
-    // derive. The derivation is pure, so rows of one name hold one base slug.
-    let mut bases: BTreeMap<&str, &str> = BTreeMap::new();
-    for game in games.iter() {
-        bases
-            .entry(game.display_name.as_str())
-            .or_insert(game.slug.as_str());
-    }
-
-    let mut assigned: BTreeMap<String, String> = BTreeMap::new();
-    let mut claimed: BTreeSet<String> = BTreeSet::new();
-    for (name, base) in &bases {
-        if claimed.contains(*base) {
-            // The bound check ends the search: candidates only grow with the
-            // counter, so once one falls outside it none can be accepted.
-            let mut accepted = None;
-            for suffix in 2_u32.. {
-                let candidate = format!("{base}-{suffix}");
-                if candidate.len() > MAX_SLUG_OCTETS {
-                    break;
-                }
-                if !claimed.contains(&candidate) {
-                    accepted = Some(candidate);
-                    break;
-                }
-            }
-            if let Some(candidate) = accepted {
-                claimed.insert(candidate.clone());
-                assigned.insert((*name).to_string(), candidate);
-            }
-            // No accepted candidate: the name keeps no slug, so its rows are
-            // refused below and counted.
-        } else {
-            claimed.insert((*base).to_string());
-            assigned.insert((*name).to_string(), (*base).to_string());
-        }
-    }
-    drop(bases);
-
-    for game in games.iter_mut() {
-        if let Some(slug) = assigned.get(&game.display_name) {
-            game.slug.clone_from(slug);
-        }
-    }
-    let before = games.len();
-    games.retain(|game| assigned.contains_key(&game.display_name));
-    *skipped += before - games.len();
-}
-
-/// Extracts the display name and install directory of one `appmanifest_*.acf`.
-///
-/// `None` means "skip this manifest": no `AppState` section, a parse error, an
-/// unusable `installdir`, or no name and no install directory to fall back on.
-/// The `installdir` rule set is `T`'s (§2, §6); everything else is shared.
+/// `None` means "skip this manifest": no `AppState` section, a parse error, no
+/// usable `appid`, an unusable `installdir`, or no name and no install directory
+/// to fall back on. The `installdir` rule set is `T`'s (§2, §6); everything else
+/// is shared. A missing or non-numeric appid is the same skip-and-count outcome
+/// as an unusable `installdir`: a row whose identity the ACF cannot name is
+/// refused, never given a name-derived or file-name-derived spelling (`025-C1`).
 pub fn parse_manifest(text: &str, target: &impl SteamTarget) -> Option<AppManifest> {
     let document = keyvalues::parse(text).ok()?;
     let app_state = document.get_section("appstate")?;
+    // `get_str` is the reader's case-insensitive lookup, so `appid`, `AppId` and
+    // `APPID` all resolve (A3): no exact-case read is needed.
+    let appid = app_state.get_str("appid").unwrap_or_default().trim();
+    if !usable_appid(appid) {
+        return None;
+    }
     let install_dir = app_state.get_str("installdir")?;
     if !usable_install_dir(install_dir, target.install_dir_rejects_backslash()) {
         return None;
     }
-    // `display_name` needs to be non-empty because the slug derives from it
+    // `display_name` needs to be non-empty because the friendly name comes from it
     // (ADR-022), so an absent or empty `name` falls back to `installdir`.
     let name = app_state.get_str("name").unwrap_or_default().trim();
     let display_name = if name.is_empty() { install_dir } else { name };
     Some(AppManifest {
+        appid: appid.to_string(),
         display_name: display_name.to_string(),
         install_dir: install_dir.to_string(),
     })
+}
+
+/// Whether `appid` is an external id a lookup key may be composed from: 1–20
+/// ASCII digits, already trimmed. An empty, whitespace-only, non-numeric,
+/// `/`-bearing or over-long value names no install, and the number in
+/// `appmanifest_<n>.acf` is never a fallback (`025-C1`).
+pub fn usable_appid(appid: &str) -> bool {
+    !appid.is_empty()
+        && appid.len() <= MAX_APPID_DIGITS
+        && appid.bytes().all(|byte| byte.is_ascii_digit())
 }
 
 /// Whether `installdir` is safe to append to an emitted path: it is a single
@@ -429,80 +390,103 @@ pub fn absolute_env(env: &dyn Fn(&str) -> Option<String>, key: &str) -> Option<P
 
 #[cfg(test)]
 mod tests {
-    //! Unit tests for the private collision pass (`024-L2`), over hand-built
-    //! rows: the `skipped` delta is asserted to grow by exactly the refused
-    //! row count, which the end-to-end suites cannot observe (its refusal
-    //! counter is only read by the all-rows-refused diagnostic).
+    //! Unit tests for the two private seams of the emission path, over
+    //! hand-built [`AppManifest`]s: the appid rule the reduction applies, and the
+    //! bound-only identity gate in `discovered_game`. The bound skip is reachable
+    //! here and nowhere else — the appid rule caps a real key far inside
+    //! `025-B1` — so this in-module construction is the only way to pin it
+    //! (design 025 Test strategy #4: defence in depth). The end-to-end suites own
+    //! the row shape and the skip counting.
     use super::*;
+    use crate::steam_linux::LinuxTarget;
 
-    fn game(slug: &str, display_name: &str, install: &str) -> DiscoveredGame {
-        DiscoveredGame {
-            slug: slug.to_string(),
-            namespace: Namespace::Unknown,
-            display_name: display_name.to_string(),
-            install_path: PathBuf::from(install),
-            platform: Platform::SteamLinux,
-            codec_id: None,
+    /// One reduced manifest: the appid is the identity, the other two fields are
+    /// constants the row carries unchanged.
+    fn manifest(appid: &str) -> AppManifest {
+        AppManifest {
+            appid: appid.to_string(),
+            display_name: "Example   Game".to_string(),
+            install_dir: "Example Game".to_string(),
         }
     }
 
+    fn row(appid: &str) -> Option<DiscoveredGame> {
+        discovered_game(Path::new("/lib"), &manifest(appid), &LinuxTarget)
+    }
+
     #[test]
-    fn a_name_with_no_in_bound_candidate_grows_skipped_by_its_own_row_count() {
-        // A base slug sitting exactly on the bound leaves no room for `-2`,
-        // so the later name's every row is refused and counted — two rows of
-        // one refused name are two skipped rows, not one.
-        let base = "a".repeat(MAX_SLUG_OCTETS);
-        let mut games = vec![
-            game(&base, "Alpha Bound", "/lib/steamapps/common/alpha"),
-            game(&base, "Zeta Bound", "/lib/steamapps/common/zeta"),
-            game(&base, "Zeta Bound", "/lib2/steamapps/common/zeta-copy"),
-        ];
-        let mut skipped = 0;
-        resolve_collisions(&mut games, &mut skipped);
-        assert_eq!(skipped, 2, "both rows of the refused name are counted");
-        assert_eq!(games.len(), 1);
-        assert_eq!(games[0].display_name, "Alpha Bound");
-        assert_eq!(
-            games[0].slug, base,
-            "the byte-order-first name keeps the base"
+    fn the_appid_rule_admits_one_to_twenty_ascii_digits_only() {
+        assert!(usable_appid("1"), "one digit is a key");
+        assert!(
+            usable_appid(&"1".repeat(20)),
+            "the twentieth digit is admitted"
+        );
+        assert!(!usable_appid(""), "an empty value names nothing");
+        assert!(!usable_appid(&"1".repeat(21)), "21 digits is not an appid");
+        assert!(!usable_appid("900o1"), "a non-digit is refused");
+        assert!(!usable_appid("900/1"), "a separator is refused");
+        assert!(
+            !usable_appid(" 900001"),
+            "an untrimmed space is refused here"
         );
     }
 
     #[test]
-    fn suffix_assignment_and_shared_names_refuse_nothing_and_count_nothing() {
-        // Byte order puts `Ys IX -Monstrum NOX-` before `Ys IX: Monstrum Nox`
-        // (` ` precedes `:`), so the former keeps the base and the latter
-        // takes `base-2`; the two rows of one display name share one slug.
-        let mut games = vec![
-            game(
-                "ys-ix-monstrum-nox",
-                "Ys IX: Monstrum Nox",
-                "/a/steamapps/common/ys",
-            ),
-            game(
-                "ys-ix-monstrum-nox",
-                "Ys IX -Monstrum NOX-",
-                "/b/steamapps/common/ys",
-            ),
-            game("dup", "Dup Game", "/c/steamapps/common/dup"),
-            game("dup", "Dup Game", "/d/steamapps/common/dup"),
-        ];
-        let mut skipped = 0;
-        resolve_collisions(&mut games, &mut skipped);
-        assert_eq!(skipped, 0, "a suffixed name is never a refusal");
-        let assigned: Vec<(&str, &str)> = games
-            .iter()
-            .map(|game| (game.display_name.as_str(), game.slug.as_str()))
-            .collect();
+    fn the_row_composes_the_lookup_key_and_the_normalized_friendly_name() {
+        let game = row("900001").expect("an ordinary appid builds a row");
         assert_eq!(
-            assigned,
-            [
-                // Input order is preserved: the pass rewrites in place.
-                ("Ys IX: Monstrum Nox", "ys-ix-monstrum-nox-2"),
-                ("Ys IX -Monstrum NOX-", "ys-ix-monstrum-nox"),
-                ("Dup Game", "dup"),
-                ("Dup Game", "dup"),
-            ]
+            game.slug, "steam/900001",
+            "the identity is the composed key, never a spelling built beside the constructor"
+        );
+        assert_eq!(
+            game.friendly_name, "Example Game",
+            "the row's friendly name is the display name's whitespace normalization"
+        );
+        assert_eq!(
+            game.display_name, "Example   Game",
+            "the display name travels raw"
+        );
+        assert_eq!(
+            game.install_path,
+            PathBuf::from("/lib/steamapps/common/Example Game"),
+            "the install path is built from the install directory, not the identity"
+        );
+    }
+
+    #[test]
+    fn a_grammar_invalid_but_in_bound_key_still_builds_its_row() {
+        // `steam/1` fails the shared product-slug grammar and is emitted all the
+        // same: the identity gate is bound-only (`025-L3`), where the retired
+        // grammar check refused exactly this row.
+        let game = row("1").expect("a grammar-invalid key is inside the bound");
+        assert_eq!(game.slug, "steam/1");
+        assert!(!bindforge_core::is_slug_name(&game.slug));
+    }
+
+    #[test]
+    fn an_over_bound_lookup_key_is_refused_by_the_row_construction() {
+        // One octet past `025-B1`, untruncated, and the row is refused outright.
+        let over_bound = "9".repeat(MAX_DISCOVERY_SLUG_OCTETS - "steam/".len() + 1);
+        assert_eq!(
+            Source::Steam.lookup_key(&over_bound).len(),
+            MAX_DISCOVERY_SLUG_OCTETS + 1
+        );
+        assert!(
+            row(&over_bound).is_none(),
+            "the bound-only gate refuses an over-long key rather than truncating it"
+        );
+    }
+
+    #[test]
+    fn a_key_exactly_on_the_bound_builds_its_row() {
+        let at_bound = "8".repeat(MAX_DISCOVERY_SLUG_OCTETS - "steam/".len());
+        assert_eq!(
+            Source::Steam.lookup_key(&at_bound).len(),
+            MAX_DISCOVERY_SLUG_OCTETS
+        );
+        assert!(
+            row(&at_bound).is_some(),
+            "the bound is inclusive: exactly `025-B1` octets survive"
         );
     }
 }

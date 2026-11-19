@@ -1,6 +1,6 @@
 ---
 doc_type: adr
-status: proposed
+status: accepted
 date: 2026-11-18
 depends-on: [013, 022, 024]
 ledger: yes
@@ -179,6 +179,10 @@ Rollout:
    `025-L3` per `021-L4`, and `024-R1` records this ADR as filling its
    slot with the publisher-namespace half superseded.
    `025-C1 025-C2 025-L3`
+6. The deferral is recorded: the run ships no catalog server — the
+   lookup contract `025-C4` stands as the client-side provisional
+   spelling until the reserved ADR-026 states the service contract and
+   the curation intake. `025-R1`
 
 ## Alternatives considered
 

@@ -1,0 +1,129 @@
+diff --git a/tmp/bindforge-editorial-discovery-identity-and-catalog-matching-r2.md b/home/mike/.local/share/opencode/worktree/f852d4/025-discovery-identity/docs/designs/025-discovery-identity-and-catalog-matching/02-proposal.md
+index 44618331..57d5f90d 100644
+--- a/tmp/bindforge-editorial-discovery-identity-and-catalog-matching-r2.md
++++ b/home/mike/.local/share/opencode/worktree/f852d4/025-discovery-identity/docs/designs/025-discovery-identity-and-catalog-matching/02-proposal.md
+@@ -8,8 +8,8 @@ ADR-024 landed today and made a discovered slug an id the product can adopt
+ byte-for-byte; this design replaces that identity half. A discovered row's
+ `slug` becomes the catalog lookup key `<source>/<external-id>` — for Steam,
+ `steam/<appid>` read out of the `appmanifest_*.acf` the scan already parses —
+-and that key joins nothing: it is exempt from the shared slug grammar and
+-`024-B1` and rides its own bound, `025-B1`. Cross-source identity becomes the
++and that key joins nothing: it is exempt from the shared slug grammar and from
++`024-B1`, and rides its own bound, `025-B1`. Cross-source identity becomes the
+ curated `game_id` (an ADR-013 manifest `id`), which arrives only from a
+ candidate the user confirms and is remembered in a new per-user match store.
+ The display name's normalized form becomes a `friendly_name` row field that is
+@@ -133,9 +133,9 @@ an unusable `installdir` is refused today.
+ string that joins nothing would delete a real install from its own machine's
+ listing. (b) Keep it unbounded — rejected: `025-C2` rides the sibling bound by
+ name. (c) Chosen: clamp to the longest prefix that is both within
+-`MAX_NATIVE_NAME_OCTETS` and a `char` boundary. Truncation is admissible here,
+-and only here, because `friendly_name` is never joined to anything: a truncated
+-display string costs a shorter label, not a different identity.
++`MAX_NATIVE_NAME_OCTETS` and on a `char` boundary. Truncation is admissible
++here, and only here, because `friendly_name` is never joined to anything: a
++truncated display string costs a shorter label, not a different identity.
+ 
+ ## Chosen design
+ 
+@@ -197,9 +197,9 @@ display string costs a shorter label, not a different identity.
+ - `schemas/README.md` gains a sibling bullet in the exported budget family:
+   ADR-025 adds `MAX_DISCOVERY_SLUG_OCTETS = 128`, the cap on the
+   `<source>/<external-id>` discovery key, set equal to the two 128 bounds so the
+-  family reads as one and explicitly *not* a slug-grammar bound — the discovery
+-  key is exempt from the grammar and never a path component; the bullet also
+-  records ADR-025's second, non-schema borrowing of
++  family reads as one and is explicitly *not* a slug-grammar bound — the
++  discovery key is exempt from the grammar and never a path component; the
++  bullet also records ADR-025's second, non-schema borrowing of
+   `MAX_NATIVE_NAME_OCTETS` as the `friendly_name` display bound. The existing
+   `MAX_SLUG_OCTETS` bullet is untouched: its rider set stays exactly as
+   `024-B1` enumerates it, and the exemption lives in the new bullet so the two
+@@ -226,9 +226,9 @@ display string costs a shorter label, not a different identity.
+   `version`, a file over a `65_536`-octet read budget, a `slug` past `025-B1`
+   or not spelled `<token>/<external-id>` with `<token>` in `Source`'s closed
+   set, or a `game_id` failing `is_slug_name` + `MAX_SLUG_OCTETS` is the named
+-  refusal `error: match store unreadable: <path>`
+-  before enumeration, and nothing on disk is rewritten; the user's remedy is to
+-  remove the file. `game_id` is validated at all three places it is seen —
++  refusal `error: match store unreadable: <path>` before
++  enumeration, and nothing on disk is rewritten; the user's remedy is to remove
++  the file. `game_id` is validated at all three places it is seen —
+   candidate parse, confirmation write, store load — because it is the one
+   identifier here that becomes a path component (`025-L5`), and both the store
+   file and the server response are untrusted inputs.
+@@ -275,7 +275,7 @@ display string costs a shorter label, not a different identity.
+   candidates. Each is `CatalogError::Unreachable(reason)`.
+ - `probe()` asks the authority, not an endpoint: resolve the host/port and
+   `TcpStream::connect_timeout` each address the resolver returns, after
+-  refusing unless every returned `SocketAddr` `IpAddr::is_loopback()` — the
++  refusing unless every returned `SocketAddr`'s `IpAddr::is_loopback()` — the
+   property is established by address, not by name, so a `hosts` entry for
+   `localhost` cannot send the query outward. It therefore invents no path
+   ADR-026 owns, and it is what enforces `025-L1` "before enumerating". A
+@@ -285,9 +285,9 @@ display string costs a shorter label, not a different identity.
+   probe or transport/parse failure, `error: catalog transport unavailable:
+   <reason>` for the endpoint policy. Both go to stderr, both exit non-zero, and
+   every value a refusal interpolates — a slug, a candidate `name`, a rejected
+-  `game_id`, the store `<path>`, the connect `<reason>` — goes
+-  through `bindforge_core::escape_and_truncate`, so no outside string forges a
+-  line or leaks a path.
++  `game_id`, the store `<path>`, the connect `<reason>` — goes through
++  `bindforge_core::escape_and_truncate`, so no outside string forges a line or
++  leaks a path.
+ - A candidate whose `game_id` fails `is_slug_name` + `MAX_SLUG_OCTETS` is
+   dropped with one named stderr refusal line; the surviving candidates keep the
+   response's order.
+@@ -312,8 +312,8 @@ display string costs a shorter label, not a different identity.
+    **stderr** — stdout carries only the table — reading one line from stdin
+    through the pure `fn selection(answer: &str, count: usize) -> Option<usize>`
+    (`1`-based; blank, `n`, out-of-range, or EOF is no match). A chosen candidate
+-   writes the one record for the slug, `(slug, game_id, friendly name of the
+-   first sharing row in `(slug, install_path)` order)`; nothing is ever stored
++   writes the one record for the slug, (`slug`, `game_id`, friendly name of the
++   first sharing row in `(slug, install_path)` order); nothing is ever stored
+    without that choice, and name similarity or a lone high-scoring candidate
+    never completes the join (`025-L2`). The answer applies to every row sharing
+    the slug — the store holds one record per distinct slug — so one Steam
+@@ -335,7 +335,7 @@ display string costs a shorter label, not a different identity.
+     "candidates":[{"game_id":"example-game","name":"Example"}]}
+    ```
+ 
+-   `candidates` is `[]` for a slug the store resolved and `null` `game_id` is
++   `candidates` is `[]` for a slug the store resolved, and `null` `game_id` is
+    the unmatched state; `friendly_name` is discovery output, which `025-L5`
+    allows.
+ 9. `ExitCode::SUCCESS`.
+@@ -346,7 +346,7 @@ display string costs a shorter label, not a different identity.
+   fixture trees emit, `!is_slug_name(slug)` and the slug is inside `025-B1` —
+   the structural proof, for the source key only, that it cannot become a
+   product id, because the grammar refuses it (A5); the friendly-name half of
+-  `025-L5` rests on the Match store rule that only `game_id` is ever an id or
++  `025-L5` rests on the match store rule that only `game_id` is ever an id or
+   path component — no grammar assertion is made about friendly names.
+ - `schemas/manifests/v1/fixtures/invalid/id-source-key.toml` (new), whose `id`
+   is `steam/900001`: refused by A12's existing conformance walk, no new test.
+@@ -412,7 +412,7 @@ display string costs a shorter label, not a different identity.
+    survives, which the retired grammar check refused; the bound skip in
+    `discovered_game` is pinned separately as an in-module `AppManifest`
+    construction with an over-long appid — the only reachable route there,
+-   defence in depth.
++   defense in depth.
+ 5. Unit: store path — `$XDG_DATA_HOME` absolute wins, a relative value is
+    treated unset and falls back to `$HOME/.local/share`; the Windows branch
+    resolves `%APPDATA%` the same way; all through the env lookup closure.
+@@ -438,10 +438,10 @@ display string costs a shorter label, not a different identity.
+ 10. Unit: response parse — a `200` with a small JSON body yields the candidates
+     in response order; a `404`, a `500`, a `Transfer-Encoding` header (also as
+     `transfer-encoding`), a missing, duplicated, or non-numeric `Content-Length`,
+-    a header block over 65 536 octets, a body over 65 536 bytes, a 257-candidate
+-    body, and a non-JSON body each raise
+-    `Unreachable` naming the reason; a `game_id` of `../x` in a `200` body is
+-    dropped with one `escape_and_truncate` echo and no path.
++    a header block over 65 536 octets, a body over 65 536 octets, a
++    257-candidate body, and a non-JSON body each raise `Unreachable` naming the
++    reason; a `game_id` of `../x` in a `200` body is dropped with one
++    `escape_and_truncate` echo and no path.
+ 11. Integration (CLI, subprocess): the gate refuses before enumerating — no
+     listener behind `--catalog-url` gives exit non-zero, one named stderr line,
+     and stdout carries neither the table header nor any fixture row, which is

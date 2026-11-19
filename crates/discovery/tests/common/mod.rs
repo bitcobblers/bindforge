@@ -64,10 +64,35 @@ impl SteamRoot {
     /// Writes one `appmanifest_<appid>.acf` into the root library: `name` is written
     /// only when given (so `None` is the name-absent case and `Some("")` the
     /// name-empty case), and `installdir` is the single path component the plugin
-    /// appends to `<library>/steamapps/common/`.
+    /// appends to `<library>/steamapps/common/`. The `appid` entry is spelled in its
+    /// shipped lowercase form; [`SteamRoot::acf_keyed`] is the ADR-025 seam that
+    /// controls the entry itself.
     pub fn acf(&self, appid: &str, library: &str, name: Option<&str>, installdir: &str) {
-        let mut text =
-            format!("\"AppState\"\n{{\n\t\"appid\"\t\t\"{appid}\"\n\t\"Universe\"\t\t\"1\"\n");
+        self.acf_keyed(appid, library, name, installdir, Some(("appid", appid)));
+    }
+
+    /// Writes one `appmanifest_<file_id>.acf` with full control over the `appid`
+    /// entry, which ADR-025 makes the row's identity source: `appid` is the
+    /// `(key, value)` pair as spelled in the ACF when `Some` — so key casing
+    /// (`AppId`, `APPID`) and refused values (empty, non-numeric, an embedded `/`,
+    /// 21 digits) are all expressible — and the entry is omitted entirely when
+    /// `None`, which is the no-`appid` refusal case the emission seam must count and
+    /// drop. The file name is spelled from `file_id` independently of the entry, so
+    /// a suite can pin that the number in `appmanifest_<n>.acf` is never read as an
+    /// identity fallback (`025-C1`, the Options' refused filename fallback).
+    pub fn acf_keyed(
+        &self,
+        file_id: &str,
+        library: &str,
+        name: Option<&str>,
+        installdir: &str,
+        appid: Option<(&str, &str)>,
+    ) {
+        let mut text = String::from("\"AppState\"\n{\n");
+        if let Some((key, value)) = appid {
+            text.push_str(&format!("\t\"{key}\"\t\t\"{value}\"\n"));
+        }
+        text.push_str("\t\"Universe\"\t\t\"1\"\n");
         if let Some(name) = name {
             text.push_str(&format!("\t\"name\"\t\t\"{name}\"\n"));
         }
@@ -82,7 +107,7 @@ impl SteamRoot {
         };
         let dir = library_dir.join("steamapps");
         fs::create_dir_all(&dir).unwrap_or_else(|err| panic!("creating {}: {err}", dir.display()));
-        let file = dir.join(format!("appmanifest_{appid}.acf"));
+        let file = dir.join(format!("appmanifest_{file_id}.acf"));
         fs::write(&file, text).unwrap_or_else(|err| panic!("writing {}: {err}", file.display()));
     }
 

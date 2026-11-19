@@ -63,6 +63,7 @@ octets, buying headroom for games with especially long titles.
   adoptable byte-for-byte as a manifest `id` by the future matching step; the
   namespace is a separate field whose only v1 value is `unknown` and which
   never appears inside `slug`. → Rollout, item 1.
+  amended-by 025-C1 (ADR-025, per 021-L4).
 - **024-C2** Slug derivation from a display name, as an ordered algorithm:
   case-fold ASCII; strip Latin diacritics (NFKD, drop combining marks);
   replace every remaining character outside `[a-z0-9]` with `-`; collapse
@@ -70,6 +71,7 @@ octets, buying headroom for games with especially long titles.
   empty result fall back to the same normalization of the install directory
   name, and refuse the game when that is empty too; cap at the shared bound.
   Deterministic, std-only, no transliteration table. → Rollout, item 1.
+  amended-by 025-C2 (ADR-025, per 021-L4).
 
 ### Laws
 
@@ -78,12 +80,14 @@ octets, buying headroom for games with especially long titles.
   bound; a violation is a named refusal and the offending value is echoed
   only through the escape-and-truncate path, never as a path. `024-B1`
   → Rollout, item 2.
+  amended-by 025-L3 (ADR-025, per 021-L4).
 - **024-L2** Collisions inside one run: distinct display names that derive
   the same slug from one plugin disambiguate with deterministic `-2`, `-3`, …
   suffixes in display-name order, re-checked against the grammar and bound.
   The same game found in two libraries keeps its duplicate slug and today's
   `(slug, install_path)` ordering — a slug names a game, not an install.
   `024-C2` → Rollout, item 3.
+  amended-by 025-L3 (ADR-025, per 021-L4).
 - **024-L3** Bound-amendment discipline: the shared bound has one stated
   home, beside the `MAX_DOCUMENT_BYTES` / `MAX_NESTING_DEPTH` family in
   `schemas/README.md`; each format spec cross-references it instead of
@@ -112,6 +116,9 @@ octets, buying headroom for games with especially long titles.
   discovered `unknown`-namespaced slug onto a real manifest id (and later a
   `publisher` namespace, once derivable), including the rename-stability
   problem this ADR defers. Owner: ADR-025 (reserved). → ADR-025.
+  filled by ADR-025 (discovery-identity-and-catalog-matching): its
+  candidate-lookup join fills the resolver half; the `publisher`-namespace
+  half is superseded by ADR-025's source-token namespaces.
 
 **Unit handles.** The handles in this ADR sit at the end of the Rollout list
 items: one trailing code span of unit ids governs the line's claim, an id

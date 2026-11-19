@@ -1,12 +1,17 @@
-//! Integration tests for `discovery list`.
+//! Integration tests for `discovery list` against the checked-in fixture tree —
+//! the Linux-regression gate (design 024 Test strategy #9, re-pinned by design
+//! 025's Test strategy #12/#13 and Rollout 3).
 //!
-//! Both tests drive the built binary through `env!("CARGO_BIN_EXE_discovery-cli")`
-//! with `--steam-root` at the crate's shared read-only fixture tree, so no CLI
-//! test probes the host or depends on the runner having Steam installed
-//! (Test strategy #9, Chosen design §8/§9).
+//! ADR-025 moved the CLI behind two seams, so every run here is migrated to the
+//! shared harness: a loopback `TcpListener` fake answers the gate and the
+//! candidate queries, and a temp `XDG_DATA_HOME`/`HOME` sandbox keeps every store
+//! byte inside the test. The fake serves no candidates, so the runs are pure
+//! rendering: every `Game Id` cell is `-` and no prompt is earned.
 
+mod common;
+
+use common::{FakeCatalog, TempDir, run_cli};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 /// The crate's checked-in fixture tree, shared with `crates/discovery` tests.
 fn fixture_root() -> PathBuf {
@@ -19,28 +24,25 @@ fn canonical(path: &Path) -> PathBuf {
     std::fs::canonicalize(path).expect("fixture root must exist")
 }
 
-/// Runs the built `discovery-cli` and returns its stdout.
-fn run_list(args: &[&str]) -> String {
-    let output = Command::new(env!("CARGO_BIN_EXE_discovery-cli"))
-        .args(args)
-        .output()
-        .expect("failed to execute discovery-cli");
-    assert!(
-        output.status.success(),
-        "discovery-cli must exit successfully, stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    String::from_utf8_lossy(&output.stdout).into_owned()
+/// A fake that serves no candidates to any query.
+fn fake_empty() -> FakeCatalog {
+    FakeCatalog::start("cli-fake-empty", |_| common::ok("[]"))
 }
 
-/// The cells of one rendered table line, split at its `|` delimiters. Each
-/// cell keeps the padding spaces the renderer wrote for it (T-003 §1).
-fn cells(line: &str) -> Vec<String> {
-    let inner = line
-        .strip_prefix('|')
-        .and_then(|rest| rest.strip_suffix('|'))
-        .unwrap_or(line);
-    inner.split('|').map(str::to_string).collect()
+/// The sandbox pair every fixture run gets, so the developer's real store is
+/// never read or written (Rollout 3 migration).
+fn sandbox(label: &str) -> (TempDir, TempDir) {
+    (
+        TempDir::new(&format!("cli-{label}-data")),
+        TempDir::new(&format!("cli-{label}-home")),
+    )
+}
+
+fn env<'a>(data: &'a TempDir, home: &'a TempDir) -> [(&'a str, &'a str); 2] {
+    [
+        ("XDG_DATA_HOME", data.path().to_str().expect("utf-8")),
+        ("HOME", home.path().to_str().expect("utf-8")),
+    ]
 }
 
 /// The byte offsets of the `|` delimiters of one rendered table line (T-003 §1:
@@ -53,14 +55,30 @@ fn pipe_offsets(line: &str) -> Vec<usize> {
         .collect()
 }
 
-// proves: Test strategy #9 (Chosen design §8), as polished by T-003 §1 —
-// `list --steam-root <fixture>` prints the padded table header and exactly the
-// four expected fixture rows, with every header cell padded right to its
-// column's width; the compatdata decoys never appear.
+/// proves: design 025's Test strategy #12 and the re-pinned output contract
+/// (Rollout 3: the retired namespace column out, `Game Id` in) — `list --steam-root
+/// <fixture>` behind the gate prints the padded five-column table, now `Slug |
+/// Game Id | Display Name | Install Path | Platform`, with the four fixture rows
+/// in slug order rendering `steam/<appid>` lookup keys and `-` `Game Id` cells;
+/// the namespace token and the compatdata decoys appear nowhere.
 #[test]
 fn test_cli_list_format() {
     let root = fixture_root();
-    let stdout = run_list(&["list", "--steam-root", root.to_str().expect("utf-8 path")]);
+    let (data, home) = sandbox("fmt");
+    let fake = fake_empty();
+    let run = run_cli(
+        &[
+            "list",
+            "--steam-root",
+            root.to_str().expect("utf-8 path"),
+            "--catalog-url",
+            &fake.url(),
+        ],
+        &env(&data, &home),
+        "",
+    );
+    assert!(run.success(), "stderr: {}", run.stderr);
+    let stdout = run.stdout.clone();
 
     let lines: Vec<&str> = stdout.lines().collect();
     assert_eq!(
@@ -69,38 +87,29 @@ fn test_cli_list_format() {
         "the table is the header, the separator, and exactly four rows:\n{stdout}"
     );
 
-    // T-003 §1: cells are padded, so the old unpadded header string is gone and
-    // every header cell carries padding beyond its single leading space.
+    // T-003 §1: cells are padded to their columns' widths, so the unpadded
+    // header string is gone, and every line shares the header's `|` offsets.
     assert!(
-        !stdout.contains("| Slug | Namespace | Display Name | Install Path | Platform |"),
+        !stdout.contains("| Slug | Game Id | Display Name | Install Path | Platform |"),
         "the header must be padded to its columns' widths:\n{}",
         lines[0]
     );
-    let header_cells = cells(lines[0]);
+    let header_cells = common::cells(lines[0]);
     assert_eq!(
-        header_cells.len(),
-        5,
-        "the header names exactly five columns: ADR-024 puts `Namespace` beside `Slug`"
+        header_cells
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<&str>>(),
+        vec![
+            "Slug",
+            "Game Id",
+            "Display Name",
+            "Install Path",
+            "Platform",
+        ],
+        "the header names exactly the five ADR-025 columns: the lookup key beside \
+         the confirmed id, the retired namespace column gone"
     );
-    for (cell, column) in header_cells.iter().zip([
-        "Slug",
-        "Namespace",
-        "Display Name",
-        "Install Path",
-        "Platform",
-    ]) {
-        assert_eq!(
-            cell.trim(),
-            column,
-            "the header must name the {column} column"
-        );
-        assert!(
-            cell.starts_with(' ') && cell.chars().count() > column.chars().count() + 1,
-            "the {column} header cell must be padded to its column width, got {cell:?}"
-        );
-    }
-    // T-003 §1: the padded cells line up, so every rendered line has its `|`
-    // characters at the same byte offsets.
     for line in &lines[1..] {
         assert_eq!(
             pipe_offsets(line),
@@ -109,48 +118,40 @@ fn test_cli_list_format() {
         );
     }
 
-    // Test strategy #8 (ADR-024's re-pin): the `Slug` cell is prefix-free and the
-    // `Namespace` cell carries the namespace that used to ride inside the slug, so
-    // the identity's two axes are rendered apart.
-    let rows: Vec<Vec<String>> = lines[2..].iter().map(|line| cells(line)).collect();
+    let rows: Vec<Vec<String>> = lines[2..].iter().map(|line| common::cells(line)).collect();
     assert_eq!(rows.len(), 4, "exactly the four fixture rows are rendered");
     let rendered: Vec<(&str, &str, &str)> = rows
         .iter()
-        .map(|row| (row[0].trim(), row[1].trim(), row[2].trim()))
+        .map(|row| (row[0].as_str(), row[1].as_str(), row[2].as_str()))
         .collect();
     assert_eq!(
         rendered,
         vec![
-            ("example-game", "unknown", "Example Game"),
-            ("mixed-case-game", "unknown", "Mixed Case Game"),
-            ("nameless-install", "unknown", "Nameless Install"),
-            ("secondary-title", "unknown", "Secondary Title"),
+            ("steam/900001", "-", "Example Game"),
+            ("steam/900002", "-", "Nameless Install"),
+            ("steam/900003", "-", "Mixed Case Game"),
+            ("steam/900100", "-", "Secondary Title"),
         ],
-        "the slug, namespace and display name cells, in the plugin's row order:\n{stdout}"
+        "the slug, game id and display name cells, in (slug, install_path) order:\n{stdout}"
     );
     for row in &rows {
         assert!(
-            !row[0].contains('/'),
-            "a rendered slug must not contain a path separator, got {:?}",
-            row[0].trim()
+            row[0].starts_with("steam/"),
+            "the `Slug` cell is the `<source>/<external-id>` lookup key, got {:?}",
+            row[0]
         );
         assert!(
             !row[3].contains("unknown/"),
             "the install path carries no namespace segment, got {:?}",
-            row[3].trim()
+            row[3]
         );
     }
 
-    // Test strategy #8 (ADR-024's re-pin): `unknown/` as a slug segment is gone
-    // from the whole rendering, table and paths alike.
-    assert_eq!(
-        stdout.matches("unknown/").count(),
-        0,
-        "no rendered cell may spell a slug as `unknown/…`:\n{stdout}"
-    );
+    // The retired namespace spelling is gone from the whole rendering, table and
+    // paths alike — the column that carried it no longer exists.
     assert!(
-        stdout.matches("unknown").count() == 4,
-        "the four rows carry their namespace in the `Namespace` column and nowhere else"
+        !stdout.contains("unknown"),
+        "the retired namespace value appears nowhere in the rendering:\n{stdout}"
     );
     assert!(
         !stdout.contains("prefix-decoy"),
@@ -158,66 +159,82 @@ fn test_cli_list_format() {
     );
 }
 
-// proves: Test strategy #9 (Chosen design §8) — `list --steam-root <fixture> --json`
-// prints exactly the four DiscoveredGame objects, in (slug, install_path) order,
-// with ADR-024's six-field JSON shape: `namespace` sits beside `slug` and the slug
-// is prefix-free.
+/// proves: design 025's Test strategy #13 over the fixture tree — `list
+/// --steam-root <fixture> --json` behind the gate prints exactly the four
+/// DiscoveredGame objects in (slug, install_path) order with the re-pinned
+/// eight-field shape: `friendly_name` sits beside `slug`, `game_id` is `null` and
+/// `candidates` `[]` with no candidates served, and the retired `namespace` key
+/// is absent.
 #[test]
 fn test_cli_list_json_format() {
     let root_arg = fixture_root();
     let root = canonical(&root_arg);
-    let stdout = run_list(&[
-        "list",
-        "--steam-root",
-        root_arg.to_str().expect("utf-8 path"),
-        "--json",
-    ]);
+    let (data, home) = sandbox("json");
+    let fake = fake_empty();
+    let run = run_cli(
+        &[
+            "list",
+            "--steam-root",
+            root_arg.to_str().expect("utf-8 path"),
+            "--catalog-url",
+            &fake.url(),
+            "--json",
+        ],
+        &env(&data, &home),
+        "",
+    );
+    assert!(run.success(), "stderr: {}", run.stderr);
 
-    let games: Vec<serde_json::Value> = serde_json::from_str(stdout.trim())
+    let games: Vec<serde_json::Value> = serde_json::from_str(run.stdout.trim())
         .expect("`list --json` must print a JSON array of DiscoveredGame objects");
     assert_eq!(games.len(), 4, "exactly the four fixture games");
 
     // §5/A2: each row's `install_path` composes from the library that holds its
     // manifest, so the secondary library's game carries the `<root>/secondary` prefix.
     let expected = [
-        ("example-game", "Example Game", "Example Game", ""),
-        ("mixed-case-game", "Mixed Case Game", "Mixed Case Game", ""),
+        ("steam/900001", "Example Game", "Example Game", ""),
+        ("steam/900002", "Nameless Install", "Nameless Install", ""),
+        ("steam/900003", "Mixed Case Game", "Mixed Case Game", ""),
         (
-            "nameless-install",
-            "Nameless Install",
-            "Nameless Install",
-            "",
-        ),
-        (
-            "secondary-title",
+            "steam/900100",
             "Secondary Title",
             "Secondary Title",
             "secondary",
         ),
     ];
-    for (game, (slug, display_name, install_dir, library)) in games.iter().zip(expected) {
+    for (game, (slug, friendly_name, display_name, library)) in games.iter().zip(expected) {
         let obj = game.as_object().expect("each game is a JSON object");
         assert_eq!(
             obj.len(),
-            6,
-            "DiscoveredGame has exactly six fields: ADR-024 adds `namespace`"
+            8,
+            "DiscoveredGame has exactly eight fields: ADR-025 adds `friendly_name` \
+             and `game_id`/`candidates` and drops `namespace`"
         );
-        assert_eq!(obj["slug"], slug, "the JSON slug carries no namespace");
         assert!(
-            !slug.contains('/'),
-            "a serialized slug must not contain a path separator: {slug}"
+            obj.get("namespace").is_none(),
+            "the retired `namespace` key must be absent: {}",
+            game
         );
+        assert_eq!(obj["slug"], slug, "the JSON slug is the lookup key");
         assert_eq!(
-            obj["namespace"], "unknown",
-            "the namespace the slug used to carry is its own field, spelled kebab-case"
+            obj["friendly_name"], friendly_name,
+            "`friendly_name` is discovery output beside the slug"
         );
         assert_eq!(obj["display_name"], display_name);
-        // Chosen design §8 / Context: ADR-024 changes the row's field *set*, not
+        // Chosen design §8 / Context: ADR-025 changes the row's field *set*, not
         // `Platform`'s spelling, so `platform` keeps serde's default variant-name
-        // spelling (the r1 major `#[serde(rename_all = "kebab-case")]` was reverted
-        // as unauthorized); the mixed spelling of the two closed enums is by design.
+        // spelling; the mixed spelling of the two closed enums is by design.
         assert_eq!(obj["platform"], "SteamLinux");
         assert!(obj["codec_id"].is_null(), "codec_id must be null");
+        assert!(
+            obj["game_id"].is_null(),
+            "an unmatched row serializes `game_id: null`"
+        );
+        assert_eq!(
+            obj["candidates"],
+            serde_json::json!([]),
+            "the fake served no candidates"
+        );
         let library_root = if library.is_empty() {
             root.clone()
         } else {
@@ -226,11 +243,12 @@ fn test_cli_list_json_format() {
         let want = library_root
             .join("steamapps")
             .join("common")
-            .join(install_dir);
+            .join(display_name);
         assert_eq!(
             obj["install_path"],
             want.to_string_lossy().as_ref(),
-            "install_path must be the composed steamapps/common path under the canonicalized library that holds the manifest"
+            "install_path must be the composed steamapps/common path under the \
+             canonicalized library that holds the manifest"
         );
         assert!(
             !obj["install_path"]
@@ -243,15 +261,25 @@ fn test_cli_list_json_format() {
     }
 }
 
-// proves: Test strategy #9 (Chosen design §7/§8) — `list --json` prints `[]`
-// for a `--steam-root` that does not exist.
+/// proves: design 025 keeps the pre-ADR contract that `list --json` prints `[]`
+/// for a `--steam-root` that does not exist — the gate is satisfied by the fake,
+/// the store is the empty sandbox default, and the document is the empty array.
 #[test]
 fn test_cli_list_json_empty_for_missing_steam_root() {
-    let stdout = run_list(&[
-        "list",
-        "--json",
-        "--steam-root",
-        "/bindforge-no-such-steam-root",
-    ]);
-    assert_eq!(stdout.trim(), "[]");
+    let (data, home) = sandbox("missing");
+    let fake = fake_empty();
+    let run = run_cli(
+        &[
+            "list",
+            "--json",
+            "--steam-root",
+            "/bindforge-no-such-steam-root",
+            "--catalog-url",
+            &fake.url(),
+        ],
+        &env(&data, &home),
+        "",
+    );
+    assert!(run.success(), "stderr: {}", run.stderr);
+    assert_eq!(run.stdout.trim(), "[]");
 }

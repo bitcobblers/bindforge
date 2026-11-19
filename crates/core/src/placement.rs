@@ -82,6 +82,18 @@ impl KeyboardGeometry {
 /// exported home.
 pub const MAX_SLUG_OCTETS: usize = 128;
 
+/// `MAX_DISCOVERY_SLUG_OCTETS = 128` is the length bound of a *discovery lookup
+/// key* — the `<source>/<external-id>` string a discovery plugin reports for one
+/// installed game (`025-B1`, ADR-025). It is a cap on a lookup key, not a
+/// grammar-validated id: the key is exempt from [`is_slug_name`] by design,
+/// because its `/` and its source token are what make it unusable as a product
+/// id, and it is never a path component. It is the one bound the discovery emit
+/// boundary checks, and it is set equal to [`MAX_SLUG_OCTETS`] and
+/// `MAX_NATIVE_NAME_OCTETS` so the exported family reads as one number.
+/// `schemas/README.md` is this bound's one stated home; this is its one exported
+/// home.
+pub const MAX_DISCOVERY_SLUG_OCTETS: usize = 128;
+
 /// The slug grammar: `[a-z][a-z0-9-]*`. Named for what it is now that three
 /// entry kinds share it — a geometry name, a manifest `id`, and a manifest
 /// `codec` or preset id (ADR-013) — and applied to a document's `geometry`

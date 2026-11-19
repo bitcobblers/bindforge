@@ -15,6 +15,23 @@ bindforge-core = { workspace = true }
 [dev-dependencies]
 serde_json = "1.0"
 
+# ADR-025 Rollout 1 retires `tests/slug_tests.rs` and `tests/collision_tests.rs`
+# — their subject (`derive_slug`, the collision pass) is gone from the crate.
+# The stage toolchain cannot delete files, so the two retired suites stay in the
+# tree yet take no part in any build: `required-features` names a feature this
+# workspace never enables. Operator follow-up: delete both files with `rm` and
+# drop this gate with them.
+[features]
+retired-adr-024-suites = []
+
+[[test]]
+name = "slug_tests"
+required-features = ["retired-adr-024-suites"]
+
+[[test]]
+name = "collision_tests"
+required-features = ["retired-adr-024-suites"]
+
 # T-002: the registry reader behind the steam_windows seam is the crate's only
 # winreg consumer, and it is `#[cfg(windows)]`, so winreg never compiles for a
 # non-Windows target (Chosen design §3, §9, A11).

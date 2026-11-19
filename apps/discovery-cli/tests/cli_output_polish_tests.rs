@@ -1,14 +1,23 @@
-//! T-003 output-polish pins for `discovery list`: an aligned ADR-022 table, the
-//! header-only empty table, and the clean plugin-failure exit (T-003 Chosen
-//! design §1/§3, Test plan).
+//! Output-polish pins for `discovery list`: an aligned ADR-022 table (T-003 §1),
+//! the header-only empty table, the global flag help — now including ADR-025's
+//! `--catalog-url` — and the clean plugin-failure exit (T-003 §3), all migrated
+//! behind the catalog gate and the store sandbox per Rollout 3.
 //!
-//! Every test drives the built binary through
-//! `env!("CARGO_BIN_EXE_discovery-cli")` against a fixture or a temp tree it
-//! creates and removes itself, so no test probes the host (repo practice:
-//! integration tests use temp directories and clean up after themselves).
+//! proves: design 025's Test strategy #12/#13 at the rendering seam and the
+//! Rollout 3 migration mandate — these pre-existing subprocess suites run behind
+//! a loopback `TcpListener` fake with a temp `XDG_DATA_HOME`/`HOME` sandbox, so
+//! the gate and the store never break a rendering pin, and the re-pinned column
+//! contract (`Game Id` in, the retired namespace column out) is what alignment is
+//! computed over.
+//!
+//! Every test drives the built binary against a fixture or a temp tree it creates
+//! and removes itself, so no test probes the host (repo practice: integration
+//! tests use temp directories and clean up after themselves).
 
+mod common;
+
+use common::{FakeCatalog, SteamRoot, TempDir, cells, ok, run_cli};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 /// The crate's checked-in fixture tree, shared with `crates/discovery` tests.
 fn fixture_root() -> PathBuf {
@@ -16,22 +25,24 @@ fn fixture_root() -> PathBuf {
         .join("../../crates/discovery/tests/fixtures/steam/minimal")
 }
 
-/// Runs the built `discovery-cli` with `args` and returns its raw output.
-fn run(args: &[&str]) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_discovery-cli"))
-        .args(args)
-        .output()
-        .expect("failed to execute discovery-cli")
+/// A fake that serves no candidates to any query.
+fn fake_empty() -> FakeCatalog {
+    FakeCatalog::start("polish-fake-empty", |_| ok("[]"))
 }
 
-/// The stdout of a successful run, as text.
-fn stdout_of(output: &std::process::Output) -> String {
-    String::from_utf8_lossy(&output.stdout).into_owned()
+/// The sandbox pair that keeps every store byte inside the test.
+fn sandbox(label: &str) -> (TempDir, TempDir) {
+    (
+        TempDir::new(&format!("polish-{label}-data")),
+        TempDir::new(&format!("polish-{label}-home")),
+    )
 }
 
-/// The stderr of a run, as text.
-fn stderr_of(output: &std::process::Output) -> String {
-    String::from_utf8_lossy(&output.stderr).into_owned()
+fn env<'a>(data: &'a TempDir, home: &'a TempDir) -> [(&'a str, &'a str); 2] {
+    [
+        ("XDG_DATA_HOME", data.path().to_str().expect("utf-8")),
+        ("HOME", home.path().to_str().expect("utf-8")),
+    ]
 }
 
 /// The byte offsets of the `|` delimiters of one rendered table line. T-003 §1
@@ -42,16 +53,6 @@ fn pipe_offsets(line: &str) -> Vec<usize> {
         .filter(|(_, byte)| *byte == b'|')
         .map(|(offset, _)| offset)
         .collect()
-}
-
-/// The cells of one rendered table line, split at its `|` delimiters. Each cell
-/// keeps the padding spaces the renderer wrote for it.
-fn cells(line: &str) -> Vec<String> {
-    let inner = line
-        .strip_prefix('|')
-        .and_then(|rest| rest.strip_suffix('|'))
-        .unwrap_or(line);
-    inner.split('|').map(str::to_string).collect()
 }
 
 /// The dash run of each column of a separator line, in column order.
@@ -83,21 +84,31 @@ fn assert_is_separator(line: &str) {
     );
 }
 
-// proves: T-003 Test plan — for `list --steam-root <fixture>`, every stdout line
-// has the identical list of `|` byte offsets; line 2 is the header separator and
-// its dash runs fill the same columns as the rows around it; each column is as
-// wide as its widest cell in characters; and the table is exactly the header, the
-// separator and the four fixture rows.
+/// proves: T-003 Test plan re-pinned to the ADR-025 columns — for `list
+/// --steam-root <fixture>` behind the gate, every stdout line has the identical
+/// list of `|` byte offsets; line 2 is the header separator and its dash runs
+/// fill the same columns as the rows around it; each column is as wide as its
+/// widest cell in characters; and the table is exactly the header, the separator
+/// and the four fixture rows with their `steam/<appid>` lookup keys beside `-`
+/// `Game Id` cells.
 #[test]
 fn test_cli_list_table_columns_align_under_a_separator() {
     let root = fixture_root();
-    let output = run(&["list", "--steam-root", root.to_str().expect("utf-8 path")]);
-    assert!(
-        output.status.success(),
-        "discovery-cli must exit successfully, stderr: {}",
-        stderr_of(&output)
+    let (data, home) = sandbox("align");
+    let fake = fake_empty();
+    let run = run_cli(
+        &[
+            "list",
+            "--steam-root",
+            root.to_str().expect("utf-8 path"),
+            "--catalog-url",
+            &fake.url(),
+        ],
+        &env(&data, &home),
+        "",
     );
-    let stdout = stdout_of(&output);
+    assert!(run.success(), "stderr: {}", run.stderr);
+    let stdout = run.stdout.clone();
     let lines: Vec<&str> = stdout.lines().collect();
     assert_eq!(
         lines.len(),
@@ -109,7 +120,8 @@ fn test_cli_list_table_columns_align_under_a_separator() {
     assert_eq!(
         offsets.len(),
         6,
-        "five columns render six delimiters — ADR-024 adds the `Namespace` column: {:?}",
+        "five columns render six delimiters — ADR-025 swapped the second column, \
+         it did not add one: {:?}",
         lines[0]
     );
     for line in &lines {
@@ -138,7 +150,18 @@ fn test_cli_list_table_columns_align_under_a_separator() {
     // that column's body cells, and each rendered cell is framed by one space
     // on each side.
     let header = cells(lines[0]);
-    let rows: Vec<Vec<String>> = lines[2..].iter().map(|line| cells(line)).collect();
+    // `cells` from the harness trims; re-split untrimmed for the framing check.
+    let untrimmed: Vec<Vec<String>> = lines
+        .iter()
+        .map(|line| {
+            let inner = line
+                .strip_prefix('|')
+                .and_then(|rest| rest.strip_suffix('|'))
+                .unwrap_or(line);
+            inner.split('|').map(str::to_string).collect()
+        })
+        .collect();
+    let rows: Vec<Vec<String>> = untrimmed[2..].to_vec();
     for row in &rows {
         assert_eq!(row.len(), 5, "every row has exactly five cells: {row:?}");
         assert!(
@@ -147,10 +170,11 @@ fn test_cli_list_table_columns_align_under_a_separator() {
             "every cell must be framed by a space on each side: {row:?}"
         );
     }
-    for cell in &header {
+    for cell in &untrimmed[0] {
         assert!(
             cell.starts_with(' ') && cell.ends_with(' '),
-            "every header cell must be framed by a space on each side: {header:?}"
+            "every header cell must be framed by a space on each side: {:?}",
+            untrimmed[0]
         );
     }
     let column_gaps: Vec<usize> = gaps(&offsets);
@@ -165,54 +189,70 @@ fn test_cli_list_table_columns_align_under_a_separator() {
             .map(|row| row[index].trim().chars().count())
             .max()
             .unwrap_or(0)
-            .max(header[index].trim().chars().count());
+            .max(header[index].chars().count());
         assert_eq!(
             column_gaps[index],
             widest + 2,
-            "column {index} must be as wide as its widest cell plus one space on each side"
+            "column {index} must be as wide as its widest cell plus one space on \
+             each side (widest cell: {:?})",
+            index
         );
     }
 
-    // And those four rows are the four fixture games, rendered with ADR-024's
-    // prefix-free `Slug` cell beside a `Namespace` cell of `unknown`.
+    // And those four rows are the four fixture games, rendered with the ADR-025
+    // `steam/<appid>` lookup key beside an unresolved `-` `Game Id`.
     assert_eq!(
         rows.iter()
             .map(|row| (row[0].trim(), row[1].trim()))
             .collect::<Vec<(&str, &str)>>(),
         vec![
-            ("example-game", "unknown"),
-            ("mixed-case-game", "unknown"),
-            ("nameless-install", "unknown"),
-            ("secondary-title", "unknown"),
+            ("steam/900001", "-"),
+            ("steam/900002", "-"),
+            ("steam/900003", "-"),
+            ("steam/900100", "-"),
         ],
-        "the table must contain exactly the four fixture rows, each with its own namespace cell"
+        "the table must contain exactly the four fixture rows, each lookup key \
+         beside its unresolved id"
     );
     for line in &lines[2..] {
         assert!(
-            !line.contains("unknown/"),
-            "no body row may spell a slug as `unknown/…`: {line:?}"
+            !line.contains("unknown"),
+            "no body row may carry the retired namespace value: {line:?}"
         );
     }
 }
 
-// proves: T-003 Test plan — `list --steam-root /bindforge-no-such-steam-root`
-// prints exactly the header block (header + separator) with no body row and no
-// "(no games found)" copy, and nothing on stderr.
+/// proves: T-003 Test plan re-pinned — `list --steam-root
+/// /bindforge-no-such-steam-root` behind the gate prints exactly the header
+/// block (header + separator) with no body row and no "(no games found)" copy,
+/// and nothing on stderr; the header names the five ADR-025 columns.
 #[test]
 fn test_cli_list_table_is_the_header_block_when_no_games_are_found() {
-    let output = run(&["list", "--steam-root", "/bindforge-no-such-steam-root"]);
-    assert!(
-        output.status.success(),
-        "a missing root is an empty result, not a failure, stderr: {}",
-        stderr_of(&output)
+    let (data, home) = sandbox("empty");
+    let fake = fake_empty();
+    let run = run_cli(
+        &[
+            "list",
+            "--steam-root",
+            "/bindforge-no-such-steam-root",
+            "--catalog-url",
+            &fake.url(),
+        ],
+        &env(&data, &home),
+        "",
     );
     assert!(
-        stderr_of(&output).is_empty(),
+        run.success(),
+        "a missing root is an empty result, not a failure, stderr: {}",
+        run.stderr
+    );
+    assert!(
+        run.stderr.is_empty(),
         "an empty result writes nothing on stderr, got: {}",
-        stderr_of(&output)
+        run.stderr
     );
 
-    let stdout = stdout_of(&output);
+    let stdout = run.stdout.clone();
     let lines: Vec<&str> = stdout.lines().collect();
     assert_eq!(
         lines.len(),
@@ -221,15 +261,16 @@ fn test_cli_list_table_is_the_header_block_when_no_games_are_found() {
     );
     let header = cells(lines[0]);
     assert_eq!(
-        header.iter().map(|cell| cell.trim()).collect::<Vec<&str>>(),
+        header,
         vec![
             "Slug",
-            "Namespace",
+            "Game Id",
             "Display Name",
             "Install Path",
             "Platform"
         ],
-        "the header names the five columns ADR-024 renders: the slug beside its namespace"
+        "the header names the five columns ADR-025 renders: the lookup key beside \
+         the confirmed game id"
     );
     assert_is_separator(lines[1]);
     assert_eq!(
@@ -238,7 +279,7 @@ fn test_cli_list_table_is_the_header_block_when_no_games_are_found() {
         "the separator sits under the aligned header"
     );
     assert!(
-        !stdout.contains("unknown/"),
+        !stdout.contains("unknown"),
         "no body row may be printed:\n{stdout}"
     );
     assert!(
@@ -247,110 +288,130 @@ fn test_cli_list_table_is_the_header_block_when_no_games_are_found() {
     );
 }
 
-// proves: operator follow-up on T-003 — `--json` is a global flag, so both
-// `discovery --help` and `discovery list --help` list it, and it is accepted
-// before or after the `list` subcommand.
+/// proves: design 025's Chosen design (`--catalog-url` is "a global clap flag
+/// beside `--json`") and the operator follow-up on T-003 — `discovery --help` and
+/// `discovery list --help` list `--json` and the new `--catalog-url`, and the
+/// global position is accepted: `--json` before the subcommand prints the same
+/// JSON array (behind the fake and the sandbox).
 #[test]
-fn test_help_lists_the_json_flag_at_every_level() {
-    let top = run(&["--help"]);
+fn test_help_lists_the_json_and_catalog_flags_at_every_level() {
+    let top = run_cli(&["--help"], &[], "");
     assert!(
-        top.status.success(),
+        top.success(),
         "`--help` must succeed, stderr: {}",
-        stderr_of(&top)
+        top.stderr
     );
-    assert!(
-        stdout_of(&top).contains("--json"),
-        "the top-level help must list --json:\n{}",
-        stdout_of(&top)
-    );
+    for flag in ["--json", "--catalog-url"] {
+        assert!(
+            top.stdout.contains(flag),
+            "the top-level help must list {flag}:\n{}",
+            top.stdout
+        );
+    }
 
-    let sub = run(&["list", "--help"]);
+    let sub = run_cli(&["list", "--help"], &[], "");
     assert!(
-        sub.status.success(),
+        sub.success(),
         "`list --help` must succeed, stderr: {}",
-        stderr_of(&sub)
+        sub.stderr
     );
-    assert!(
-        stdout_of(&sub).contains("--json"),
-        "the `list` help must list --json:\n{}",
-        stdout_of(&sub)
-    );
+    for flag in ["--json", "--catalog-url"] {
+        assert!(
+            sub.stdout.contains(flag),
+            "the `list` help must list {flag}:\n{}",
+            sub.stdout
+        );
+    }
 
     // Global position: accepted before the subcommand, same JSON array.
     let root = fixture_root();
-    let output = run(&[
-        "--json",
-        "list",
-        "--steam-root",
-        root.to_str().expect("utf-8 path"),
-    ]);
-    assert!(
-        output.status.success(),
-        "`--json` before the subcommand must parse, stderr: {}",
-        stderr_of(&output)
+    let (data, home) = sandbox("global");
+    let fake = fake_empty();
+    let run = run_cli(
+        &[
+            "--json",
+            "list",
+            "--steam-root",
+            root.to_str().expect("utf-8 path"),
+            "--catalog-url",
+            &fake.url(),
+        ],
+        &env(&data, &home),
+        "",
     );
-    let games: Vec<serde_json::Value> = serde_json::from_str(stdout_of(&output).trim())
+    assert!(
+        run.success(),
+        "`--json` before the subcommand must parse, stderr: {}",
+        run.stderr
+    );
+    let games: Vec<serde_json::Value> = serde_json::from_str(run.stdout.trim())
         .expect("`--json list` must print a JSON array of DiscoveredGame objects");
     assert_eq!(games.len(), 4, "the fixture yields exactly four games");
 }
 
-// proves: T-003 §3 Test plan — a `--steam-root` whose
-// `steamapps/libraryfolders.vdf` is non-UTF-8 makes `discover()` return
-// `PluginError` (the §7 error path); the CLI exits non-zero with exactly one
-// stderr line naming the plugin, leaves stdout empty, and never panics.
+/// proves: T-003 §3 Test plan, behind the migrated gate — a `--steam-root` whose
+/// `steamapps/libraryfolders.vdf` is non-UTF-8 makes `discover()` return
+/// `PluginError` (the §7 error path); the gate passed (the fake is listening), so
+/// the failure is the plugin's: the CLI exits non-zero with exactly one stderr
+/// line naming the plugin, leaves stdout empty, and never panics.
 #[test]
 fn test_cli_list_reports_a_plugin_failure_on_one_stderr_line() {
-    let root = std::env::temp_dir().join(format!(
-        "bindforge-t003-unreadable-root-{}",
-        std::process::id()
-    ));
-    let _ = std::fs::remove_dir_all(&root);
-    std::fs::create_dir_all(root.join("steamapps")).expect("temp steamapps directory");
+    let root = SteamRoot::new("polish-unreadable-root");
     // One selected root, no games and one file skipped as unreadable is the §7
     // error path, so `discover()` answers `PluginError`.
     std::fs::write(
-        root.join("steamapps").join("libraryfolders.vdf"),
+        root.path().join("steamapps").join("libraryfolders.vdf"),
         [0xff_u8, 0xfe, 0x00, 0x01],
     )
     .expect("temp libraryfolders.vdf");
+    let (data, home) = sandbox("pluginfail");
+    let fake = fake_empty();
 
-    let output = run(&["list", "--steam-root", root.to_str().expect("utf-8 path")]);
-    match std::fs::remove_dir_all(&root) {
-        Ok(()) => {}
-        Err(error) => panic!("failed to clean up {}: {error}", root.display()),
-    }
+    let run = run_cli(
+        &[
+            "list",
+            "--steam-root",
+            root.path().to_str().expect("utf-8 path"),
+            "--catalog-url",
+            &fake.url(),
+        ],
+        &env(&data, &home),
+        "",
+    );
 
     assert!(
-        !output.status.success(),
+        !run.success(),
         "a plugin failure must exit non-zero, stdout: {}",
-        stdout_of(&output)
+        run.stdout
     );
     assert_eq!(
-        output.status.code(),
+        run.code(),
         Some(1),
         "a plugin failure exits with `ExitCode::FAILURE`"
     );
 
-    let stdout = stdout_of(&output);
     assert!(
-        stdout.is_empty(),
-        "a failed run writes no table on stdout, got: {stdout}"
+        run.stdout.is_empty(),
+        "a failed run writes no table on stdout, got: {}",
+        run.stdout
     );
 
-    let stderr = stderr_of(&output);
     assert!(
-        !stderr.contains("panicked at"),
-        "the failure must be a clean error path, never a panic: {stderr}"
+        !run.stderr.contains("panicked at"),
+        "the failure must be a clean error path, never a panic: {}",
+        run.stderr
     );
     assert!(
-        !stderr.contains("Error from plugin"),
-        "the CLI must not speak the engine's swallowed-error voice: {stderr}"
+        !run.stderr.contains("Error from plugin"),
+        "the CLI must not speak the engine's swallowed-error voice: {}",
+        run.stderr
     );
-    let lines: Vec<&str> = stderr.lines().collect();
+    let lines = run.stderr_lines();
     assert_eq!(
         lines.len(),
         1,
-        "exactly one stderr line names the failure: {stderr}"
+        "exactly one stderr line names the failure: {}",
+        run.stderr
     );
     assert!(
         lines[0].starts_with("error: plugin steam-linux failed: "),

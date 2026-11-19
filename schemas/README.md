@@ -140,7 +140,20 @@ can reach a writer:
   component on every platform this product names — and the amendment is
   relaxation only: an id valid under the 63-octet text stays valid.
 
-The reference implementation exports all twelve constants as the public names
+- ADR-025 adds one budget beside it for a value that rides no grammar at all:
+  `MAX_DISCOVERY_SLUG_OCTETS = 128` caps the `<source>/<external-id>` discovery
+  lookup key a discovery plugin reports for one installed game. It is set equal
+  to the two 128 bounds above so the exported family reads as one number, and it
+  is explicitly *not* a slug-grammar bound: the discovery key is exempt from
+  `[a-z][a-z0-9-]*` — its `/` is the point — it is never a path component, and it
+  can never be adopted as a manifest `id` or a profile pin (`025-B1`, `025-L5`).
+  The reference implementation checks the key against this cap alone at the
+  discovery emit boundary and never against the grammar. ADR-025 also borrows
+  `MAX_NATIVE_NAME_OCTETS = 128` a second, non-schema time: it bounds a
+  discovered game's `friendly_name`, display metadata that joins nothing, which
+  is what makes clamping that value admissible.
+
+The reference implementation exports all thirteen constants as the public names
 for these limits, so an implementer never has to guess which number a
 rejection names.
 

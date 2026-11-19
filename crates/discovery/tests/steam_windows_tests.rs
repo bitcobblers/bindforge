@@ -10,10 +10,9 @@
 //! compile-verified by the cross-target `cargo check` gate (Test strategy
 //! #12), never executed here.
 
-use discovery::game::{DiscoveredGame, Namespace, Platform};
+use discovery::game::{DiscoveredGame, Platform};
 use discovery::plugin::DiscoveryPlugin;
 use discovery::registry::DiscoveryError;
-use discovery::slug::derive_slug;
 use discovery::steam_linux;
 use discovery::steam_linux::SteamLinuxPlugin;
 use discovery::steam_windows::{
@@ -70,14 +69,15 @@ fn manifest_text(name: Option<&str>, installdir: Option<&str>) -> String {
     text
 }
 
-/// `steam_windows::parse_manifest` reduced to a comparable shape.
-fn windows_manifest(text: &str) -> Option<(String, String)> {
-    parse_manifest(text).map(|m| (m.display_name, m.install_dir))
+/// `steam_windows::parse_manifest` reduced to a comparable shape. ADR-025 adds the
+/// appid to the reduction: the two plugins must agree on the identity read too.
+fn windows_manifest(text: &str) -> Option<(String, String, String)> {
+    parse_manifest(text).map(|m| (m.display_name, m.install_dir, m.appid))
 }
 
 /// `steam_linux::parse_manifest` reduced to the same comparable shape.
-fn linux_manifest(text: &str) -> Option<(String, String)> {
-    steam_linux::parse_manifest(text).map(|m| (m.display_name, m.install_dir))
+fn linux_manifest(text: &str) -> Option<(String, String, String)> {
+    steam_linux::parse_manifest(text).map(|m| (m.display_name, m.install_dir, m.appid))
 }
 
 fn no_env(_key: &str) -> Option<String> {
@@ -161,8 +161,9 @@ fn expected_registry_calls() -> Vec<(RegistryKey, String)> {
     ]
 }
 
-/// The plugin's rows reduced to everything except the platform tag. ADR-024 adds
-/// the namespace's spelling: two plugins must agree on it as much as on the slug.
+/// The plugin's rows reduced to everything except the platform tag. ADR-025 replaces
+/// the retired namespace with the friendly name: two plugins must agree on it as much
+/// as on the composed lookup key.
 fn rows_without_platform(
     games: Vec<DiscoveredGame>,
 ) -> Vec<(String, String, String, PathBuf, bool)> {
@@ -171,7 +172,7 @@ fn rows_without_platform(
         .map(|g| {
             (
                 g.slug,
-                g.namespace.to_string(),
+                g.friendly_name,
                 g.display_name,
                 g.install_path,
                 g.codec_id.is_none(),
@@ -213,7 +214,11 @@ fn parse_manifest_agrees_with_linux_on_every_shared_case() {
     let good = manifest_text(Some("Example Game"), Some("Example Game"));
     assert_eq!(
         windows_manifest(&good),
-        Some(("Example Game".to_string(), "Example Game".to_string())),
+        Some((
+            "Example Game".to_string(),
+            "Example Game".to_string(),
+            "900001".to_string(),
+        )),
         "the parity assertions must not pass on vacuous None-equality"
     );
 
@@ -251,7 +256,7 @@ fn parse_manifest_agrees_with_linux_on_every_shared_case() {
         "unparseable text must be refused identically"
     );
 
-    let mixed_case = "\"appstate\"\n{\n\t\"NAME\"\t\t\"Mixed Case Game\"\n\t\"stateflags\"\t\t\"4\"\n\t\"INSTALLDIR\"\t\t\"Mixed Case Game\"\n}\n";
+    let mixed_case = "\"appstate\"\n{\n\t\"Appid\"\t\t\"900001\"\n\t\"NAME\"\t\t\"Mixed Case Game\"\n\t\"stateflags\"\t\t\"4\"\n\t\"INSTALLDIR\"\t\t\"Mixed Case Game\"\n}\n";
     assert_eq!(
         windows_manifest(mixed_case),
         linux_manifest(mixed_case),
@@ -260,7 +265,7 @@ fn parse_manifest_agrees_with_linux_on_every_shared_case() {
     assert_eq!(
         windows_manifest(mixed_case)
             .as_ref()
-            .map(|(display, _)| display.as_str()),
+            .map(|(display, _, _)| display.as_str()),
         Some("Mixed Case Game"),
         "the mixed-case case must actually parse"
     );
@@ -494,13 +499,13 @@ fn from_registry_and_roots_scans_two_view_roots_deduped() {
     assert_eq!(
         slugs,
         [
-            "example-game",
-            "mixed-case-game",
-            "nameless-install",
-            "secondary-title",
+            "steam/900001",
+            "steam/900002",
+            "steam/900003",
+            "steam/900100",
         ],
-        "both installs contribute their rows, ordered by (slug, install_path); ADR-024's \
-         slugs carry no namespace prefix"
+        "both installs contribute their rows, ordered by (slug, install_path); ADR-025's \
+         slugs are the `steam/<appid>` lookup keys"
     );
     assert!(
         games.iter().all(|g| g.platform == Platform::SteamWindows),
@@ -617,12 +622,11 @@ fn host_candidates_does_not_dedup_a_registry_value_equal_to_an_env_default() {
 
 // proves: Test strategy #4 (Chosen design §5, §7) — a registry-sourced root
 // reaches the shared scan end to end: the four minimal-fixture games come back
-// tagged `Platform::SteamWindows` with `codec_id == None`,
-// `slug == derive_slug(display_name)`, `install_path` composed from the
+// tagged `Platform::SteamWindows` with `codec_id == None`, the `steam/<appid>`
+// lookup key read from each manifest, `install_path` composed from the
 // canonicalized library's `steamapps/common/`, ordered by (slug, install_path).
-// Re-pinned by ADR-024: the derivation is the canonical one, the slug is
-// prefix-free and inside the shared bound, and the namespace is the row's own
-// field.
+// Re-pinned by ADR-025: the identity is the appid-sourced lookup key — inside
+// `025-B1`, exempt from the product slug grammar — and the row carries no namespace.
 #[test]
 fn from_registry_and_roots_scans_the_registry_sourced_root_end_to_end() {
     let root_arg = fixture("minimal");
@@ -637,29 +641,33 @@ fn from_registry_and_roots_scans_the_registry_sourced_root_end_to_end() {
     for game in &games {
         assert_eq!(game.platform, Platform::SteamWindows);
         assert!(game.codec_id.is_none(), "codec_id must stay None");
-        assert_eq!(
-            game.slug,
-            derive_slug(&game.display_name).expect("a fixture display name derives a slug"),
-            "the Windows plugin derives the same prefix-free slug the Linux plugin does"
-        );
+        let appid = game
+            .slug
+            .strip_prefix("steam/")
+            .unwrap_or_else(|| panic!("`{}` must be a `steam/<appid>` lookup key", game.slug));
         assert!(
-            bindforge_core::is_slug_name(&game.slug)
-                && game.slug.len() <= bindforge_core::MAX_SLUG_OCTETS,
-            "`{}` must be a grammar-valid id inside the shared bound",
+            !appid.is_empty() && appid.bytes().all(|byte| byte.is_ascii_digit()),
+            "`{}` must carry the numeric appid: the Windows plugin reads the same \
+             identity source the Linux plugin does",
             game.slug
         );
-        assert_eq!(
-            game.namespace,
-            Namespace::Unknown,
-            "a Windows row's namespace is the v1 namespace, kept out of its slug"
+        assert!(
+            game.slug.len() <= bindforge_core::MAX_DISCOVERY_SLUG_OCTETS,
+            "`{}` must sit inside `025-B1`'s lookup-key bound",
+            game.slug
+        );
+        assert!(
+            !bindforge_core::is_slug_name(&game.slug),
+            "`{}` is grammar-invalid by design — the lookup key never becomes a product id",
+            game.slug
         );
     }
 
     let expected = [
-        ("example-game", "", "Example Game"),
-        ("mixed-case-game", "", "Mixed Case Game"),
-        ("nameless-install", "", "Nameless Install"),
-        ("secondary-title", "secondary", "Secondary Title"),
+        ("steam/900001", "", "Example Game"),
+        ("steam/900002", "", "Nameless Install"),
+        ("steam/900003", "", "Mixed Case Game"),
+        ("steam/900100", "secondary", "Secondary Title"),
     ];
     for (game, (slug, library, install_dir)) in games.iter().zip(expected) {
         assert_eq!(
@@ -684,8 +692,8 @@ fn from_registry_and_roots_scans_the_registry_sourced_root_end_to_end() {
 
 // proves: Test strategy #5 (Chosen design §1, §2) — the Windows plugin on the
 // shared minimal fixture returns the same four rows as the Linux plugin except
-// for the `platform` field; no new fixture tree is introduced. ADR-024's identity
-// rule is part of that parity: slug and namespace agree across the two plugins.
+// for the `platform` field; no new fixture tree is introduced. ADR-025's identity
+// rule is part of that parity: slug and friendly name agree across the two plugins.
 #[test]
 fn windows_rows_match_linux_rows_except_the_platform_tag() {
     let root = fixture("minimal");

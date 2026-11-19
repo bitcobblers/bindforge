@@ -1,0 +1,1428 @@
+{
+  "version": 1,
+  "slug": "discovery-identity-and-catalog-matching",
+  "nnn": "025",
+  "branch": "pipeline/025-discovery-identity-and-catalog-matching",
+  "source": {
+    "kind": "adr",
+    "path": "docs/adrs/025-discovery-identity-and-catalog-matching.md"
+  },
+  "status": "done",
+  "lastStage": "doc-sync",
+  "designRound": 2,
+  "codeRound": 2,
+  "designBudgetUsed": 1,
+  "codeBudgetUsed": 8,
+  "editorialDone": false,
+  "testsGreen": true,
+  "testsNeedUpdate": false,
+  "stageFailures": {
+    "design-review:correctness": 1
+  },
+  "stageCommits": [
+    "8e005c314b753adf51f0c392fe2b6569549165e4",
+    "b45354b0afdaabeee0f29e90df7d1424a6854c4b",
+    "1645dbd9a43fe9dcd499240b8e0691b49bc476d7",
+    "d7996c9f43972aa839e32b7247366679e2136a85",
+    "121f82e42bee1dc336ed80eb71e7956541324ac3",
+    "b38fdd976bb2179efba96d76494a8abde13ac1a4",
+    "3501eab748ebb519621556ef5ca4963a98b9aba8",
+    "ff881a877d7005fd31a37a1e2b699db78426eb97",
+    "0a727d5b8f7ee9e0de48afd23efa97d82796d422",
+    "eef48d0a026439b2a6947f652edb68ce02a80880",
+    "0f25a16765964738d3a2d886733718571b3da362",
+    "b3a74b8b859073f4fc816e2573a95228c836b516",
+    "f502ae1f6a8dc0fbdbdb8162800ca5797d4063db",
+    "11b7af97e806fdbbf735ffede19c3fb82742fdd4",
+    "dbae6d1a24bf3574894c360166b912cb81431867",
+    "c8c752ed5c75f34e4045c7779e234fd75db5ed27",
+    "c9983a81a11f89b092d69d3681778c158753366e",
+    "eeee46ef80109331512461ade217a6d48af1c50a",
+    "6cde7499aee5d364626172cf0fd828a1f0b52810"
+  ],
+  "forceNext": null,
+  "results": [
+    {
+      "stage": "research",
+      "round": 0,
+      "sessionID": "ses_e0ea62f6cffeXu9e3ulQ5r7LSK",
+      "agent": "research/researcher",
+      "at": 1795050749219,
+      "reply": {
+        "summary": "Wrote docs/designs/025-discovery-identity-and-catalog-matching/01-research.md for ADR-025. Research grounded the ADR's three-identifier split in: the shipped ADR-024 code state (DiscoveredGame with Namespace::Unknown, MAX_SLUG_OCTETS=128 landed, Steam plugins that never read AppID, two slug emit-boundary checks, two-variant DiscoveryError, no persistence anywhere); primary external docs for the source ids (Steamworks App ID docs, community ACF format docs, Epic .item/.egstore/LauncherInstalled.dat layouts); and a decisive finding for 025-R2 — Epic's own glossary and Ecom APIs scope CatalogItemId uniqueness to a product namespace, arguing the epic external-id likely needs the namespace pair. Prior art covers Playnite (provider-id + plugin-id split, duplicate-merge pain), GOG Galaxy (negative control for auto-fusion by title), Wikidata/PCGamingWiki (curated id + steam_appid lookup key + title metadata), and MusicBrainz (curation posture). Applied lenses: prior art, standards, platform notes. Ten open questions flagged for the designer, led by the Epic external-id spelling, match-store location/format, connectivity-gate placement, and JSON-mode candidate passthrough contract change.",
+        "commitMessage": "docs: research ADR-025 discovery identity and catalog matching"
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/research-r0.md",
+      "durationMs": 191548,
+      "nudges": 0,
+      "docName": "01-research.md",
+      "docLines": 345,
+      "docLinesAdded": 345,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "proposal",
+      "round": 0,
+      "sessionID": "ses_e0ea34298ffeVt629236TClpc5",
+      "agent": "design/designer",
+      "at": 1795051155866,
+      "reply": {
+        "commitMessage": "docs: design ADR-025 source key, game id, and friendly name split"
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/proposal-r0.md",
+      "durationMs": 406550,
+      "nudges": 0,
+      "docName": "02-proposal.md",
+      "docLines": 520,
+      "docLinesAdded": 520,
+      "docLinesRemoved": 0
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e0e9d0e1bffeSjdn0gSuLTkfOZ",
+      "agent": "review/design-correctness",
+      "at": 1795052957488,
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/design-review-correctness-r1c0.md",
+      "durationMs": 1801480,
+      "nudges": 0,
+      "failure": "stage-timeout"
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e0e8190bcffepNoAu2QIyklPr2",
+      "agent": "review/design-correctness",
+      "at": 1795053232986,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Rollout item 3 + Risks row \"`024`'s identity fixtures and tests re-pin a second time\" + Test strategy #4 (\"The plugin-side skip case at the same bound is asserted separately\")",
+            "problem": "The plan accounts for the new integration tests (#11-#13) and for named deletions, but not for the pre-existing apps/discovery-cli subprocess suites the new step 1 breaks. Verified: cli_tests.rs, cli_output_polish_tests.rs and cli_slug_refusal_tests.rs all run the built binary (CARGO_BIN_EXE_discovery-cli) against fixture/temp Steam roots and assert a rendered table or JSON array; with the probe gate landing before any plugin is constructed, every such run now exits non-zero with `error: catalog transport unavailable` and empty stdout, so each needs the loopback fake — harness work that appears in no Option, Rollout item, or Risk. Separately cli_slug_refusal_tests.rs pins the emission boundary end-to-end off a fixture whose display name is over-bound (`const SLUG_BOUND: usize = bindforge_core::MAX_SLUG_OCTETS;`), which the design makes unproducible: a `steam/<appid>` key is at most 26 octets under its own 1-20-digit appid rule. As written the gates cannot pass without unplanned re-tooling of suites the design never names.",
+            "fix": "In Rollout item 3, name the migration: every existing apps/discovery-cli subprocess test runs behind a TcpListener fake (or an injected CatalogClient); and state that the CLI emit-boundary bound refusal moves to the in-source #[cfg(test)] hand-built-row pin in src/main.rs, deleting the fixture route in cli_slug_refusal_tests.rs rather than leaving it asserting an unreachable condition."
+          },
+          {
+            "severity": "minor",
+            "location": "Test strategy #14 (retirement) — \"`derive_slug`, `Namespace`, `namespace`, and `resolve_collisions` appear in no source under `crates/discovery` or `apps/discovery-cli`\"",
+            "problem": "The textual-absence scope is far wider than the scheduled changes: grep finds 90 `namespace` occurrences in crates/discovery and 32 in apps/discovery-cli, across plugin_tests.rs, game_tests.rs, steam_linux_tests.rs, steam_windows_tests.rs, emission_tests.rs, zz_api_probe.rs, cli_dual_plugin_tests.rs, cli_tests.rs, cli_output_polish_tests.rs and cli_slug_refusal_tests.rs — none named for change by Rollout 1-5, which names only `slug.rs`, `slug_tests.rs`, `collision_tests.rs`, `resolve_collisions` and `Namespace`. It also catches prose, e.g. the doc comment above COLUMNS: \"(ADR-022, widened by ADR-024's namespace)\".",
+            "fix": "Pin the compiled surface instead of the string — the `Namespace` type, the `namespace` field, `derive_slug` and `resolve_collisions` resolve nowhere in src/ or in any assertion — and list the re-pinned suites in Rollout 1 and 3."
+          },
+          {
+            "severity": "minor",
+            "location": "Corpus boundary and ledger — \"`!is_slug_name(slug)`, `!is_slug_name(friendly_name)`, and the slug is inside `025-B1` — the structural proof that a source key cannot become a product id, because the grammar refuses it (A5)\"",
+            "problem": "The claim is structural only for the slug (the `/` decides it). For `friendly_name` the normalization rule (trim, collapse whitespace, clamp at a char boundary) leaves an all-lowercase single-word name verbatim, and display_name falls back to installdir; every current fixture happens to carry a capital or a space (\"Example Game\", \"Secondary Title\", \"BrokenMarker900202\"), so the pin passes by fixture accident and will fail confusingly for a future fixture named e.g. `doom`.",
+            "fix": "Restrict \"the structural proof\" to the slug, and either state the friendly-name assertion as a fixture-contingent pin or replace it with the property 025-L5 actually needs — a friendly name is never used as a manifest/profile id or a path component."
+          },
+          {
+            "severity": "minor",
+            "location": "Scan flow and output, step 6 — \"A chosen candidate writes the record `(slug, game_id, the row's friendly name)`\" together with \"The answer applies to every row sharing the slug\"",
+            "problem": "When several rows share one slug — the case the Emission section relies on (\"keeps the same game in two libraries as two rows\") — \"the row's friendly name\" names no row, and the store, \"keyed by `slug` alone\", holds one record where 025-C3 says \"one record per confirmed install\". The design acknowledges slug-sharing only for `local` (\"Two install directories differing only in case collapse to one `local/<slug>`\"), leaving the general case unstated.",
+            "fix": "State that the store holds one record per distinct slug, and name the row whose friendly name is stored (the first in the existing (slug, install_path) order)."
+          },
+          {
+            "severity": "minor",
+            "location": "Assumption register A10 — \"The workspace's external deps are `serde`, `winreg`, `clap`, `serde_json`\" marked verified on basis \"Cargo.toml:20-24\"",
+            "problem": "The cited basis does not support the stated set: [workspace.dependencies] lists bindforge-core, serde and winreg, and comments that clap is among the deps that \"enter when their consumer lands\"; clap and serde_json are per-package deps of apps/discovery-cli (`clap = { version = \"4\", features = [\"derive\"] }`, `serde_json = \"1.0\"`). The conclusion is safe — the CLI already has everything the new modules need, so no Cargo.lock change follows — but the row is marked verified against a basis that contradicts its wording.",
+            "fix": "Restate A10 as \"the CLI's deps are `discovery`, `bindforge-core`, `clap`, `serde`, `serde_json`\", citing apps/discovery-cli/Cargo.toml:6-13 beside Cargo.toml:20-24."
+          },
+          {
+            "severity": "minor",
+            "location": "Bound — \"`schemas/README.md` gains a sibling bullet in the exported budget family: ADR-025 adds `MAX_DISCOVERY_SLUG_OCTETS = 128`\"",
+            "problem": "The new bullet covers only the new constant, while the design also gives the existing MAX_NATIVE_NAME_OCTETS a second, non-schema use as the friendly_name bound (025-C2's borrowed sibling bound). Its stated homes stay narrow — the README bullet says \"one game-native action name\", 013-B4 the same — so nothing states the discovery row's display bound in the budget family.",
+            "fix": "Add one clause to the new bullet: ADR-025 also borrows `MAX_NATIVE_NAME_OCTETS` as the `friendly_name` display bound, a non-schema use beside the lookup-key cap — leaving both existing bullets' text intact."
+          },
+          {
+            "severity": "nit",
+            "location": "Test strategy #4 — \"The plugin-side skip case at the same bound is asserted separately\"",
+            "problem": "Through any plugin entry point that case is unreachable: the 1-20-digit appid rule caps a composed key at 26 octets, so only an in-module construction of AppManifest with a 130-digit appid can reach the MAX_DISCOVERY_SLUG_OCTETS skip in `discovered_game`.",
+            "fix": "Say so in one line and pin it as an in-module AppManifest construction (defence in depth), or drop it and keep the refuse_invalid_slugs hand-built-row boundary pin."
+          }
+        ]
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/design-review-correctness-attempt2-r1c0.md",
+      "durationMs": 275433,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e0e9d0e1affeFKsiE4iQDWqCog",
+      "agent": "review/design-compatibility",
+      "at": 1795052895942,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → \"Match store — `apps/discovery-cli/src/matches.rs` (new)\" with Compatibility matrix row \"macOS (APFS)\" — \"`<data>` is `$XDG_DATA_HOME` when set and absolute (else `$HOME/.local/share`) on Linux/other, and `%APPDATA%` on Windows\" / \"Yes, no CI leg\"",
+            "problem": "The design names only two data-dir conventions (freedesktop XDG, Windows known folder) and A16 scopes its own basis to \"a Linux/Windows product\", yet the matrix claims macOS as supported `Yes`. The macOS per-user data directory (`~/Library/Application Support`) is named nowhere, so on that platform the match store lands at `~/.local/share/bindforge/matches.json` with neither a stated basis nor a recorded deviation — the per-OS config-dir convention (compatibility checklist item 6) is established for two of the three named platforms only.",
+            "fix": "Make macOS a stated decision instead of a leftover: either the store rule names it (`$XDG_DATA_HOME` if set and absolute, else `$HOME/Library/Application Support/bindforge/matches.json` on macOS, else `$HOME/.local/share`), or the Match-store bullet and the macOS row state that macOS deliberately rides the Linux XDG fallback and a macOS-native location is Deferred; extend A16's basis accordingly or mark its macOS half unverified."
+          },
+          {
+            "severity": "minor",
+            "location": "Test strategy #15 with Compatibility matrix row \"macOS (APFS)\" — \"macOS has no leg — so no test asserts a platform-specific outcome; the Windows store-path rule is exercised on Linux through the env seam\"",
+            "problem": "The matrix claims macOS as supported while the test strategy names no macOS-targeted verification at all, where the Windows row names its substitute (the `%APPDATA%` branch through the env-lookup seam). Checklist item 7 requires a named platform test for every platform the matrix claims supported; the row's own answer, \"runtime verification level is Test strategy #15's\", is a statement that the level is none.",
+            "fix": "Give macOS the pin Windows has: extend Test #5 with the non-Windows branch as the path macOS runs (`XDG_DATA_HOME` unset → `$HOME/.local/share/bindforge/matches.json`, asserted through the same env closure) and cite it from #15; or restate the cell as expectation by code-path sharing with Linux rather than a supported claim."
+          },
+          {
+            "severity": "minor",
+            "location": "Compatibility matrix row set — \"Third-party schema readers | Not affected\" and \"`tools/orchestration` (Node) | Not affected\"",
+            "problem": "The matrix lists the surfaces that survive and is silent on the two contracts this design breaks by construction: the `discovery` crate's public API (the Options section reasons about \"the type a third-party plugin constructs\", while `DiscoveredGame.namespace` and `Namespace` are deleted, `friendly_name` added, `slug.rs` and `resolve_collisions` deleted, `Source`/`lookup_key` added) and the CLI's published stdout contract A7 cites T-003 for (fixed JSON key set carrying `namespace`; the `Namespace` column). Test #13/#14 re-pin both in-tree, but a matrix reader sees only `Not affected` rows and no breaking-change row.",
+            "fix": "Add one row — \"`discovery` public API and CLI stdout contract | Breaking, in-tree only\" — naming the deletions and the re-pinned key set and columns, with the basis that bounds the blast radius (`crates/discovery` is an unpublished workspace member; `discovery-cli` is the only in-tree consumer)."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → \"Bound — `crates/core` and `schemas/README.md`\" — \"`schemas/README.md` gains a sibling bullet in the exported budget family\"",
+            "problem": "`crates/core/tests/ledger_annotations.rs::bound_bullet` selects the first line containing the literal `MAX_SLUG_OCTETS = 128` and asserts the seven-rider set on that whole bullet, and the family's house style for a sibling quotes exactly that string (the current bullet: \"The value is the sibling of `MAX_NATIVE_NAME_OCTETS = 128`\"). A new ADR-025 bullet written in that style, or ordered above the ADR-024 bullet, makes design 024's Test #13(c) pin fail against the new text; the proposal's wording (\"set equal to the two 128 bounds\") happens to dodge it, and neither the bullet spec nor Test #16 pins the placement or phrasing.",
+            "fix": "State that the new bullet lands after the ADR-024 bullet and states `MAX_DISCOVERY_SLUG_OCTETS = 128` without the literal `MAX_SLUG_OCTETS = 128`; or name re-anchoring `bound_bullet` to the ADR-024 bullet's own constant in Test #16."
+          }
+        ]
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/design-review-compatibility-r1c0.md",
+      "durationMs": 1739933,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e0e9d0e1affdAphy2u2H18U7de",
+      "agent": "review/design-security",
+      "at": 1795052003412,
+      "reply": {
+        "verdict": "request-changes",
+        "findings": [
+          {
+            "severity": "major",
+            "location": "Chosen design > Catalog client and gate — `apps/discovery-cli/src/catalog.rs` (new) — \"It requires scheme `http` and a loopback host (`127.0.0.1`, `[::1]`, `localhost`)\"",
+            "problem": "The loopback-only authority is the sole enforcement of the design's headline non-disclosure property (Options considered: \"it cannot disclose an installed-game inventory to a remote host\"; Risks row 3 mitigation: \"This build can only reach a loopback authority\" for a risk rated Medium impact / Certain-by-design), yet the document never states the string split that decides it: no rule for a userinfo (`http://127.0.0.1:8080@host.example/`), for where the authority ends (`/`, `?`, `#`), for an empty host, for the port's character set, or for non-dotted IPv4 spellings. No URL parser exists to fall back on (Cargo.lock's only external names are clap, serde, serde_json, winreg) and the design commits to no new dependency and no Cargo.lock change. Test strategy 9 pins only four spellings, none of which separates a correct authority split from one that merely contains `127.0.0.1`, so a build passing every pinned case can still send `GET /v1/candidates?slug=steam%2F900001` to a remote socket: the claimed property cannot be established from this text. The endpoint also arrives from `BINDFORGE_CATALOG_URL` and is never classified as untrusted, unlike the store path (\"a relative value being unset\").",
+            "fix": "State a pure `fn parse_endpoint(base: &str) -> Result<Endpoint, CatalogError>` beside `candidates_url`/`selection` with the accepted grammar spelled out (literal `http://` prefix; authority runs to the first `/`, `?` or `#`; a `@` anywhere in the authority is refused; host must be exactly one of the three literals; a port, if present, is 1–5 ASCII digits), enforce it at the single `HttpCatalog` construction site, and add the userinfo, embedded-`?`, embedded-`#` and odd-IPv4 spellings to Test strategy 9's rejection list."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design > Catalog client and gate — \"`probe()` asks the authority, not an endpoint: resolve the host/port and `TcpStream::connect_timeout`\"",
+            "problem": "The loopback property is established by name, not by address. `localhost` is resolved by the system resolver, so a hosts/NSS entry pointing it elsewhere passes the stated check, and since resolution can return several addresses that `connect_timeout` tries in order, a name resolving to one loopback and one remote address passes the name test yet connects outward — the same disclosure as the endpoint-parse finding, from the resolver side.",
+            "fix": "After resolution require every candidate `SocketAddr`'s `IpAddr::is_loopback()` and refuse otherwise (making the two IP literals redundant), or state the name-literal rule as an accepted residual risk beside the inventory-disclosure row in Risks."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design > Scan flow and output — `apps/discovery-cli/src/main.rs` step 8 (\"`Game Id` prints the resolved id or `-`\") with the gate section's \"every echoed value — a slug, a candidate `name`, a rejected `game_id` — goes through `bindforge_core::escape_and_truncate`\"",
+            "problem": "The escape invariant covers exactly three values while the two table columns this design keeps are raw third-party bytes: `display_name` and `install_path`, both read from the ACF (`parse_manifest` only trims `name`; `usable_install_dir` refuses `.`, `..`, `/`, NUL, absolute and — on Windows only — `\\`, admitting every other byte). `row_cells`/`render_table` (apps/discovery-cli/src/main.rs:157-165) pass cells through unchanged, so an ESC/OSC sequence in `name` or `installdir` reaches the terminal as a control sequence, bounded in length only by `keyvalues::MAX_DOCUMENT_BYTES` = 1 MiB. The product's own grammar refuses ASCII control characters in a native name (crates/core/src/manifest.rs:330-348), and this design clamps the hidden `friendly_name` to MAX_NATIVE_NAME_OCTETS while leaving the visible field uncapped. Inherited, but the design rewrites COLUMNS and the echo rule in the same section.",
+            "fix": "State that the two ACF-sourced cells render through `escape_and_truncate` (replacing today's raw `row_cells` passthrough), or state ADR-013's control-character rule as the explicit acceptance, and pin a control-character `name` fixture so the table cannot emit a control sequence."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design > Catalog client and gate — \"status other than `200`, a `Transfer-Encoding` header, a missing or over-`65_536`-byte `Content-Length`, a body that is not valid `Vec<Candidate>` JSON\"",
+            "problem": "The refused shapes are named but the matching rules are not, and in a hand-rolled parse those details are the control: header field names are case-insensitive, so a `transfer-encoding: chunked` spelling must be matched case-insensitively or the named refusal is skipped and the JSON parse fails by luck rather than rule; two `Content-Length` lines, or one with leading zeros, a `+` or non-digits, is the confusion the cap exists to prevent, and the text says which value is too big but not which line wins or what spelling is legal; the 65 536 bound covers the body only, bounding nothing about the header block, which a peer that never sends the blank line streams into memory for the whole 5 s read timeout. The candidate array has no client-side count bound, so one 64 KiB `200` becomes a prompt of ~2000 numbered lines (the contract is deferred to 025-R1; a read cap is not).",
+            "fix": "One sentence stating that header names are matched case-insensitively, that exactly one `Content-Length` is accepted and only as 1–5 ASCII digits, that the header block is refused past the same 65 536-octet budget, and that a body over a named candidate maximum is an `Unreachable` refusal; add those spellings to Test strategy 10's response-parse cases."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design > Match store — `apps/discovery-cli/src/matches.rs` (new) — \"one file, `<data>/bindforge/matches.json`\" and \"through `matches.json.tmp` + `std::fs::rename`\"",
+            "problem": "The section states path, shape and atomic-write mechanism but no access mode and no read bound, and the store is this design's trust root for cross-source identity: the record whose `game_id` is trusted forever (\"Records never expire and are re-trusted on every scan\", 025-L4) is protected only by directory ownership. A umask-default 0644 file in a 0755 `bindforge/` makes the confirmed installed-game inventory readable by every local user, and if any ancestor is group/world-writable (a shared `XDG_DATA_HOME`, which the seam accepts because it only checks absoluteness) another user can write a record and choose which `game_id` attaches to the user's installs — a wrong join that survives every later scan. The fixed `matches.json.tmp` name shares the assumption: a pre-created symlink is followed by a plain create. Load has no byte bound, so an arbitrarily large matches.json is read whole, where the ACF path caps size before allocation (crates/discovery/src/steam_common.rs:371-380).",
+            "fix": "State that the `bindforge/` directory and both store files are created owner-only (0700/0600 on unix) and the tmp file exclusively, and that a store above a named byte budget (the `keyvalues::MAX_DOCUMENT_BYTES` shape) is the same named refusal; pin the mode and the budget in Test strategy 6 and 7."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design > Match store — \"a `slug` past `025-B1`, or a `game_id` failing `is_slug_name` + `MAX_SLUG_OCTETS` is the named refusal\"",
+            "problem": "`slug` is the only record field bounded by length alone, so a hand-edited or corrupted file persists a slug carrying control characters, spaces or path-ish spellings. Nothing renders or path-joins a store slug today (queries are issued only for discovered rows' slugs), so the gap is latent, but it sits against the design's own rule that an identifier is validated \"at all three places it is seen\".",
+            "fix": "Also refuse at load a `slug` not spelled `<token>/<external-id>` with `<token>` in `Source`'s closed set, or state in the section that a store slug is only compared byte-for-byte with a discovered slug and never rendered or joined."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design > Match store (\"the named refusal `error: match store unreadable: <path>`\") and Catalog client and gate (\"error: catalog unreachable: <reason>\")",
+            "problem": "These two refusal lines interpolate values the escape clause does not enumerate: `<path>` is composed from `$XDG_DATA_HOME`/`$HOME`/`%APPDATA%` and `<reason>` from a connect error whose display text can carry the host spelling from `--catalog-url`/`BINDFORGE_CATALOG_URL`, so one embedded newline or escape puts a second, well-formed-looking line on stderr — against the invariant stated for this very renderer (crates/core/src/error.rs:176-188). Naming the store path is correct (the user's remedy is to remove the file), so the fix is not to drop it.",
+            "fix": "Extend the escape clause to \"every interpolated value in every named refusal\", naming the store path and the reason, and add a newline-in-`$XDG_DATA_HOME` case to Test strategy 6."
+          }
+        ]
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/design-review-security-r1c0.md",
+      "durationMs": 847404,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e0e9d0e19ffe1r7hxHzEBkv6c3",
+      "agent": "review/design-performance",
+      "at": 1795051465670,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → \"Catalog client and gate — apps/discovery-cli/src/catalog.rs\" — \"One GET per distinct unresolved slug — the ADR's singular call shape; batching is 025-R1's.\" with \"TcpStream with a 2 s connect and 5 s read timeout\"; and \"Scan flow and output\" step 5 — \"For the distinct unresolved slugs (those the store does not resolve), in byte order, one candidates() call each.\"",
+            "problem": "The design budgets every request but nothing at the scan level. The common first-scan case (absent store means every installed game is unresolved — routinely hundreds of Steam slugs) runs sequentially, one fresh TcpStream per slug (Connection: close); a failure aborts fail-closed, but a slow-but-successful loopback peer costs its full latency on every slug, so scan wall-time is N_unresolved × (resolve + connect + up to 5 s read) with no aggregate deadline and no stated expectation anywhere in Chosen design or Risks. The sequential shape is ADR-mandated (025-C4) and not the finding; the missing scan-level budget statement is.",
+            "fix": "One sentence at the timeout statement (or one Risks row) quantifying the bound — N_unresolved sequential requests, 7 s per-request worst case, and why it is accepted (loopback-only peers, fail-closed on first failure, user-initiated scans, batching/concurrency reserved to 025-R1) — so the implementation inherits the intended budget instead of inferring it."
+          },
+          {
+            "severity": "nit",
+            "location": "Chosen design → \"Catalog client and gate\" — \"The request is std-only: TcpStream with a 2 s connect and 5 s read timeout\"",
+            "problem": "For the localhost authority (one of the three accepted hosts), std's connect timeout covers the connect syscall only; address resolution happens before it, untimed, and as written each of the N per-slug requests repeats that resolution.",
+            "fix": "Resolve the authority once at HttpCatalog construction and carry the resolved address into every request, replacing per-request host resolution; one clause in the same bullet states the timeout's scope."
+          }
+        ]
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/design-review-performance-r1c0.md",
+      "durationMs": 309661,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e0e985433ffe10xQMcfUOo4WDV",
+      "agent": "review/design-complexity",
+      "at": 1795052934861,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → Emission — `crates/discovery/src/steam_common.rs` (with Test strategy #4): \"the identity gate becomes bound-only: `slug.len() > bindforge_core::MAX_DISCOVERY_SLUG_OCTETS` is the refusal (`025-L3`)\"; \"The plugin-side skip case at the same bound is asserted separately.\"",
+            "problem": "For the only emitter shipped this run the key is Source::Steam.lookup_key(appid) and parse_manifest \"requires 1–20 ASCII digits\", so the longest slug any input can produce is `steam/` + 20 = 26 octets — 102 short of the 128 bound. The plugin-side comparison is unreachable dead code, and its test case can only be written by hand-building an AppManifest whose appid the parser already refuses, pinning a path no input reaches. `025-L3` names one emit boundary (\"The product checks only `025-B1` at the emit boundary\") and the Goals say the constant \"is the only thing the emit boundary checks\" — that is `refuse_invalid_slugs`, where rows from any `dyn DiscoveryPlugin`, including a future Epic key, are aggregated.",
+            "fix": "Drop the plugin-side `slug.len()` comparison and test #4's last sentence, leaving the 1–20-digit cap plus the one CLI emit boundary to hold `025-B1`. If the defence-in-depth line is kept instead, replace that sentence with the 21-digit skip case test #3 already asserts, so no case fabricates an input the parser refuses."
+          },
+          {
+            "severity": "minor",
+            "location": "Goals / Non-goals vs Chosen design → Catalog client and gate: Goals \"a connectivity gate with one named refusal\" vs \"Two named refusals, one gate: `error: catalog unreachable: <reason>` … `error: catalog transport unavailable: <reason>`\"",
+            "problem": "The document promises one refusal name in its Goals and ships two, and the second name exists for the loopback endpoint policy — the one mechanism in the design that no Goal states (its rationale appears only in the Options entry and the Risks table, while it costs an error variant, a compatibility-matrix row, and Test strategy #9's policy cases).",
+            "fix": "Add one Goals bullet naming the policy (\"this build's client reaches a loopback authority only; `https` and non-loopback `http` refuse by name\") and make the gate count agree: either say \"two named refusals\" in Goals, or collapse to one name `catalog unreachable: <reason>` whose reason string carries the flag/env/ADR-026 text the Risks mitigation already promises, deleting `TransportUnavailable` rather than adding a Goal for it."
+          },
+          {
+            "severity": "minor",
+            "location": "Chosen design → Corpus boundary and ledger: \"A corpus sweep asserting no file under `data/` or `schemas/*/v*/fixtures/valid/` contains `steam/`, `epic/`, or `local/` — Rollout 4's … pinned literally against the shipped corpus\" (with `!is_slug_name(friendly_name)` in `boundary_tests.rs`)",
+            "problem": "`025-L5` is asserted three ways and the sweep is the only non-structural one: `!is_slug_name(slug)` already proves it (`lookup_key` always inserts a `/`, which `is_slug_name` refuses — crates/core/src/placement.rs:95-105) and `id-source-key.toml` is refused by the existing conformance walk. The sweep instead constrains unrelated files: the two files under `data/` are prose READMEs, and this design's own store location `$HOME/.local/share/bindforge` contains the substring `local/`, so the first README documenting where data lives fails an unrelated gate. The `!is_slug_name(friendly_name)` clause is contingent for the same reason — it holds only because every current fixture name carries a space or a capital (\"Example Game\", \"Secondary Title\", \"BrokenMarker900201\"), so a lowercase single-word fixture name would fail an assertion about the fixtures, not the design.",
+            "fix": "Delete the corpus sweep and the `!is_slug_name(friendly_name)` clause, keeping `!is_slug_name(slug)` plus the invalid fixture — which is what Rollout 4 names (\"boundary fixtures assert no source key or friendly name reaches a manifest or profile\"); the friendly-name half of `025-L5` stays held by the rule that it is written only to the JSON row and the store."
+          },
+          {
+            "severity": "nit",
+            "location": "Options considered — Transport, option (a): \"on A17's unverified but plausible reading it puts a C-toolchain build script in the `x86_64-pc-windows-msvc` compile-check leg, which is the gate this run must not break\"",
+            "problem": "The rejection of a maintained client rests on a premise the assumption register itself marks \"plausible but unexercised\" (A17), and the option never considers such a client without its TLS provider (`default-features = false`), whose lack of native code is exactly what would answer the premise; what the premise buys is the hand-rolled `TcpStream` request/response parser, its six parse refusals, the hostile-response risk row, and Test strategy #10's parse cases.",
+            "fix": "Either exercise the premise once on the `x86_64-pc-windows-msvc` check leg, or restate the decision on the ground the document already relies on elsewhere — `Cargo.lock` stays frozen (Rollout 7: \"if one appears, it is a finding\") and repo practice prefers hand-rolled text parsing to a new dependency (crates/core/tests/gate_contract.rs: \"Hand-rolled because a suite that pulls in a YAML parser would be asserting against a dependency\") — so the std-only parse stands on verified grounds."
+          }
+        ]
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/design-review-complexity-r1c0.md",
+      "durationMs": 1469153,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-revise",
+      "round": 1,
+      "sessionID": "ses_e0e7d5c4fffeLS5CLD2oIQKhPX",
+      "agent": "design/designer",
+      "at": 1795053554543,
+      "reply": {
+        "changed": true,
+        "summary": "All 2 majors and every minor/nit are consumed: the correctness major names the pre-existing `apps/discovery-cli` subprocess-suite migration (loopback `TcpListener` fake, deletion of the unproducible `cli_slug_refusal_tests` fixture route, in-module `main.rs` bound pin) in Rollout 3; the security major replaces the loopback-host hand-wave with a pure `parse_endpoint` whose accepted grammar is spelled out (literal `http://`, authority to first `/?#`, no `@`, digits-only port, exactly the three host spellings) plus a post-resolution all-addresses-`is_loopback()` check and four new refused spellings pinned in Test 9; the friendly-name grammar assertion is deleted and its `025-L5` half consolidated into the store's game-id-sole-identifier rule; multi-row slug sharing gets one canonical record-per-distinct-slug statement with the stored friendly name sourced to the first row in `(slug, install_path)` order; A10 is restated against `apps/discovery-cli/Cargo.toml`; the README budget bullet records the `MAX_NATIVE_NAME_OCTETS` borrowing; response-parse matching rules (case-insensitive names, single 1–5-digit `Content-Length`, header-block budget, 256-candidate cap), store owner-only modes/exclusive tmp/byte budget with a closed-set store-slug load refusal, the extended escape clause over every interpolated refusal value, and ACF-sourced table cells through `escape_and_truncate` (ESC-byte fixture) all land with matching Test 4/6/7/10/12/14 pins and the retirement check re-scoped to the compiled surface with re-pinned suites named in Rollout 1 and 3. The diff is net +54 lines because both reviews' majors demand previously unstated contracts — an enforceable endpoint-authority split and the subprocess-test migration — whose substance (grammar clauses, refusal spellings, named suites, pinned cases) could not be stated within the existing text; offsets came from deleting the fixture-contingent assertion, tightening the fixture-route and enumeration clauses, and consolidating the record-per-slug and escape-rule claims into single canonical statements, with the Revision log maintained by superseding the transport and match-store entries in place plus two new r1 entries.",
+        "commitMessage": "docs: revise ADR-025 proposal for r1 correctness and security review findings"
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/proposal-revise-r1.md",
+      "durationMs": 321438,
+      "nudges": 0,
+      "docName": "02-proposal.md",
+      "docLines": 574,
+      "docLinesAdded": 106,
+      "docLinesRemoved": 52
+    },
+    {
+      "stage": "design-review:correctness",
+      "round": 1,
+      "sessionID": "ses_e0e787449ffedQXp6CuaDWb8O4",
+      "agent": "review/design-correctness",
+      "at": 1795053880180,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Rollout 3 — \"including the migration that keeps the gate from breaking the pre-existing subprocess suites: `cli_tests`, `cli_output_polish_tests`, `cli_dual_plugin_tests` and `cli_slug_refusal_tests` run behind a loopback `TcpListener` fake\"",
+            "problem": "The named migration covers the gate only. Every one of those runs also loads the match store — and Test #12's confirmation round-trip writes it — through the subprocess's own XDG_DATA_HOME/HOME. Verified: apps/discovery-cli/tests/cli_tests.rs:24 and cli_output_polish_tests.rs:21 build the command with no .env call, so they inherit the developer's HOME and read (and the round-trip test would write) the real ~/.local/share/bindforge/matches.json; only cli_dual_plugin_tests.rs:35-36 clears the environment. The suite is therefore not hermetic and the store assertion in #12 has no owned target.",
+            "fix": "Extend the clause: each subprocess run pins XDG_DATA_HOME and HOME to a per-test temp dir beside the loopback fake, and Test #12 asserts the one file under that temp dir."
+          },
+          {
+            "severity": "minor",
+            "location": "Match store, Save — \"`matches.json.tmp` (opened exclusively, never through a pre-existing entry) + `std::fs::rename`, after `create_dir_all` on the parent\"",
+            "problem": "Load's every failure is a named refusal, but a save that cannot create the parent or rename (read-only or missing data dir — the route cli_dual_plugin_tests' HOME=/bindforge-no-such-home already walks) has no stated outcome: no refusal name, no exit code, and no case in Test #7. A confirmed match can silently fail to persist.",
+            "fix": "Name one refusal (`error: match store unwritable: <path>`) with ExitCode::FAILURE, or state that the confirmation is lost and named; pin it as a Test #7 case with an unwritable parent."
+          },
+          {
+            "severity": "minor",
+            "location": "Match store, Load — \"a `slug` past `025-B1` or not spelled `<token>/<external-id>` with `<token>` in `Source`'s closed set\", read with Scan flow steps 4 and 6",
+            "problem": "Step 4's emit boundary checks \"the `025-B1` bound alone\" and step 6 writes \"the one record for the slug\" with no shape check, so a row whose slug did not come from `lookup_key` — the case refuse_invalid_slugs' own doc comment names (\"from any `dyn DiscoveryPlugin`, including a future third-party one\", apps/discovery-cli/src/main.rs:105-111) — clears the boundary, gets confirmed, is written, and then makes the next scan refuse the whole store, whose stated remedy (\"remove the file\") destroys every unrelated match.",
+            "fix": "Apply Load's slug-shape rule at the confirmation write (the write refuses with the named error), so a record Load would reject can never enter the file."
+          },
+          {
+            "severity": "minor",
+            "location": "Match store, Load — \"a file over a `65_536`-octet read budget\"",
+            "problem": "The budget is unowned arithmetic: one record is at most ~426 octets (the two 128 bounds plus the 128-octet friendly bound plus JSON punctuation) and typically ~95, so the store starts refusing between roughly 150 and ~690 confirmed matches — inside a large Steam library — and the only stated remedy is deleting every match. No record count is capped and no derivation or headroom is stated.",
+            "fix": "State the budget as records x worst-case record size, or replace the byte cap with a named \"more than N records\" refusal so an over-cap store reports the rule it broke."
+          },
+          {
+            "severity": "minor",
+            "location": "Catalog client, `probe()` — \"after refusing unless every returned `SocketAddr` `IpAddr::is_loopback()` — the property is established by address, not by name\"",
+            "problem": "The address check sits only on the probe, while scan-flow step 5 makes one candidates() call per distinct unresolved slug and nothing says those requests reuse the validated address instead of re-resolving the name. The guarantee the Risks row claims (\"This build can only reach a loopback authority\") is thus established before enumeration but not on the requests that carry the installed-game inventory.",
+            "fix": "One clause: HttpCatalog connects to the SocketAddr the probe validated, or candidates() repeats the same is_loopback() refusal on every resolved address."
+          },
+          {
+            "severity": "minor",
+            "location": "Scan flow step 8 — \"the two ACF-sourced cells — `Display Name`, `Install Path` — render through `escape_and_truncate` in place of today's raw `row_cells` pass-through\"",
+            "problem": "escape_and_truncate is the structured-error value renderer (crates/core/src/error.rs:190-204): it cuts at MESSAGE_VALUE_CHARS = 80 characters with a `…` and doubles every backslash. Adopting it for table cells silently clips long display names and install paths and renders Windows paths with doubled backslashes — a render-contract change the design does not state, while Test #12 pins only the ESC-byte case.",
+            "fix": "State both consequences in step 8 and pin them in Test #12, or escape control bytes without the 80-character cut if clipping is unwanted."
+          },
+          {
+            "severity": "minor",
+            "location": "Assumption register A10 — \"those are the workspace's only external deps (`clap` and `serde_json` per-package, not workspace-level)\"",
+            "problem": "The row is marked verified against a basis that contradicts the wording: [workspace.dependencies] in Cargo.toml carries bindforge-core, serde and winreg and comments that clap enters \"when their consumer lands\", so the workspace's external deps are serde, winreg, clap, serde_json. The five names A10 lists include two path deps (discovery, bindforge-core) and omit winreg. (The conclusion, no Cargo.lock change, is safe.)",
+            "fix": "Drop the clause, or restate: \"the workspace's external deps are `serde`, `winreg`, `clap`, `serde_json`; the CLI's are `discovery`, `bindforge-core`, `clap`, `serde`, `serde_json`\"."
+          },
+          {
+            "severity": "nit",
+            "location": "Catalog client, endpoint policy — \"an authority that is non-empty, carries no `@`, and runs to the first `/`, `?`, or `#`, with an optional `:` and digits-only port; and a host that is exactly `127.0.0.1`, `[::1]`, or `localhost`\"",
+            "problem": "With `[::1]` admitted, the \"optional `:`\" split is ambiguous because that host is itself colon-bearing, and Test #9 pins acceptance only for http://127.0.0.1:PORT, so the IPv6 case the prose admits is unpinned and could be refused by a first-match-on-colon parser.",
+            "fix": "Mirror RFC 3986 §3.2.2 in one clause — a leading `[` host runs to its `]` before the optional port colon — and add `http://[::1]:PORT` to Test #9's accepted list."
+          },
+          {
+            "severity": "nit",
+            "location": "Catalog client — \"`fn candidates_url(base: &str, slug: &str) -> String` is pure\" beside the new \"`fn parse_endpoint(base: &str) -> Result<Endpoint, CatalogError>`\"",
+            "problem": "The same thing appears in two shapes: it is undefined whether candidates_url receives the raw flag/env string (so `http://127.0.0.1:8080/prefix` yields `/prefix/v1/candidates`) or the parsed Endpoint (so a path prefix is silently dropped).",
+            "fix": "Name in one clause which value candidates_url receives and what happens to a base path."
+          },
+          {
+            "severity": "nit",
+            "location": "Scan flow step 6 — \"writes the one record for the slug, `(slug, game_id, friendly name of the first sharing row in `(slug, install_path)` order)`\"",
+            "problem": "The nested inline code spans close the first span mid-sentence, so the record tuple this rule now hinges on renders mangled.",
+            "fix": "Use one span with no inner backticks: `(slug, game_id, friendly_name of the first sharing row in (slug, install_path) order)`."
+          }
+        ]
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/design-review-correctness-r1c1.md",
+      "durationMs": 325524,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:security",
+      "round": 1,
+      "sessionID": "ses_e0e787448ffeZjl4wvwwI69zkO",
+      "agent": "review/design-security",
+      "at": 1795053800363,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Scan flow and output, step 8 — \"`Display Name`, `Install Path` — render through `escape_and_truncate` in place of today's raw `row_cells` pass-through\"",
+            "problem": "new: the escaped set is exactly the two ACF cells, but the same revision retires the only thing that kept the `Slug` column clean — step 4 makes `refuse_invalid_slugs` \"the `025-B1` bound alone\", and the retired grammar check is what refused control bytes in a slug today (apps/discovery-cli/src/main.rs:115-129, whose in-module test pins a newline-in-slug reaching stderr as `\\u000a`, never as a second line). `DiscoveredGame.slug` is a `pub` field (crates/discovery/src/game.rs:44-51), so the Row identity claim that \"a plugin cannot spell the key differently without using another function\" does not bound a third-party row, and `Source::lookup_key` validates nothing about `external_id`: a row from any `dyn DiscoveryPlugin` — the population today's boundary doc comment says it exists for — can carry 128 arbitrary octets straight into the raw `Slug` cell.",
+            "fix": "Add `Slug` (and `Game Id`, already grammar-validated, for symmetry) to the escaped-cell set in step 8 instead of enumerating only the ACF-sourced two, and extend Test strategy 12's no-raw-control-byte assertion to every column."
+          },
+          {
+            "severity": "minor",
+            "location": "Scan flow and output, step 6 — \"one prompt on **stderr** — stdout carries only the table\"",
+            "problem": "new: the prompt is the remaining render of a server-sourced string, and the revision's escape clause is scoped to \"every value a refusal interpolates\", so a loopback peer's candidate `name` (reachable by any local process that binds the port) reaches the terminal outside `escape_and_truncate` — the control-sequence path step 8 and Test 12 just closed for the table.",
+            "fix": "Widen the escape clause from refusals to every out-of-band terminal write (the prompt's candidate names and slug), and pin a control byte in a fake's candidate `name` in Test strategy 12."
+          },
+          {
+            "severity": "minor",
+            "location": "Catalog client and gate — \"`probe()` asks the authority ... after refusing unless every returned `SocketAddr` `IpAddr::is_loopback()` — the property is established by address, not by name, so a `hosts` entry for `localhost` cannot send the query outward\"",
+            "problem": "new (residual of the r1-2 closure): the address check is stated inside `probe()` only, while the sentence claims it protects the query — which `candidates()` sends. `candidates()` is specified over a raw `base: &str` (`candidates_url(base: &str, slug: &str)`) plus a plain `TcpStream`, so as written the query path re-resolves the name and dials whatever the resolver returns; a differing answer between gate and query, or an implementation that puts the check only where the document does, puts the slug on a remote socket.",
+            "fix": "State that the gate resolves once and `Endpoint` carries the validated `Vec<SocketAddr>` that `candidates()` dials, so the loopback requirement binds every connection the client makes rather than the probe alone; in the same sentence state that a non-numeric or out-of-range port is the endpoint policy's `TransportUnavailable`, not a later `Unreachable`."
+          },
+          {
+            "severity": "minor",
+            "location": "Catalog client and gate — \"admits exactly: a literal `http://` prefix; an authority that is non-empty, carries no `@`, and runs to the first `/`, `?`, or `#`\"",
+            "problem": "new: the grammar bounds the authority and is silent about the bytes after it, while `candidates_url` is still specified over the raw string (`<base>/v1/candidates?slug=<encoded>`) and the request is `GET <path> HTTP/1.1`. The section now classifies `--catalog-url`/`BINDFORGE_CATALOG_URL` as \"both untrusted config sources\", so a CR or LF in the path portion of an otherwise admitted base flows verbatim into the request line and lets that config value forge extra request lines or headers to whatever loopback service holds the port.",
+            "fix": "One clause: everything after the authority in an admitted base is restricted to printable ASCII (no control bytes, no space), and the request target is built from the parsed `Endpoint` rather than the raw base; add a `http://127.0.0.1:8080/x\\r\\n` rejection to Test strategy 9."
+          },
+          {
+            "severity": "nit",
+            "location": "Match store — \"the `bindforge/` directory and both files are created owner-only — 0700/0600 where unix modes apply — so the confirmed inventory is never a `umask` accident\"",
+            "problem": "re-raised (half of r1-5): this closes the modes this process sets, but leaves the case where `<data>` or `bindforge/` already exists group/world-writable (a shared `XDG_DATA_HOME`, which the path rule accepts because it only checks absoluteness) unaddressed and unrecorded, while the store is the trust root for records that are \"re-trusted on every scan\".",
+            "fix": "One sentence beside the inventory-disclosure row in Risks accepting a user-configured shared data directory as residual, or tightening the mode at load."
+          },
+          {
+            "severity": "nit",
+            "location": "Match store, Save — \"`matches.json.tmp` (opened exclusively, never through a pre-existing entry)\"",
+            "problem": "new: the exclusive open adds a failure mode with no named refusal — a `matches.json.tmp` left by an interrupted run makes every later save fail, and no named refusal covers a failed save, so the run reports a confirmation it never persisted.",
+            "fix": "Name it: `error: match store unwritable: <path>` on stderr with a non-zero exit and no record claimed, and pin the pre-existing-tmp case in Test strategy 7."
+          }
+        ]
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/design-review-security-r1c1.md",
+      "durationMs": 245706,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:compatibility",
+      "round": 1,
+      "sessionID": "ses_e0e737c3bffe4Sr2OVEH4GtFnq",
+      "agent": "review/design-compatibility",
+      "at": 1795054243274,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → \"Scan flow and output — `apps/discovery-cli/src/main.rs`\", step 8: \"the two ACF-sourced cells — `Display Name`, `Install Path` — render through `escape_and_truncate` in place of today's raw `row_cells` pass-through\"",
+            "problem": "The r1 revision routes routine table cells through the refusal-echo renderer, but `escape_and_truncate` (crates/core/src/error.rs:190-204, bound at :30) does more than escape control characters: it doubles every backslash and cuts at 80 characters with `…`, and its own doc scopes it to rejection echoes. Consequence: every legitimate Windows `Install Path` renders with doubled separators (`C:\\\\Steam\\…`) in the shipped table, and any name or path past 80 chars is silently shortened on every platform. Test #12's new case pins only the ESC-byte outcome; no test or matrix note covers the backslash-doubling or 80-char cell cap, and the Windows matrix row's named gap concerns test execution, not table rendering.",
+            "fix": "Replace \"render through `escape_and_truncate`\" with a cell rule that escapes control characters only (no backslash doubling, no 80-char cut), naming `escape_and_truncate` as what it replaces; or keep the reuse and pin the Windows-path and long-path renderings in Test #12 plus one clause on the Windows matrix row."
+          },
+          {
+            "severity": "nit",
+            "location": "Assumption register row A10: \"and those are the workspace's only external deps (`clap` and `serde_json` per-package, not workspace-level)\"",
+            "problem": "The rewritten A10 dropped `winreg`, which is a workspace external dep (Cargo.toml:23, consumed target-gated at crates/discovery/Cargo.toml:21-22) and is named by this proposal's own A9; the pre-revision A10 listed it correctly. The row's conclusion is unaffected (`winreg` is already locked and compiles only for the Windows leg, so \"no `Cargo.lock` change\" holds) and the matrix row it grounds stays true, but the verified-status basis sentence is now false.",
+            "fix": "Restore it: \"…`serde`, `serde_json`, plus the target-gated `winreg` (A9), and those are the workspace's only external deps…\"."
+          }
+        ]
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/design-review-compatibility-r1c2.md",
+      "durationMs": 362941,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:performance",
+      "round": 1,
+      "sessionID": "ses_e0e737c3affeRQyDMPO60rjRT1",
+      "agent": "review/design-performance",
+      "at": 1795054180149,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/design-review-performance-r1c2.md",
+      "durationMs": 299816,
+      "nudges": 0
+    },
+    {
+      "stage": "design-review:complexity",
+      "round": 1,
+      "sessionID": "ses_e0e737c3affdK2gpVlLyR8lo2j",
+      "agent": "review/design-complexity",
+      "at": 1795054157858,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/design-review-complexity-r1c2.md",
+      "durationMs": 277525,
+      "nudges": 0
+    },
+    {
+      "stage": "proposal-final",
+      "round": 0,
+      "sessionID": "ses_e0e6df1f3ffeN1Dze8ooInhVau",
+      "agent": "design/editor",
+      "at": 1795054418236,
+      "reply": {
+        "ambiguities": [],
+        "commitMessage": "docs: final language pass on the ADR-025 discovery identity proposal"
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/proposal-final-r0.md",
+      "durationMs": 174869,
+      "nudges": 0,
+      "docName": "02-proposal.md",
+      "docLines": 574,
+      "docLinesAdded": 24,
+      "docLinesRemoved": 24
+    },
+    {
+      "stage": "editorial-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e0e6b4678fferUodzcahOiN3sA",
+      "agent": "review/design-correctness",
+      "at": 1795054824953,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/editorial-review-correctness-r2.md",
+      "durationMs": 406582,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e0e6b4678ffdkRU72L33mMB9OK",
+      "agent": "review/design-compatibility",
+      "at": 1795054794674,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/editorial-review-compatibility-r2.md",
+      "durationMs": 376299,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:security",
+      "round": 2,
+      "sessionID": "ses_e0e6b4677ffepHD9qOv2YnR1rM",
+      "agent": "review/design-security",
+      "at": 1795054713999,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/editorial-review-security-r2.md",
+      "durationMs": 295627,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:performance",
+      "round": 2,
+      "sessionID": "ses_e0e6b4677ffdNdN4ITRZS3tj8B",
+      "agent": "review/design-performance",
+      "at": 1795054697909,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/editorial-review-performance-r2.md",
+      "durationMs": 279538,
+      "nudges": 0
+    },
+    {
+      "stage": "editorial-review:complexity",
+      "round": 2,
+      "sessionID": "ses_e0e67023affeCfObJIPQgccOYQ",
+      "agent": "review/design-complexity",
+      "at": 1795054833058,
+      "reply": {
+        "verdict": "approve",
+        "findings": []
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/editorial-review-complexity-r2.md",
+      "durationMs": 135099,
+      "nudges": 0
+    },
+    {
+      "stage": "test-authoring",
+      "round": 0,
+      "sessionID": "ses_e0e64f213ffeB4jxg17I0eMwLt",
+      "agent": "code/test-engineer",
+      "at": 1795056043704,
+      "reply": {
+        "testsAdded": 122,
+        "commitMessage": "test: pin ADR-025 discovery identity, match store, and catalog client"
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/test-authoring-r0.md",
+      "durationMs": 1210548,
+      "nudges": 0
+    },
+    {
+      "stage": "implement",
+      "round": 0,
+      "sessionID": "ses_e0e527902ffew3m9xOft7KFXaI",
+      "agent": "code/coder",
+      "at": 1795057179285,
+      "reply": {
+        "testsNeedUpdate": true,
+        "commitMessage": "feat: split discovery identity into source key, game id, and friendly name",
+        "moves": []
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/implement-r0.md",
+      "durationMs": 1135483,
+      "nudges": 0
+    },
+    {
+      "stage": "test-update",
+      "round": 0,
+      "sessionID": "ses_e0e40e3e1ffeU5g30D4rfPjf88",
+      "agent": "code/test-engineer",
+      "at": 1795057727481,
+      "reply": {
+        "commitMessage": "test: repair 025 suites and re-pin retirement gates",
+        "moves": []
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/test-update-r0.md",
+      "durationMs": 531369,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e0e388d81ffe3uW7l1C1cxGFEn",
+      "agent": "code/coder",
+      "at": 1795057906704,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "docs: record 025 gate posture and Rollout 5 ledger hand-off in build notes",
+        "moves": []
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/fix-r0.md",
+      "durationMs": 164199,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e0e35d355ffeIoNlJ4fKRoXh6o",
+      "agent": "code/coder",
+      "at": 1795058125838,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "docs: re-verify 025 gate posture and record the Rollout 5 ledger hand-off payload",
+        "moves": []
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/fix-r0.md",
+      "durationMs": 204610,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e0e3279f9ffeU51xqGMO49826J",
+      "agent": "code/coder",
+      "at": 1795058339261,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "docs: re-verify 025 gate posture at fix round 3 and refresh the Rollout 5 operator hand-off record",
+        "moves": []
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/fix-r0.md",
+      "durationMs": 198545,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e0e2f39ceffeZ3AYof5oft33Mh",
+      "agent": "code/coder",
+      "at": 1795058540339,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "docs: re-verify 025 gate posture at fix round 4; Rollout 5 ledger red remains an operator hand-off",
+        "moves": []
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/fix-r0.md",
+      "durationMs": 186571,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e0e2c2737ffeziDDcxiyAYAhKm",
+      "agent": "code/coder",
+      "at": 1795058717239,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "docs: re-verify 025 gate posture and pin the Rollout 5 ledger payload to the ledger_unit helper",
+        "moves": []
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/fix-r0.md",
+      "durationMs": 162022,
+      "nudges": 0
+    },
+    {
+      "stage": "fix",
+      "round": 0,
+      "sessionID": "ses_e0e283365ffe7AbYfhYs2SUIsW",
+      "agent": "code/coder",
+      "at": 1795059018955,
+      "reply": {
+        "testsNeedUpdate": false,
+        "commitMessage": "docs: record green gate posture after the operator landed the Rollout 5 ledger lines",
+        "moves": []
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/fix-r0.md",
+      "durationMs": 204702,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:correctness",
+      "round": 2,
+      "sessionID": "ses_e0e19df64ffeit6axSL46QdGnK",
+      "agent": "codereview/code-correctness",
+      "at": 1795060215894,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/discovery/src/slug.rs:1-5; crates/discovery/Cargo.toml:17-33; crates/discovery/tests/slug_tests.rs:24",
+            "problem": "The retirement lands as tombstones plus a `required-features` gate instead of the deletion the proposal names (Chosen design 'Row identity': slug.rs 'is deleted'; Rollout 1 'the deletion of slug.rs ... and their suites'; Test strategy #14: the two suites 'are gone'). src/slug.rs stays in the tree emptied, and tests/slug_tests.rs and tests/collision_tests.rs still stand at their original paths (still spelling `use discovery::slug::derive_slug;`) excluded from the build via the never-enabled `retired-adr-024-suites` feature. The functional property — the retired machinery compiles, builds and asserts nowhere the gates run — is held by retirement_tests.rs, and the shape is forced by the stage toolchain's rm denial with file removal named as an operator follow-up; the deviation is asserted to be recorded in 03-build-notes.md, which is outside this pass's permitted inputs, so I could not establish it is undeclared (if absent there, checklist item 3 escalates it).",
+            "fix": "Have the runner delete slug.rs, tests/slug_tests.rs, tests/collision_tests.rs and the gate/feature block at final integration, or confirm 03-build-notes.md records the gated-retirement shape as a declared deviation."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/discovery/tests/.rm-probe:1",
+            "problem": "A stray zero-byte file is committed at crates/discovery/tests/.rm-probe, referenced nowhere in the tree and part of no build target; it is residue of a delete probe, asked for by nothing in the proposal.",
+            "fix": "Delete the file (runner/operator cleanup)."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/discovery/tests/retired/README.md:10-13",
+            "problem": "The README states the two retired suites 'are kept here' under tests/retired/, but the README is the only file in that directory; the suites actually stand at tests/slug_tests.rs and tests/collision_tests.rs, gated off the build via the package manifest — the shape retirement_tests.rs itself pins. The retirement's own record misdescribes where the retired files live.",
+            "fix": "Correct the README to the gated-in-place shape (or reconcile it when the operator deletions land)."
+          },
+          {
+            "severity": "minor",
+            "location": "apps/discovery-cli/src/catalog.rs:200-203",
+            "problem": "Named surfaces diverge from the proposal's signatures: `trait CatalogClient` carries only `candidates`, while the proposal's trait includes `fn probe`; the flow is written against the concrete `HttpCatalog` in main.rs, so the trait is not the 'seam every behavior below is written against' (no in-process fake drives the CLI flow through it — the suites drive the real client over a loopback socket). Related: `parse_endpoint` returns a normalized String rather than the sketched Endpoint, and `Candidate` is a plain struct with a hand-rolled parse rather than a `Deserialize` derive (behavioral equivalence holds — unknown fields ignored). No behavior or contract is missing; this is a named-interface deviation.",
+            "fix": "Add `probe` to the trait and have the flow depend on `&dyn CatalogClient`, or record the simplified seam as a declared deviation in 03-build-notes.md."
+          },
+          {
+            "severity": "minor",
+            "location": "docs/adrs/025-discovery-identity-and-catalog-matching.md:182-186",
+            "problem": "The branch adds Rollout item 6 (the deferral record, 025-R1) to its own source ADR. AGENTS.md sanctions only the runner flipping the source document's status on completion; the sanctioned ledger edits are ADR-024's per Rollout 5. The added text merely records a deferral the proposal already states (whose record the proposal places in 03-build-notes.md) and relaxes nothing, but the run editing the requirement document it is measured against is an audit-trail concern.",
+            "fix": "Confirm the runner authored this edit, or move the deferral record to 03-build-notes.md alone, as the proposal's own Rollout 6 spells it."
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/src/main.rs:334",
+            "problem": "Provenance citations name unit handles `025-C5` and `025-C6` (also at apps/discovery-cli/src/catalog.rs:37, tests/cli_confirmation_flow_tests.rs:1, tests/cli_json_mode_tests.rs:1), which ADR-025 does not define — its contracts stop at 025-C4 — and the ADR's unit-handle discipline says ids elsewhere 'govern nothing'. The citations point at nothing.",
+            "fix": "Re-cite these docs to `025-C4`/`025-L2` (or the proposal sections) or drop the phantom handles."
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/Cargo.toml:14-22",
+            "problem": "The dev-dependencies block is justified by a false claim ('integration tests only see dev-dependencies'); integration targets also see the package's normal dependencies, and all three listed crates are already normal deps, so the block is redundant (harmless — Cargo.lock is unchanged, as Rollout 7 requires).",
+            "fix": "Drop the redundant block or correct the comment."
+          }
+        ]
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/code-review-correctness-r2c0.md",
+      "durationMs": 462658,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:compatibility",
+      "round": 2,
+      "sessionID": "ses_e0e12cf9effeAJxtfNPeb2RbWz",
+      "agent": "codereview/code-compatibility",
+      "at": 1795060364378,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "apps/discovery-cli/src/catalog.rs:438 (with authority() at apps/discovery-cli/src/catalog.rs:224-228)",
+            "problem": "The endpoint policy admits `[::1]` as one of exactly three loopback host spellings, but `authority()` strips the brackets and the request is built as `Host: {host}:{port}` from the stripped host, so an IPv6 endpoint sends `Host: ::1:8080` — RFC 9110 requires the bracketed form for an IPv6 `uri-host` in `Host:`. The build only ever talks to its own fake (which ignores the header), so no test or gate catches it, but the pinned provisional wire spelling (025-C4) interoperates with permissive loopback peers only: a strict server fails the `[::1]` endpoint the policy advertises.",
+            "fix": "Keep the bracketed host spelling for the `Host` header (the normalized base already spells `http://[::1]:port`) and strip brackets only for `to_socket_addrs`/`connect_timeout`; pin the request-line spelling for a `[::1]` endpoint in the unit surface."
+          }
+        ]
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/code-review-compatibility-r2c0.md",
+      "durationMs": 148439,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:security",
+      "round": 2,
+      "sessionID": "ses_e0e108ba1fferrW9lO51ZcMif1",
+      "agent": "codereview/code-security",
+      "at": 1795060508516,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "apps/discovery-cli/src/catalog.rs:460 and apps/discovery-cli/src/main.rs:295",
+            "problem": "The lookup key (`slug`) is interpolated raw into the candidate-drop refusal line and the confirmation prompt, while the design's escape invariant (02-proposal.md 'Catalog client and gate') and core's documented echo contract (crates/core/src/error.rs:183-188, naming third-party plugin slugs explicitly) require every such value to pass through escape_and_truncate. Because the emit boundary checks only 025-B1's length by design, a third-party plugin slug carrying control bytes could forge a line on stderr; shipped Steam emitters (digits-only appid) cannot reach it.",
+            "fix": "Wrap the slug in escape_and_truncate in both format strings (catalog.rs partition_candidates and main.rs print_prompt), matching the table path which already escapes the slug via cell(), and pin the one-line property on the partition refusal as main.rs's tests pin the bound-refusal line."
+          },
+          {
+            "severity": "minor",
+            "location": "apps/discovery-cli/src/catalog.rs:408-431",
+            "problem": "HttpCatalog::candidates() re-resolves the endpoint host on every mid-scan query and connects to the returned addresses without re-asserting IpAddr::is_loopback(), which probe() does at catalog.rs:247-254. For the admitted `localhost` spelling, a hosts/NSS change between the gate (step 1) and a query (step 5) sends the lookup key to a non-loopback address even though the run believes the address-based loopback property holds, against the design's claim that the property is established by address, not by name.",
+            "fix": "Factor probe()'s resolve-and-require-loopback logic into one helper and call it from both probe() and candidates() so every connect re-checks that all resolved addresses are loopback; add a unit case pinning the query-path refusal."
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/src/matches.rs:194-211",
+            "problem": "The 65,536-octet read budget is decided from fs::metadata, then fs::read allocates the whole file before the second length check; a file swapped or grown between the metadata call and the read is fully buffered before the refusal. The store file is user-owned, so this is defense-in-depth rather than an exploitable path.",
+            "fix": "Open the file and cap the read with Read::take(STORE_READ_BUDGET_OCTETS + 1) so the allocation itself is bounded by construction, independent of metadata."
+          }
+        ]
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/code-review-security-r2c0.md",
+      "durationMs": 144110,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:performance",
+      "round": 2,
+      "sessionID": "ses_e0e0e5896ffeFYQKDrOzK7yQx3",
+      "agent": "codereview/code-performance",
+      "at": 1795060595770,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/src/catalog.rs:283-304",
+            "problem": "read_response pulls the HTTP header block from the raw TcpStream one byte per read() call, making every header byte a syscall (~150-300 for a typical response, up to the 65,536-octet budget before the over-budget refusal fires). Small impact on this one-shot, loopback-only, bounded path, so a nit rather than a defect.",
+            "fix": "Wrap the stream in a std::io::BufReader at catalog.rs:444 before calling read_response so the \\r\\n\\r\\n scan amortizes on buffer refills; the body read_exact already reads in bulk."
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/src/matches.rs:249-261",
+            "problem": "MatchStore::game_id/resolves/confirm locate records with a linear Vec::find although the store is keyed by slug, so main.rs:162-174 costs O(rows x records) per scan. Harmless today (the 65,536-octet read budget bounds records to roughly a thousand entries and rows are per-machine), but the cheap fix is nearly free.",
+            "fix": "records is already kept in slug byte order by sort_records (matches.rs:358-360): use binary_search_by_key in game_id and confirm, or index once into a BTreeMap after load."
+          }
+        ]
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/code-review-performance-r2c0.md",
+      "durationMs": 87225,
+      "nudges": 0
+    },
+    {
+      "stage": "code-review:testing",
+      "round": 2,
+      "sessionID": "ses_e0e0d03bfffe1qH4MlI669RQgc",
+      "agent": "codereview/code-testing",
+      "at": 1795060820109,
+      "reply": {
+        "verdict": "approve",
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/discovery/tests/.rm-probe:1",
+            "problem": "A stray zero-byte file is committed in the tests tree by this diff, referenced nowhere and part of no build target; it is delete-probe residue asked for by nothing in the proposal, and the committed tests directory should carry no unreferenced artifacts.",
+            "fix": "Have the runner/operator delete the file at final integration (the stage rm denial explains its creation, not its commit)."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/discovery/Cargo.toml:24-33; crates/discovery/tests/retired/README.md:10-13",
+            "problem": "The gated-retirement shape leaves a knob with no possible consumer — the `retired-adr-024-suites` feature cannot be meaningfully enabled because the gated suites import the deleted `discovery::slug::derive_slug`, so enabling it never compiles (checklist item 7); and the retirement README states the two suites 'are kept here' under `tests/retired/` while the files actually stand at `tests/slug_tests.rs` and `tests/collision_tests.rs` behind the feature gate — the retirement record misdescribes the tree. The functional property (retired machinery builds and asserts nowhere the gates run) is held by retirement_tests.rs and the operator follow-up is named, so this is not a functional break.",
+            "fix": "At final integration have the runner delete src/slug.rs, tests/slug_tests.rs, tests/collision_tests.rs and the [features]/[[test]] block together; until then, correct the README to say the suites stand at their original paths, required-features-gated."
+          },
+          {
+            "severity": "minor",
+            "location": "apps/discovery-cli/src/catalog.rs:527-538",
+            "problem": "Test strategy #9 names three encoding cases — `steam/900001` → `steam%2F900001` (pinned), a slug with a space, and a slug with a `%`, each 'encoded once (never double-encoded)' — but no assertion pins the space or the `%` case in the pure `candidates_url` units or the subprocess request-line pin. The implementation is correct, yet a future edit that pre-encoded or double-escaped the query would pass the suite.",
+            "fix": "Add one assertion to the in-module `candidates_url` test, e.g. `candidates_url(base, \"local/a%b c\")` → `?slug=local%2Fa%25b%20c`, citing Test strategy #9."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/discovery/src/registry.rs:10-19",
+            "problem": "The diff adds public `Display` and `Error` impls for `DiscoveryError` with no consumer anywhere (the engine and the CLI both format the `Debug` shape; `registry_tests.rs` pins equality only), and the added doc comment claims 'design 025's suites format the failure with `{}`' when every suite and caller actually uses `{:?}`. The exact line shape (`PluginError: <msg>`) is asserted nowhere — an unconsumed, untested addition (checklist item 7).",
+            "fix": "Pin the Display line in `registry_tests.rs` (`assert_eq!(err.to_string(), \"PluginError: error\")` for both variants) and correct the comment to state the suites quote the Debug shape — or delete the impls until a consumer exists."
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/tests/cli_confirmation_flow_tests.rs:1; apps/discovery-cli/tests/cli_json_mode_tests.rs:1; apps/discovery-cli/src/catalog.rs:37",
+            "problem": "Headers cite unit handles `025-C5` and `025-C6`, which name no unit in ADR-025 (contracts end at `025-C4`); a handle naming nothing governs nothing, so the suite-to-contract trace these citations exist to provide is broken for those lines.",
+            "fix": "Cite the real handles: the confirmation flow and store are `025-C3`/`025-L2`/`025-L4`, the JSON candidate passthrough is `025-C4`."
+          }
+        ]
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/code-review-testing-r2c0.md",
+      "durationMs": 224314,
+      "nudges": 0
+    },
+    {
+      "stage": "doc-sync",
+      "round": 2,
+      "sessionID": "ses_e0e099730ffeilB3Syo9ekK4EM",
+      "agent": "ops/doc-sync",
+      "at": 1795060948118,
+      "reply": {
+        "drifted": true,
+        "commitMessage": "docs: record 025 as-built drift in proposal and build notes"
+      },
+      "transcript": "docs/designs/025-discovery-identity-and-catalog-matching/transcripts/doc-sync-r2.md",
+      "durationMs": 127918,
+      "nudges": 0
+    }
+  ],
+  "gateLog": [
+    {
+      "gate": "sourceAdmissible",
+      "round": 0,
+      "proceed": true,
+      "reason": "ADR is proposed and complete",
+      "at": 1795050535985
+    },
+    {
+      "gate": "ledger-join",
+      "round": 0,
+      "proceed": false,
+      "reason": "ledger join: 1 finding(s) in the corpus docs/adrs/025-discovery-identity-and-catalog-matching.md:144 unit-unhandled 025-R1 carries no handle anywhere in the corpus",
+      "at": 1795050535994
+    },
+    {
+      "gate": "escalate",
+      "round": 0,
+      "proceed": false,
+      "reason": "ledger join refused: ledger join: 1 finding(s) in the corpus docs/adrs/025-discovery-identity-and-catalog-matching.md:144 unit-unhandled 025-R1 carries no handle anywhere in the corpus",
+      "at": 1795050535994
+    },
+    {
+      "gate": "stageFailure",
+      "round": 1,
+      "proceed": false,
+      "reason": "design-review:correctness: stage-timeout",
+      "at": 1795052957489
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "dissent pass c1 pending: correctness, security",
+      "at": 1795053233058
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": false,
+      "reason": "ratify pass c2 pending: compatibility, performance, complexity",
+      "at": 1795053880246
+    },
+    {
+      "gate": "design-review",
+      "round": 1,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1795054243333
+    },
+    {
+      "gate": "editorial-review",
+      "round": 2,
+      "proceed": true,
+      "reason": "all 5 reviewers approved with no blocking findings",
+      "at": 1795054833123
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1795057196046
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1795057742444
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1795057921176
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1795058140671
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1795058353701
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1795058555045
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": false,
+      "reason": "npm run check + cargo gate red",
+      "at": 1795058731784
+    },
+    {
+      "gate": "escalate",
+      "round": 0,
+      "proceed": false,
+      "reason": "tests not green at the code-review budget limit",
+      "at": 1795058731787
+    },
+    {
+      "gate": "testsGreen",
+      "round": 0,
+      "proceed": true,
+      "reason": "npm run check + cargo gate green",
+      "at": 1795059034251
+    },
+    {
+      "gate": "operatorExtension",
+      "round": 1,
+      "proceed": true,
+      "reason": "extended the review budget by 1 review session(s) over the caps of 40/20: over-cap code round entered under operator extension (4 granted round(s) left)",
+      "at": 1795059034258
+    },
+    {
+      "gate": "operatorExtension",
+      "round": 2,
+      "proceed": true,
+      "reason": "extended the review budget by 1 review session(s) over the caps of 40/20: over-cap code round entered under operator extension (3 granted round(s) left)",
+      "at": 1795059753044
+    },
+    {
+      "gate": "code-review",
+      "round": 2,
+      "proceed": true,
+      "reason": "all five seats approve the current revision stamp",
+      "at": 1795060820167
+    },
+    {
+      "gate": "ledger-join",
+      "round": 0,
+      "proceed": true,
+      "reason": "the ledger join holds: every handle resolves, every unit is handled",
+      "at": 1795060948180
+    },
+    {
+      "gate": "done",
+      "round": 0,
+      "proceed": true,
+      "reason": "pipeline complete",
+      "at": 1795060948181
+    }
+  ],
+  "startedAt": 1795050535948,
+  "updatedAt": 1795060948181,
+  "flow": "full",
+  "baseRef": "7b036617dfa2d7895888b73c9b9412387b1d7e08",
+  "designCycle": 3,
+  "designStamp": "4461833195ec56a1f702f869cb3c83db3f95c017",
+  "seats": {
+    "design": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "4461833195ec56a1f702f869cb3c83db3f95c017",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Rollout 3 — \"including the migration that keeps the gate from breaking the pre-existing subprocess suites: `cli_tests`, `cli_output_polish_tests`, `cli_dual_plugin_tests` and `cli_slug_refusal_tests` run behind a loopback `TcpListener` fake\"",
+            "problem": "The named migration covers the gate only. Every one of those runs also loads the match store — and Test #12's confirmation round-trip writes it — through the subprocess's own XDG_DATA_HOME/HOME. Verified: apps/discovery-cli/tests/cli_tests.rs:24 and cli_output_polish_tests.rs:21 build the command with no .env call, so they inherit the developer's HOME and read (and the round-trip test would write) the real ~/.local/share/bindforge/matches.json; only cli_dual_plugin_tests.rs:35-36 clears the environment. The suite is therefore not hermetic and the store assertion in #12 has no owned target.",
+            "fix": "Extend the clause: each subprocess run pins XDG_DATA_HOME and HOME to a per-test temp dir beside the loopback fake, and Test #12 asserts the one file under that temp dir."
+          },
+          {
+            "severity": "minor",
+            "location": "Match store, Save — \"`matches.json.tmp` (opened exclusively, never through a pre-existing entry) + `std::fs::rename`, after `create_dir_all` on the parent\"",
+            "problem": "Load's every failure is a named refusal, but a save that cannot create the parent or rename (read-only or missing data dir — the route cli_dual_plugin_tests' HOME=/bindforge-no-such-home already walks) has no stated outcome: no refusal name, no exit code, and no case in Test #7. A confirmed match can silently fail to persist.",
+            "fix": "Name one refusal (`error: match store unwritable: <path>`) with ExitCode::FAILURE, or state that the confirmation is lost and named; pin it as a Test #7 case with an unwritable parent."
+          },
+          {
+            "severity": "minor",
+            "location": "Match store, Load — \"a `slug` past `025-B1` or not spelled `<token>/<external-id>` with `<token>` in `Source`'s closed set\", read with Scan flow steps 4 and 6",
+            "problem": "Step 4's emit boundary checks \"the `025-B1` bound alone\" and step 6 writes \"the one record for the slug\" with no shape check, so a row whose slug did not come from `lookup_key` — the case refuse_invalid_slugs' own doc comment names (\"from any `dyn DiscoveryPlugin`, including a future third-party one\", apps/discovery-cli/src/main.rs:105-111) — clears the boundary, gets confirmed, is written, and then makes the next scan refuse the whole store, whose stated remedy (\"remove the file\") destroys every unrelated match.",
+            "fix": "Apply Load's slug-shape rule at the confirmation write (the write refuses with the named error), so a record Load would reject can never enter the file."
+          },
+          {
+            "severity": "minor",
+            "location": "Match store, Load — \"a file over a `65_536`-octet read budget\"",
+            "problem": "The budget is unowned arithmetic: one record is at most ~426 octets (the two 128 bounds plus the 128-octet friendly bound plus JSON punctuation) and typically ~95, so the store starts refusing between roughly 150 and ~690 confirmed matches — inside a large Steam library — and the only stated remedy is deleting every match. No record count is capped and no derivation or headroom is stated.",
+            "fix": "State the budget as records x worst-case record size, or replace the byte cap with a named \"more than N records\" refusal so an over-cap store reports the rule it broke."
+          },
+          {
+            "severity": "minor",
+            "location": "Catalog client, `probe()` — \"after refusing unless every returned `SocketAddr` `IpAddr::is_loopback()` — the property is established by address, not by name\"",
+            "problem": "The address check sits only on the probe, while scan-flow step 5 makes one candidates() call per distinct unresolved slug and nothing says those requests reuse the validated address instead of re-resolving the name. The guarantee the Risks row claims (\"This build can only reach a loopback authority\") is thus established before enumeration but not on the requests that carry the installed-game inventory.",
+            "fix": "One clause: HttpCatalog connects to the SocketAddr the probe validated, or candidates() repeats the same is_loopback() refusal on every resolved address."
+          },
+          {
+            "severity": "minor",
+            "location": "Scan flow step 8 — \"the two ACF-sourced cells — `Display Name`, `Install Path` — render through `escape_and_truncate` in place of today's raw `row_cells` pass-through\"",
+            "problem": "escape_and_truncate is the structured-error value renderer (crates/core/src/error.rs:190-204): it cuts at MESSAGE_VALUE_CHARS = 80 characters with a `…` and doubles every backslash. Adopting it for table cells silently clips long display names and install paths and renders Windows paths with doubled backslashes — a render-contract change the design does not state, while Test #12 pins only the ESC-byte case.",
+            "fix": "State both consequences in step 8 and pin them in Test #12, or escape control bytes without the 80-character cut if clipping is unwanted."
+          },
+          {
+            "severity": "minor",
+            "location": "Assumption register A10 — \"those are the workspace's only external deps (`clap` and `serde_json` per-package, not workspace-level)\"",
+            "problem": "The row is marked verified against a basis that contradicts the wording: [workspace.dependencies] in Cargo.toml carries bindforge-core, serde and winreg and comments that clap enters \"when their consumer lands\", so the workspace's external deps are serde, winreg, clap, serde_json. The five names A10 lists include two path deps (discovery, bindforge-core) and omit winreg. (The conclusion, no Cargo.lock change, is safe.)",
+            "fix": "Drop the clause, or restate: \"the workspace's external deps are `serde`, `winreg`, `clap`, `serde_json`; the CLI's are `discovery`, `bindforge-core`, `clap`, `serde`, `serde_json`\"."
+          },
+          {
+            "severity": "nit",
+            "location": "Catalog client, endpoint policy — \"an authority that is non-empty, carries no `@`, and runs to the first `/`, `?`, or `#`, with an optional `:` and digits-only port; and a host that is exactly `127.0.0.1`, `[::1]`, or `localhost`\"",
+            "problem": "With `[::1]` admitted, the \"optional `:`\" split is ambiguous because that host is itself colon-bearing, and Test #9 pins acceptance only for http://127.0.0.1:PORT, so the IPv6 case the prose admits is unpinned and could be refused by a first-match-on-colon parser.",
+            "fix": "Mirror RFC 3986 §3.2.2 in one clause — a leading `[` host runs to its `]` before the optional port colon — and add `http://[::1]:PORT` to Test #9's accepted list."
+          },
+          {
+            "severity": "nit",
+            "location": "Catalog client — \"`fn candidates_url(base: &str, slug: &str) -> String` is pure\" beside the new \"`fn parse_endpoint(base: &str) -> Result<Endpoint, CatalogError>`\"",
+            "problem": "The same thing appears in two shapes: it is undefined whether candidates_url receives the raw flag/env string (so `http://127.0.0.1:8080/prefix` yields `/prefix/v1/candidates`) or the parsed Endpoint (so a path prefix is silently dropped).",
+            "fix": "Name in one clause which value candidates_url receives and what happens to a base path."
+          },
+          {
+            "severity": "nit",
+            "location": "Scan flow step 6 — \"writes the one record for the slug, `(slug, game_id, friendly name of the first sharing row in `(slug, install_path)` order)`\"",
+            "problem": "The nested inline code spans close the first span mid-sentence, so the record tuple this rule now hinges on renders mangled.",
+            "fix": "Use one span with no inner backticks: `(slug, game_id, friendly_name of the first sharing row in (slug, install_path) order)`."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "4461833195ec56a1f702f869cb3c83db3f95c017",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Chosen design → \"Scan flow and output — `apps/discovery-cli/src/main.rs`\", step 8: \"the two ACF-sourced cells — `Display Name`, `Install Path` — render through `escape_and_truncate` in place of today's raw `row_cells` pass-through\"",
+            "problem": "The r1 revision routes routine table cells through the refusal-echo renderer, but `escape_and_truncate` (crates/core/src/error.rs:190-204, bound at :30) does more than escape control characters: it doubles every backslash and cuts at 80 characters with `…`, and its own doc scopes it to rejection echoes. Consequence: every legitimate Windows `Install Path` renders with doubled separators (`C:\\\\Steam\\…`) in the shipped table, and any name or path past 80 chars is silently shortened on every platform. Test #12's new case pins only the ESC-byte outcome; no test or matrix note covers the backslash-doubling or 80-char cell cap, and the Windows matrix row's named gap concerns test execution, not table rendering.",
+            "fix": "Replace \"render through `escape_and_truncate`\" with a cell rule that escapes control characters only (no backslash doubling, no 80-char cut), naming `escape_and_truncate` as what it replaces; or keep the reuse and pin the Windows-path and long-path renderings in Test #12 plus one clause on the Windows matrix row."
+          },
+          {
+            "severity": "nit",
+            "location": "Assumption register row A10: \"and those are the workspace's only external deps (`clap` and `serde_json` per-package, not workspace-level)\"",
+            "problem": "The rewritten A10 dropped `winreg`, which is a workspace external dep (Cargo.toml:23, consumed target-gated at crates/discovery/Cargo.toml:21-22) and is named by this proposal's own A9; the pre-revision A10 listed it correctly. The row's conclusion is unaffected (`winreg` is already locked and compiles only for the Windows leg, so \"no `Cargo.lock` change\" holds) and the matrix row it grounds stays true, but the verified-status basis sentence is now false.",
+            "fix": "Restore it: \"…`serde`, `serde_json`, plus the target-gated `winreg` (A9), and those are the workspace's only external deps…\"."
+          }
+        ]
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "4461833195ec56a1f702f869cb3c83db3f95c017",
+        "dissents": 1,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "Scan flow and output, step 8 — \"`Display Name`, `Install Path` — render through `escape_and_truncate` in place of today's raw `row_cells` pass-through\"",
+            "problem": "new: the escaped set is exactly the two ACF cells, but the same revision retires the only thing that kept the `Slug` column clean — step 4 makes `refuse_invalid_slugs` \"the `025-B1` bound alone\", and the retired grammar check is what refused control bytes in a slug today (apps/discovery-cli/src/main.rs:115-129, whose in-module test pins a newline-in-slug reaching stderr as `\\u000a`, never as a second line). `DiscoveredGame.slug` is a `pub` field (crates/discovery/src/game.rs:44-51), so the Row identity claim that \"a plugin cannot spell the key differently without using another function\" does not bound a third-party row, and `Source::lookup_key` validates nothing about `external_id`: a row from any `dyn DiscoveryPlugin` — the population today's boundary doc comment says it exists for — can carry 128 arbitrary octets straight into the raw `Slug` cell.",
+            "fix": "Add `Slug` (and `Game Id`, already grammar-validated, for symmetry) to the escaped-cell set in step 8 instead of enumerating only the ACF-sourced two, and extend Test strategy 12's no-raw-control-byte assertion to every column."
+          },
+          {
+            "severity": "minor",
+            "location": "Scan flow and output, step 6 — \"one prompt on **stderr** — stdout carries only the table\"",
+            "problem": "new: the prompt is the remaining render of a server-sourced string, and the revision's escape clause is scoped to \"every value a refusal interpolates\", so a loopback peer's candidate `name` (reachable by any local process that binds the port) reaches the terminal outside `escape_and_truncate` — the control-sequence path step 8 and Test 12 just closed for the table.",
+            "fix": "Widen the escape clause from refusals to every out-of-band terminal write (the prompt's candidate names and slug), and pin a control byte in a fake's candidate `name` in Test strategy 12."
+          },
+          {
+            "severity": "minor",
+            "location": "Catalog client and gate — \"`probe()` asks the authority ... after refusing unless every returned `SocketAddr` `IpAddr::is_loopback()` — the property is established by address, not by name, so a `hosts` entry for `localhost` cannot send the query outward\"",
+            "problem": "new (residual of the r1-2 closure): the address check is stated inside `probe()` only, while the sentence claims it protects the query — which `candidates()` sends. `candidates()` is specified over a raw `base: &str` (`candidates_url(base: &str, slug: &str)`) plus a plain `TcpStream`, so as written the query path re-resolves the name and dials whatever the resolver returns; a differing answer between gate and query, or an implementation that puts the check only where the document does, puts the slug on a remote socket.",
+            "fix": "State that the gate resolves once and `Endpoint` carries the validated `Vec<SocketAddr>` that `candidates()` dials, so the loopback requirement binds every connection the client makes rather than the probe alone; in the same sentence state that a non-numeric or out-of-range port is the endpoint policy's `TransportUnavailable`, not a later `Unreachable`."
+          },
+          {
+            "severity": "minor",
+            "location": "Catalog client and gate — \"admits exactly: a literal `http://` prefix; an authority that is non-empty, carries no `@`, and runs to the first `/`, `?`, or `#`\"",
+            "problem": "new: the grammar bounds the authority and is silent about the bytes after it, while `candidates_url` is still specified over the raw string (`<base>/v1/candidates?slug=<encoded>`) and the request is `GET <path> HTTP/1.1`. The section now classifies `--catalog-url`/`BINDFORGE_CATALOG_URL` as \"both untrusted config sources\", so a CR or LF in the path portion of an otherwise admitted base flows verbatim into the request line and lets that config value forge extra request lines or headers to whatever loopback service holds the port.",
+            "fix": "One clause: everything after the authority in an admitted base is restricted to printable ASCII (no control bytes, no space), and the request target is built from the parsed `Endpoint` rather than the raw base; add a `http://127.0.0.1:8080/x\\r\\n` rejection to Test strategy 9."
+          },
+          {
+            "severity": "nit",
+            "location": "Match store — \"the `bindforge/` directory and both files are created owner-only — 0700/0600 where unix modes apply — so the confirmed inventory is never a `umask` accident\"",
+            "problem": "re-raised (half of r1-5): this closes the modes this process sets, but leaves the case where `<data>` or `bindforge/` already exists group/world-writable (a shared `XDG_DATA_HOME`, which the path rule accepts because it only checks absoluteness) unaddressed and unrecorded, while the store is the trust root for records that are \"re-trusted on every scan\".",
+            "fix": "One sentence beside the inventory-disclosure row in Risks accepting a user-configured shared data directory as residual, or tightening the mode at load."
+          },
+          {
+            "severity": "nit",
+            "location": "Match store, Save — \"`matches.json.tmp` (opened exclusively, never through a pre-existing entry)\"",
+            "problem": "new: the exclusive open adds a failure mode with no named refusal — a `matches.json.tmp` left by an interrupted run makes every later save fail, and no named refusal covers a failed save, so the run reports a confirmation it never persisted.",
+            "fix": "Name it: `error: match store unwritable: <path>` on stderr with a non-zero exit and no record claimed, and pin the pre-existing-tmp case in Test strategy 7."
+          }
+        ]
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "4461833195ec56a1f702f869cb3c83db3f95c017",
+        "dissents": 0,
+        "findings": []
+      },
+      "complexity": {
+        "verdict": "approve",
+        "stamp": "4461833195ec56a1f702f869cb3c83db3f95c017",
+        "dissents": 0,
+        "findings": []
+      }
+    },
+    "code": {
+      "correctness": {
+        "verdict": "approve",
+        "stamp": "c9983a81a11f89b092d69d3681778c158753366e",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/discovery/src/slug.rs:1-5; crates/discovery/Cargo.toml:17-33; crates/discovery/tests/slug_tests.rs:24",
+            "problem": "The retirement lands as tombstones plus a `required-features` gate instead of the deletion the proposal names (Chosen design 'Row identity': slug.rs 'is deleted'; Rollout 1 'the deletion of slug.rs ... and their suites'; Test strategy #14: the two suites 'are gone'). src/slug.rs stays in the tree emptied, and tests/slug_tests.rs and tests/collision_tests.rs still stand at their original paths (still spelling `use discovery::slug::derive_slug;`) excluded from the build via the never-enabled `retired-adr-024-suites` feature. The functional property — the retired machinery compiles, builds and asserts nowhere the gates run — is held by retirement_tests.rs, and the shape is forced by the stage toolchain's rm denial with file removal named as an operator follow-up; the deviation is asserted to be recorded in 03-build-notes.md, which is outside this pass's permitted inputs, so I could not establish it is undeclared (if absent there, checklist item 3 escalates it).",
+            "fix": "Have the runner delete slug.rs, tests/slug_tests.rs, tests/collision_tests.rs and the gate/feature block at final integration, or confirm 03-build-notes.md records the gated-retirement shape as a declared deviation."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/discovery/tests/.rm-probe:1",
+            "problem": "A stray zero-byte file is committed at crates/discovery/tests/.rm-probe, referenced nowhere in the tree and part of no build target; it is residue of a delete probe, asked for by nothing in the proposal.",
+            "fix": "Delete the file (runner/operator cleanup)."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/discovery/tests/retired/README.md:10-13",
+            "problem": "The README states the two retired suites 'are kept here' under tests/retired/, but the README is the only file in that directory; the suites actually stand at tests/slug_tests.rs and tests/collision_tests.rs, gated off the build via the package manifest — the shape retirement_tests.rs itself pins. The retirement's own record misdescribes where the retired files live.",
+            "fix": "Correct the README to the gated-in-place shape (or reconcile it when the operator deletions land)."
+          },
+          {
+            "severity": "minor",
+            "location": "apps/discovery-cli/src/catalog.rs:200-203",
+            "problem": "Named surfaces diverge from the proposal's signatures: `trait CatalogClient` carries only `candidates`, while the proposal's trait includes `fn probe`; the flow is written against the concrete `HttpCatalog` in main.rs, so the trait is not the 'seam every behavior below is written against' (no in-process fake drives the CLI flow through it — the suites drive the real client over a loopback socket). Related: `parse_endpoint` returns a normalized String rather than the sketched Endpoint, and `Candidate` is a plain struct with a hand-rolled parse rather than a `Deserialize` derive (behavioral equivalence holds — unknown fields ignored). No behavior or contract is missing; this is a named-interface deviation.",
+            "fix": "Add `probe` to the trait and have the flow depend on `&dyn CatalogClient`, or record the simplified seam as a declared deviation in 03-build-notes.md."
+          },
+          {
+            "severity": "minor",
+            "location": "docs/adrs/025-discovery-identity-and-catalog-matching.md:182-186",
+            "problem": "The branch adds Rollout item 6 (the deferral record, 025-R1) to its own source ADR. AGENTS.md sanctions only the runner flipping the source document's status on completion; the sanctioned ledger edits are ADR-024's per Rollout 5. The added text merely records a deferral the proposal already states (whose record the proposal places in 03-build-notes.md) and relaxes nothing, but the run editing the requirement document it is measured against is an audit-trail concern.",
+            "fix": "Confirm the runner authored this edit, or move the deferral record to 03-build-notes.md alone, as the proposal's own Rollout 6 spells it."
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/src/main.rs:334",
+            "problem": "Provenance citations name unit handles `025-C5` and `025-C6` (also at apps/discovery-cli/src/catalog.rs:37, tests/cli_confirmation_flow_tests.rs:1, tests/cli_json_mode_tests.rs:1), which ADR-025 does not define — its contracts stop at 025-C4 — and the ADR's unit-handle discipline says ids elsewhere 'govern nothing'. The citations point at nothing.",
+            "fix": "Re-cite these docs to `025-C4`/`025-L2` (or the proposal sections) or drop the phantom handles."
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/Cargo.toml:14-22",
+            "problem": "The dev-dependencies block is justified by a false claim ('integration tests only see dev-dependencies'); integration targets also see the package's normal dependencies, and all three listed crates are already normal deps, so the block is redundant (harmless — Cargo.lock is unchanged, as Rollout 7 requires).",
+            "fix": "Drop the redundant block or correct the comment."
+          }
+        ]
+      },
+      "compatibility": {
+        "verdict": "approve",
+        "stamp": "c9983a81a11f89b092d69d3681778c158753366e",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "apps/discovery-cli/src/catalog.rs:438 (with authority() at apps/discovery-cli/src/catalog.rs:224-228)",
+            "problem": "The endpoint policy admits `[::1]` as one of exactly three loopback host spellings, but `authority()` strips the brackets and the request is built as `Host: {host}:{port}` from the stripped host, so an IPv6 endpoint sends `Host: ::1:8080` — RFC 9110 requires the bracketed form for an IPv6 `uri-host` in `Host:`. The build only ever talks to its own fake (which ignores the header), so no test or gate catches it, but the pinned provisional wire spelling (025-C4) interoperates with permissive loopback peers only: a strict server fails the `[::1]` endpoint the policy advertises.",
+            "fix": "Keep the bracketed host spelling for the `Host` header (the normalized base already spells `http://[::1]:port`) and strip brackets only for `to_socket_addrs`/`connect_timeout`; pin the request-line spelling for a `[::1]` endpoint in the unit surface."
+          }
+        ]
+      },
+      "security": {
+        "verdict": "approve",
+        "stamp": "c9983a81a11f89b092d69d3681778c158753366e",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "apps/discovery-cli/src/catalog.rs:460 and apps/discovery-cli/src/main.rs:295",
+            "problem": "The lookup key (`slug`) is interpolated raw into the candidate-drop refusal line and the confirmation prompt, while the design's escape invariant (02-proposal.md 'Catalog client and gate') and core's documented echo contract (crates/core/src/error.rs:183-188, naming third-party plugin slugs explicitly) require every such value to pass through escape_and_truncate. Because the emit boundary checks only 025-B1's length by design, a third-party plugin slug carrying control bytes could forge a line on stderr; shipped Steam emitters (digits-only appid) cannot reach it.",
+            "fix": "Wrap the slug in escape_and_truncate in both format strings (catalog.rs partition_candidates and main.rs print_prompt), matching the table path which already escapes the slug via cell(), and pin the one-line property on the partition refusal as main.rs's tests pin the bound-refusal line."
+          },
+          {
+            "severity": "minor",
+            "location": "apps/discovery-cli/src/catalog.rs:408-431",
+            "problem": "HttpCatalog::candidates() re-resolves the endpoint host on every mid-scan query and connects to the returned addresses without re-asserting IpAddr::is_loopback(), which probe() does at catalog.rs:247-254. For the admitted `localhost` spelling, a hosts/NSS change between the gate (step 1) and a query (step 5) sends the lookup key to a non-loopback address even though the run believes the address-based loopback property holds, against the design's claim that the property is established by address, not by name.",
+            "fix": "Factor probe()'s resolve-and-require-loopback logic into one helper and call it from both probe() and candidates() so every connect re-checks that all resolved addresses are loopback; add a unit case pinning the query-path refusal."
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/src/matches.rs:194-211",
+            "problem": "The 65,536-octet read budget is decided from fs::metadata, then fs::read allocates the whole file before the second length check; a file swapped or grown between the metadata call and the read is fully buffered before the refusal. The store file is user-owned, so this is defense-in-depth rather than an exploitable path.",
+            "fix": "Open the file and cap the read with Read::take(STORE_READ_BUDGET_OCTETS + 1) so the allocation itself is bounded by construction, independent of metadata."
+          }
+        ]
+      },
+      "performance": {
+        "verdict": "approve",
+        "stamp": "c9983a81a11f89b092d69d3681778c158753366e",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/src/catalog.rs:283-304",
+            "problem": "read_response pulls the HTTP header block from the raw TcpStream one byte per read() call, making every header byte a syscall (~150-300 for a typical response, up to the 65,536-octet budget before the over-budget refusal fires). Small impact on this one-shot, loopback-only, bounded path, so a nit rather than a defect.",
+            "fix": "Wrap the stream in a std::io::BufReader at catalog.rs:444 before calling read_response so the \\r\\n\\r\\n scan amortizes on buffer refills; the body read_exact already reads in bulk."
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/src/matches.rs:249-261",
+            "problem": "MatchStore::game_id/resolves/confirm locate records with a linear Vec::find although the store is keyed by slug, so main.rs:162-174 costs O(rows x records) per scan. Harmless today (the 65,536-octet read budget bounds records to roughly a thousand entries and rows are per-machine), but the cheap fix is nearly free.",
+            "fix": "records is already kept in slug byte order by sort_records (matches.rs:358-360): use binary_search_by_key in game_id and confirm, or index once into a BTreeMap after load."
+          }
+        ]
+      },
+      "testing": {
+        "verdict": "approve",
+        "stamp": "c9983a81a11f89b092d69d3681778c158753366e",
+        "dissents": 0,
+        "findings": [
+          {
+            "severity": "minor",
+            "location": "crates/discovery/tests/.rm-probe:1",
+            "problem": "A stray zero-byte file is committed in the tests tree by this diff, referenced nowhere and part of no build target; it is delete-probe residue asked for by nothing in the proposal, and the committed tests directory should carry no unreferenced artifacts.",
+            "fix": "Have the runner/operator delete the file at final integration (the stage rm denial explains its creation, not its commit)."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/discovery/Cargo.toml:24-33; crates/discovery/tests/retired/README.md:10-13",
+            "problem": "The gated-retirement shape leaves a knob with no possible consumer — the `retired-adr-024-suites` feature cannot be meaningfully enabled because the gated suites import the deleted `discovery::slug::derive_slug`, so enabling it never compiles (checklist item 7); and the retirement README states the two suites 'are kept here' under `tests/retired/` while the files actually stand at `tests/slug_tests.rs` and `tests/collision_tests.rs` behind the feature gate — the retirement record misdescribes the tree. The functional property (retired machinery builds and asserts nowhere the gates run) is held by retirement_tests.rs and the operator follow-up is named, so this is not a functional break.",
+            "fix": "At final integration have the runner delete src/slug.rs, tests/slug_tests.rs, tests/collision_tests.rs and the [features]/[[test]] block together; until then, correct the README to say the suites stand at their original paths, required-features-gated."
+          },
+          {
+            "severity": "minor",
+            "location": "apps/discovery-cli/src/catalog.rs:527-538",
+            "problem": "Test strategy #9 names three encoding cases — `steam/900001` → `steam%2F900001` (pinned), a slug with a space, and a slug with a `%`, each 'encoded once (never double-encoded)' — but no assertion pins the space or the `%` case in the pure `candidates_url` units or the subprocess request-line pin. The implementation is correct, yet a future edit that pre-encoded or double-escaped the query would pass the suite.",
+            "fix": "Add one assertion to the in-module `candidates_url` test, e.g. `candidates_url(base, \"local/a%b c\")` → `?slug=local%2Fa%25b%20c`, citing Test strategy #9."
+          },
+          {
+            "severity": "minor",
+            "location": "crates/discovery/src/registry.rs:10-19",
+            "problem": "The diff adds public `Display` and `Error` impls for `DiscoveryError` with no consumer anywhere (the engine and the CLI both format the `Debug` shape; `registry_tests.rs` pins equality only), and the added doc comment claims 'design 025's suites format the failure with `{}`' when every suite and caller actually uses `{:?}`. The exact line shape (`PluginError: <msg>`) is asserted nowhere — an unconsumed, untested addition (checklist item 7).",
+            "fix": "Pin the Display line in `registry_tests.rs` (`assert_eq!(err.to_string(), \"PluginError: error\")` for both variants) and correct the comment to state the suites quote the Debug shape — or delete the impls until a consumer exists."
+          },
+          {
+            "severity": "nit",
+            "location": "apps/discovery-cli/tests/cli_confirmation_flow_tests.rs:1; apps/discovery-cli/tests/cli_json_mode_tests.rs:1; apps/discovery-cli/src/catalog.rs:37",
+            "problem": "Headers cite unit handles `025-C5` and `025-C6`, which name no unit in ADR-025 (contracts end at `025-C4`); a handle naming nothing governs nothing, so the suite-to-contract trace these citations exist to provide is broken for those lines.",
+            "fix": "Cite the real handles: the confirmation flow and store are `025-C3`/`025-L2`/`025-L4`, the JSON candidate passthrough is `025-C4`."
+          }
+        ]
+      }
+    }
+  },
+  "lastReviewPass": {
+    "phase": "code",
+    "round": 2,
+    "cycle": 0,
+    "seats": [
+      "correctness",
+      "compatibility",
+      "security",
+      "performance",
+      "testing"
+    ]
+  },
+  "reviseNoChange": false,
+  "gateEvidence": {
+    "at": 1795059034250,
+    "green": true,
+    "legs": [
+      {
+        "command": "npm run check",
+        "cwd": "tools/orchestration",
+        "exit": 0,
+        "tail": "npm notice run @bindforge/orchestration@1.0.0 precheck npm notice run npm install  up to date, audited 178 packages in 1s  45 packages are looking for funding   run `npm fund` for details  10 moderate severity vulnerabilities  To address issues that do not require attention, run:   npm audit fix  To address all issues (including breaking changes), run:   npm audit fix --force  Run `npm audit` for details. npm warn install-scripts 1 package had install scripts blocked because they are not covered by allowScripts: npm warn install-scripts   esbuild@0.28.2 (postinstall: node install.js) npm warn install-scripts npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow. npm notice run @bindforge/orchestration@1.0.0 check npm notice run npm run lint && npm run format:check && npm run test npm notice run @bindforge/orchestration@1.0.0 lint npm notice run eslint . npm notice run @bindforge/orchestration@1.0.0 format:check npm notice run prettier --check . Checking formatting... All matched files use Prettier code style! npm notice run @bindforge/orchestration@1.0.0 test npm notice run vitest run          dmesg(1) may have more information after failed mount system call.   Test Files  61 passed (61)       Tests  692 passed | 2 skipped (694)    Start at  22:30:25    Duration  8.12s (tests 92%, import 7%, transform 1%)      Isolate  61 workers spawned · ~75ms startup each (spawn + environment, per file)              at least ~499ms faster with isolate: false — reuses workers across files instead of one per file [2 tail line(s) dropped by the record's citation rule]"
+      },
+      {
+        "command": "cargo fmt --all -- --check",
+        "cwd": ".",
+        "exit": 0,
+        "tail": ""
+      },
+      {
+        "command": "cargo clippy --workspace --all-targets -- -D warnings",
+        "cwd": ".",
+        "exit": 0,
+        "tail": "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.06s"
+      },
+      {
+        "command": "cargo test --workspace --locked",
+        "cwd": ".",
+        "exit": 0,
+        "tail": "[44419 characters elided by the gate tail cap]ord_per_slug_sorted_in_byte_order ... ok test the_same_record_set_saves_as_identical_bytes_whatever_the_order ... ok  test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s       Running tests/cli_output_polish_tests.rs (target/debug/build/discovery-cli/6baeaa5867e93b03/out/cli_output_polish_tests-6baeaa5867e93b03)  running 4 tests test test_cli_list_table_is_the_header_block_when_no_games_are_found ... ok test test_cli_list_reports_a_plugin_failure_on_one_stderr_line ... ok test test_cli_list_table_columns_align_under_a_separator ... ok test test_help_lists_the_json_and_catalog_flags_at_every_level ... ok  test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s       Running tests/cli_slug_refusal_tests.rs (target/debug/build/discovery-cli/1ace125c7ba0d38c/out/cli_slug_refusal_tests-1ace125c7ba0d38c)  running 2 tests test a_root_whose_only_row_has_no_valid_appid_fails_without_echoing_that_row ... ok test a_scratch_root_renders_the_five_columns_with_a_grammar_exempt_lookup_key ... ok  test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s       Running tests/cli_tests.rs (target/debug/build/discovery-cli/458d6475e117d1e1/out/cli_tests-458d6475e117d1e1)  running 3 tests test test_cli_list_json_empty_for_missing_steam_root ... ok test test_cli_list_format ... ok test test_cli_list_json_format ... ok  test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s     Doc-tests bindforge_core  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests bindforge_transforms  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s     Doc-tests discovery  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      }
+    ]
+  },
+  "extensionSessions": 5,
+  "extensionRounds": 3,
+  "codeCycle": 1,
+  "codeStamp": "c9983a81a11f89b092d69d3681778c158753366e"
+}

@@ -83,8 +83,11 @@
 //! budgets named above — and, from ADR-024, `is_slug_name`, `MAX_SLUG_OCTETS`,
 //! and `escape_and_truncate`: the shared slug grammar, the one exported bound
 //! every slug-grammar id rides, and the single echo renderer a refusal runs its
-//! payload through, so a discovered game's slug is checked against the same
-//! grammar a manifest `id` is parsed by.
+//! payload through — and, from ADR-025, `MAX_DISCOVERY_SLUG_OCTETS`, the
+//! thirteenth exported constant: the cap on a discovery plugin's
+//! `<source>/<external-id>` lookup key, which rides that cap and is deliberately
+//! *not* checked against the grammar, so a discovered game's source key can
+//! never be adopted as a manifest `id`.
 
 mod action;
 mod chain;
@@ -113,7 +116,9 @@ pub use manifest::{
     DockedAction, ExclusivityGroup, MAX_CONSTRAINT_GROUPS, MAX_GROUP_MEMBERS, MAX_MANIFEST_ROWS,
     MAX_NATIVE_NAME_OCTETS, Manifest, ManifestAction, load_manifest,
 };
-pub use placement::{GradeBound, KeyboardGeometry, MAX_SLUG_OCTETS, PlacementCheck};
+pub use placement::{
+    GradeBound, KeyboardGeometry, MAX_DISCOVERY_SLUG_OCTETS, MAX_SLUG_OCTETS, PlacementCheck,
+};
 pub use placement::{geometry_matches_file_name, is_slug_name, load_geometry, placement_is_legal};
 pub use policy::load_policy;
 pub use reach::{Hand, InputGrade, ReachClass, ReachTable, ReachTables};

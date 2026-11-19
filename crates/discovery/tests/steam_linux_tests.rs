@@ -5,10 +5,9 @@
 //! read-only fixture trees under `tests/fixtures/steam/`, so no test probes the
 //! host, writes to the filesystem, or needs Steam installed (Chosen design §9).
 
-use discovery::game::{DiscoveredGame, Namespace, Platform};
+use discovery::game::{DiscoveredGame, Platform};
 use discovery::plugin::DiscoveryPlugin;
 use discovery::registry::DiscoveryError;
-use discovery::slug::derive_slug;
 use discovery::steam_linux::{
     SteamLinuxPlugin, host_candidates, libraries_in_root, parse_manifest,
 };
@@ -67,12 +66,77 @@ fn paths(list: &[&str]) -> Vec<PathBuf> {
 // ---------------------------------------------------------------------------
 
 // proves: Test strategy #2 (Chosen design §5) — name + installdir yields both fields.
+// proves: design 025's Test strategy #3 (Chosen design: Emission — `AppManifest`
+// gains `appid`) — the reduction step now reads the ACF's `appid` beside them.
 #[test]
 fn parse_manifest_extracts_name_and_installdir() {
     let m = parse_manifest(&manifest_text(Some("Example Game"), Some("Example Game")))
         .expect("a manifest with name and installdir must parse");
     assert_eq!(m.display_name, "Example Game");
     assert_eq!(m.install_dir, "Example Game");
+    assert_eq!(m.appid, "900001", "ADR-025 reads the appid the ACF names");
+}
+
+// proves: design 025's Test strategy #3 (Chosen design: Emission — the appid read
+// "already a case-insensitive lookup") — the key spellings `AppId` and `APPID`
+// resolve to the same value the lowercase spelling does.
+#[test]
+fn parse_manifest_reads_the_appid_key_case_insensitively() {
+    for key in ["appid", "AppId", "APPID"] {
+        let text = format!(
+            "\"AppState\"\n{{\n\t\"{key}\"\t\t\"900001\"\n\t\"name\"\t\t\"Example Game\"\n\t\
+             \"installdir\"\t\t\"Example Game\"\n}}\n"
+        );
+        assert!(
+            parse_manifest(&text).is_some_and(|m| m.appid == "900001"),
+            "the `{key}` spelling must resolve to the appid"
+        );
+    }
+}
+
+// proves: design 025's Test strategy #3 (Chosen design: Emission — "requires 1–20
+// ASCII digits; anything else is the same skip-and-count outcome") — the value
+// refusals: absent, empty, whitespace-only after trim, non-numeric, an embedded `/`,
+// and 21 digits all skip the manifest; 20 digits is the accepted extreme; a padded
+// value is trimmed, not refused.
+#[test]
+fn parse_manifest_requires_a_numeric_appid() {
+    let text =
+        "\"AppState\"\n{\n\t\"name\"\t\t\"Some Game\"\n\t\"installdir\"\t\t\"Some Game\"\n}\n";
+    assert!(
+        parse_manifest(text).is_none(),
+        "an absent appid key must skip the manifest"
+    );
+
+    let base = |value: &str| {
+        format!(
+            "\"AppState\"\n{{\n\t\"appid\"\t\t\"{value}\"\n\t\"name\"\t\t\"Some Game\"\n\t\
+             \"installdir\"\t\t\"Some Game\"\n}}\n"
+        )
+    };
+    for bad in [
+        "",
+        "   ",
+        "900o1",
+        "900/1",
+        "123456789012345678901", // 21 digits
+        "-1",
+    ] {
+        assert!(
+            parse_manifest(&base(bad)).is_none(),
+            "appid `{bad}` is outside the 1–20 ASCII-digit set and must skip"
+        );
+    }
+
+    let twenty = "1".repeat(20);
+    let m = parse_manifest(&base(&twenty)).expect("20 digits is inside the accepted set");
+    assert_eq!(m.appid, twenty);
+
+    let m = parse_manifest(&base(" 900001 ")).expect("the design trims the value");
+    assert_eq!(
+        m.appid, "900001",
+        "the appid is read trimmed, not refused for padding"
+    );
 }
 
 // proves: Test strategy #2 (Chosen design §5, A1) — a manifest with no `name`
@@ -142,13 +206,19 @@ fn parse_manifest_rejects_document_without_appstate_section() {
 }
 
 // proves: Test strategy #2 (Chosen design §5, A5) — the `AppState` root section
-// and the task keys are taken case-insensitively.
+// and the task keys are taken case-insensitively. Re-pinned by ADR-025 (Test
+// strategy #3): the section now carries the `appid` the row identity is built
+// from — without it the manifest skips, so the mixed-case text rides one too.
 #[test]
 fn parse_manifest_reads_appstate_and_keys_case_insensitively() {
-    let text = "\"appstate\"\n{\n\t\"NAME\"\t\t\"Mixed Case Game\"\n\t\"stateflags\"\t\t\"4\"\n\t\"INSTALLDIR\"\t\t\"Mixed Case Game\"\n}\n";
+    let text = "\"appstate\"\n{\n\t\"Appid\"\t\t\"900001\"\n\t\"NAME\"\t\t\"Mixed Case Game\"\n\t\"stateflags\"\t\t\"4\"\n\t\"INSTALLDIR\"\t\t\"Mixed Case Game\"\n}\n";
     let m = parse_manifest(text).expect("mixed-case keys must resolve");
     assert_eq!(m.display_name, "Mixed Case Game");
     assert_eq!(m.install_dir, "Mixed Case Game");
+    assert_eq!(
+        m.appid, "900001",
+        "the mixed-case `Appid` spelling resolves too"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -332,8 +402,9 @@ fn plugin_name_is_steam_linux() {
 // proves: Test strategy #8 — the minimal fixture root yields exactly four games
 // in slug order: the two libraries, the name-absent fallback, mixed key case,
 // the skipped malformed and escaping manifests, and the ignored decoys. Re-pinned
-// by ADR-024: the slugs are prefix-free, so the `unknown/` namespace that used to
-// sit inside them is gone.
+// by ADR-025: the slug is the `steam/<appid>` lookup key read from each ACF, so the
+// row order is the byte order of the appids and the display names travel in their
+// own column.
 #[test]
 fn discover_fixture_root_yields_the_four_expected_games() {
     let games = minimal_games();
@@ -341,10 +412,10 @@ fn discover_fixture_root_yields_the_four_expected_games() {
     assert_eq!(
         slugs,
         [
-            "example-game",
-            "mixed-case-game",
-            "nameless-install",
-            "secondary-title",
+            "steam/900001",
+            "steam/900002",
+            "steam/900003",
+            "steam/900100",
         ]
     );
     let names: Vec<&str> = games.iter().map(|g| g.display_name.as_str()).collect();
@@ -352,19 +423,30 @@ fn discover_fixture_root_yields_the_four_expected_games() {
         names,
         [
             "Example Game",
-            "Mixed Case Game",
             "Nameless Install",
+            "Mixed Case Game",
             "Secondary Title",
         ]
+    );
+    let friendly: Vec<&str> = games.iter().map(|g| g.friendly_name.as_str()).collect();
+    assert_eq!(
+        friendly,
+        [
+            "Example Game",
+            "Nameless Install",
+            "Mixed Case Game",
+            "Secondary Title",
+        ],
+        "each row carries the normalized display name as its friendly name"
     );
 }
 
 // proves: Test strategy #6 (Chosen design §5, A2) — the output contract: every
-// game carries platform SteamLinux, codec_id None and a slug derived from the
-// display name; install_path is `<canonical library>/steamapps/common/<installdir>`;
-// the vector is ordered by (slug, install_path). Re-pinned by ADR-024: the slug is
-// `derive_slug`'s output, in the shared grammar and bound, and the row's namespace
-// is its own field.
+// game carries platform SteamLinux, codec_id None and the `steam/<appid>` lookup key
+// read from its manifest; install_path is `<canonical library>/steamapps/common/\
+// <installdir>`; the vector is ordered by (slug, install_path). Re-pinned by ADR-025:
+// the slug is the composed lookup key — grammar-exempt, inside `025-B1` — and the
+// row carries no namespace at all.
 #[test]
 fn discover_output_honours_the_game_output_contract() {
     let root = canonical(&fixture("minimal"));
@@ -373,21 +455,29 @@ fn discover_output_honours_the_game_output_contract() {
     for game in &games {
         assert_eq!(game.platform, Platform::SteamLinux);
         assert!(game.codec_id.is_none(), "codec_id must stay None");
-        assert_eq!(
-            game.slug,
-            derive_slug(&game.display_name).expect("a fixture display name derives a slug"),
-            "the slug is the canonical derivation of the row's display name"
+        let appid = game
+            .slug
+            .strip_prefix("steam/")
+            .unwrap_or_else(|| panic!("`{}` must be a `steam/<appid>` lookup key", game.slug));
+        assert!(
+            !appid.is_empty() && appid.bytes().all(|byte| byte.is_ascii_digit()),
+            "`{}` must carry the numeric appid the manifest names: identity comes from \
+             the ACF, never from the display name",
+            game.slug
         );
         assert!(
-            bindforge_core::is_slug_name(&game.slug)
-                && game.slug.len() <= bindforge_core::MAX_SLUG_OCTETS,
-            "`{}` must be a grammar-valid id inside the shared bound",
+            game.slug.len() <= bindforge_core::MAX_DISCOVERY_SLUG_OCTETS,
+            "`{}` must sit inside `025-B1`'s lookup-key bound",
+            game.slug
+        );
+        assert!(
+            !bindforge_core::is_slug_name(&game.slug),
+            "`{}` is grammar-invalid by design — the lookup key never becomes a product id",
             game.slug
         );
         assert_eq!(
-            game.namespace,
-            Namespace::Unknown,
-            "the one v1 namespace rides its own field, not the slug"
+            game.friendly_name, game.display_name,
+            "the fixture names need no normalization, so friendly and display agree"
         );
         assert!(
             game.install_path.starts_with(&root),
@@ -403,10 +493,10 @@ fn discover_output_honours_the_game_output_contract() {
     // §5/A2: `install_path` composes from the library that holds the manifest,
     // so the secondary library's game carries the `<root>/secondary` prefix.
     for (slug, library, install_dir) in [
-        ("example-game", "", "Example Game"),
-        ("mixed-case-game", "", "Mixed Case Game"),
-        ("nameless-install", "", "Nameless Install"),
-        ("secondary-title", "secondary", "Secondary Title"),
+        ("steam/900001", "", "Example Game"),
+        ("steam/900002", "", "Nameless Install"),
+        ("steam/900003", "", "Mixed Case Game"),
+        ("steam/900100", "secondary", "Secondary Title"),
     ] {
         let library_root = if library.is_empty() {
             root.clone()
@@ -454,7 +544,7 @@ fn discover_never_emits_compatdata_paths_or_decoy_games() {
             game.install_path
         );
         assert!(
-            !game.slug.contains("prefix-decoy"),
+            !game.slug.contains("900099"),
             "the compatdata decoy game must never be discovered: {:?}",
             game.slug
         );

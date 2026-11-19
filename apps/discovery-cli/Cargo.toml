@@ -11,3 +11,12 @@ bindforge-core = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = "1.0"
+
+# ADR-025: the CLI suites parse the JSON contract with `serde_json`, name the
+# shared bound (`bindforge_core::MAX_DISCOVERY_SLUG_OCTETS`) in a refusal pin,
+# and drive the engine seam with `discovery` — all three are integration-test
+# reads, and integration tests only see dev-dependencies.
+[dev-dependencies]
+bindforge-core = { workspace = true }
+discovery = { path = "../../crates/discovery" }
+serde_json = "1.0"

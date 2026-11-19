@@ -476,3 +476,29 @@ fn the_adr_015_policy_names_resolve_at_the_crate_root() {
          new `CoreError` variant joins the refusal family (A9, A15)"
     );
 }
+
+/// proves: design 025's Test strategy #14 + Chosen design (Bound — "`placement.rs`
+/// gains `pub const MAX_DISCOVERY_SLUG_OCTETS: usize = 128;` beside
+/// `MAX_SLUG_OCTETS`… `lib.rs` re-exports it and its public-surface paragraph names
+/// it as the thirteenth exported constant") — the lookup-key bound resolves at the
+/// crate root in value position beside the existing family, at the value `025-B1`
+/// states, set equal to the two 128 bounds so the family reads as one. Its *lookup-
+/// key, not-grammar* character is pinned by the discovery-side suites
+/// (`crates/discovery/tests/zz_api_probe.rs`, `plugin_tests.rs`), which compose keys
+/// this predicate refuses; the README sibling bullet is gated in
+/// `ledger_annotations.rs`.
+#[test]
+fn the_adr_025_discovery_bound_resolves_beside_the_family() {
+    // Value position, beside the family, exactly as the ADR-013 budgets above.
+    let family = [
+        bindforge_core::MAX_DISCOVERY_SLUG_OCTETS,
+        bindforge_core::MAX_SLUG_OCTETS,
+        bindforge_core::MAX_NATIVE_NAME_OCTETS,
+    ];
+    assert_eq!(
+        family,
+        [128, 128, 128],
+        "`025-B1` sets the lookup-key cap equal to the two 128 bounds so the family \
+         reads as one: {family:?}"
+    );
+}

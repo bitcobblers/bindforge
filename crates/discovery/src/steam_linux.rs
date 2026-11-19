@@ -3,8 +3,10 @@
 //! The plugin reads library folders from `<root>/steamapps/libraryfolders.vdf`,
 //! always includes the root itself as a library, enumerates the
 //! `appmanifest_*.acf` files directly inside each library's `steamapps/`, and
-//! emits one [`DiscoveredGame`] per surviving manifest. AppIDs are never read
-//! and never stored (ADR-022).
+//! emits one [`DiscoveredGame`] per surviving manifest. Each manifest's
+//! `AppState.appid` is read and composed into the row's lookup key
+//! (`025-C1`): a manifest without a usable appid is refused like one with an
+//! unusable `installdir`.
 //!
 //! The scan itself lives once in [`crate::steam_common`]; this module is the
 //! Linux `pub` surface over it plus the Linux-only host probe (T-002 Chosen

@@ -175,7 +175,7 @@ fn ledger_unit(text: &str, unit: &str) -> String {
     }
     assert!(
         !entry.is_empty(),
-        "`docs/adrs/013-game-manifests.md` must carry a `{unit}` unit entry"
+        "the ledger text must carry a `{unit}` unit entry"
     );
     entry.join(" ").replace('`', "")
 }
@@ -232,11 +232,20 @@ fn has_number(text: &str, number: &str) -> bool {
 /// `MAX_SLUG_OCTETS = 128`, from its opening line to the blank line that ends
 /// the item, whitespace normalized.
 fn bound_bullet(text: &str) -> String {
+    budget_bullet(text, "MAX_SLUG_OCTETS = 128")
+}
+
+/// The `schemas/README.md` bullet of the exported budget family that carries
+/// `marker`, from its opening line to the blank line that ends the item,
+/// whitespace normalized.
+fn budget_bullet(text: &str, marker: &str) -> String {
     let lines: Vec<&str> = text.lines().collect();
     let start = lines
         .iter()
-        .position(|line| line.contains("MAX_SLUG_OCTETS = 128"))
-        .expect("`schemas/README.md` must state the bound as `MAX_SLUG_OCTETS = 128` in the exported budget family");
+        .position(|line| line.contains(marker))
+        .unwrap_or_else(|| {
+            panic!("`schemas/README.md` must state `{marker}` in the exported budget family")
+        });
     let mut bullet = String::new();
     for line in &lines[start..] {
         let trimmed = line.trim();
@@ -247,4 +256,80 @@ fn bound_bullet(text: &str) -> String {
         bullet.push(' ');
     }
     bullet
+}
+
+/// proves: design 025's Test strategy #16 + Rollout 5 — the four amended units in
+/// `docs/adrs/024-game-slug-identity.md` carry their `amended-by` annotations naming
+/// the ADR-025 units, in `021-L4`'s shipped shape: `024-C1` → `025-C1`, `024-C2` →
+/// `025-C2`, `024-L1` → `025-L3`, `024-L2` → `025-L3`. `024`'s prose and
+/// `024-B1`/`024-L3` stay untouched as history — this gate reads only the unit
+/// entries, and a branch whose ledger rows are un-annotated is the drift it refuses.
+#[test]
+fn the_024_amended_units_carry_the_adr_025_annotations() {
+    let path = repo_root()
+        .join("docs")
+        .join("adrs")
+        .join("024-game-slug-identity.md");
+    let text = fixture_text(&path);
+    for (unit, amendment) in [
+        ("024-C1", "amended-by 025-C1"),
+        ("024-C2", "amended-by 025-C2"),
+        ("024-L1", "amended-by 025-L3"),
+        ("024-L2", "amended-by 025-L3"),
+    ] {
+        let entry = ledger_unit(&text, unit);
+        assert!(
+            entry.contains(amendment),
+            "`{unit}` must carry `{amendment}` (design 025 Rollout 5, per `021-L4`): \
+             ADR-025 replaces the identity half of ADR-024, and the amended units' \
+             ledger rows must say so. Unit entry as shipped: {entry}"
+        );
+    }
+}
+
+/// proves: design 025's Test strategy #16 + Rollout 5 — the `024-R1` reservation
+/// entry records ADR-025 as filling its slot with the publisher-namespace half
+/// superseded: the resolver reservation is now a named, taken reservation.
+#[test]
+fn the_024_r1_reservation_records_adr_025_as_filling_its_slot() {
+    let path = repo_root()
+        .join("docs")
+        .join("adrs")
+        .join("024-game-slug-identity.md");
+    let text = fixture_text(&path);
+    let entry = ledger_unit(&text, "024-R1");
+    assert!(
+        entry.contains("ADR-025"),
+        "`024-R1` must name ADR-025 as the ADR that fills its slot (design 025 Rollout \
+         5): {entry}"
+    );
+    assert!(
+        entry.contains("superseded"),
+        "`024-R1` must record that the publisher-namespace half is superseded while \
+         ADR-025 fills the resolver slot (design 025 Rollout 5): {entry}"
+    );
+}
+
+/// proves: design 025's Test strategy #16 (Chosen design: Bound — "`schemas/
+/// README.md` gains a sibling bullet in the exported budget family") — the sibling
+/// bullet states `MAX_DISCOVERY_SLUG_OCTETS = 128` and carries the not-a-grammar-bound
+/// clause: the discovery key is exempt from the slug grammar and never a path
+/// component. The bullet is its own item, so the `024-B1` bullet's rider set stays
+/// exactly as shipped (gated by the existing test above) and the two cannot drift.
+#[test]
+fn the_readme_sibling_bullet_states_the_discovery_bound_is_not_a_grammar_bound() {
+    let path = repo_root().join("schemas").join("README.md");
+    let text = fixture_text(&path);
+    let bullet = budget_bullet(&text, "MAX_DISCOVERY_SLUG_OCTETS = 128");
+    assert!(
+        bullet.contains("MAX_DISCOVERY_SLUG_OCTETS = 128"),
+        "`schemas/README.md` must state the lookup-key cap as \
+         `MAX_DISCOVERY_SLUG_OCTETS = 128` in the exported budget family"
+    );
+    assert!(
+        bullet.contains("grammar") && bullet.contains("not"),
+        "the sibling bullet must carry the explicit clause that this bound is *not* a \
+         slug-grammar bound — the discovery key is exempt from the grammar and never a \
+         path component (`025-B1`, `025-L5`): {bullet}"
+    );
 }
