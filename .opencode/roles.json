@@ -1,12 +1,12 @@
 {
   "roles": {
-    "coder": "basalt/Qwen3.8-Flash-Next NVIDIA-NVFP4",
-    "code-review": "basalt/Qwen3.8-Flash-Next NVIDIA-NVFP4",
-    "designer": "basalt/Qwen3.8-Flash-Next NVIDIA-NVFP4",
-    "editor": "basalt/Qwen3.8-Flash-Next NVIDIA-NVFP4",
-    "planner": "basalt/Qwen3.8-Flash-Next NVIDIA-NVFP4",
-    "doc-sync": "basalt/Qwen3.8-Flash-Next NVIDIA-NVFP4",
-    "researcher": "basalt/Qwen3.8-Flash-Next NVIDIA-NVFP4",
-    "design-review": "basalt/Qwen3.8-Flash-Next NVIDIA-NVFP4"
+    "coder": "basalt/qwen-flash-next",
+    "code-review": "basalt/qwen-flash-next",
+    "designer": "basalt/qwen-flash-next",
+    "editor": "basalt/qwen-flash-next",
+    "planner": "basalt/qwen-flash-next",
+    "doc-sync": "basalt/qwen-flash-next",
+    "researcher": "basalt/qwen-flash-next",
+    "design-review": "basalt/qwen-flash-next"
   }
 }
