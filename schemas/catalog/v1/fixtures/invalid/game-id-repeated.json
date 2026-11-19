@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "revision": 0,
+  "games": [
+    {
+      "game_id": "example-game",
+      "name": "First Name",
+      "source_keys": ["steam/900001"]
+    },
+    {
+      "game_id": "example-game",
+      "name": "Second Name",
+      "source_keys": ["steam/900002"]
+    }
+  ]
+}

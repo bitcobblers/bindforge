@@ -1,0 +1,239 @@
+diff --git a/tmp/bindforge-editorial-registry-service-r2.md b/home/mike/.local/share/opencode/worktree/f852d4/026-registry-service/docs/designs/026-registry-service/02-proposal.md
+index e1e63cb6..07e3a739 100644
+--- a/tmp/bindforge-editorial-registry-service-r2.md
++++ b/home/mike/.local/share/opencode/worktree/f852d4/026-registry-service/docs/designs/026-registry-service/02-proposal.md
+@@ -4,7 +4,7 @@
+ 
+ ADR-025 shipped the discovery catalog *client* and deferred the server (`025-R1`).
+ ADR-026 discharges that half: one `apps/registry` binary with two modes — a
+-**root** serving a canonical catalog corpus, and a **caching** mode holding a
++**root** mode serving a canonical catalog corpus, and a **caching** mode holding a
+ user's own registrations plus a per-slug cache of upstream lookups — pinned to
+ the per-slug `GET /v1/candidates?slug=…` question the shipped client already
+ speaks (`025-C4`), plus a health route and a token-or-loopback-gated admin face
+@@ -105,8 +105,8 @@ reader (A7).
+ ### `apps/registry` — one crate, two modes (traces `026-C1`)
+ 
+ A new binary crate `apps/registry` (workspace member via `apps/*`, A13).
+-`std`-only for its serving face: `std::net::TcpListener` accept loop, hand-
+-written HTTP/1.1 framing, `serde_json` for bodies (already a shipped-client
++`std`-only for its serving face: `std::net::TcpListener` accept loop,
++hand-written HTTP/1.1 framing, `serde_json` for bodies (already a shipped-client
+ dependency, so "std-only" means no HTTP/TLS runtime, not "no deps"). It depends
+ on `bindforge-core` for the grammar and name bounds (`is_slug_name`,
+ `MAX_SLUG_OCTETS`, `MAX_NATIVE_NAME_OCTETS`, `escape_and_truncate`, A4, A5) and
+@@ -133,14 +133,14 @@ Modules (concrete file plan):
+   `Content-Length`-framed bodies within the budgets below — a
+   `Transfer-Encoding`, missing or non-decimal length, or an over-cap body is
+   refused before any mutation.
+-- `corpus.rs` — `026-C3` catalog-document load + validate + the slug→candidates
+-  index.
++- `corpus.rs` — `026-C3` catalog-document load + validation + the
++  slug→candidates index.
+ - `admin.rs` — `026-C4` upsert/delete/stats + `026-C5` enablement/auth.
+ - `cache.rs` — `026-C7` cache document, `026-B1`/`026-B2` enforcement, eviction.
+ - `upstream.rs` — `026-C6` upstream client.
+ - `endpoint.rs` — the `--upstream` URL gate: the copied `parse_endpoint` rules
+   (A11; copy list above).
+-- `constants.rs` — the private budgets (see Budgets).
++- `constants.rs` — the private budgets (see §Budgets).
+ 
+ CLI surface:
+ 
+@@ -174,9 +174,9 @@ negative, a `game_id` failing the grammar+bound (A4), a repeated `game_id`
+ octets (A5), a `source_key` failing §The serving face step 1's rule (A16, A3), a
+ `source_key` repeated within one record (the slug→candidates index would post
+ the same game twice, crowding the `MAX_CANDIDATES` window), a non-object/missing
+-field, and a document over `MAX_CATALOG_DOCUMENT_OCTETS` (§Budgets), whose write
+-side §The admin face and auth applies to every upsert. Nothing on disk is
+-rewritten on refusal (A7's load discipline).
++field, and a document over `MAX_CATALOG_DOCUMENT_OCTETS` (§Budgets) — on the
++write side, §The admin face and auth applies that cap to every upsert. Nothing
++on disk is rewritten on refusal (A7's load discipline).
+ 
+ `schemas/catalog/v1/` ships `spec.md` + `fixtures/valid/*.json` +
+ `fixtures/invalid/*.json` and is declared a **JSON format**, a documented
+@@ -222,8 +222,8 @@ grammar-valid kebab strings (e.g. `example-game`) each carrying its
+ today. This is safe because the registry validates `game_id` **only** against the
+ slug grammar (A4) and never joins it against `data/manifests/` — `013-L5`'s
+ name-agreement rule is a manifest-tree rule, not a registry rule. The seed
+-therefore mints provisional grammar-valid ids — `026-S1` is satisfied
+-partially, and step 6 of §Rollout records that on the unit — and adopting real
++therefore mints provisional grammar-valid ids — `026-S1` is partially satisfied,
++and step 6 of §Rollout records that on the unit — and adopting real
+ manifest ids is deferred to the first manifest PR (§Deferred).
+ 
+ ### The serving face (traces `026-C2`, `026-L3`, `026-L6`; resolves Q6/Q7/Q13)
+@@ -237,9 +237,9 @@ manifest ids is deferred to the first manifest PR (§Deferred).
+    `game_id`-only, A4). Path safety is the only extra refusal, at its own scope:
+    after the first `/`, one non-empty component with no further `/` or `\`, none
+    equal to `.` or `..`, and no control byte or invalid-UTF-8 sequence,
+-   so `%2e%2e%2f` and `%0a` never reach a corpus, cache document or refusal line
++   so `%2e%2e%2f` and `%0a` never reach a corpus, cache document, or refusal line
+    (keys are opaque in-memory strings, never joined onto paths). The rule
+-   governs candidate queries, admin upserts and cache loads alike; an over-cap or
++   governs candidate queries, admin upserts, and cache loads alike; an over-cap or
+    failing decoded slug is the `404` `026-C2` names.
+ 2. Answer = the join, served from the `corpus.rs` slug→candidates index: at
+    load, postings are built already ordered by `game_id` byte order, so a
+@@ -258,7 +258,7 @@ its upstream reports `down` with `last_upstream_fetch: 0` — the named value of
+ the never-fetched state. It is a **status document, not a readiness gate**:
+ it never answers non-`200`, so a `down` upstream is reported in the body, not
+ in the code. Answering it reads the **last-known** upstream verdict (see
+-Caching mode) and never fires that probe. It is never gated (`026-L3` permits
++§Caching mode) and never fires that probe. It is never gated (`026-L3` permits
+ the summary counts).
+ 
+ Any other route, or a malformed slug, is `404` (`026-C2`). The `026-L4` cold
+@@ -322,8 +322,8 @@ lock**, so persist order can never diverge from mutation order and a restart
+ cannot lose an accepted mutation (#11). A reader may wait on one local write, and
+ that latency is accepted. **Running two `registry serve` instances against one
+ corpus is a refused, unsupported state**: the fixed-name `create_new(true)` tmp
+-makes the second writer fail loudly (A7), the documented answer to the state the
+-ADR left unstated.
++makes the second writer fail loudly (A7), the documented answer to what the ADR
++left unstated.
+ 
+ ### Caching mode (traces `026-C6`, `026-L4`, `026-L5`; resolves Q8/Q9/Q14)
+ 
+@@ -355,7 +355,7 @@ std-only; the transport hop's assurance is `026-R1`, open Q14).
+ **Upstream reachability** (the `health.upstream` gauge) is gauged by the
+ upstream's own `/v1/health`, probed **at most once per TTL**, fired lazily by
+ the first *lookup* after expiry on that request's own thread — there is no timer
+-thread, and a health read only reports the verdict as it stands, it never fires
++thread, and a health read only reports the verdict as it stands; it never fires
+ the probe. Lookups themselves reveal reachability too (a connect failure on a
+ cold fetch ⇒ `down`), and the lazy once-per-TTL probe is how the design keeps
+ `026-C6`'s "gauged by `/v1/health`" without a second round trip per cold lookup.
+@@ -372,8 +372,8 @@ choose which legitimate id a slug resolves to (§Risks); closing that is `026-R1
+ 
+ The three registry budgets are **private to `apps/registry`** (`constants.rs`),
+ following the precedent `matches.rs` already set with its private
+-`STORE_READ_BUDGET_OCTETS` (A22). They are **not** added to core's thirteen-
+-constant family and get **no** `schemas/README.md` bullet, so that count is
++`STORE_READ_BUDGET_OCTETS` (A22). They are **not** added to core's
++thirteen-constant family and get **no** `schemas/README.md` bullet, so that count is
+ unchanged (open Q4); `schemas/catalog/v1/spec.md` states the catalog format's own
+ bound, the named refusals that enforce it on both sides of a document's life, and
+ the per-record arithmetic behind `MAX_CATALOG_DOCUMENT_OCTETS` below.
+@@ -403,7 +403,8 @@ private request budgets in the same `constants.rs`: `MAX_REQUEST_HEADER_OCTETS`
+ (= `MAX_CATALOG_DOCUMENT_OCTETS`, so any record a loadable corpus could legally
+ hold also fits an upsert and no per-record `source_keys` bound is needed); and
+ `MAX_CONCURRENT_CONNECTIONS` (64 — one thread per admitted connection, which
+-answers the one request §http.rs closes, so ≤64 live threads and ≤64 in-flight
++answers exactly one request before `http.rs` closes the connection, so ≤64 live
++threads and ≤64 in-flight
+ upstream hops at the mirrored `2 s`/`5 s` timeouts; over-cap is closed at accept
+ with no status line, which the shipped CLI reports as its named unreachable).
+ These bound inbound input as the client bounds outbound (`026-C2`/`026-C4`
+@@ -423,7 +424,7 @@ In `apps/discovery-cli/src/catalog.rs`:
+ - `parse_endpoint` keeps the literal-`http://` requirement and the digits-only
+   port but **drops the `LOOPBACK_HOSTS` host check and the constant with it** —
+   any parseable host+port is admitted (A11).
+-- `probe()` deletes the `is_loopback()` non-loopback-resolution refusal and keeps
++- `probe()` drops the `is_loopback()` non-loopback-resolution refusal and keeps
+   everything else: resolve, refuse an empty address set, prove one
+   `TcpStream::connect_timeout` **before any plugin is constructed** — the
+   fail-closed gate survives with its loopback half amended (`026-L1`).
+@@ -472,11 +473,11 @@ CI, macOS, Windows) are the rows the tasks owe behavior to, and no other Unix is
+ Unit (in `apps/registry` unless noted):
+ 
+ 1. **Catalog-document loader (`026-C3`):** every `fixtures/valid/*.json` loads;
+-   each of — wrong `version`, negative `revision`, grammar-invalid `game_id`
+-   (A4), repeated `game_id`, `name` over 128 octets (A5), a `source_key` failing
+-   §The serving face step 1's rule (A3, A16), a `source_key` repeated within one
++   each of the following — wrong `version`, negative `revision`, grammar-invalid
++   `game_id` (A4), repeated `game_id`, `name` over 128 octets (A5), a `source_key`
++   failing §The serving face step 1's rule (A3, A16), a `source_key` repeated within one
+    record, malformed record, document over `MAX_CATALOG_DOCUMENT_OCTETS` —
+-   ships in `fixtures/invalid/*.json` and is a named refusal; nothing on disk is
++   ships in `fixtures/invalid/*.json` as a named refusal; nothing on disk is
+    rewritten.
+ 2. **Corpus join:** `candidates(slug)` probes the load-built index and returns
+    the games whose `source_keys` contain the decoded slug, postings already
+@@ -511,12 +512,12 @@ Unit (in `apps/registry` unless noted):
+    configured token is required on every admin request including loopback;
+    non-loopback+no-token disables (admin ⇒ `404`); constant-time token compare;
+    wrong/missing ⇒ `401` with `WWW-Authenticate` and no echo of the configured
+-    token; `405` carries `Allow`.
++   token; `405` carries `Allow`.
+ 10. **Admin mutations (`026-C4`):** upsert validates + bumps `revision` + atomic
+     rename, and an upsert whose serialized corpus with its bumped `revision`
+-    would pass `MAX_CATALOG_DOCUMENT_OCTETS` is that named `422` with model,
+-    `revision` and file untouched and no tmp written; delete decodes+validates + bumps
+-    `revision` + atomic rename; `405` on a method a route lacks; `stats` is the
++    would exceed `MAX_CATALOG_DOCUMENT_OCTETS` is that named `422` with model,
++    `revision` and file untouched and no tmp written; delete decodes + validates +
++    bumps `revision` + atomic rename; `405` on a method a route lacks; `stats` is the
+     three-field integer shape `{games, source_keys, revision}` from the instance
+     document.
+ 11. **Atomic persist + concurrency:** a second save over a stale tmp fails loudly
+@@ -529,21 +530,21 @@ Unit (in `apps/registry` unless noted):
+     line.
+ 12. **Health (`026-C2`):** always `200`; reports `mode`/`upstream`/counts; the
+     `upstream` verdict is read from the last-known cached value and a health read
+-     never fires the TTL probe; a freshly started caching instance answers
+-     `upstream: down`, `last_upstream_fetch: 0`.
++    never fires the TTL probe; a freshly started caching instance answers
++    `upstream: down`, `last_upstream_fetch: 0`.
+ 13. **Data-dir / cache path (`026-C7`, A6):** both Unix and Windows branches
+     through the `StoreLayout` env-closure seam (XDG/HOME vs `%APPDATA%`),
+     relative = unset; this seam is how caching tests relocate the local-entries
+-     document — the subprocess cases (#17) set `XDG_DATA_HOME`/`APPDATA` in the
+-     child environment, since there is no path knob.
++    document — the subprocess cases (#17) set `XDG_DATA_HOME`/`APPDATA` in the
++    child environment, since there is no path knob.
+ 14. **`--upstream` endpoint gate:** literal `http://` + parseable host/port
+     admitted (any host); `https`/`ftp`/`@`/empty/non-numeric refused (A11).
+ 15. **CLI amendment (`apps/discovery-cli`, `026-L1`):** remote-host admission is
+     pinned at `parse_endpoint` in the unit suite only; `probe()`'s admission
+     is pinned against the loopback fake and still refuses before plugin
+-     construction; the subprocess suite re-pins only the refused spellings
++    construction; the subprocess suite re-pins only the refused spellings
+     (`https`/`ftp`/`@`/empty/non-numeric port) and the new refusal line; **no
+-     test dials or resolves a non-loopback host** — the loopback fake stays
++    test dials or resolves a non-loopback host** — the loopback fake stays
+     the only server (A11, A15).
+ 
+ Integration (subprocess / over a loopback socket):
+@@ -551,7 +552,7 @@ Integration (subprocess / over a loopback socket):
+ 16. **Root end-to-end:** `registry serve --root --corpus <seed>` bound to an
+     ephemeral `127.0.0.1` port; `discovery list --catalog-url http://127.0.0.1:<port>`
+     resolves a `steam/<appid>` to a curated id, and an absent slug answers `200`
+-     with `[]`; response shape pinned byte-exact
++    with `[]`; response shape pinned byte-exact
+     to A1 (single decimal `Content-Length`, no `Transfer-Encoding`, caps);
+     `GET /v1/health` shape.
+ 17. **Caching end-to-end:** a root and a caching registry chained via `--upstream`
+@@ -571,7 +572,7 @@ Platform:
+ 
+ ## Rollout
+ 
+-This run ships the contract and the ledger annotations only; the service is
++This run ships the contract and the ledger annotations only; the service lands as
+ tasks. Steps from merged branch to shipped feature:
+ 
+ 1. Merge the contract artifacts this proposal fixes: `schemas/catalog/v1/`
+@@ -590,16 +591,15 @@ tasks. Steps from merged branch to shipped feature:
+    `query` subcommand; prefetch stays `026-R3`.
+ 5. `T-008` lands the CLI amendment (`026-L1`/`026-L2`): `parse_endpoint` admits
+    any host, `probe()` keeps the fail-closed pre-plugin connect, the suites split
+-    and the refusal line re-pin per §CLI amendment. **Until `T-008` merges the
+-    CLI still refuses
+-   non-loopback endpoints while `026-L1` states it must not** — an accepted,
+-   documented contract-ahead-of-code divergence window that the ADR itself
+-   acknowledges by shipping no product code.
++   and the refusal line re-pin per §CLI amendment. **Until `T-008` merges the CLI
++   still refuses non-loopback endpoints while `026-L1` states it must not** — an
++   accepted, documented contract-ahead-of-code divergence window that the ADR
++   itself acknowledges by shipping no product code.
+ 6. Ledger annotations (ADR Rollout item 6): `025-C4` and `025-L1` gain their
+    `amended-by 026-L1` lines per `021-L4`; `025-R1` records this ADR as filling
+    its catalog half with the profile half reserved forward to `026-R2` (ADR-027);
+-    `026-S1` gains an `amended-by`/partially-satisfied line recording that the
+-    seed mints grammar-valid ids while `data/manifests/` is empty (`021-L4`).
++   `026-S1` gains an `amended-by`/partially-satisfied line recording that the
++   seed mints grammar-valid ids while `data/manifests/` is empty (`021-L4`).
+ 7. The deferral is recorded (ADR Rollout item 7): the binary, schema and CLI
+    amendment ship as `T-004`…`T-008`; the transport assurance stays `026-R1`.
+ 

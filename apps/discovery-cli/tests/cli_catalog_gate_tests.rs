@@ -6,11 +6,18 @@
 //! no listener behind `--catalog-url` gives exit non-zero, one named stderr line,
 //! and stdout carries neither the table header nor any fixture row, which is what
 //! proves "before enumerating"), #9 (`candidates_url` and endpoint policy — the
-//! accepted loopback spelling and the named `TransportUnavailable` refusals of
-//! `https`, non-loopback, and the malformed authorities; the same refusal with the
-//! flag and env both unset), and #10 (the response parse — every hostile response
-//! raises `Unreachable` as the named refusal, and a hostile `game_id` in a `200`
-//! body is dropped with one echoed, escaped line while the survivors keep order).
+//! accepted loopback spelling and the named `TransportUnavailable` refusals of the
+//! malformed authorities; the same refusal with the flag and env both unset), and
+//! #10 (the response parse — every hostile response raises `Unreachable` as the
+//! named refusal, and a hostile `game_id` in a `200` body is dropped with one
+//! echoed, escaped line while the survivors keep order).
+//!
+//! And design 026's Test strategy #15 (the `026-L1` amendment to this same gate):
+//! `endpoint_policy_refuses_everything_beyond_a_configured_http_endpoint` keeps only
+//! the spellings the amended gate still refuses — `https`/`ftp`/`@`/empty/
+//! non-numeric port — with the refusal line re-pinned off the loopback wording (A12).
+//! Remote-host admission itself is pinned at `parse_endpoint` in the unit suite
+//! (design 026 §CLI amendment), never here.
 //!
 //! Integration (CLI, subprocess) per repo practice: every run gets a temp
 //! `XDG_DATA_HOME` and `HOME` (the store sandbox is owned by
@@ -102,32 +109,41 @@ fn the_gate_refuses_before_enumerating() {
     );
 }
 
-/// proves: design 025's Test strategy #9 (Chosen design: Catalog client and gate —
-/// the endpoint policy "admits exactly" a literal `http://`, a loopback authority,
-/// and a digits-only port) — `https`, a non-loopback host, an `@`-bearing authority,
-/// a non-dotted IP spelling, an empty host, and a non-numeric port each raise the
-/// named `TransportUnavailable` refusal naming the flag, the env var, and ADR-026,
-/// and nothing is enumerated.
+/// proves: design 026's Test strategy #15 — "the subprocess suite re-pins only the
+/// refused spellings (`https`/`ftp`/`@`/empty/non-numeric port) and the new refusal
+/// line" — with §CLI amendment's rule behind it: `parse_endpoint` "keeps the
+/// literal-`http://` requirement and the digits-only port but drops the
+/// `LOOPBACK_HOSTS` host check and the constant with it".
+///
+/// So this list is exactly what survives the amendment, and nothing else: the two
+/// spellings that only the host allowlist refused (`http://catalog.example`, and the
+/// non-dotted `http://0177.0.0.1/`) are **gone**, because after `026-L1` they are
+/// admitted endpoints whose admission design 026 pins at `parse_endpoint` in the unit
+/// suite and nowhere near a socket (A11, A15: "no test dials or resolves a
+/// non-loopback host"). The line each refusal prints is re-pinned too (A12): the
+/// `loopback` wording is dropped and the admitted spelling — a configured `http://`
+/// endpoint, any host — takes its place, naming `--catalog-url` and
+/// `BINDFORGE_CATALOG_URL`.
 #[test]
-fn endpoint_policy_refuses_everything_beyond_the_loopback_spelling() {
+fn endpoint_policy_refuses_everything_beyond_a_configured_http_endpoint() {
     let root = one_game_root("gate-policy");
     let data = sandbox("gate-policy");
     let bad_endpoints = [
-        "https://127.0.0.1:8080/",
-        "http://catalog.example",
-        "http://catalog.example:8080/v1",
-        "http://127.0.0.1:8080@host.example/",
-        "http://0177.0.0.1/",
-        "http://:8080/",
-        "http://127.0.0.1:99x/",
-        "ftp://127.0.0.1/",
-        "127.0.0.1:8080",
+        ("https-scheme", "https://127.0.0.1:8080/"),
+        (
+            "userinfo-in-the-authority",
+            "http://127.0.0.1:8080@host.example/",
+        ),
+        ("empty-host", "http://:8080/"),
+        ("non-numeric-port", "http://127.0.0.1:99x/"),
+        ("ftp-scheme", "ftp://127.0.0.1/"),
+        ("no-scheme-at-all", "127.0.0.1:8080"),
     ];
-    for endpoint in bad_endpoints {
+    for (label, endpoint) in bad_endpoints {
         let run = run(&root, &[], &data, endpoint, "");
         assert!(
             !run.success(),
-            "`{endpoint}` is outside the endpoint policy and must fail the run, \
+            "`{label}` (`{endpoint}`) is outside the endpoint policy and must fail the run, \
              stderr: {}",
             run.stderr
         );
@@ -135,29 +151,77 @@ fn endpoint_policy_refuses_everything_beyond_the_loopback_spelling() {
         assert_eq!(
             lines.len(),
             1,
-            "the endpoint refusal is exactly one named line for `{endpoint}`: {:?}",
+            "the endpoint refusal is exactly one named line for `{label}`: {:?}",
             run.stderr
         );
         assert!(
             lines[0].starts_with("error: catalog transport unavailable:"),
             "the endpoint policy speaks `error: catalog transport unavailable: <reason>` \
-             for `{endpoint}`, got: {:?}",
+             for `{label}`, got: {:?}",
             lines[0]
         );
         assert!(
-            lines[0].contains("--catalog-url")
-                && lines[0].contains("BINDFORGE_CATALOG_URL")
-                && lines[0].contains("ADR-026"),
-            "the refusal names the flag, the env var, and ADR-026 as the owner of the \
-             real transport, for `{endpoint}`: {:?}",
+            lines[0].contains("--catalog-url") && lines[0].contains("BINDFORGE_CATALOG_URL"),
+            "the refusal names both config sources for `{label}`: {:?}",
+            lines[0]
+        );
+        assert!(
+            lines[0].contains("http://"),
+            "the refusal now points at the spelling it actually admits — a configured \
+             `http://` endpoint, any host — for `{label}`: {:?}",
+            lines[0]
+        );
+        assert!(
+            !lines[0].contains("loopback"),
+            "A12: the `loopback` wording is gone from the refusal line, and the host \
+             allowlist with it (`026-L1`), but `{label}` still said: {:?}",
             lines[0]
         );
         assert!(
             run.stdout.is_empty(),
-            "`{endpoint}` must fail before enumeration: {:?}",
+            "`{label}` must fail before enumeration: {:?}",
             run.stdout
         );
     }
+
+    // The fourth refused spelling needs the flag present with no value at all, which
+    // the `run` helper cannot express (it omits an empty URL rather than passing it).
+    let xdg = data.path().to_str().expect("utf-8 temp path").to_string();
+    let empty_flag = run_cli(
+        &[
+            "list",
+            "--steam-root",
+            root.path().to_str().expect("utf-8"),
+            "--catalog-url",
+            "",
+        ],
+        &[("XDG_DATA_HOME", xdg.as_str()), ("HOME", xdg.as_str())],
+        "",
+    );
+    assert!(
+        !empty_flag.success(),
+        "an empty `--catalog-url` is a refused endpoint, not an unconfigured one: {}",
+        empty_flag.stderr
+    );
+    let lines = empty_flag.stderr_lines();
+    assert_eq!(
+        lines.len(),
+        1,
+        "the empty endpoint is one named line: {:?}",
+        empty_flag.stderr
+    );
+    assert!(
+        lines[0].starts_with("error: catalog transport unavailable:")
+            && lines[0].contains("http://")
+            && !lines[0].contains("loopback"),
+        "the empty endpoint speaks the re-pinned refusal line, got: {:?}",
+        lines[0]
+    );
+    assert!(
+        empty_flag.stdout.is_empty(),
+        "and nothing is enumerated: {:?}",
+        empty_flag.stdout
+    );
 }
 
 /// proves: design 025's Test strategy #9 (Chosen design: "`HttpCatalog` is built
@@ -202,8 +266,10 @@ fn the_catalog_endpoint_comes_from_the_flag_or_the_env_var_and_from_nothing_else
         lines[0].starts_with("error: catalog transport unavailable:")
             && lines[0].contains("--catalog-url")
             && lines[0].contains("BINDFORGE_CATALOG_URL")
-            && lines[0].contains("ADR-026"),
-        "an unset flag and env raise the same name, naming both sources and ADR-026: \
+            && lines[0].contains("http://")
+            && !lines[0].contains("loopback"),
+        "an unset flag and env raise the same name, and after `026-L1` it points at a \
+         configured `http://` endpoint of any host rather than at a loopback spelling: \
          {:?}",
         lines[0]
     );

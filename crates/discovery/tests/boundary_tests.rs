@@ -101,16 +101,33 @@ fn every_fixture_emitted_slug_is_inside_the_discovery_bound() {
     }
 }
 
+/// `catalog` is the one tree in the contract corpus where a `<source>/<external-id>`
+/// lookup key is legal content (design 026: Catalog document and its spec,
+/// §The seed corpus): `026-C3` documents are built out of source keys, so
+/// `data/catalog/` (the `026-S1` seed) and `schemas/catalog/` (the format's own
+/// fixtures) are the only sweep skips below. Every other tree stays under the
+/// hygiene gate.
+const SOURCE_KEY_TREE: &str = "catalog";
+
 /// proves: design 025's Test strategy #16 (Chosen design: Corpus boundary — the
 /// corpus sweep) — no file under `data/` or `schemas/*/v*/fixtures/valid/` contains
 /// the `steam/`, `epic/`, or `local/` spelling: Rollout 4's "no source key or
 /// friendly name reaches a manifest, a profile, or a path" pinned literally against
-/// the shipped corpus (A20 re-asserted as a gate, not an observation).
+/// the shipped corpus (A20 re-asserted as a gate, not an observation). Both roots
+/// stay in the sweep (design 026: the rejected "just don't put it in `schemas/`"
+/// dodge); only files under `data/catalog/` and `schemas/catalog/` are skipped —
+/// `026-S1` mandates source keys as content there (`SOURCE_KEY_TREE` names the
+/// tree) — and the `checked > 0` guard is unchanged.
 #[test]
 fn the_shipped_corpus_carries_no_source_key_spelling() {
     let root = repo_root();
     let mut checked = 0usize;
     let mut violations: Vec<String> = Vec::new();
+
+    let skipped = [
+        root.join("data").join(SOURCE_KEY_TREE),
+        root.join("schemas").join(SOURCE_KEY_TREE),
+    ];
 
     let mut dirs: Vec<PathBuf> = vec![root.join("data")];
     let schemas = root.join("schemas");
@@ -131,6 +148,9 @@ fn the_shipped_corpus_carries_no_source_key_spelling() {
 
     for dir in dirs {
         for path in walk_files(&dir) {
+            if skipped.iter().any(|skip| path.starts_with(skip)) {
+                continue;
+            }
             checked += 1;
             let text = std::fs::read_to_string(&path).unwrap_or_else(|err| {
                 panic!("reading {}: {err}", path.display());

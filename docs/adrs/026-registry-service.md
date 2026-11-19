@@ -1,6 +1,6 @@
 ---
 doc_type: adr
-status: proposed
+status: accepted
 date: 2026-11-19
 depends-on: [013, 022, 025]
 ledger: yes
@@ -11,16 +11,21 @@ ledger: yes
 This ADR fills the slot `025-R1` reserved: the catalog service itself — its
 REST surface, its data, and the curation intake — is decided here for the
 catalog half; its profile upload/download/sharing half is not, and is
-reserved forward (`026-R2`). It amends the endpoint-policy half of `025-C4`
-and the loopback-resolution half of `025-L1` — both gain their `amended-by`
-per `021-L4` (Rollout, item 6) — while the wire contract `025-C4` pinned
-(the request target, the response shape, the response budgets) and the
-connectivity gate itself stand untouched. ADR-025 shipped the client and
-stated, as its Rollout item 6, that the run ships no catalog server; the
-CLI's refusal line names this ADR as the owner of that transport. This run
-discharges the symmetric half: it ships the contract and the ledger
-annotations, and no product code — the service lands as tasks, per the
-ADR-023 decoupling of intent from implementation.
+reserved forward (`026-R2`). It amends the provisional endpoint admission
+stated at the design targets of `025-C4` and `025-L1` — the loopback-only
+rule, marked there as this ADR's to replace — and both units gain their
+`amended-by` per `021-L4` (Rollout, item 6), while the wire contract
+`025-C4` pinned (the request target, the response shape, the response
+budgets) and the connectivity gate itself stand untouched. ADR-025 shipped
+the client and stated, as its Rollout item 6, that the run ships no catalog
+server; the CLI's refusal line names this ADR as the owner of that
+transport. This run discharges that reservation: it ships the contract, the
+ledger annotations, and — a recorded over-delivery the operator has
+accepted, Rollout item 7 — the service itself: the registry application,
+the catalog contract and seed, and the CLI amendment. The task-level split
+planned at authoring time (`T-004`…`T-008`, per the ADR-023 decoupling of
+intent from implementation) was never exercised; those task sources retire
+against this branch.
 
 **Terminology.** The *catalog* is the data: the curated set of games and
 their source-key join facts. The *registry* is the service that serves a
@@ -218,10 +223,11 @@ Rollout:
 
 1. The catalog document lands: `schemas/catalog/v1/` (format spec and
    fixtures, valid and invalid), the seed corpus at
-   `data/catalog/v1/catalog.json`, and the validating loader. This work and
-   items 2–5 are implementation units beneath this ADR and ship as tasks
-   `T-004` (this item), `T-005` (items 2), `T-006` (item 3), `T-007`
-   (item 4), `T-008` (item 5), per ADR-023. `026-C3 026-S1`
+   `data/catalog/v1/catalog.json`, and the validating loader. Items 1–5
+   were planned at authoring time as implementation tasks beneath this ADR
+   (`T-004`…`T-008`, per ADR-023); item 7 records that this run's build
+   landed them all on this branch and the task sources retire.
+   `026-C3 026-S1`
 2. The root's serving face lands in `apps/registry`: `serve --root` answers
    `/v1/candidates` as the join over the loaded corpus, `/v1/health`, and
    the named `404`s, under the no-bulk and corpus-boundary laws.
@@ -242,10 +248,14 @@ Rollout:
    `amended-by` lines naming `026-L1` per `021-L4`, and `025-R1` records
    this ADR as filling its slot with the profile half reserved forward to
    `026-R2`. `026-L1 026-R2`
-7. The deferral is recorded: this run ships the contract and the two
-   annotation edits and no product code — the registry binary, schema, and
-   CLI amendment ship as the tasks item 1 names, and the transport
-   assurance stays reserved. `026-R1`
+7. The over-delivery is recorded: the Rollout planned at authoring time
+   shipped the contract and these annotations with no product code, the
+   run's build instead landed the registry application, the catalog
+   contract and seed, and the CLI amendment of items 1–5 on this branch;
+   the operator has accepted the green, reviewed implementation as this
+   ADR's reference implementation and retired the five task sources rather
+   than delete working code to match a plan; the transport assurance stays
+   reserved. `026-R1`
 
 ## Alternatives considered
 

@@ -1,7 +1,8 @@
 //! `discovery list` — the discovery CLI of ADR-025's shape.
 //!
 //! The scan flow is design 025's fixed order: the catalog gate first (a probe
-//! of the loopback endpoint before any plugin is constructed, `025-L1`), then
+//! of the configured endpoint before any plugin is constructed, `025-L1` with
+//! `026-L1`'s amended host rule), then
 //! the per-user match store load, then enumeration through the crate's
 //! plugins, then the `025-B1` bound-only emit boundary, then one candidate
 //! query per distinct unresolved slug (`025-L4`), then — in table mode only —
@@ -38,8 +39,10 @@ struct Cli {
     /// Accepted before or after the `list` subcommand. Never prompts.
     #[arg(long, global = true)]
     json: bool,
-    /// The catalog endpoint: a loopback `http://` URL only (`127.0.0.1`,
-    /// `[::1]`, `localhost`). Falls back to `BINDFORGE_CATALOG_URL`.
+    /// The catalog endpoint: a literal `http://` URL, any host (`026-L1`
+    /// retires the loopback-only allowlist, so a remote registry is admitted and
+    /// every queried source key is sent to it in clear text). Falls back to
+    /// `BINDFORGE_CATALOG_URL`.
     #[arg(long = "catalog-url", global = true)]
     catalog_url: Option<String>,
     #[command(subcommand)]

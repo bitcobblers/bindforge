@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "revision": 1,
+  "games": [
+    {
+      "game_id": "counter-strike-2",
+      "name": "Counter-Strike 2",
+      "source_keys": ["steam/730"]
+    },
+    {
+      "game_id": "dota-2",
+      "name": "Dota 2",
+      "source_keys": ["steam/570"]
+    },
+    {
+      "game_id": "half-life-2",
+      "name": "Half-Life 2",
+      "source_keys": ["steam/220"]
+    },
+    {
+      "game_id": "left-4-dead-2",
+      "name": "Left 4 Dead 2",
+      "source_keys": ["steam/550", "epic/45435c81e1f04279a739ec1ce3a1e96c"]
+    },
+    {
+      "game_id": "portal",
+      "name": "Portal",
+      "source_keys": ["steam/400"]
+    },
+    {
+      "game_id": "portal-two",
+      "name": "Portal 2",
+      "source_keys": ["steam/620"]
+    }
+  ]
+}

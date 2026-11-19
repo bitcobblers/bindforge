@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "revision": 0,
+  "games": [
+    {
+      "game_id": "example-game",
+      "name": "Example Game",
+      "source_keys": ["steam/900001"],
+      "gameId": "a-camel-case-typo"
+    }
+  ]
+}

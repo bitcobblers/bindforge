@@ -68,6 +68,25 @@ legal TOML and outside the v1 grammar, and each has an invalid fixture. The
 subset is stated here, in the contract, because a narrowing that only lives
 in one implementation is not a contract.
 
+**One format is JSON, and it is named here so the sentence above is not a
+lie about it.** `catalog` (ADR-026, `026-C3`) is the JSON format: ADR-026 fixes
+the on-disk spellings as JSON — `data/catalog/v1/catalog.json` for the seed
+corpus, `<data>/bindforge/registry/catalog-v1.json` for a caching instance's
+local entries, and the bare-integer `version: 1` form no TOML format shares —
+so its fixtures are `.json`, its `spec.md` states a JSON shape rather than a
+TOML subset, and its conformance is exercised by its own loader in
+`apps/registry` (`corpus.rs`), not by core's TOML `parse`/`rejection` sweep.
+The harness's `schemas/*/v*/` walk still picks the directory up for the fixture
+naming and zero-fixture rules; it skips only the TOML parse path there. The
+contract's other JSON documents — the match store `matches.json`, the per-slug
+candidate response body, and the `026-C7` cache document
+`<data>/bindforge/registry/cache-v1.json` — join it outside the TOML subset,
+with the same "the loader that owns the document states its refusals" posture.
+`catalog` is also the one tree where a discovery lookup key (`steam/…`,
+`epic/…`, `local/…`) is legal *content*: it is what the format stores, so the
+hygiene sweep that keeps such spellings out of the shipped corpus skips
+`data/catalog/` and `schemas/catalog/` and nothing else.
+
 The fixtures are the conformance currency — following the JSON Schema Test
 Suite model, every implementer runs the same golden fixtures — and no
 machine-checkable schema language is committed.

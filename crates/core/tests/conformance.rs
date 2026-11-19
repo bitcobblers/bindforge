@@ -44,6 +44,15 @@
 //! the contract tree is reached through `env!("CARGO_MANIFEST_DIR")`, so the
 //! cargo gate needs no cwd convention, no network and no database (A8, A26).
 //!
+//! proves: design 026's Catalog-document carve-out (Chosen design: "Catalog
+//! document as a JSON format, carved out of the TOML conformance walk") — the
+//! `catalog` JSON format joins the walk, but its fixtures are not parsed
+//! through core's TOML path: the parse/re-serialization loop and both
+//! invalid-fixture message loops skip it (its conformance is exercised by its
+//! own loader, `apps/registry/tests/catalog_document.rs`). The zero-fixture
+//! rule and the fixture-name rule stay ungoverned by that skip: they count and
+//! name files, not parses, and cover `catalog`'s `.json` fixtures too.
+//!
 //! # Corpus obligations Rollout 3 must satisfy
 //!
 //! Every suite in this directory reads the contract tree, so the scaffold
@@ -59,9 +68,9 @@ use std::fs;
 
 use bindforge_core::Hand;
 use common::{
-    ScratchDir, fixture_text, fixtures, format_dirs, format_dirs_under, is_fixture_name,
-    quoted_array, rejection, schemas_root, string_array, string_entry, version_dir,
-    zero_fixture_violation,
+    ScratchDir, fixture_text, fixtures, format_dirs, format_dirs_under, is_core_toml_format,
+    is_fixture_name, quoted_array, rejection, schemas_root, string_array, string_entry,
+    version_dir, zero_fixture_violation,
 };
 
 /// proves: Test strategy #1 — every valid fixture parses, is accepted by the
@@ -69,6 +78,9 @@ use common::{
 #[test]
 fn every_valid_fixture_re_serializes_to_a_semantically_equal_value() {
     for dir in &format_dirs() {
+        if !is_core_toml_format(&dir.format) {
+            continue; // design 026: the JSON format's fixtures are not TOML.
+        }
         for path in fixtures(dir, "valid") {
             let label = path.display().to_string();
             let text =
@@ -197,6 +209,9 @@ fn load_corpus_table(label: &str, text: &str, major: &str) {
 #[test]
 fn every_invalid_fixture_is_rejected_with_a_structured_error() {
     for dir in &format_dirs() {
+        if !is_core_toml_format(&dir.format) {
+            continue; // design 026: refusals here are core-TOML refusals.
+        }
         for path in fixtures(dir, "invalid") {
             let label = path.display().to_string();
             let text =
@@ -282,6 +297,9 @@ fn the_zero_fixture_rule_fires_on_an_empty_fixture_directory() {
 #[test]
 fn every_invalid_fixture_is_rejected_with_a_single_line_message() {
     for dir in &format_dirs() {
+        if !is_core_toml_format(&dir.format) {
+            continue; // design 026: the message contract is core TOML's.
+        }
         for path in fixtures(dir, "invalid") {
             let label = path.display().to_string();
             let text =
@@ -332,7 +350,11 @@ fn a_rejection_truncates_an_untrusted_value_rather_than_echoing_it() {
 /// proves: Formats contract → versioning rule — fixture file names are
 /// lowercase ASCII, `-`-separated, and case-unique within a fixture
 /// directory, which is what keeps the same corpus green on a contributor's
-/// case-insensitive Windows filesystem as on the Linux CI runner.
+/// case-insensitive Windows filesystem as on the Linux CI runner. Deliberately
+/// **not** governed by the design 026 core-TOML guard: through the
+/// directory-aware `is_fixture_name` it keeps its rule over the `catalog`
+/// JSON format's `.json` fixtures — the only coverage behind that design's
+/// case-unique-fixture-name claim on a case-insensitive filesystem.
 #[test]
 fn fixture_file_names_are_lowercase_ascii_dash_separated_and_case_unique() {
     for dir in &format_dirs() {
@@ -345,7 +367,7 @@ fn fixture_file_names_are_lowercase_ascii_dash_separated_and_case_unique() {
                     .and_then(|name| name.to_str())
                     .unwrap_or_else(|| panic!("{} has no usable file name", path.display()));
                 assert!(
-                    is_fixture_name(name),
+                    is_fixture_name(name, &dir.format),
                     "{} is not a valid fixture name: use lowercase ASCII words separated by `-`",
                     path.display()
                 );

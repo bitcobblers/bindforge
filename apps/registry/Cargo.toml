@@ -1,0 +1,24 @@
+[package]
+name = "bindforge-registry"
+version = "0.1.0"
+edition = "2024"
+
+# One binary, `registry` (`026-C1`): `serve` and `query` over one set of handlers.
+# `std`-only for the serving face — `std::net` framing, no HTTP or TLS runtime —
+# with `serde_json` for bodies, the shipped client's own JSON dependency.
+[dependencies]
+# The grammar and name bounds the key rule and the ingest rule read (A4, A5).
+bindforge-core = { workspace = true }
+# `Source::spells_lookup_key` alone: the same closed source-token set the shipped
+# client reaches, never a re-spelled one (A16).
+discovery = { path = "../../crates/discovery" }
+serde_json = "1.0"
+
+# The suites speak raw HTTP/1.1 over a loopback socket and read the two documents
+# as JSON; integration tests see only dev-dependencies.
+[dev-dependencies]
+serde_json = "1.0"
+
+[[bin]]
+name = "registry"
+path = "src/main.rs"

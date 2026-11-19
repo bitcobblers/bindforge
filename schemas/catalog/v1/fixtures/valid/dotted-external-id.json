@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "revision": 0,
+  "games": [
+    {
+      "game_id": "local-directory-game",
+      "name": "A game installed into a dotted directory",
+      "source_keys": ["local/Steam.SE", "local/My Game (2024)"]
+    }
+  ]
+}

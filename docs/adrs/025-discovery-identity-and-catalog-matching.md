@@ -99,6 +99,9 @@ other format's use of the word changes here.
   already resolve (`025-L4`) and puts the candidates to the user; in
   JSON-output mode it emits the candidates instead of prompting. The
   server-side contract is `025-R1`. → Rollout, item 3.
+  amended-by 026-L1 (ADR-026, per 021-L4): the provisional loopback-only
+  endpoint admission stated at this unit's design target — marked there as
+  ADR-026's — retires; the lookup contract itself stands.
 
 ### Laws
 
@@ -109,6 +112,9 @@ other format's use of the word changes here.
   network. (This overrides ADR-022's rejection of remote-service
   coupling for discovery; enumeration itself stays local.) → Rollout,
   item 3.
+  amended-by 026-L1 (ADR-026, per 021-L4): the probe's
+  refuse-non-loopback-resolution leg stated at this unit's design target
+  retires; the fail-closed gate itself stands.
 - **025-L2** No silent match: a `game_id` attaches to a discovered row
   only from a stored confirmed match or from a candidate the user chose;
   name similarity, duplicate names across sources, or a lone high-scoring
@@ -145,6 +151,10 @@ other format's use of the word changes here.
   surface, the curation intake by which new source-id↔game-id facts
   enter the catalog, auth, and profile upload/download/sharing.
   Owner: ADR-026 (reserved). → ADR-026.
+  filled by ADR-026 (registry-service): its root and caching registry
+  modes fill the hosting, candidate-surface, and curation-intake half;
+  auth beyond the single bearer token and profile
+  upload/download/sharing are reserved forward to ADR-027 (`026-R2`).
 - **025-R2** The Epic discovery backend behind the `epic` token,
   including verifying whether `CatalogItemId` alone is Epic-unique or
   needs its catalog namespace. Owner: `unassigned` — a rollout task, not

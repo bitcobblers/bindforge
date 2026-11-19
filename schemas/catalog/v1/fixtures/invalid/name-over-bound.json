@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "revision": 0,
+  "games": [
+    {
+      "game_id": "example-game",
+      "name": "name_name_name_name_name_name_name_name_name_name_name_name_name_name_name_name_name_name_name_name_name_name_name_name_name_name_name_name_name_x",
+      "source_keys": ["steam/900001"]
+    }
+  ]
+}

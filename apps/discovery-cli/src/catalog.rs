@@ -1,14 +1,22 @@
 //! The catalog client of design 025 / ADR-025: a deliberately small, std-only
-//! HTTP/1.1 loopback client plus the endpoint policy that gates it.
+//! HTTP/1.1 client plus the endpoint policy that gates it.
 //!
 //! The real transport is ADR-026's problem. This module exists so the matching
 //! flow can run *today* against a local catalog: it speaks one request shape
 //! (`GET <base>/v1/candidates?slug=<percent-encoded>`), understands exactly one
 //! response shape (`200`, no `Transfer-Encoding`, one small `Content-Length`),
-//! and refuses everything else by name. The endpoint policy admits exactly the
-//! `http://` loopback spelling, and [`HttpCatalog::probe`] resolves the host and
-//! refuses unless every address is loopback, so the client cannot be pointed at
-//! the wider network by flag or env var (`025-L1`).
+//! and refuses everything else by name. Since `026-L1` the endpoint policy
+//! admits any host+port behind the literal `http://` scheme, and
+//! [`HttpCatalog::probe`] still resolves the host and refuses an empty address
+//! set or an unreachable one before any plugin is constructed (`025-L1`), so the
+//! fail-closed gate survives with its loopback half amended.
+//!
+//! **`026-L2` disclosure:** with the host allowlist retired, the endpoint a
+//! operator configures may be a remote registry, and a scan sends every queried
+//! source key to it in clear text over plain HTTP with no transport assurance
+//! (`026-R1`). The choice of endpoint *is* the consent, so `--catalog-url` is a
+//! value to point only at a registry the operator means to tell what is
+//! installed here.
 
 use crate::matches::game_id_is_valid;
 use bindforge_core::escape_and_truncate;
@@ -25,13 +33,15 @@ pub const MAX_RESPONSE_OCTETS: usize = 65_536;
 /// The most candidates one response may carry before the body is refused.
 pub const MAX_CANDIDATES: usize = 256;
 
-/// Socket timeouts: a hung loopback listener must not hang the scan.
+/// Socket timeouts: a hung catalog listener must not hang the scan.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
 const READ_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// The only host spellings the endpoint policy admits, as literals — no
-/// resolution-based trust, so `0177.0.0.1`-style spellings are refused.
-const LOOPBACK_HOSTS: [&str; 3] = ["127.0.0.1", "[::1]", "localhost"];
+/// The only scheme the endpoint policy admits, as a literal prefix — the
+/// `026-L1` amendment retired the loopback host allowlist (`LOOPBACK_HOSTS`)
+/// that `025-L1` shipped here, so any parseable host+port behind this scheme is
+/// admitted and the disclosure of §CLI amendment applies.
+const HTTP_SCHEME: &str = "http://";
 
 /// One catalog candidate: the curated id a confirmation stores, and the name
 /// the prompt shows. Serialized shape `{"game_id","name"}` (`025-C6`).
@@ -47,8 +57,9 @@ pub struct Candidate {
 /// answered with something undecodable).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CatalogError {
-    /// The endpoint itself is outside the policy: not the loopback `http://`
-    /// spelling, a non-loopback resolution, or no endpoint at all.
+    /// The endpoint itself is outside the policy: not the `http://` spelling, no
+    /// parseable host+port, an address set that resolves to nothing, or no
+    /// endpoint configured at all.
     TransportUnavailable(String),
     /// The endpoint was accepted but the request or response failed.
     Unreachable(String),
@@ -64,14 +75,15 @@ impl CatalogError {
     }
 
     /// The single stderr line this failure is reported as (the `error: ` prefix
-    /// is the caller's). The transport-unavailable line names the flag, the
-    /// env var, and ADR-026 as the owner of the real transport.
+    /// is the caller's). Since `026-L1` the line names the flag, the env var, and
+    /// the spelling it actually admits — a configured `http://` endpoint, any
+    /// host — with no loopback wording left (A12).
     pub fn line(&self) -> String {
         match self {
             Self::TransportUnavailable(reason) => format!(
                 "catalog transport unavailable: {reason}; pass --catalog-url or set \
-                 BINDFORGE_CATALOG_URL with a loopback http:// endpoint — ADR-026 owns \
-                 the real transport"
+                 BINDFORGE_CATALOG_URL with the configured http:// endpoint to use, any \
+                 host — ADR-026 owns the real transport"
             ),
             Self::Unreachable(reason) => format!("catalog unreachable: {reason}"),
         }
@@ -105,13 +117,15 @@ fn split_authority(authority: &str) -> Option<(&str, Option<&str>)> {
     }
 }
 
-/// The endpoint policy (`025-C4`): admits exactly a literal `http://` scheme, a
-/// loopback host spelling, and a digits-only port; everything else — `https`,
-/// another scheme, any non-loopback authority, an `@`-bearing authority, an
-/// empty host, a non-numeric port — is the named `TransportUnavailable`.
-/// Returns the normalized `<scheme>://<host>:<port>` base without any path.
+/// The endpoint policy (`025-C4` as amended by `026-L1`): admits exactly a
+/// literal `http://` scheme, any parseable host, and a digits-only port;
+/// everything else — `https`, another scheme, an `@`-bearing authority, an empty
+/// host, a non-numeric port — is the named `TransportUnavailable`. The loopback
+/// host allowlist `025-L1` shipped here is retired: remote hosts are admitted,
+/// and the `026-L2` disclosure of §CLI amendment applies to whoever configures
+/// one. Returns the normalized `<scheme>://<host>:<port>` base without any path.
 pub fn parse_endpoint(url: &str) -> Result<String, CatalogError> {
-    let rest = url.strip_prefix("http://").ok_or_else(|| {
+    let rest = url.strip_prefix(HTTP_SCHEME).ok_or_else(|| {
         CatalogError::transport_unavailable(format!(
             "`{}` does not start with the literal `http://` scheme",
             escape_and_truncate(url)
@@ -138,14 +152,10 @@ pub fn parse_endpoint(url: &str) -> Result<String, CatalogError> {
             escape_and_truncate(authority)
         ))
     })?;
-    if !LOOPBACK_HOSTS
-        .iter()
-        .any(|allowed| host.eq_ignore_ascii_case(allowed))
-    {
-        return Err(CatalogError::transport_unavailable(format!(
-            "`{}` is not a loopback host — only `127.0.0.1`, `[::1]` and `localhost` are admitted",
-            escape_and_truncate(host)
-        )));
+    if host.is_empty() {
+        return Err(CatalogError::transport_unavailable(
+            "the authority has no host — a host is required before the port",
+        ));
     }
     let port = match port {
         None => 80,
@@ -202,8 +212,8 @@ pub trait CatalogClient {
     fn candidates(&self, slug: &str) -> Result<Vec<Candidate>, CatalogError>;
 }
 
-/// The std-only loopback client built from `--catalog-url` /
-/// `BINDFORGE_CATALOG_URL` (`025-C4`, `025-L1`).
+/// The std-only HTTP/1.1 client built from `--catalog-url` /
+/// `BINDFORGE_CATALOG_URL` (`025-C4`, `025-L1` as amended by `026-L1`).
 #[derive(Debug)]
 pub struct HttpCatalog {
     base: String,
@@ -227,10 +237,12 @@ impl HttpCatalog {
         (host, port.unwrap_or("80").parse().unwrap_or(80))
     }
 
-    /// The connectivity gate, run before any plugin is constructed (`025-C4`):
-    /// resolves the host and refuses unless *every* address is loopback, then
-    /// proves an answer with one connect. A failure is the named `Unreachable`
-    /// (or `TransportUnavailable` for a now-non-loopback resolution).
+    /// The connectivity gate, run before any plugin is constructed (`025-C4`,
+    /// with `026-L1`'s amended host rule): resolves the host, refuses an empty
+    /// address set, then proves an answer with one connect. The non-loopback
+    /// resolution refusal `025-L1` shipped here is retired — remote hosts are
+    /// admitted — but the gate itself still fails closed before any plugin
+    /// exists. A failure is the named `Unreachable`.
     pub fn probe(&self) -> Result<(), CatalogError> {
         let (host, port) = self.authority();
         let addrs: Vec<SocketAddr> = (host, port)
@@ -243,14 +255,6 @@ impl HttpCatalog {
             return Err(CatalogError::unreachable(format!(
                 "host `{host}` resolves to no address"
             )));
-        }
-        for addr in &addrs {
-            if !addr.ip().is_loopback() {
-                return Err(CatalogError::transport_unavailable(format!(
-                    "host `{host}` resolves to the non-loopback address {}",
-                    addr.ip()
-                )));
-            }
         }
         for addr in &addrs {
             match TcpStream::connect_timeout(addr, CONNECT_TIMEOUT) {
@@ -494,16 +498,43 @@ mod tests {
         );
     }
 
+    /// `026-L1`'s admitted half, pinned here and nowhere else: the loopback host
+    /// allowlist is retired, so any parseable host+port behind the literal
+    /// `http://` scheme is a valid endpoint — the spelling is the whole rule, and
+    /// no test in this suite dials or resolves any of these hosts (A15).
+    /// `026-L2`'s consent model travels with the admission: a scan sends every
+    /// queried source key to whichever endpoint is configured, and the choice of
+    /// endpoint *is* the consent, so a remote value is an operator decision, not
+    /// a policy the client enforces.
     #[test]
-    fn the_policy_refuses_everything_beyond_the_loopback_spelling() {
+    fn the_amended_policy_admits_every_parseable_http_host() {
+        for (url, base) in [
+            ("http://catalog.example", "http://catalog.example:80"),
+            ("http://0177.0.0.1/", "http://0177.0.0.1:80"),
+            (
+                "http://registry.internal:8787/v1",
+                "http://registry.internal:8787",
+            ),
+            ("http://10.0.0.1:8787", "http://10.0.0.1:8787"),
+            ("http://[2001:db8::1]:8080/", "http://[2001:db8::1]:8080"),
+        ] {
+            assert_eq!(
+                parse_endpoint(url).unwrap_or_else(|error| panic!("`{url}` is admitted: {error}")),
+                base,
+                "`{url}` normalizes to its host+port with no path"
+            );
+        }
+    }
+
+    #[test]
+    fn the_policy_refuses_everything_beyond_a_configured_http_endpoint() {
         for url in [
             "https://127.0.0.1:8080/",
             "ftp://127.0.0.1/",
             "127.0.0.1:8080",
-            "http://catalog.example",
-            "http://0177.0.0.1/",
             "http://:8080/",
             "http://127.0.0.1:8080@host.example/",
+            "http://user@host.example:8080/",
             "http://127.0.0.1:99x/",
             "http://127.0.0.1:",
             "http://127.0.0.1:70000/",
@@ -539,8 +570,11 @@ mod tests {
 
     #[test]
     fn a_client_built_from_a_bad_endpoint_refuses_before_any_socket() {
-        let error = HttpCatalog::new("http://example.com").expect_err("not loopback");
+        let error = HttpCatalog::new("https://localhost:8787/").expect_err("wrong scheme");
         assert!(matches!(error, CatalogError::TransportUnavailable(_)));
+        // The remote host `025-L1` refused here is a built client after `026-L1`:
+        // admission is the policy's whole answer, and only `probe()` dials.
+        HttpCatalog::new("http://catalog.example:8787").expect("a remote host is admitted");
     }
 
     #[test]

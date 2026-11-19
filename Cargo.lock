@@ -57,6 +57,15 @@ name = "bindforge-core"
 version = "0.1.0"
 
 [[package]]
+name = "bindforge-registry"
+version = "0.1.0"
+dependencies = [
+ "bindforge-core",
+ "discovery",
+ "serde_json",
+]
+
+[[package]]
 name = "bindforge-transforms"
 version = "0.1.0"
 dependencies = [

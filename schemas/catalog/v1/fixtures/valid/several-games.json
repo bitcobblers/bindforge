@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "revision": 4,
+  "games": [
+    {
+      "game_id": "alpha-game",
+      "name": "Alpha Game",
+      "source_keys": ["steam/730", "epic/alpha-game"]
+    },
+    {
+      "game_id": "beta-game",
+      "name": "Beta Game",
+      "source_keys": ["steam/570"]
+    },
+    {
+      "game_id": "gamma-game",
+      "name": "Gamma Game",
+      "source_keys": ["local/Steam.SE", "local/gamma install"]
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+# Security review r1c1 (dissent pass)
+
+verdict: approve
+
+Scope: `git diff 4a75e3d…9ff2ec7` of `02-proposal.md`, then the full current document. Inputs: the proposal, ADR-026, the Revision log, and this seat's round-1 findings. Check legs run against the code (`spells_lookup_key`, `is_slug_name`, `probe()`'s loopback predicate, the `boundary_tests` sweep, `serde_json` in `Cargo.lock`); no advisories exist for `serde_json` 1.0.154 (RustSec page 404; already a shipped-client dependency, no new dependencies named).
+
+## Closure check of this seat's r1 findings
+
+1. **[major, r1] — CLOSED.** §The serving face step 1 now names one registry key validator ("after the first `/`, exactly one non-empty `.`-free component, no embedded `/`"), states "Lookup keys are opaque in-memory strings, never joined onto paths", and pins it "at candidate queries, admin upserts, and cache loads alike"; the corpus refusal list (§Catalog document) and the cache load (§Budgets: "refuses a repeated `slug` and any `slug` failing §The serving face step 1's validator by name") both consume it; tests #3/#4 pin the dot/separator `404`. Verified `spells_lookup_key` is indeed shape-only (crates/discovery/src/game.rs), so the tightening is load-bearing, and `is_slug_name` (`[a-z][a-z0-9-]*`) confirms the cited precedent and keeps the decoded DELETE segment (`game_id`, A4 grammar) dot- and separator-free independently.
+2. **[minor, r1] — CLOSED.** `MAX_CONCURRENT_CONNECTIONS` (over-cap closed at accept) and request-read *and write* timeouts are named in `serve.rs`, §Budgets, the Risks row, and test #11.
+3. **[minor, r1] — CLOSED.** "The configured token never appears in a refusal line, log, or status surface" is added to §Admin face and auth, and test #9 pins "no echo of the configured token"; `401` still carries only `WWW-Authenticate: Bearer`.
+4. **[nit, r1] — CLOSED.** `MAX_CATALOG_DOCUMENT_OCTETS` (1 MiB) is "`fs::metadata`-gated before the read of the `--corpus` or local-entries file, refused by name, mirroring A22"; refusal and fixture pinned in #1.
+5. **[nit, r1] — CLOSED.** `http.rs` now admits "`Content-Length`-framed bodies" only and refuses `Transfer-Encoding`/non-decimal length before any mutation; test #11 pins it.
+
+## Findings
+
+- [nit][new] Test strategy #3 — "the cap and the key validator apply to **decoded** `slug` and decoded `DELETE` path segment" — the key validator requires `<source-token>/<component>`, so applied literally to a `DELETE` path segment it would `404` every valid `game_id`; §Admin face correctly pins the DELETE segment to the A4 slug grammar instead, and the security property (dot/separator rejection) survives via `is_slug_name`, but the test line as written pins the wrong predicate pair. Fix: in #3, pin `slug` against the key validator + `025-B1` cap, and the `DELETE` segment against the A4 grammar (which already excludes `.` and `/`).
+- [nit][new] Chosen design → `http.rs` — "a `Transfer-Encoding`, missing or non-decimal length, or an over-cap body is refused before any mutation" — read literally, "missing … length is refused" contradicts the A1-pinned client, whose `GET` carries no `Content-Length` (integration #16 would fail); the rule the hand-written reader needs is one clause longer: `Transfer-Encoding` ⇒ refusal; `Content-Length` present ⇒ read exactly that many octets within cap; absent ⇒ zero-length body admitted. Fix: state the zero-`Content-Length`-means-zero-body case explicitly so the framing refusal targets body claims, and request-side framing has exactly one reading at the smuggling seam.
+- [nit][new] Chosen design → Budgets — "`MAX_CATALOG_DOCUMENT_OCTETS` (1,048,576), `fs::metadata`-gated before the read" — the cache got a write-time dual-cap invariant, but the corpus cap is checked only at read, so an authenticated admin face can grow the corpus past 1 MiB and the next start refuses to load it (self-DoS; reachable at most by a token-holder, whose total-integrity damage is already the accepted `026-R1` risk, hence nit). Fix: one clause — an upsert whose record would push the document over `MAX_CATALOG_DOCUMENT_OCTETS` is refused by name at write, mirroring the cache's "provably inside both caps after every mutation".
+
+## FYI (no severity)
+
+- Correctness seat: the re-scoped `the_shipped_corpus_carries_no_source_key_spelling` sweep ("re-scope the sweep to `data/manifests` + `data/profiles`") drops the `schemas/*/v*/fixtures/valid/` leg the shipped test also walks (crates/discovery/tests/boundary_tests.rs); if the intent was only to exempt `catalog`, the fixtures leg should stay for the other formats.
+- Correctness seat: §Concurrency now runs the tmp-and-rename "under a separate persist-only lock" — the snapshot point (under the write lock vs. under the persist lock) is unstated, so concurrent mutations could persist out of order and lose an update; the A7 two-writer refusal doesn't cover two threads of one process.
