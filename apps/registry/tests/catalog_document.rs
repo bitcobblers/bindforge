@@ -15,6 +15,19 @@
 //! before it answers anything (`026-C1`, A22's metadata-gated load discipline).
 //! Every corpus lives in a temp directory that is removed on drop, and each
 //! refusal re-reads the file to prove it came back byte-for-byte.
+//!
+//! # What ADR-027 changed in this file
+//!
+//! The loader and its refusal list stand — Test strategy #7 reuses them verbatim for
+//! the issued document, which `issued_entries.rs` pins — so most legs are the shipped
+//! pins. Two carry the mode change. A run that is being asked to refuse a *document*
+//! has to be handed a resolvable `<data>` and a steam posture before that, because
+//! `027-C4` and `027-C3` made both startup requirements; the legs now pass a sandboxed
+//! `<data>` that is deliberately not the one they count files under, so the one line
+//! the run prints is the document's refusal and the counted directory stays a
+//! witness. And the document-name leg spells the documents hosted mode actually keeps:
+//! `cache-v1.json` and `catalog-v1.json` retired with the mode (A15), and §Concurrency
+//! adds the `write.lock` §Hosted mode gives both `serve` and `query`.
 
 mod common;
 
@@ -24,12 +37,16 @@ use common::{
 };
 use std::path::Path;
 
-/// The `<data>/bindforge/registry/` document is irrelevant here; root mode reads
-/// only `--corpus`.
+/// A hosted run needs a resolvable `<data>` (`027-C4`) and a steam posture
+/// (`027-C3`) before its corpus is in play, so a leg that pins a *document* refusal
+/// hands it both — a sandboxed `<data>` that is deliberately not the one whose files
+/// are counted below, and the inert `--no-steam` posture — and nothing else, so the
+/// one line the run prints is the refusal of the document it was given.
 fn refuse(data: &TempDir, label: &str, document: &str, named: &[&str]) {
     let file = format!("{label}.json");
     let path = data.write(&file, document.as_bytes());
     let before = std::fs::read(&path).expect("the corpus fixture is readable");
+    let registry_data = TempDir::new("catalog-refusal-data");
 
     let run = expect_refused_startup(
         &[
@@ -37,8 +54,15 @@ fn refuse(data: &TempDir, label: &str, document: &str, named: &[&str]) {
             "--root",
             "--corpus",
             path.to_str().expect("a utf-8 temp corpus path"),
+            "--no-steam",
         ],
-        &[],
+        &[(
+            "XDG_DATA_HOME",
+            registry_data
+                .path()
+                .to_str()
+                .expect("a utf-8 temp data directory"),
+        )],
     );
 
     let lines: Vec<&str> = run.stderr.lines().collect();
@@ -130,6 +154,7 @@ fn every_catalog_fixture_loads_or_is_the_named_refusal() {
             .to_string();
         let document = std::fs::read_to_string(path).expect("the fixture is readable");
         let data = TempDir::new("catalog-fixture");
+        let registry_data = TempDir::new("catalog-fixture-data");
         let copied = data.write(&format!("copied-{name}"), document.as_bytes());
         let run = expect_refused_startup(
             &[
@@ -137,8 +162,15 @@ fn every_catalog_fixture_loads_or_is_the_named_refusal() {
                 "--root",
                 "--corpus",
                 copied.to_str().expect("a utf-8 temp path"),
+                "--no-steam",
             ],
-            &[],
+            &[(
+                "XDG_DATA_HOME",
+                registry_data
+                    .path()
+                    .to_str()
+                    .expect("a utf-8 temp data directory"),
+            )],
         );
         let lines: Vec<&str> = run.stderr.lines().collect();
         assert_eq!(
@@ -475,21 +507,25 @@ fn is_slug_name(value: &str) -> bool {
     chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
-/// The registry documents are named here so the fixture suite keeps the
-/// `026-C7` spelling in one place; see `data_layout.rs` for their placement.
+/// The registry documents are named here so the fixture suite keeps the §Hosted mode
+/// spelling in one place; see `data_layout.rs` for their placement. ADR-027 retired
+/// the caching mode's `cache-v1.json`/`catalog-v1.json` (A15) and §Hosted mode makes a
+/// leftover copy of either one in the registry directory a startup refusal — which
+/// `hosted_startup.rs` pins — so this suite carries the three documents hosted mode
+/// actually keeps, plus the write lock §Concurrency gives it.
 #[test]
 fn the_registry_document_spellings_are_the_ones_the_contract_names() {
     let data = std::path::Path::new("/sandbox-data");
-    assert_eq!(
-        registry_document(data, "cache-v1.json"),
-        data.join("bindforge")
-            .join("registry")
-            .join("cache-v1.json")
-    );
-    assert_eq!(
-        registry_document(data, "catalog-v1.json"),
-        data.join("bindforge")
-            .join("registry")
-            .join("catalog-v1.json")
-    );
+    for name in [
+        "steam-snapshot.json",
+        "issued-v1.json",
+        "retired-ids-v1.json",
+        "write.lock",
+    ] {
+        assert_eq!(
+            registry_document(data, name),
+            data.join("bindforge").join("registry").join(name),
+            "`<data>/bindforge/registry/{name}` is the §Hosted mode spelling"
+        );
+    }
 }

@@ -1,51 +1,74 @@
-//! BindForge registry (design 026): a catalog registry with the two modes `026-C1`
-//! names — a *root* instance that answers only from its own curated corpus, and a
-//! *caching* instance that answers from local entries, then its own cache, then one
-//! configured upstream.
+//! BindForge registry (design 026, grown by ADR-027): the hosted catalog registry.
 //!
-//! This crate is bin-only, and every budget it enforces is its own
-//! ([`constants`]). The two documents it owns are the `026-C3` catalog document and
-//! the `026-C7` cache document; the `026-L1` amendment that lets it point at any
-//! parseable upstream origin lives in [`endpoint`].
+//! One mode. A hosted instance answers from three documents it owns — the curated
+//! `026-C3` corpus the operator pointed `--corpus` at, the issued document it mints
+//! into, and the retired-id set that keeps a deleted id deleted — plus the steam
+//! snapshot it pulls from the store on a schedule and consults, never the other way
+//! round, on a miss (`027-C1`'s one-way content supply). Caching mode, its upstream
+//! origin, its gauge, and its two documents retired with ADR-027; their flags stay in
+//! the parser only to be refused, so a stale operator invocation explains itself.
+//!
+//! The crate has two targets. This is the binary; [`bindforge_registry`] is the
+//! library face the suites drive directly (the resolver, the documents, the policy —
+//! `src/lib.rs` says why each of them is on the face). Either way, every budget the
+//! instance enforces is its own ([`constants`]).
 //!
 //! A refusal at startup is exactly one line and a non-zero exit, and it happens
-//! before the process binds: an operator reads the condition, not a usage dump, and
-//! a refused instance has touched no file and dialled nothing.
+//! before the process binds: an operator reads the condition, not a usage dump, and a
+//! refused instance writes no document of the catalog's and dials nothing beyond the
+//! pinned store. The two files it may have touched are the `<data>` write lock
+//! §Concurrency takes first — `Drop` takes the refusal's run out of it on the way out
+//! — and the snapshot a *successful* `027-C3` startup pull published before a later
+//! refusal stopped the run, which is a valid fresh snapshot, not a half-written one.
 
 mod admin;
-mod cache;
-mod constants;
 mod corpus;
-mod endpoint;
 mod http;
 mod keys;
+mod mint;
 mod persist;
+mod retired;
 mod serve;
 mod state;
-mod upstream;
+mod store_lock;
 #[cfg(test)]
 mod wire;
+
+// The store resolver is the library face's (`src/lib.rs`): the snapshot loader, the
+// pull codec, and the refresh cadence are one set of items, compiled once, that
+// `tests/steam.rs` pins directly. The bin uses them rather than keeping a second
+// copy of its own — [`constants`] among them, because the `026-C7` plausibility pair
+// §The steam snapshot's load admits names for the snapshot's `fetched_at` is read by
+// the library's loader and by nothing in this target, so a second copy of that file
+// compiled into the binary would carry two budgets no binary code reads.
+use bindforge_registry::constants;
+use bindforge_registry::steam::{self, SteamStore};
 
 use std::io::Write as _;
 use std::net::TcpListener;
 use std::net::ToSocketAddrs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::admin::Admin;
-use crate::endpoint::parse_endpoint;
+use crate::corpus::Catalog;
 use crate::keys::key_is_admissible;
-use crate::persist::{DataLayout, data_dir, document_path};
-use crate::state::{Answer, State};
-use crate::upstream::Upstream;
+use crate::persist::{DataLayout, data_dir, document_path, registry_dir};
+use crate::retired::RetiredIds;
+use crate::state::{Answer, State, SteamPosture};
+use crate::store_lock::WriteLock;
 
 /// The environment seam `026-C5` names for configuring the admin token.
 const ADMIN_TOKEN_ENV: &str = "BINDFORGE_REGISTRY_ADMIN_TOKEN";
 
-/// The wall clock in whole seconds since the Unix epoch: the unit both `026-B3`'s
-/// TTL and `026-C7`'s `fetched_at` are stated in.
+/// `027-C3`: the steam Web API key arrives through the environment and nowhere else
+/// — not a flag, not a file, not a diagnostic.
+const STEAM_KEY_ENV: &str = "BINDFORGE_STEAM_WEB_API_KEY";
+
+/// The wall clock in whole seconds since the Unix epoch: the unit both `027-B2`'s
+/// age bound and every document's `fetched_at` are stated in.
 #[must_use]
 pub fn now_unix() -> u64 {
     SystemTime::now()
@@ -88,52 +111,50 @@ fn run(command: Option<&str>, args: Vec<String>) -> Result<(), String> {
 /// Everything the command line decides, after parsing.
 #[derive(Debug)]
 struct Config {
-    /// `--root`: this is a root instance.
+    /// `--root`: the mode ADR-027 leaves, spelled as `026-C1` spelled it.
     root: bool,
-    /// `--corpus <path>`: the `026-C3` document a root instance answers from.
+    /// `--corpus <path>`: the `026-C3` document this instance answers from.
     corpus: Option<PathBuf>,
-    /// `--upstream <url>`: the origin a caching instance fetches from.
-    upstream: Option<String>,
+    /// `--no-steam`: serve with the steam resolver inactive.
+    no_steam: bool,
     /// `--host`, defaulting to the loopback spelling.
     host: String,
     /// `--port`, defaulting to `0` so the kernel assigns one.
     port: u16,
     /// `--admin-token`, or the environment's value of [`ADMIN_TOKEN_ENV`].
     admin_token: Option<String>,
-    /// `--refresh-interval <seconds>`, overriding `026-B3`.
-    refresh_interval: Option<u64>,
-    /// The one slug `query` asks about.
+    /// The one key `query` asks about.
     slug: Option<String>,
 }
 
 impl Config {
     /// Parses the flag set. An unknown flag, a flag without its value, or a value
     /// outside its stated form is a one-line refusal before any file or socket is
-    /// touched.
+    /// touched — and so is either retired caching flag, which is refused as a
+    /// *retirement* rather than as an unknown name (§Hosted mode).
     fn parse(args: &[String]) -> Result<Self, String> {
         let refused = |reason: String| Err(format!("error: {reason}"));
         let mut config = Self {
             root: false,
             corpus: None,
-            upstream: None,
+            no_steam: false,
             host: "127.0.0.1".to_string(),
             port: 0,
             admin_token: std::env::var(ADMIN_TOKEN_ENV)
                 .ok()
                 .filter(|value| !value.is_empty()),
-            refresh_interval: None,
             slug: None,
         };
         let mut index = 0;
         while index < args.len() {
-            // A value is taken with its flag, so `--corpus` and `--upstream` never
-            // have to guess whether the next token is theirs or another flag's.
+            // A value is taken with its flag, so `--corpus` never has to guess
+            // whether the next token is its own or another flag's.
             let flag = args[index].as_str();
             // `--flag=value` is the same flag as `--flag value`, and accepting that
             // spelling is a credential rule as much as a convenience: the unknown-flag
             // refusal quotes the flag it did not recognize, and `--admin-token=S3CRET`
             // reaching it would print the configured token into a terminal, a journal,
-            // or a CI log. Only a `--` flag is ever split — a `query` slug may hold
+            // or a CI log. Only a `--` flag is ever split — a `query` key may hold
             // `=` and is a positional, not a flag.
             let (name, inline) = match flag.split_once('=') {
                 Some((name, value)) if name.starts_with("--") => (name, Some(value)),
@@ -157,7 +178,15 @@ impl Config {
                     config.root = true;
                 }
                 "--corpus" => config.corpus = Some(PathBuf::from(value("--corpus")?)),
-                "--upstream" => config.upstream = Some(value("--upstream")?),
+                "--no-steam" => {
+                    if inline.is_some() {
+                        return refused(
+                            "`--no-steam` names the resolver's posture and takes no value"
+                                .to_string(),
+                        );
+                    }
+                    config.no_steam = true;
+                }
                 "--host" => config.host = value("--host")?,
                 "--port" => {
                     let spelled = value("--port")?;
@@ -170,15 +199,14 @@ impl Config {
                     })?;
                 }
                 "--admin-token" => config.admin_token = Some(value("--admin-token")?),
-                "--refresh-interval" => {
-                    let spelled = value("--refresh-interval")?;
-                    let Ok(seconds) = spelled.parse::<u64>() else {
-                        return refused(format!(
-                            "`--refresh-interval {}` is not a bare unsigned count of seconds",
-                            bindforge_core::escape_and_truncate(&spelled)
-                        ));
-                    };
-                    config.refresh_interval = Some(seconds);
+                // ADR-027's retirement pair. They are refused here, in the parser,
+                // quoting the flag and naming the retirement, rather than reaching the
+                // unknown-flag arm: an operator whose deployment still spells them has
+                // to learn what happened from this line, and a `--upstream` value must
+                // never be repeated back the way an unknown flag's never is.
+                "--upstream" | "--refresh-interval" => {
+                    let _ = value(name)?;
+                    return refused(retirement_refusal(name));
                 }
                 other if other.starts_with('-') => {
                     // The *name* is quoted, never the value: whatever followed an
@@ -190,7 +218,7 @@ impl Config {
                 }
                 positional => {
                     if config.slug.is_some() {
-                        return refused("only one slug is asked about".to_string());
+                        return refused("only one lookup key is asked about".to_string());
                     }
                     config.slug = Some(positional.to_string());
                 }
@@ -200,60 +228,188 @@ impl Config {
         Ok(config)
     }
 
-    /// Builds the instance state the command runs: the mode, its documents, and its
-    /// gated upstream. The endpoint gate runs before anything else, so a refused
-    /// origin binds nothing and resolves nothing.
-    fn build(&self) -> Result<State, String> {
+    /// Builds the instance the command runs: `<data>` and its write lock, the three
+    /// documents, and the snapshot. Shared by `serve` and `query` because a one-shot
+    /// runs the same policy and may mint.
+    fn build(&self) -> Result<Instance, String> {
         let lookup = |key: &str| std::env::var(key).ok();
         self.build_with(&|key| lookup(key))
     }
 
-    /// The same build against an injected environment reader — the seam #13's
-    /// data-directory rules are tested through, since a process may not rewrite
-    /// its own environment from a test thread.
-    fn build_with(&self, lookup: &dyn Fn(&str) -> Option<String>) -> Result<State, String> {
+    /// The same build against an injected environment reader — the seam the
+    /// data-directory rules are tested through, since a process may not rewrite its
+    /// own environment from a test thread.
+    fn build_with(&self, lookup: &dyn Fn(&str) -> Option<String>) -> Result<Instance, String> {
         let refused = |reason: String| Err(format!("error: {reason}"));
-        if let Some(spelling) = &self.upstream {
-            // Caching mode: `026-C7`'s two documents under `<data>/bindforge/registry/`,
-            // each created empty on first write rather than at startup.
-            let base =
-                parse_endpoint(spelling).map_err(|error| format!("error: {}", error.line()))?;
-            let layout = DataLayout::host();
-            let data = data_dir(layout, lookup).ok_or_else(|| {
-                format!(
-                    "error: caching mode needs a data directory: set `XDG_DATA_HOME` to an \
-                     absolute path (`{ADMIN_TOKEN_ENV}` is unrelated); no usable `<data>` \
-                     was resolved"
-                )
-            })?;
-            let ttl = self
-                .refresh_interval
-                .unwrap_or(constants::REGISTRY_UPSTREAM_TTL_SECONDS);
-            return State::caching(
-                document_path(&data, persist::CATALOG_DOCUMENT),
-                document_path(&data, persist::CACHE_DOCUMENT),
-                Upstream::new(base),
-                ttl,
-            )
-            .map_err(|error| error.line());
-        }
         if !self.root {
             return refused(
-                "one of `--root` (a root instance) or `--upstream <url>` (a caching instance) \
-                 chooses the mode"
+                "`--root` names the one mode this registry runs: `serve --root --corpus <path>` \
+                 (ADR-027 retired the mode `--upstream` chose)"
                     .to_string(),
             );
         }
         let Some(corpus) = self.corpus.as_ref() else {
             return refused("`--root` needs `--corpus <path>` to answer from".to_string());
         };
-        State::root(corpus.clone()).map_err(|error| error.line())
+        // `027-C4`: `<data>` is now a startup requirement, a posture change from root
+        // mode, which needed none.
+        let data = data_dir(DataLayout::host(), lookup).ok_or_else(|| {
+            "error: a hosted registry needs a data directory: set `XDG_DATA_HOME` to an \
+             absolute path (or `HOME`, whose `.local/share` it falls back to); no usable \
+             `<data>` was resolved"
+                .to_string()
+        })?;
+        let registry = registry_dir(&data);
+        // §Concurrency, and §Hosted mode's order: `<data>` resolved, "whose write lock
+        // the run then takes". One writer per `<data>`, taken before any document is
+        // written and before anything else is refused, and held for the whole run —
+        // including the one-shot `query`, which can mint. A run that is refused below
+        // drops the lock on the way out, so a refusal leaves no lock behind.
+        let lock = WriteLock::take(&registry)?;
+        // The key is required *before* anything is loaded, regardless of snapshot
+        // freshness: the refresh thread is part of the run (`027-C3`).
+        let steam_key = if self.no_steam {
+            None
+        } else {
+            let key = lookup(STEAM_KEY_ENV).filter(|value| !value.trim().is_empty());
+            match key {
+                Some(key) => Some(key),
+                None => {
+                    return refused(format!(
+                        "the steam Web API key is not configured: set `{STEAM_KEY_ENV}`, or \
+                         start `--no-steam` to serve with the steam resolver inactive"
+                    ));
+                }
+            }
+        };
+        // The retired document pair is a refusal by *presence*, except at the path
+        // `--corpus` names: an upgraded host cleans its data directory rather than
+        // carrying inert state, and the exception is how an operator keeps reading
+        // their old entries across the upgrade.
+        let corpus_path = self.spared_document(corpus);
+        for retired_document in [persist::CACHE_DOCUMENT, persist::CATALOG_DOCUMENT] {
+            let path = document_path(&data, retired_document);
+            if path.exists() && !same_document(&self.spared_document(&path), &corpus_path) {
+                return refused(format!(
+                    "`{}` is the caching mode's document, retired with ADR-027: delete it or \
+                     point `--corpus` at it",
+                    persist::echo_path(&path)
+                ));
+            }
+        }
+        // `026-C1` survives: the corpus has to exist.
+        let corpus = Catalog::load_required(corpus, constants::MAX_CATALOG_DOCUMENT_OCTETS)
+            .map_err(|error| error.line())?;
+        let steam = match &steam_key {
+            None => SteamPosture::Inactive,
+            Some(_) => SteamPosture::Active,
+        };
+        let snapshot_path = document_path(&data, persist::STEAM_SNAPSHOT_DOCUMENT);
+        let (mut store, mut snapshot) = (None, None);
+        if let Some(key) = steam_key.as_ref() {
+            let built = self.store(key)?;
+            // `--no-steam` never reads the file at all, so it must never write one
+            // either (§The steam snapshot resolver); this branch is the resolver's.
+            let loaded = self.load_or_pull_snapshot(&built, &snapshot_path)?;
+            store = Some(built);
+            snapshot = loaded;
+        }
+        let issued = Catalog::load(
+            &document_path(&data, persist::ISSUED_DOCUMENT),
+            constants::MAX_ISSUED_DOCUMENT_OCTETS,
+        )
+        .map_err(|error| error.line())?;
+        let retired = RetiredIds::load(&document_path(&data, persist::RETIRED_IDS_DOCUMENT))
+            .map_err(|error| error.line())?;
+        let state = State::hosted(corpus, issued, retired, snapshot, steam);
+        Ok(Instance {
+            state,
+            snapshot_path,
+            store,
+            _lock: lock,
+        })
     }
+
+    /// The canonical spelling of one file, for the `--corpus` exception's comparison:
+    /// two spellings of one path spare one document. A file that is not there is
+    /// compared as given.
+    fn spared_document(&self, path: &Path) -> PathBuf {
+        std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+    }
+    /// The store client: the authority pinned at compile time (`027-C3`) and the
+    /// verified transport, held as a *name*. Building one resolves nothing and dials
+    /// nothing — `SteamStore` looks the name up when a page is about to be dialed — so
+    /// an instance whose snapshot is on disk and fresh never consults the resolver, and
+    /// nothing outside a pull can reach the network. No flag, environment value, or
+    /// document can point this instance at another store.
+    fn store(&self, key: &str) -> Result<SteamStore, String> {
+        Ok(SteamStore::production(key))
+    }
+
+    /// Startup's load-or-pull decision, delegated to [`steam::startup_snapshot`] where
+    /// the library face can drive it with a loopback store; this seam only adds the
+    /// `error: ` the binary's refusal lines carry.
+    ///
+    /// The clause is `027-C3`'s: load only a present, loadable **and** fresh snapshot,
+    /// so a past-bound one is the full pull's case. An operator who wants the network
+    /// kept out of startup starts the instance `--no-steam`, the posture that neither
+    /// reads nor pulls the file.
+    fn load_or_pull_snapshot(
+        &self,
+        store: &SteamStore,
+        path: &Path,
+    ) -> Result<Option<steam::SteamSnapshot>, String> {
+        steam::startup_snapshot(store, path, crate::now_unix())
+            .map(Some)
+            .map_err(|line| format!("error: {line}"))
+    }
+}
+
+/// Whether two canonical spellings name one file.
+///
+/// The `--corpus` exception to the retired-document-pair refusal spares "the path
+/// `--corpus` names", and a *string* comparison of canonical paths is a spelling
+/// comparison: on the §Compatibility matrix's Windows row,
+/// `%APPDATA%\BINDFORGE\REGISTRY\Catalog-V1.JSON` and
+/// `<data>/bindforge/registry/catalog-v1.json` are one file, and a case-folding split
+/// tells the operator to delete or re-point a document they have already spared. So
+/// identity is asked for where the platform can answer it — device and inode on unix —
+/// and everything else falls back to the case-insensitive spelling, which is the
+/// direction that spares a file rather than refusing a start over nothing.
+fn same_document(a: &Path, b: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        match (std::fs::metadata(a), std::fs::metadata(b)) {
+            (Ok(first), Ok(second)) => (first.dev(), first.ino()) == (second.dev(), second.ino()),
+            // A file that is not there has no identity to compare, which leaves the
+            // spelling — and a missing file is not the spared one either way.
+            _ => a == b,
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        a.as_os_str()
+            .to_string_lossy()
+            .eq_ignore_ascii_case(&b.as_os_str().to_string_lossy())
+    }
+}
+
+/// A built instance: the state, the `<data>` it owns, and the write lock that keeps
+/// the next one out until this one exits.
+struct Instance {
+    state: State,
+    /// The snapshot file's path, and the store client the startup seam built. Both
+    /// are `serve`'s refresh thread's; `query` never uses them, and `--no-steam`
+    /// leaves the client unbuilt.
+    snapshot_path: PathBuf,
+    store: Option<SteamStore>,
+    _lock: WriteLock,
 }
 
 /// Binds, prints the bound port, and serves until stopped.
 fn serve_command(config: Config) -> Result<(), String> {
-    let state = config.build()?;
+    let instance = config.build()?;
     let listener = bind(&config.host, config.port)?;
     let bound = listener
         .local_addr()
@@ -261,7 +417,7 @@ fn serve_command(config: Config) -> Result<(), String> {
     // `--port 0` is the documented default, so the printed value is the contract.
     println!(
         "registry {} listening on http://{bound}",
-        state.mode().as_str()
+        instance.state.mode().as_str()
     );
     std::io::stdout()
         .flush()
@@ -269,34 +425,119 @@ fn serve_command(config: Config) -> Result<(), String> {
     // Enablement is judged from the address actually bound, not from the spelling
     // that was asked for (`026-C5`).
     let admin = Admin::new(bound.ip().is_loopback(), config.admin_token.clone());
-    serve::serve(listener, Arc::new(state), Arc::new(admin))
+    let state = Arc::new(instance.state);
+    // §The store pull: the refresh thread lives here and nowhere else, takes only the
+    // snapshot's lock, and is the snapshot's only writer. `--no-steam` built no store,
+    // so it starts no thread.
+    if let Some(store) = instance.store {
+        spawn_refresh(Arc::clone(&state), store, instance.snapshot_path);
+    }
+    serve::serve(listener, state, Arc::new(admin))
         .map_err(|error| format!("error: the accept loop stopped: {error}"))
 }
 
-/// Runs the mode's policy once for one slug, prints the answer with its
-/// provenance, and exits non-zero on the `026-L4` cold case so scripts see failure
-/// (open question 12). In caching mode this is the real policy, so it writes the
-/// cache.
+/// Runs the refresh schedule §The store pull states: sleep the full interval, pull,
+/// publish through the tmp-and-rename and the model swap, and on failure keep the old
+/// snapshot, print one line, and retry on the shorter clock. Never the mutation lock,
+/// never the corpus or issued documents.
+fn spawn_refresh(state: Arc<State>, store: SteamStore, snapshot_path: PathBuf) {
+    if let Err(error) = std::thread::Builder::new()
+        .name("steam-refresh".to_string())
+        .spawn(move || {
+            // The cadence is the pure function [`steam::next_refresh_seconds`], and the
+            // thread sleeps on it and nothing else. The anchor is the snapshot's own
+            // `fetched_at` — the moment the pull that produced it ran — because that is
+            // when the last pull actually happened: a startup that *pulled* seeds this
+            // with the present clock and so sleeps the full interval, and a startup that
+            // *loaded* a nearly-age-bound one sleeps only what is left before `027-B2`'s
+            // bound, instead of leaving steam misses on the named `503` for a day after
+            // a boot the design made legal.
+            let mut outcome = steam::PullOutcome::Published;
+            let mut last_pull_at = state
+                .snapshot_slot()
+                .read()
+                .ok()
+                .and_then(|slot| slot.as_ref().map(|slot| slot.fetched_at()))
+                .unwrap_or_else(crate::now_unix);
+            loop {
+                let now = crate::now_unix();
+                let wait = steam::next_refresh_seconds(now, last_pull_at, outcome);
+                std::thread::sleep(Duration::from_secs(wait));
+                // The clock read *before* the pull's first page is the stamp the pull
+                // publishes with (§The store pull), so it is also the anchor the next
+                // gap is measured from.
+                let started_at = crate::now_unix();
+                let loaded = state
+                    .snapshot_slot()
+                    .read()
+                    .ok()
+                    .and_then(|slot| slot.as_ref().map(Arc::clone));
+                let pulled = match loaded {
+                    Some(loaded) => store.delta(started_at, &loaded),
+                    None => store.full(started_at),
+                };
+                last_pull_at = started_at;
+                outcome = match pulled {
+                    // A pull that produced a snapshot the file refused is this
+                    // thread's failure posture too: the old snapshot keeps serving,
+                    // one line is printed, and the retry is on the short clock.
+                    // Scoring it `Published` would sleep the full interval over a
+                    // supply that is already running down `027-B2`'s age bound.
+                    Ok(snapshot) => match snapshot.publish(&snapshot_path) {
+                        Ok(()) => {
+                            state.publish_snapshot(snapshot);
+                            steam::PullOutcome::Published
+                        }
+                        Err(error) => {
+                            eprintln!(
+                                "warning: the steam snapshot could not be published: {}",
+                                persist::echo_safe(&error.to_string())
+                            );
+                            steam::PullOutcome::Failed
+                        }
+                    },
+                    Err(error) => {
+                        // One line, naming the condition and never the URL or the key
+                        // (`027-L4`); the old snapshot keeps serving.
+                        eprintln!(
+                            "warning: the steam pull: {}",
+                            persist::echo_safe(&error.to_string())
+                        );
+                        steam::PullOutcome::Failed
+                    }
+                };
+            }
+        })
+    {
+        eprintln!(
+            "warning: the steam refresh thread could not start: {error}; the snapshot will \
+             not refresh on its own"
+        );
+    }
+}
+
+/// Runs the hosted policy once for one key, prints the answer with its provenance,
+/// and exits non-zero on every named-`503` posture. A `query` can mint, so it took
+/// the same `<data>` write lock `serve` takes: it is a stopped-instance tool.
 fn query_command(config: Config) -> Result<(), String> {
-    let state = config.build()?;
-    let Some(slug) = config.slug.as_ref() else {
-        return Err("error: `query` needs one slug to ask about".to_string());
+    let instance = config.build()?;
+    let Some(key) = config.slug.as_ref() else {
+        return Err("error: `query` needs one lookup key to ask about".to_string());
     };
-    if !key_is_admissible(slug) {
+    if !key_is_admissible(key) {
         return Err(format!(
             "error: `{}` is not a lookup key this registry answers",
-            bindforge_core::escape_and_truncate(slug)
+            bindforge_core::escape_and_truncate(key)
         ));
     }
-    let answer = state.candidates(slug, now_unix());
-    match answer {
+    match instance.state.candidates(key, crate::now_unix()) {
         Answer::Candidates {
             candidates,
             provenance,
         } => {
             println!(
                 "queried `{}` answered from {}",
-                bindforge_core::escape_and_truncate(slug),
+                bindforge_core::escape_and_truncate(key),
                 provenance.as_str()
             );
             if candidates.is_empty() {
@@ -310,11 +551,26 @@ fn query_command(config: Config) -> Result<(), String> {
                 .map_err(|error| format!("error: printing the answer failed: {error}"))?;
             Ok(())
         }
-        Answer::NoAnswer => Err(format!(
-            "error: no catalog answer for `{}`: no local entry, no cache entry, and no \
-             reachable upstream",
-            bindforge_core::escape_and_truncate(slug)
-        )),
+        // Every named `503` is a non-zero exit, with the same name the wire answers:
+        // the status line is all the shipped CLI shows a user, and this is what a
+        // script sees instead.
+        Answer::Refusal(named) => Err(format!("error: {}/{}", named.code(), named.detail())),
+    }
+}
+
+/// The named retirement `027-C1`'s flag posture owes an operator: it quotes the flag,
+/// names ADR-027 and what retired, and is not the unknown-flag line.
+#[must_use]
+fn retirement_refusal(flag: &str) -> String {
+    match flag {
+        "--upstream" => "--upstream is not a flag this registry runs: caching mode retired \
+             with ADR-027, so a hosted registry fetches from the steam store and its own \
+             corpus alone"
+            .to_string(),
+        _ => "--refresh-interval is not a flag this registry runs: the caching mode's \
+             upstream TTL retired with ADR-027; the steam snapshot refreshes on its own \
+             schedule"
+            .to_string(),
     }
 }
 
@@ -342,130 +598,4 @@ fn bind(host: &str, port: u16) -> Result<TcpListener, String> {
         last.map(|error| error.to_string())
             .unwrap_or_else(|| "no address".to_string())
     ))
-}
-
-#[cfg(test)]
-mod tests {
-    //! The command line: which flag sets decide the mode, and what a bad one costs.
-    use super::Config;
-
-    fn args(spelled: &[&str]) -> Vec<String> {
-        spelled.iter().map(|arg| (*arg).to_string()).collect()
-    }
-
-    #[test]
-    fn the_flags_decide_the_mode_and_the_budgets() {
-        let config = Config::parse(&args(&[
-            "--root",
-            "--corpus",
-            "/tmp/corpus.json",
-            "--port",
-            "8080",
-            "--refresh-interval",
-            "30",
-        ]))
-        .expect("a well-formed root invocation");
-        assert!(config.root);
-        assert_eq!(
-            config.corpus.as_deref(),
-            Some(std::path::Path::new("/tmp/corpus.json"))
-        );
-        assert_eq!(config.port, 8080);
-        assert_eq!(config.refresh_interval, Some(30));
-        assert_eq!(config.host, "127.0.0.1", "the default host is loopback");
-    }
-
-    #[test]
-    fn the_port_defaults_to_zero_so_the_kernel_assigns_one() {
-        let config = Config::parse(&args(&["--root", "--corpus", "/tmp/corpus.json"]))
-            .expect("a well-formed root invocation");
-        assert_eq!(config.port, 0, "`--port` defaults to `0`");
-        assert!(
-            config.admin_token.is_none(),
-            "no token is configured by default"
-        );
-    }
-
-    #[test]
-    fn a_flag_without_its_value_or_an_unknown_flag_is_refused() {
-        for spelled in [
-            vec!["--root", "--corpus"],
-            vec!["--nope"],
-            vec!["--port", "not-a-port"],
-            vec!["--refresh-interval", "-5"],
-        ] {
-            let error = Config::parse(&args(&spelled)).expect_err("a refusal is expected");
-            assert!(error.starts_with("error: "), "{spelled:?} is a named line");
-        }
-    }
-
-    #[test]
-    fn an_equals_form_takes_its_value_and_a_refusal_never_quotes_one() {
-        let config = Config::parse(&args(&[
-            "--root",
-            "--corpus=/tmp/corpus.json",
-            "--admin-token=s3cret-token",
-        ]))
-        .expect("`--flag=value` is the same flag as `--flag value`");
-        assert_eq!(
-            config.corpus.as_deref(),
-            Some(std::path::Path::new("/tmp/corpus.json"))
-        );
-        assert_eq!(config.admin_token.as_deref(), Some("s3cret-token"));
-
-        let error = Config::parse(&args(&["--admin-token=s3cret-token", "--nope=also-secret"]))
-            .expect_err("an unknown flag is still refused");
-        assert!(error.contains("--nope"), "{error}");
-        assert!(
-            !error.contains("s3cret") && !error.contains("also-secret"),
-            "the refusal quotes the flag name it did not recognize, never a value: {error}"
-        );
-
-        let error = Config::parse(&args(&["--root=oops"])).expect_err("the mode flag takes none");
-        assert!(error.contains("--root"), "{error}");
-    }
-
-    #[test]
-    fn a_slug_holding_an_equals_sign_is_a_positional_and_not_a_flag() {
-        let config = Config::parse(&args(&[
-            "--root",
-            "--corpus",
-            "/tmp/corpus.json",
-            "local/a=b",
-        ]))
-        .expect("a slug may hold `=`");
-        assert_eq!(config.slug.as_deref(), Some("local/a=b"));
-    }
-
-    #[test]
-    fn a_caching_build_without_a_data_directory_is_refused() {
-        // No `XDG_DATA_HOME`, no `HOME`: caching mode has nowhere to put its documents.
-        // The environment is injected here rather than rewritten in this process, whose
-        // other test threads read it too.
-        let config = Config::parse(&args(&["--upstream", "http://127.0.0.1:8080"]))
-            .expect("the flags parse");
-        let nothing = |_key: &str| None;
-        let error = config
-            .build_with(&nothing)
-            .expect_err("a data directory is required");
-        assert!(error.contains("XDG_DATA_HOME"), "{error}");
-    }
-
-    #[test]
-    fn an_upstream_outside_the_gate_is_named_and_binds_nothing() {
-        let config = Config::parse(&args(&["--upstream", "https://127.0.0.1:8080"]))
-            .expect("the flags parse");
-        let error = config.build().expect_err("the gate refuses");
-        assert!(error.to_lowercase().contains("upstream"), "{error}");
-    }
-
-    #[test]
-    fn a_mode_is_always_chosen() {
-        let config = Config::parse(&args(&[])).expect("no flags is a parseable command line");
-        let error = config.build().expect_err("neither mode was chosen");
-        assert!(
-            error.contains("--root") && error.contains("--upstream"),
-            "{error}"
-        );
-    }
 }

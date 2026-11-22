@@ -88,8 +88,39 @@ fn shared_corpus(label: &str) -> Corpus {
     )
 }
 
-/// Starts the accept loop over a root-mode instance on `corpus`, on an ephemeral
-/// loopback port, with the admin face enabled the way a loopback bind enables it.
+/// The hosted instance these in-process checks run: the corpus the caller named, an
+/// empty issued document and retired set over a temp path nothing here writes (except
+/// the admin mutations, which write the corpus), and no snapshot — `--no-steam`, whose
+/// `steam` misses are the named `503` this module pins.
+fn hosted_state(corpus_path: &Path) -> State {
+    let corpus = crate::corpus::Catalog::load_required(
+        corpus_path,
+        crate::constants::MAX_CATALOG_DOCUMENT_OCTETS,
+    )
+    .expect("the corpus loads");
+    let issued = crate::corpus::Catalog::empty(
+        corpus_path
+            .parent()
+            .expect("the corpus sits in its own directory")
+            .join(crate::persist::ISSUED_DOCUMENT),
+    );
+    let retired = crate::retired::RetiredIds::empty(
+        corpus_path
+            .parent()
+            .expect("the corpus sits in its own directory")
+            .join(crate::persist::RETIRED_IDS_DOCUMENT),
+    );
+    State::hosted(
+        corpus,
+        issued,
+        retired,
+        None,
+        crate::state::SteamPosture::Inactive,
+    )
+}
+
+/// Starts the accept loop over a hosted instance on `corpus`, on an ephemeral loopback
+/// port, with the admin face enabled the way a loopback bind enables it.
 fn start(corpus: &Corpus, token: Option<&str>) -> SocketAddr {
     start_with(corpus, Admin::new(true, token.map(str::to_string)))
 }
@@ -100,7 +131,7 @@ fn start(corpus: &Corpus, token: Option<&str>) -> SocketAddr {
 fn start_with(corpus: &Corpus, admin: Admin) -> SocketAddr {
     let listener = TcpListener::bind("127.0.0.1:0").expect("a loopback listener binds");
     let address = listener.local_addr().expect("the bound address");
-    let state = Arc::new(State::root(corpus.path.clone()).expect("the corpus loads"));
+    let state = Arc::new(hosted_state(&corpus.path));
     let admin = Arc::new(admin);
     thread::spawn(move || {
         let _outcome: std::io::Result<()> = serve::serve(listener, state, admin);
@@ -254,16 +285,35 @@ fn the_candidate_answer_is_the_ordered_projection_in_the_pinned_byte_shape() {
 }
 
 #[test]
-fn an_empty_join_is_200_with_the_empty_list() {
+fn an_empty_join_is_200_with_the_empty_list_and_a_steam_miss_is_the_named_503() {
     let corpus = shared_corpus("empty-join");
     let address = start(&corpus, None);
-    let answer = candidates(address, "steam/999999");
+    // §The hosted lookup policy's step 3: a `local` key is never a candidate for any
+    // resolver and the registry holds no local knowledge, so the join is the empty
+    // list — the claim the instance is entitled to make.
+    let answer = candidates(address, "local/Not.In.A.Dir");
     assert_eq!(
         status_code(&answer),
         Some(200),
-        "a root-mode miss is `200 []`, never the caching `503`"
+        "a `local` miss is `200 []`: {}",
+        status_line(&answer)
     );
     assert_eq!(json(&answer), serde_json::json!([]));
+    // And step 5's cold arm: with the resolver inactive, a steam miss is never `[]`.
+    let answer = candidates(address, "steam/999999");
+    assert_eq!(
+        status_code(&answer),
+        Some(503),
+        "an inactive steam resolver is the named `503`, not the empty list: {}",
+        status_line(&answer)
+    );
+    assert!(
+        status_line(&answer)
+            .to_ascii_lowercase()
+            .contains("steam resolver inactive"),
+        "the refusal names its reason: {}",
+        status_line(&answer)
+    );
 }
 
 #[test]
@@ -328,24 +378,22 @@ fn health_is_always_a_200_and_reports_the_status_document() {
     let answer = exchange(address, &framed("GET", "/v1/health", &[], ""));
     assert_eq!(status_code(&answer), Some(200), "{}", status_line(&answer));
     let document = json(&answer).as_object().expect("an object").clone();
-    for field in [
-        "status",
-        "mode",
-        "upstream",
-        "local_entries",
-        "cached_slugs",
-        "last_upstream_fetch",
-    ] {
-        assert!(
-            document.contains_key(field),
-            "`{field}` is missing: {document:?}"
-        );
-    }
-    assert_eq!(document["mode"].as_str(), Some("root"));
-    assert_eq!(document["upstream"].as_str(), Some("none"));
-    assert_eq!(document["local_entries"].as_u64(), Some(3));
-    assert_eq!(document["cached_slugs"].as_u64(), Some(0));
-    assert_eq!(document["last_upstream_fetch"].as_u64(), Some(0));
+    // `027-C6`'s enumerated list: exactly these four fields, and none of the three
+    // caching facts that retired with the mode.
+    let fields: Vec<&str> = document.keys().map(String::as_str).collect();
+    assert_eq!(
+        fields,
+        vec!["corpus_entries", "mode", "status", "steam_snapshot"],
+        "`027-C6` re-pinned health to four fields: {document:?}"
+    );
+    assert_eq!(document["mode"].as_str(), Some("hosted"));
+    assert_eq!(
+        document["steam_snapshot"].as_str(),
+        Some("none"),
+        "no snapshot is the `\"none\"` spelling: {document:?}"
+    );
+    assert_eq!(document["corpus_entries"].as_u64(), Some(3));
+    assert_eq!(document["status"].as_str(), Some("serving"));
 }
 
 #[test]
@@ -389,11 +437,11 @@ fn the_admin_face_mutates_the_document_bumps_revision_and_persists() {
     assert_eq!(
         document.keys().map(String::as_str).collect::<Vec<_>>(),
         {
-            let mut names: Vec<&str> = vec!["games", "revision", "source_keys"];
+            let mut names: Vec<&str> = vec!["games", "issued", "revision", "source_keys"];
             names.sort_unstable();
             names
         },
-        "`stats` is the three integer counts: {document:?}"
+        "`stats` is the four integer counts `027-C6` names: {document:?}"
     );
     assert_eq!(document["revision"].as_u64(), Some(4));
 
@@ -815,17 +863,41 @@ fn an_unauthenticated_admin_request_is_refused_without_its_declared_body() {
 }
 
 #[test]
-fn a_root_whose_corpus_is_absent_refuses_to_start_rather_than_serving_nothing() {
-    // Absent-is-empty is `026-C7`'s rule for the local-entries document and the
-    // cache. A root's `--corpus` is the one content argument it has, so its absence
-    // is the named startup refusal every other corpus fault gets.
+fn a_hosted_run_whose_corpus_is_absent_refuses_to_start_rather_than_serving_nothing() {
+    // Absent-is-empty is `026-C7`'s rule for the issued document. The corpus is the
+    // one content argument a hosted run has, so its absence is the named startup
+    // refusal every other corpus fault gets (`026-C1`, unchanged by ADR-027).
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
-    let missing = std::env::temp_dir().join(format!("bindforge-no-such-corpus-{nonce}.json"));
-    let error = State::root(missing).expect_err("an absent corpus refuses to start a root");
-    let line = error.line();
+    let data = std::env::temp_dir().join(format!("bindforge-no-corpus-{nonce}"));
+    std::fs::create_dir_all(&data).expect("a temp `<data>`");
+    let missing = data.join("no-such-corpus.json");
+    let spelled = missing.display().to_string();
+    let config = crate::Config::parse(&[
+        "--root".to_string(),
+        "--corpus".to_string(),
+        spelled,
+        "--no-steam".to_string(),
+    ])
+    .expect("the flags parse");
+    let data_home = data.display().to_string();
+    let outcome = config.build_with(&|key| {
+        if key == "XDG_DATA_HOME" {
+            Some(data_home.clone())
+        } else {
+            None
+        }
+    });
+    let line = match outcome {
+        Ok(instance) => {
+            drop(instance);
+            panic!("an absent corpus must refuse to start a hosted instance");
+        }
+        Err(line) => line,
+    };
+    let _ = std::fs::remove_dir_all(&data);
     assert_eq!(line.lines().count(), 1, "one named line: {line}");
     assert!(line.contains("not there"), "{line}");
 }

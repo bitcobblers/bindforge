@@ -1,7 +1,18 @@
 //! The admin mutations: `POST /v1/admin/games` upserts a whole record, `DELETE
-//! /v1/admin/games/<game_id>` removes one, `GET /v1/admin/stats` answers three
-//! integer counts — every accepted one bumps `revision` and lands atomically in
-//! that instance's own catalog document, every refused one touches nothing.
+//! /v1/admin/games/<game_id>` removes one, `GET /v1/admin/stats` answers four integer
+//! counts — every accepted one bumps `revision` and lands atomically in the curated
+//! corpus document, every refused one touches nothing.
+//!
+//! # What ADR-027 changed in this file
+//!
+//! §The curation face keeps `026-C4`/`026-C5` for the corpus, so most legs here are
+//! the shipped pins, and the document they read is the corpus at the `--corpus` path —
+//! the instance's own `<data>` holds no copy of it. `027-C6` adds `issued` to the
+//! `stats` body (Test strategy #9), a delete of a *steam* key now turns the removed
+//! record's key over to the resolver so the empty-answer legs ask `local/…` keys, and
+//! the two legs that pinned the caching mode's local-entries/cache-document pair
+//! retired with the mode (A15). The issued side of the new curation face is
+//! `retired_ids_and_curation.rs` and `hosted_health_stats.rs`, not restated here.
 //!
 //! proves: design 026's Test strategy #10 — "Admin mutations (`026-C4`): upsert
 //! validates + bumps `revision` + atomic rename, and an upsert whose serialized
@@ -10,7 +21,9 @@
 //! delete decodes + validates + bumps `revision` + atomic rename; `405` on a method
 //! a route lacks; `stats` is the three-field integer shape `{games, source_keys,
 //! revision}` from the instance document" (with the r4 revision-log note that the
-//! cap check rides the post-`revision`-bump buffer that is renamed).
+//! cap check rides the post-`revision`-bump buffer that is renamed), read with the
+//! `stats` field list as `027-C6` leaves it — `{games, source_keys, revision,
+//! issued}` — and with `026-C4`/`026-C5` standing unchanged for the corpus.
 //!
 //! Loopback binds, so no credential is involved (the auth rule is `admin_auth.rs`).
 //! Every document lives in a temp directory, and every refusal asserts the file it
@@ -431,19 +444,22 @@ fn a_delete_removes_the_record_bumps_revision_and_persists_atomically() {
     );
     assert_eq!(counts["revision"], document["revision"]);
 
-    let answer = server.get("/v1/candidates?slug=steam%2F900003");
+    let answer = server.get("/v1/candidates?slug=local%2FTo.Remove");
     assert_eq!(
         common::game_ids(&answer),
         Vec::<String>::new(),
-        "the removed record stops answering"
+        "the removed record stops answering — and the key is a `local/…` one, which \
+         §The steam snapshot resolver never takes on, so this is the join's own empty \
+         answer rather than a hosted-mode resolver verdict on a steam key"
     );
 }
 
-/// proves: Test strategy #10's `stats` clause and `026-L3` — `{games,
-/// source_keys, revision}` are three integer counts from the instance's own
-/// catalog document, never key lists.
+/// proves: Test strategy #9's `stats` clause with #10's admin face and `026-L3` —
+/// `027-C6` keeps `026-C4`'s three corpus counts and adds `issued`, the issued
+/// document's record count: four integer counts from the instance's own documents,
+/// never key lists.
 #[test]
-fn stats_is_three_integer_counts_from_the_instance_document() {
+fn stats_is_four_integer_counts_and_never_a_key_list() {
     let (_data, _corpus, server) = root("mut-stats");
 
     let counts = stats(&server);
@@ -452,12 +468,19 @@ fn stats_is_three_integer_counts_from_the_instance_document() {
     keys.sort();
     assert_eq!(
         keys,
-        vec!["games", "revision", "source_keys"],
-        "`026-C4` fixes the stats body exactly"
+        vec!["games", "issued", "revision", "source_keys"],
+        "`027-C6` fixes the stats body exactly: `026-C4`'s three corpus counts plus the \
+         issued count"
     );
     assert_eq!(counts["games"].as_u64(), Some(1));
     assert_eq!(counts["source_keys"].as_u64(), Some(1));
     assert_eq!(counts["revision"].as_u64(), Some(5));
+    assert_eq!(
+        counts["issued"].as_u64(),
+        Some(0),
+        "an instance that has minted nothing counts an empty issued document \
+         (Test strategy #7's absent-file clause)"
+    );
 
     server.request(
         "POST",
@@ -478,21 +501,42 @@ fn stats_is_three_integer_counts_from_the_instance_document() {
     );
 }
 
-/// proves: `026-C4`'s "mutating that instance's own catalog document" for caching
-/// mode (Chosen design: CLI surface — the local-entries document defaults to
-/// `<data>/bindforge/registry/catalog-v1.json`, "a `026-C3` instance, created empty
-/// if absent, mutated by the admin face").
+/// proves: `026-C4`'s "mutating that instance's own catalog document" the way ADR-027
+/// carries it — §The curation face says "`026-C4`/`026-C5` stand unchanged for the
+/// corpus", so in the one mode that is left the document the admin face mutates is the
+/// curated corpus at the path `--corpus` names, and the instance's own `<data>` gets no
+/// copy of it. §Hosted mode's owner-paths list is
+/// `{steam-snapshot, issued-v1, retired-ids-v1}.json` beside the write lock, and the
+/// caching mode's `catalog-v1.json` is a retired name a leftover copy of which
+/// `hosted_startup.rs` pins as a startup refusal (A15).
 #[test]
-fn in_caching_mode_the_admin_face_mutates_the_local_entries_document() {
-    let data = TempDir::new("mut-caching");
-    let local_entries = registry_document(data.path(), "catalog-v1.json");
-    let upstream = common::unreachable_upstream();
-    let server = Registry::caching("mut-caching", &upstream, &data, &[]);
-
-    assert_eq!(
-        json_body(&server.get("/v1/admin/stats"))["games"].as_u64(),
-        Some(0),
-        "an absent local-entries document is an empty catalog, not an error"
+fn in_hosted_mode_the_admin_face_mutates_the_corpus_at_its_own_path_and_no_copy_in_data() {
+    let home = TempDir::new("mut-corpus-path");
+    let corpus = home.write(
+        "corpus.json",
+        corpus_doc(
+            5,
+            &[("example-game", "Example Game", &["steam/900001"][..])],
+        )
+        .as_bytes(),
+    );
+    let registry_data = TempDir::new("mut-corpus-path-data");
+    let server = Registry::start(
+        "mut-corpus-path",
+        &[
+            "serve",
+            "--root",
+            "--corpus",
+            corpus.to_str().expect("a utf-8 temp corpus path"),
+            "--no-steam",
+        ],
+        &[(
+            "XDG_DATA_HOME",
+            registry_data
+                .path()
+                .to_str()
+                .expect("a utf-8 temp data directory"),
+        )],
     );
 
     let answer = server.request(
@@ -503,36 +547,55 @@ fn in_caching_mode_the_admin_face_mutates_the_local_entries_document() {
     );
     assert!(
         matches!(status_code(&answer), Some(200..=299)),
-        "the caching instance's admin face works: {}",
+        "the hosted instance's admin face works: {}",
         status_line(&answer)
     );
-    assert!(
-        local_entries.is_file(),
-        "the local-entries document lives at `<data>/bindforge/registry/catalog-v1.json`"
-    );
-    let document = document_of(&local_entries);
-    assert_eq!(game_ids_in(&document), vec!["mine".to_string()]);
+
+    let document = document_of(&corpus);
     assert_eq!(
-        document["version"].as_i64(),
-        Some(1),
-        "it is a `026-C3` instance"
+        game_ids_in(&document),
+        vec!["example-game".to_string(), "mine".to_string()],
+        "the mutation lands in the corpus file the operator pointed at"
+    );
+    assert_eq!(
+        document["revision"].as_u64(),
+        Some(6),
+        "and rides the same tmp-and-rename as every other mutation"
     );
     assert_eq!(
         json_body(&server.get("/v1/admin/stats"))["revision"].as_u64(),
         document["revision"].as_u64(),
         "stats reads the same document the admin face wrote"
     );
-    assert_eq!(
-        json_body(&server.health())["local_entries"].as_u64(),
-        Some(1),
-        "health's `local_entries` counts it (`026-C2`)"
+
+    let mut landed = registry_data.files_below("bindforge");
+    let write_lock = registry_document(registry_data.path(), "write.lock");
+    landed.retain(|path| path != &write_lock);
+    assert!(
+        landed.is_empty(),
+        "a corpus mutation writes nothing into `<data>`: §Hosted mode's owner paths are \
+         the snapshot, the issued entries, the retired ids and the write lock — found \
+         {landed:?} beside {write_lock:?}"
+    );
+    assert!(
+        !registry_document(registry_data.path(), "catalog-v1.json").exists(),
+        "the caching mode's local-entries document is a retired name (A15), not a place \
+         the admin face writes"
     );
 }
 
-/// proves: Test strategy #10's "from the instance document" qualifier, in the mode
-/// where the two documents differ — `stats` counts local entries, never cache
-/// entries (Chosen design: "`GET /v1/admin/stats` … from the instance's own catalog
-/// document (not the cache)").
+/// Retired by ADR-027 (A15): this leg's subject was the caching mode's *pair* of
+/// documents — it planted a `cache-v1.json` to prove `stats` counted local entries
+/// rather than cache entries, with `026-C2`'s `cached_slugs` as the cache's own
+/// counter. `027-C1` retires the mode, that document, and the `cached_slugs`/
+/// `upstream`/`last_upstream_fetch` health facts together, so neither side of the
+/// comparison is there to count any more: a leftover `cache-v1.json` in the registry
+/// directory is a startup refusal now (Test strategy #8, `hosted_startup.rs`), and the
+/// one document pair that is left has its shapes pinned by
+/// `stats_is_four_integer_counts_and_never_a_key_list` above and Test strategy #9 in
+/// `hosted_health_stats.rs`. Kept ignored rather than rewritten, for the same reason
+/// the four caching suites are: the ADR retires them and only the runner deletes files.
+#[ignore = "caching mode and its cache document retired with ADR-027 (A15): no cache to count"]
 #[test]
 fn stats_counts_the_local_entries_document_and_never_the_cache() {
     let data = TempDir::new("mut-stats-cache");

@@ -13,6 +13,32 @@ bindforge-core = { workspace = true }
 # client reaches, never a re-spelled one (A16).
 discovery = { path = "../../crates/discovery" }
 serde_json = "1.0"
+# ADR-027's store pull runs over the *production* transport: rustls verifying the
+# compile-time-pinned authority, with the crate's own trust anchors so a hosted
+# instance needs no system trust store. `ring` is the provider deliberately: the
+# default `aws-lc-rs` brings a second language's build graph to a crate this
+# framework ships as a single binary.
+#
+# The version requirements are the named floors of design 027 §Options, not
+# caret conveniences: rustls >= 0.23.46 closes RUSTSEC-2026-0346 (`Debug`
+# disclosing TLS secrets), webpki-roots >= 1.0.10 (1.x parent of the 0.26.x
+# compat package) closes RUSTSEC-2026-0381/-0382 (distrusted-intermediate
+# acceptance — the tooling to impersonate the authority carrying our key).
+# Cargo may resolve above a floor within the stated ceiling; re-resolution
+# onto an advised version is failed by the RUSTSEC screen in
+# .github/workflows/check.yml, which is what makes these floors load-bearing.
+rustls = { version = ">=0.23.46, <0.24", default-features = false, features = [
+  "ring",
+  "std",
+  "tls12",
+] }
+webpki-roots = ">=1.0.10, <2"
+# Floor declaration for rustls' verifier: this crate is never imported here
+# (grep stays empty by design), it is named so no re-resolution can land the
+# transitive verifier below the patched line — the advisories it carries are
+# the same impersonation class as the two above (design 027 §Options names
+# rustls-webpki >= 0.103.16 for exactly that reason).
+rustls-webpki = ">=0.103.16, <0.104"
 
 # The suites speak raw HTTP/1.1 over a loopback socket and read the two documents
 # as JSON; integration tests see only dev-dependencies.

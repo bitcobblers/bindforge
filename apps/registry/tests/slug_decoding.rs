@@ -39,7 +39,10 @@ fn serving(label: &str) -> (TempDir, std::path::PathBuf, Registry) {
 /// proves: Test strategy #3 (decode first, then measure) — a query whose
 /// *encoded* form is many times the cap but whose *decoded* key is exactly
 /// `025-B1`'s 128 octets is admitted, while one octet more on the decoded side is
-/// the `404` `026-C2` names.
+/// the `404` `026-C2` names. Both keys are `local/…` keys: §The steam snapshot
+/// resolver keeps them out of the resolver's hands, so what answers is the decode
+/// plus the join — the thing this leg measures — rather than a hosted-mode
+/// resolver verdict on a steam key the corpus does not hold.
 #[test]
 fn the_octet_cap_and_key_rule_apply_to_the_decoded_slug() {
     let (_data, _corpus, server) = serving("decode-cap");
@@ -47,7 +50,7 @@ fn the_octet_cap_and_key_rule_apply_to_the_decoded_slug() {
     // The 128-octet key, spelled out as `%XX` escapes on every octet: the
     // *encoded* query is several times the cap while the decoded key sits
     // exactly on it — admitted, because the cap rides the decoded bytes.
-    let decoded = format!("steam/{}", "a".repeat(122));
+    let decoded = format!("local/{}", "a".repeat(122));
     assert_eq!(decoded.len(), 128, "the fixture key is exactly on the cap");
     let encoded_key: String = decoded.bytes().map(|byte| format!("%{byte:02X}")).collect();
     let encoded_query = format!("/v1/candidates?slug={encoded_key}");
@@ -65,7 +68,7 @@ fn the_octet_cap_and_key_rule_apply_to_the_decoded_slug() {
     );
 
     // One octet over the cap once decoded: the named 404.
-    let over = format!("steam/{}", "a".repeat(123));
+    let over = format!("local/{}", "a".repeat(123));
     let answer = server.get(&slug_query(&over));
     assert_eq!(
         status_code(&answer),

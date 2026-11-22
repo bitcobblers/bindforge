@@ -1,13 +1,21 @@
 # The cargo equivalents of npm run check, plus the orchestration gate —
-# ADR-008 clause 4; design 008 "Gates". Two independent jobs per PR: a PR
-# that breaks only TypeScript fails `orchestration` while `rust` passes, and
-# vice versa (Test strategy #6). The cargo gate installs nothing beyond the
-# rustup-pinned toolchain (rust-toolchain.toml) and needs no Postgres or
-# DATABASE_URL (Test strategy #5).
+# ADR-008 clause 4; design 008 "Gates". Two independent *gate* jobs per PR: a
+# PR that breaks only TypeScript fails `orchestration` while `rust` passes, and
+# vice versa (design 008 Test strategy #6). The cargo gate installs nothing
+# beyond the rustup-pinned toolchain (rust-toolchain.toml) and needs no Postgres
+# or DATABASE_URL (design 008 Test strategy #5). ADR-027 Rollout 3 adds a third,
+# advisories-only job — design 027 Test strategy #17 names it as one of the two
+# ways the cargo job changes — and it is independent of the other two the same
+# way: it installs its own pinned scanner on its own toolchain and reads no
+# source but the root `Cargo.lock`.
 #
-# Third-party actions are pinned to commit SHAs; advisory scanning is a
-# separate scheduled workflow (.github/workflows/advisories.yml), never a
-# PR check.
+# Third-party actions are pinned to commit SHAs. Advisory scanning keeps two
+# shapes (ADR-027, Rollout 3): the scheduled full report
+# (.github/workflows/advisories.yml) stays triage input that never turns a PR
+# red, and a narrow advisories-only RUSTSEC screen runs in this gate beside
+# the cargo trio, because the store-pull stack's mitigation is its named
+# version floors (`apps/registry/Cargo.toml`) and a re-resolution onto an
+# advised version must fail the PR, not a weekly report.
 name: check
 
 on:
@@ -26,10 +34,23 @@ jobs:
       # T-002 Chosen design §9: the cfg(windows) code (the steam_windows host
       # probe and its winreg reader) is compile-verified from this Linux runner;
       # cargo check performs no code generation or linking (A11, A12).
+      # ADR-027 Rollout 3: apps/registry is off this leg — its rustls `ring`
+      # provider compiles C/assembly for the *target* through a build script,
+      # and this runner has no MSVC C toolchain (design 027 §Options, A16).
+      # The crate's Windows posture is the host compile check below plus the
+      # DataLayout seam its suites run.
       - name: Windows compile check
         run: |
           rustup target add x86_64-pc-windows-msvc
-          cargo check --workspace --all-targets --target x86_64-pc-windows-msvc
+          cargo check --workspace --exclude bindforge-registry --all-targets \
+            --target x86_64-pc-windows-msvc
+      - name: Host compile check (registry)
+        # The half of the coverage the Windows leg gave up: the host target
+        # has the C toolchain `ring` needs, and every other leg builds the
+        # registry anyway — this step names the promise so dropping it from
+        # a leg cannot silently drop the coverage (design 027 §Compatibility
+        # matrix, Windows row).
+        run: cargo check -p bindforge-registry --all-targets
       - name: Format check
         run: cargo fmt --all -- --check
       - name: Clippy
@@ -58,4 +79,48 @@ jobs:
         working-directory: tools/orchestration
       - name: Check
         run: npm run check
-        working-directory: tools/orchestration
+
+  advisory-gate:
+    # ADR-027 Rollout 3: the RUSTSEC screen beside the cargo trio. The store-pull
+    # stack's headline mitigation is its named version floors
+    # (apps/registry/Cargo.toml); this job is what makes the floors load-bearing
+    # — a Cargo.lock re-resolution onto an advised rustls/rustls-webpki/
+    # webpki-roots version turns the PR red here, not in next week's report.
+    # Advisories only: the bans/licenses/sources sections stay the scheduled
+    # workflow's triage input, and the full SARIF report stays there too. Its
+    # own job with its own budget because installing the pinned scanner builds
+    # it from source — too heavy for the 15-minute `rust` job — on a toolchain
+    # deliberately independent of the product pin (see advisories.yml for why).
+    # (The rationale sits inside the job rather than above it because the gate
+    # contract reads this file's `jobs:` mapping line by line: a comment at the
+    # mapping's own indent is read as a job.)
+    runs-on: ubuntu-latest
+    # The scanner build is hundreds of crates; same budget as the scheduled
+    # scan's install-plus-run job.
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      # Keep in lockstep with advisories.yml: one scanner, one pin, bumped
+      # together.
+      SCAN_TOOLCHAIN: "1.88.0"
+      CARGO_DENY_VERSION: "0.20.2"
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install cargo-deny (pinned, on the scanner toolchain)
+        run: |
+          rustup toolchain install "$SCAN_TOOLCHAIN" --profile minimal
+          RUSTUP_TOOLCHAIN="$SCAN_TOOLCHAIN" \
+            cargo install cargo-deny --version "$CARGO_DENY_VERSION" --locked
+      - name: RUSTSEC screen (advisories only, findings fail the PR)
+        # Unlike the scheduled scan, a finding here exits non-zero and turns
+        # the job red — that is the whole point of the screen. Waivers live
+        # in the root deny.toml and apply identically to both jobs, so a
+        # triaged waiver never asks the PR author to fight the gate.
+        # The repo root, like the scheduled scan: `deny.toml` and the `Cargo.lock`
+        # whose rustls/rustls-webpki/webpki-roots versions the floors protect are both
+        # here, and `tools/orchestration` has neither — a screen run there would read no
+        # lockfile at all and turn nothing red.
+        run: |
+          RUSTUP_TOOLCHAIN="$SCAN_TOOLCHAIN" \
+            cargo deny check advisories

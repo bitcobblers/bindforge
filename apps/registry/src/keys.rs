@@ -45,22 +45,10 @@ pub fn percent_decode(value: &str) -> Option<String> {
     String::from_utf8(out).ok()
 }
 
-/// Percent-encodes everything outside the RFC 3986 unreserved set — the copied
-/// shipped-client rule (A19), so the inbound form a client sent and the outbound
-/// form this registry builds are the same encoding of the same decoded key.
-#[must_use]
-pub fn percent_encode(value: &str) -> String {
-    let mut out = String::with_capacity(value.len());
-    for byte in value.as_bytes() {
-        match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
-                out.push(*byte as char);
-            }
-            other => out.push_str(&format!("%{other:02X}")),
-        }
-    }
-    out
-}
+// `percent_encode` (the copied shipped-client escape-everything rule, A19) retired
+// with `upstream.rs`: it built the outbound request target, and this registry builds
+// no outbound requests now. Inbound decoding — [`percent_decode`] — is the half the
+// serving face still needs.
 
 /// Whether `key` is a lookup key this registry will act on: inside `025-B1`'s cap,
 /// spelled `<token>/<external-id>` against the closed source-token set, carrying one
@@ -101,7 +89,7 @@ mod tests {
     //! The key rule as the design states it, one row per spelling it names: the cap
     //! and `spells_lookup_key` ride the decoded bytes, path safety is the only extra
     //! refusal, and `is_slug_name`'s dot ban stays `game_id`-only.
-    use super::{key_is_admissible, percent_decode, percent_encode};
+    use super::{key_is_admissible, percent_decode};
 
     #[test]
     fn the_admitted_alphabet_is_the_shipped_pair_plus_one_component() {
@@ -172,11 +160,6 @@ mod tests {
         assert!(key_is_admissible(&decoded), "the cap rides the decoded key");
     }
 
-    #[test]
-    fn the_encoder_is_the_shipped_clients_escape_everything_rule() {
-        assert_eq!(percent_encode("local/100%"), "local%2F100%25");
-        assert_eq!(percent_encode("steam/900001"), "steam%2F900001");
-        assert_eq!(percent_encode("local/two words"), "local%2Ftwo%20words");
-        assert_eq!(percent_encode("local/Steam.SE"), "local%2FSteam.SE");
-    }
+    // `percent_encode`'s own check retired with `upstream.rs`, the only product code
+    // that built an outbound request target; the suites' encoder is `tests/common`.
 }

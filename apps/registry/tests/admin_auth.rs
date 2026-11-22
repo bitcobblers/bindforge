@@ -11,6 +11,18 @@
 //! ("configured ⇒ required everywhere"; enablement judged from the address actually
 //! bound via `IpAddr::is_loopback` on the listener's `local_addr()`).
 //!
+//! # What ADR-027 adds to this file
+//!
+//! `027-C6` puts one new route behind this same rule — `DELETE
+//! /v1/admin/issued/<game_id>`, "behind the identical enablement/auth rule
+//! (loopback-or-bearer, same `401`/`404` posture)" (§The curation face) — and Test
+//! strategy #10 pins the issued route's auth posture as *identical* to the corpus
+//! routes'. So the route is in every matrix here: it is asked without a credential,
+//! with a wrong one, with a valid one and an `Origin`, and on a face disabled by an
+//! ungated routable bind. What is specific to the route — the `Absent` refusal, the
+//! retire-and-remove persists, the no-bulk-verb posture — belongs to
+//! `retired_ids_and_curation.rs` and is not restated here.
+//!
 //! The routable bind is `0.0.0.0`, whose `local_addr()` is not loopback; every run
 //! still talks to the instance over `127.0.0.1`, so nothing leaves the host. Only
 //! methods a route actually carries are asked without a credential, so the auth
@@ -39,7 +51,9 @@ fn root(label: &str, extra: &[&str]) -> (TempDir, std::path::PathBuf, Registry) 
     (data, corpus, server)
 }
 
-/// The three admin requests, each with a method its route carries.
+/// Every request the admin face carries, each with a method its route carries: the
+/// corpus pair `026-C4`/`026-C5` shipped with, and `027-C6`'s issued delete — which
+/// Test strategy #10 requires to carry *this* posture, not its own.
 fn carried_admin_requests() -> Vec<(&'static str, &'static str, &'static str)> {
     vec![
         ("GET", "/v1/admin/stats", ""),
@@ -49,6 +63,7 @@ fn carried_admin_requests() -> Vec<(&'static str, &'static str, &'static str)> {
             "{\"game_id\":\"new-game\",\"name\":\"New Game\",\"source_keys\":[]}",
         ),
         ("DELETE", "/v1/admin/games/example-game", ""),
+        ("DELETE", "/v1/admin/issued/example-game", ""),
     ]
 }
 
@@ -79,9 +94,11 @@ fn a_loopback_admin_face_answers_with_no_credential() {
     );
 }
 
-/// proves: `026-C5` as design 026 resolves open Q11 (Test strategy #9) — once a
-/// token is configured it is required on every admin request, including on a
-/// loopback bind, on all three routes.
+/// proves: `026-C5` as design 026 resolves open Q11 (Test strategy #9), with
+/// `027-C6`'s issued delete in the same matrix (Test strategy #10's "auth posture
+/// identical to the corpus routes") — once a token is configured it is required on
+/// every admin request, including on a loopback bind, on every route the face
+/// carries.
 #[test]
 fn a_configured_token_is_required_on_every_admin_request_including_loopback() {
     let (_data, corpus, server) = root("auth-required", &["--admin-token", TOKEN]);
@@ -183,7 +200,8 @@ fn a_refused_admin_request_is_401_with_a_bearer_challenge_and_no_token_echo() {
 /// proves: `026-C5`'s second clause and design 026's resolution of the ADR's
 /// ambiguity (Test strategy #9) — a non-loopback bind with **no** token leaves the
 /// admin face disabled, a disabled admin route is a `404` (never a `401` oracle),
-/// and the serving face keeps answering.
+/// and the serving face keeps answering — with `027-C6`'s issued delete asked on the
+/// same terms (Test strategy #10).
 #[test]
 fn a_non_loopback_bind_without_a_token_disables_the_admin_face() {
     let (_data, corpus, server) = root("auth-disabled", &["--host", "0.0.0.0"]);
@@ -231,6 +249,9 @@ fn a_non_loopback_bind_without_a_token_disables_the_admin_face() {
 /// every method including ones an enabled route would answer with a `405`, and no
 /// answer carries an `Allow` header. An `Allow` list on a disabled face is an
 /// existence oracle, and `026-C5`'s rule is that the routes are *absent*.
+/// `027-C6` adds a route to that face, and §The curation face puts it behind the
+/// identical enablement rule, so the new path — the collection spelling as well as
+/// the `<game_id>` one — is pinned to the same flat `404`.
 #[test]
 fn a_disabled_admin_face_publishes_no_allow_list_for_any_method() {
     let (_data, corpus, server) = root("auth-flat404", &["--host", "0.0.0.0"]);
@@ -247,6 +268,9 @@ fn a_disabled_admin_face_publishes_no_allow_list_for_any_method() {
         ("PUT", "/v1/admin/games"),
         ("DELETE", "/v1/admin/games/example-game"),
         ("PUT", "/v1/admin/games/example-game"),
+        ("DELETE", "/v1/admin/issued/example-game"),
+        ("PUT", "/v1/admin/issued/example-game"),
+        ("POST", "/v1/admin/issued"),
     ] {
         let answer = server.request(method, target, &[], body);
         assert_eq!(
@@ -280,7 +304,9 @@ fn a_disabled_admin_face_publishes_no_allow_list_for_any_method() {
 /// request this plain-HTTP bearer face can never authenticate) — an admin request
 /// carrying an `Origin`, even with a valid credential, is the named `400`, decided
 /// before any mutation: the document is byte-identical afterwards and the same
-/// request without `Origin` still lands.
+/// request without `Origin` still lands. `027-C6`'s issued delete shares the gate
+/// (§The curation face's "identical enablement/auth rule"), so a mutating call on
+/// the new route is in the matrix too.
 #[test]
 fn an_admin_request_carrying_an_origin_is_400_and_mutates_nothing() {
     let (_data, corpus, server) = root("auth-origin", &["--admin-token", TOKEN]);
@@ -294,6 +320,12 @@ fn an_admin_request_carrying_an_origin_is_400_and_mutates_nothing() {
         (
             "DELETE",
             "/v1/admin/games/example-game",
+            bearer.as_str(),
+            "",
+        ),
+        (
+            "DELETE",
+            "/v1/admin/issued/example-game",
             bearer.as_str(),
             "",
         ),
@@ -531,8 +563,8 @@ fn an_authenticated_wrong_method_on_an_admin_route_is_405_naming_its_methods() {
 }
 
 /// proves: `026-L3` and Test strategy #18's admin half — no admin route answers a
-/// whole document: `stats` is three counts, and every bulk-shaped path is a `404`
-/// even to a correctly authenticated caller.
+/// whole document: `stats` is the four integer counts `027-C6` fixes, and every
+/// bulk-shaped path is a `404` even to a correctly authenticated caller.
 #[test]
 fn no_admin_route_answers_the_whole_document() {
     let (_data, corpus, server) = root("auth-nobulk", &["--admin-token", TOKEN]);
@@ -556,10 +588,13 @@ fn no_admin_route_answers_the_whole_document() {
     let stats = server.get_with_token("/v1/admin/stats", TOKEN);
     let document = json_body(&stats);
     let counts = document.as_object().expect("stats is an object");
+    let mut names: Vec<&str> = counts.keys().map(String::as_str).collect();
+    names.sort();
     assert_eq!(
-        counts.keys().cloned().collect::<Vec<String>>().len(),
-        3,
-        "`stats` is exactly `{{games, source_keys, revision}}`: {document:?}"
+        names,
+        vec!["games", "issued", "revision", "source_keys"],
+        "`stats` is exactly the four counts the design fixes (`027-C6` added `issued` \
+         to `026-C4`'s three), and none of them is a list: {document:?}"
     );
     assert!(
         !document.to_string().contains("steam/900001"),

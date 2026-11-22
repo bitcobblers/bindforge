@@ -337,9 +337,50 @@ impl Catalog {
     /// `revision` the model carries, and the records in `game_id` byte order.
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
-        let games: Vec<serde_json::Value> = self
-            .records
-            .values()
+        Self::write_document(self.revision, self.records.values())
+    }
+
+    /// The document as it would read with `record` in it, computed **against the live
+    /// model rather than a clone of it**: the same `game_id` byte order
+    /// [`Catalog::to_bytes`] writes, with this one record spliced into its place, under
+    /// the `revision` the matching [`Catalog::insert`] will carry.
+    ///
+    /// This is the seam §Concurrency's mint shape needs — a writer "computes and
+    /// serializes the new document straight into the write buffer" — because at
+    /// `027-B3`'s cap a mint that cloned the model first paid a full records-and-postings
+    /// copy, an index rebuild, and the whole serialization per novel key, all inside the
+    /// one mutation lock. A `game_id` the document already holds is replaced, the way
+    /// [`Catalog::upsert`] replaces it.
+    #[must_use]
+    pub fn to_bytes_with(&self, record: &Record) -> Vec<u8> {
+        let mut games: Vec<&Record> = Vec::with_capacity(self.records.len() + 1);
+        let mut spliced = false;
+        for existing in self.records.values() {
+            match existing.game_id.cmp(&record.game_id) {
+                std::cmp::Ordering::Less => games.push(existing),
+                std::cmp::Ordering::Equal => {
+                    games.push(record);
+                    spliced = true;
+                }
+                std::cmp::Ordering::Greater => {
+                    if !spliced {
+                        games.push(record);
+                        spliced = true;
+                    }
+                    games.push(existing);
+                }
+            }
+        }
+        if !spliced {
+            games.push(record);
+        }
+        Self::write_document(self.revision + 1, games.iter().copied())
+    }
+
+    /// The one document spelling: `version`, the given `revision`, and `games` in the
+    /// order handed over.
+    fn write_document<'a>(revision: u64, games: impl Iterator<Item = &'a Record>) -> Vec<u8> {
+        let games: Vec<serde_json::Value> = games
             .map(|record| {
                 serde_json::json!({
                     "game_id": record.game_id,
@@ -350,10 +391,36 @@ impl Catalog {
             .collect();
         serde_json::to_vec(&serde_json::json!({
             "version": DOCUMENT_VERSION,
-            "revision": self.revision,
+            "revision": revision,
             "games": games,
         }))
         .expect("a catalog document of plain records serializes")
+    }
+
+    /// Adds a record the document does not hold yet: `revision` bumps, and the
+    /// postings are **inserted** — one map entry per source key, the new `game_id` put
+    /// into the existing posting at its ordered position. That is §Concurrency's mint
+    /// shape ("a mint inserts the new key's posting rather than rebuilding the index"):
+    /// rebuilding at the issued cap would walk every record and re-clone every posted id
+    /// per mint, under the mutation lock, for one new key.
+    ///
+    /// A `game_id` the document already holds is not an insert, so it falls back to
+    /// [`Catalog::upsert`] — the operation that can retire the postings the replaced
+    /// record used to hold.
+    pub fn insert(&mut self, record: Record) {
+        if self.records.contains_key(&record.game_id) {
+            self.upsert(record);
+            return;
+        }
+        let game_id = record.game_id.clone();
+        for key in &record.source_keys {
+            let posting = self.postings.entry(key.clone()).or_default();
+            if let Err(at) = posting.binary_search(&game_id) {
+                posting.insert(at, game_id.clone());
+            }
+        }
+        self.records.insert(game_id, record);
+        self.revision += 1;
     }
 
     /// `026-C4`'s upsert: replaces or adds the whole record, bumps `revision`, and
@@ -462,7 +529,9 @@ pub fn record_from_value(value: &serde_json::Value) -> Result<Record, String> {
 mod tests {
     //! The loader's refusals and its arithmetic, in-process: the join's order and
     //! truncation, the projection, and the record gate the admin face shares.
-    use super::{Catalog, candidates_body, game_id_is_valid, record_from_value, response_bounded};
+    use super::{
+        Catalog, Record, candidates_body, game_id_is_valid, record_from_value, response_bounded,
+    };
     use crate::constants::{MAX_CANDIDATES, MAX_RESPONSE_OCTETS};
     use std::path::Path;
 
@@ -474,6 +543,54 @@ mod tests {
 
     fn record(game_id: &str, keys: &[&str]) -> serde_json::Value {
         serde_json::json!({"game_id": game_id, "name": "A Game", "source_keys": keys})
+    }
+
+    /// The incremental document and the whole document are one spelling.
+    ///
+    /// §Concurrency's mint shape serializes the new document **against the live model**
+    /// and inserts the new key's posting rather than rebuilding the index, which is only
+    /// a cheaper spelling of the same contract if the bytes agree with the model-clone
+    /// shape it replaced. This pins that, so the mint's fast path cannot drift from the
+    /// document every other seam — loader, admin face, the next mint — reads.
+    #[test]
+    fn the_incremental_document_spelling_is_the_whole_document_spelling() {
+        let catalog = Catalog::from_document(
+            &document(vec![
+                record("alpha", &["steam/900100"]),
+                record("bravo", &["steam/900200"]),
+                record("delta", &["steam/900400"]),
+            ]),
+            Path::new("issued-v1.json"),
+        )
+        .expect("the document loads");
+        let novel = Record {
+            game_id: "charlie".to_string(),
+            name: "Charlie Game".to_string(),
+            source_keys: vec!["steam/900300".to_string()],
+        };
+        let mut inserted = catalog.clone();
+        inserted.insert(novel.clone());
+        assert_eq!(
+            catalog.to_bytes_with(&novel),
+            inserted.to_bytes(),
+            "the spliced bytes are the bytes the insert produces, in `game_id` order and \
+             under the same `revision`"
+        );
+
+        // A `game_id` the document already holds is replaced by both spellings — the
+        // splice puts it in the place the old record held, the upsert replaces it there.
+        let repeat = Record {
+            game_id: "bravo".to_string(),
+            name: "Renamed Bravo".to_string(),
+            source_keys: vec!["steam/900200".to_string(), "epic/7".to_string()],
+        };
+        let mut replaced = catalog.clone();
+        replaced.upsert(repeat.clone());
+        assert_eq!(
+            catalog.to_bytes_with(&repeat),
+            replaced.to_bytes(),
+            "a replacement splices into the record's own place"
+        );
     }
 
     #[test]

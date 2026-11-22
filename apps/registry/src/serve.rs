@@ -15,6 +15,7 @@ use crate::admin::{self, Admin, Dispatch, Route};
 use crate::constants;
 use crate::http::{self, Refused, Request, RequestHead, json_object, refusal_body};
 use crate::keys::key_is_admissible;
+use crate::persist;
 use crate::state::{Answer, State};
 
 /// The connection slots, counted so the ceiling is a fact rather than an
@@ -76,7 +77,7 @@ pub fn serve(listener: TcpListener, state: Arc<State>, admin: Arc<Admin>) -> std
                 // went away) is reported and ridden out: the instance keeps serving.
                 eprintln!(
                     "warning: accepting a connection failed: {}",
-                    crate::upstream::echo_safe(&error.to_string())
+                    persist::echo_safe(&error.to_string())
                 );
                 continue;
             }
@@ -102,7 +103,7 @@ pub fn serve(listener: TcpListener, state: Arc<State>, admin: Arc<Admin>) -> std
                 // The slot comes back with the guard when this scope exits.
                 eprintln!(
                     "warning: no thread for a connection: {}",
-                    crate::upstream::echo_safe(&error.to_string())
+                    persist::echo_safe(&error.to_string())
                 );
             }
         }
@@ -300,17 +301,14 @@ fn candidates_answer(state: &State, request: &Request) -> Sent {
             // copy of the arithmetic exists.
             Sent::Json(crate::corpus::candidates_body(&candidates))
         }
-        // The `026-L4` cold case: a legible reason phrase, because the shipped CLI
-        // shows the user nothing but the status line (A2), and a body that is a
-        // named refusal rather than the empty list it must never degrade into.
-        Answer::NoAnswer => Sent::Refusal {
+        // ADR-027's named `503`s: the reason phrase carries the name, because the
+        // shipped CLI shows the user nothing but the status line (A2), and the body
+        // is a named refusal rather than the empty list the policy must never
+        // degrade into. The empty list it *does* answer is the other arm.
+        Answer::Refusal(named) => Sent::Refusal {
             status: 503,
-            reason: "No catalog answer for slug",
-            body: refusal_body(
-                "no_answer",
-                "this caching registry has no local entry, no cache entry, and no reachable \
-                 upstream for that slug",
-            ),
+            reason: named.reason(),
+            body: refusal_body(named.code(), &named.detail()),
             allow: None,
         },
     }
@@ -375,7 +373,7 @@ fn write(stream: &mut std::net::TcpStream, answer: Sent) {
         // A peer that hung up mid-answer is not an incident; the answer was made.
         eprintln!(
             "warning: writing the answer failed: {}",
-            crate::upstream::echo_safe(&error.to_string())
+            persist::echo_safe(&error.to_string())
         );
     }
 }

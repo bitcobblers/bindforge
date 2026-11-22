@@ -43,7 +43,7 @@ use bindforge_core::escape_and_truncate;
 
 use crate::corpus::{game_id_is_valid, record_from_value};
 use crate::http::{Request, RequestHead, json_object, refusal_body};
-use crate::state::{AdminRefusal, State};
+use crate::state::{AdminRefusal, Named, State};
 
 /// The scheme token the compared value follows.
 const BEARER: &str = "Bearer ";
@@ -53,6 +53,9 @@ const GAMES: &str = "/v1/admin/games";
 const STATS: &str = "/v1/admin/stats";
 /// The parameter prefix, whose one segment is a `game_id`.
 const GAME_PREFIX: &str = "/v1/admin/games/";
+/// `027-C6`'s second parameter prefix: the same grammar, applied to the issued
+/// document. Its auth posture is identical to [`GAME_PREFIX`]'s.
+const ISSUED_PREFIX: &str = "/v1/admin/issued/";
 
 /// An admin route the caller is standing in front of.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -64,6 +67,9 @@ pub enum Route {
     /// `DELETE /v1/admin/games/<game_id>`, with the path segment already
     /// percent-decoded by the request reader.
     Delete { game_id: String },
+    /// `DELETE /v1/admin/issued/<game_id>` (`027-C6`): the mint's record leaves the
+    /// issued document and its id enters the retired set.
+    DeleteIssued { game_id: String },
 }
 
 /// What the routing decision for one `/v1/admin/**` path and method is.
@@ -106,6 +112,20 @@ pub fn dispatch(path: &str, method: &str) -> Dispatch {
     {
         return if method == "DELETE" {
             Dispatch::Carried(Route::Delete {
+                game_id: segment.to_string(),
+            })
+        } else {
+            Dispatch::NotARoute
+        };
+    }
+    // `027-C6`: one issued record per call, no bulk retire, and the same
+    // parameterized-path posture as `026-C4`: a route only for the method it carries.
+    if let Some(segment) = path.strip_prefix(ISSUED_PREFIX)
+        && !segment.is_empty()
+        && !segment.contains('/')
+    {
+        return if method == "DELETE" {
+            Dispatch::Carried(Route::DeleteIssued {
                 game_id: segment.to_string(),
             })
         } else {
@@ -208,6 +228,18 @@ impl Answer {
         }
     }
 
+    /// A refusal the instance's own capacity law names: the status is the named
+    /// condition's, the reason phrase and the body token are its name, and the detail
+    /// is its sentence — the same rendering `serve` gives a lookup's named `503`, so
+    /// one name reaches the operator the same way from either path.
+    fn named(named: &Named) -> Self {
+        Self {
+            status: 503,
+            reason: named.reason(),
+            body: refusal_body(named.code(), &named.detail()),
+        }
+    }
+
     fn refused(status: u16, detail: impl Into<String>) -> Self {
         let reason = match status {
             404 => "Not Found",
@@ -235,6 +267,7 @@ pub fn handle(route: Route, state: &State, request: &Request) -> Answer {
         Route::Stats => Answer::ok(json_object(&state.stats())),
         Route::Upsert => handle_upsert(state, &request.body),
         Route::Delete { game_id } => handle_delete(state, &game_id),
+        Route::DeleteIssued { game_id } => handle_delete_issued(state, &game_id),
     }
 }
 
@@ -268,12 +301,32 @@ fn handle_delete(state: &State, game_id: &str) -> Answer {
     }
 }
 
+/// `027-C6`'s issued delete: the same grammar check, the same `Absent` refusal shape
+/// the corpus delete answers (`026-C4`), and the two persists behind it that retire
+/// the id before they remove the record.
+fn handle_delete_issued(state: &State, game_id: &str) -> Answer {
+    if !game_id_is_valid(game_id) {
+        return Answer::refused(
+            422,
+            format!(
+                "the path segment `{}` is not a `game_id` the catalog contract admits",
+                escape_and_truncate(game_id)
+            ),
+        );
+    }
+    match state.remove_issued(game_id) {
+        Ok(()) => Answer::ok(json_object(&state.stats())),
+        Err(rejected) => refusal(rejected),
+    }
+}
+
 /// Maps a state-level refusal onto its status line.
 fn refusal(refusal: AdminRefusal) -> Answer {
     match refusal {
         AdminRefusal::Reject { status, detail } => Answer::refused(status, detail),
         AdminRefusal::Absent { detail } => Answer::refused(404, detail),
         AdminRefusal::Persist { detail } => Answer::refused(500, detail),
+        AdminRefusal::Named(named) => Answer::named(&named),
     }
 }
 

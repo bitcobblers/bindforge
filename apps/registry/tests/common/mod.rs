@@ -429,6 +429,31 @@ pub fn registry_document(data_home: &Path, file: &str) -> PathBuf {
     data_home.join("bindforge").join("registry").join(file)
 }
 
+/// The path of §Concurrency's cross-process `<data>` lock.
+pub fn write_lock(data_home: &Path) -> PathBuf {
+    registry_document(data_home, "write.lock")
+}
+
+/// The runbook's recovery act for a crashed run — §Concurrency: "A crashed run
+/// leaves the file; the runbook names deleting it", and Rollout 6 carries that act
+/// to `docs/registry-hosting.md`.
+///
+/// A harness `Registry` is closed by `Drop`, which is `child.kill()`, so the run it
+/// stood up is *exactly* the crashed run §Concurrency describes: the lock stays, and
+/// `027-C4`'s single-writer rule then refuses every next instance ("finding it
+/// present is the named startup refusal"). A leg that restarts over the same `<data>`
+/// therefore performs the operator's act between the two runs — it is not an act a
+/// run performs, and no product seam may delete the lock for it: the whole point of
+/// the refusal is that only a human decides a lock is stale.
+pub fn clear_crashed_run_write_lock(data_home: &Path) {
+    let path = write_lock(data_home);
+    match std::fs::remove_file(&path) {
+        Ok(()) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(err) => panic!("deleting the crashed run's {}: {err}", path.display()),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // The registry subprocess.
 // ---------------------------------------------------------------------------
@@ -440,6 +465,12 @@ pub struct Registry {
     port: u16,
     stdout: Arc<Mutex<Vec<String>>>,
     stderr: Arc<Mutex<Vec<String>>>,
+    /// The sandboxed `<data>` `start` handed this instance (None when the leg
+    /// spelled its own data home). It lives here so the tree goes with the
+    /// instance: `Drop for Registry` kills the child first, and the fields then
+    /// drop in declaration order, so the directory is only removed once its writer
+    /// is gone.
+    _default_data: Option<TempDir>,
 }
 
 impl Registry {
@@ -478,15 +509,38 @@ impl Registry {
     /// Any `registry` invocation, with the ambient endpoint/token/data variables
     /// removed first so no run inherits a developer's documents or reaches
     /// anything the test did not stand up.
+    ///
+    /// Two ADR-027 defaults carry a leg that is not itself *about* `<data>` or the
+    /// store supply. A leg that spells no data-home variable is handed a sandboxed
+    /// `<data>` of its own, because `027-C4` made a resolvable `<data>` a startup
+    /// requirement and a pre-027 boot is that refusal now. A leg that spells
+    /// neither `--no-steam` nor a steam key runs `--no-steam`, because `027-C3`
+    /// makes a key-less run without it a startup requirement too and `--no-steam`
+    /// is the inert-supply posture Test strategy #17's no-outbound rule wants. A
+    /// leg that pins either posture spells it and the default steps aside; the
+    /// startup-refusal suites go through `expect_refused_startup`/`run_registry`,
+    /// which keep the scrubbed environment with no default at all.
     pub fn start(label: &str, args: &[&str], envs: &[(&str, &str)]) -> Self {
-        let _ = label;
+        let spells_data_home = envs
+            .iter()
+            .any(|(name, _)| matches!(*name, "XDG_DATA_HOME" | "HOME" | "APPDATA"));
+        let default_data = (!spells_data_home).then(|| TempDir::new(&format!("{label}-data")));
+        let defaults_no_steam =
+            !args.contains(&"--no-steam") && !envs.iter().any(|(name, _)| *name == STEAM_KEY_VAR);
+
         let mut command = Command::new(env!("CARGO_BIN_EXE_registry"));
         command.args(args);
+        if defaults_no_steam {
+            command.arg("--no-steam");
+        }
         for name in AMBIENT_ENV_VARS {
             command.env_remove(name);
         }
         for (key, value) in envs {
             command.env(key, value);
+        }
+        if let Some(data) = default_data.as_ref() {
+            command.env("XDG_DATA_HOME", data.path());
         }
         command.stdin(Stdio::null());
         command.stdout(Stdio::piped());
@@ -530,6 +584,7 @@ impl Registry {
             port,
             stdout,
             stderr,
+            _default_data: default_data,
         };
         server.wait_for_listener();
         server
@@ -667,10 +722,25 @@ impl Registry {
     }
 }
 
+/// The environment name `027-C3` gives the steam Web API key — the harness's one
+/// spelling of it, so the scrub list and `Registry::start`'s `--no-steam` default
+/// cannot drift apart.
+const STEAM_KEY_VAR: &str = "BINDFORGE_STEAM_WEB_API_KEY";
+
 /// The environment a registry run must never inherit from the developer's shell.
-const AMBIENT_ENV_VARS: [&str; 5] = [
+///
+/// `BINDFORGE_STEAM_WEB_API_KEY` (`027-C3`) joins the list for the same reason as
+/// the admin token and the data-home spellings, and with a sharper edge: a hosted
+/// run resolves the Web API key from the environment alone, so an instance whose
+/// run inherited a real key would put the store pull's credentials on the network
+/// from a test process. Every suite that wants a resolver therefore passes a
+/// throwaway key explicitly; nothing reaches `api.steampowered.com` by accident,
+/// and `Registry::start` reads the same name to decide whether a leg has asked for
+/// a resolver at all.
+const AMBIENT_ENV_VARS: [&str; 6] = [
     "BINDFORGE_CATALOG_URL",
     "BINDFORGE_REGISTRY_ADMIN_TOKEN",
+    STEAM_KEY_VAR,
     "XDG_DATA_HOME",
     "HOME",
     "APPDATA",

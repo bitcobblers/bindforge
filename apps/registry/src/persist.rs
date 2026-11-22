@@ -83,11 +83,29 @@ pub fn document_path(data: &Path, name: &str) -> PathBuf {
     registry_dir(data).join(name)
 }
 
-/// The cache document's name (`026-C7`).
+/// The cache document's name (`026-C7`). Retired as a *name* by ADR-027: a hosted
+/// instance refuses to start on it rather than carrying inert state, which is the
+/// only thing it still reads it for.
 pub const CACHE_DOCUMENT: &str = "cache-v1.json";
 
-/// The local-entries document's name (`026-C7`).
+/// The local-entries document's name (`026-C7`). Retired with
+/// [`CACHE_DOCUMENT`], with the same exception: `--corpus` may name it.
 pub const CATALOG_DOCUMENT: &str = "catalog-v1.json";
+
+/// `027-C4`: the issued document — a `026-C3` catalog document the instance mints
+/// into, with its own `revision`.
+pub const ISSUED_DOCUMENT: &str = "issued-v1.json";
+
+/// `027-L2`: the retired-ids document — `{version, ids}` in byte order, the memory
+/// that makes "deleting a record never frees its id" true.
+pub const RETIRED_IDS_DOCUMENT: &str = "retired-ids-v1.json";
+
+/// `027-C3`: the steam snapshot, the resolver's whole knowledge of the store.
+pub const STEAM_SNAPSHOT_DOCUMENT: &str = "steam-snapshot.json";
+
+/// §Concurrency's cross-process guard: `<data>/bindforge/registry/write.lock`, taken
+/// under `create_new` by `serve` and `query` and removed on exit.
+pub const WRITE_LOCK: &str = "write.lock";
 
 /// Echoes a path inside the shared renderer's bounds without cutting off the file
 /// name an operator has to act on: the parent is escaped and truncated, the last
@@ -114,6 +132,30 @@ pub fn echo_path(path: &Path) -> String {
     )
 }
 
+/// The stderr value filter every warning passes through: exactly one line of
+/// printable ASCII. Control bytes become backslash-`u` escapes, and long values are
+/// truncated the way the error discipline truncates them. Common typographic
+/// punctuation — the prose in this crate's own refusal text — folds to its ASCII
+/// spelling, and anything else outside ASCII is escaped rather than written. One
+/// hostile store error, or one badly-worded document, therefore
+/// cannot forge an extra stderr line or smuggle a non-ASCII byte into a log an
+/// operator's tooling reads as ASCII (`027-L4`'s scrubbing half).
+#[must_use]
+pub fn echo_safe(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for c in bindforge_core::escape_and_truncate(value).chars() {
+        match c {
+            '—' | '–' | '−' => out.push('-'),
+            '…' => out.push_str("..."),
+            '‘' | '’' => out.push('\''),
+            '“' | '”' => out.push('"'),
+            c if c.is_ascii() => out.push(c),
+            other => out.push_str(&format!("\\u{:04x}", other as u32)),
+        }
+    }
+    out
+}
+
 /// A persist that did not happen: what stopped it, naming the document in the
 /// reason itself (every call site names the path in its own words).
 #[derive(Debug)]
@@ -129,8 +171,11 @@ impl PersistError {
     }
 }
 
-/// Creates `dir` if it is missing, owner-only where unix modes apply (A8).
-fn owner_only_dir(dir: &Path) -> std::io::Result<()> {
+/// Creates `dir` if it is missing, owner-only where unix modes apply (A8). Public
+/// because ADR-027's hosted instance takes its `<data>` write lock in this
+/// directory before it has anything to persist, so the directory has to be created
+/// by a caller that is not saving a document.
+pub fn owner_only_dir(dir: &Path) -> std::io::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;
@@ -138,7 +183,7 @@ fn owner_only_dir(dir: &Path) -> std::io::Result<()> {
             .recursive(true)
             .mode(0o700)
             .create(dir)?;
-        std::fs::set_permissions(dir, std::os::unix::fs::PermissionsExt::from_mode(0o700))
+        narrow_to_owner_only(dir)
     }
     #[cfg(not(unix))]
     {
@@ -146,9 +191,30 @@ fn owner_only_dir(dir: &Path) -> std::io::Result<()> {
     }
 }
 
+/// Enforces [`owner_only_dir`]'s owner-only **ceiling**, which is not the same rule as
+/// "its mode is `0700`": this clears the group and other bits and never sets one, so a
+/// directory the operator holds stricter (`0500`) stays as they set it and a save into
+/// it fails closed on its own permissions. Widening it back to `0700` would undo a
+/// deliberate read-only posture on the way to a write the design says must fail — Test
+/// strategy #4's injected persist failure is the named `503` with the file and the
+/// model untouched, and a save that chmods the directory first answers that write `200`.
+/// A2's "parent `0700`" is the mode [`owner_only_dir`] *creates* and the ceiling this
+/// never exceeds.
+#[cfg(unix)]
+fn narrow_to_owner_only(dir: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let mode = std::fs::metadata(dir)?.permissions().mode();
+    if mode & 0o077 != 0 {
+        std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))?;
+    }
+    Ok(())
+}
+
 /// Opens a fresh file for writing, refusing to follow or reuse an existing entry,
-/// owner-only where unix modes apply (A7).
-fn owner_only_new_file(path: &Path) -> std::io::Result<File> {
+/// owner-only where unix modes apply (A7). Public for the same reason
+/// [`owner_only_dir`] is: §Concurrency's `write.lock` is taken with exactly this
+/// exclusive-creation discipline.
+pub fn owner_only_new_file(path: &Path) -> std::io::Result<File> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;

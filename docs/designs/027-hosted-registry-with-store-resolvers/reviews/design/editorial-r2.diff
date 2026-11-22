@@ -1,0 +1,129 @@
+diff --git a/tmp/bindforge-editorial-hosted-registry-with-store-resolvers-r2.md b/home/mike/repos/bindforge-wt/027-hosted-registry/docs/designs/027-hosted-registry-with-store-resolvers/02-proposal.md
+index d105d78c..c45dac32 100644
+--- a/tmp/bindforge-editorial-hosted-registry-with-store-resolvers-r2.md
++++ b/home/mike/repos/bindforge-wt/027-hosted-registry/docs/designs/027-hosted-registry-with-store-resolvers/02-proposal.md
+@@ -28,7 +28,7 @@ untouched. Link:
+   - Issued entries (`027-C4`, `027-C5`): a second `026-C3` document, the
+     mint rule with its collision and degenerate-name spellings,
+     persist-before-serve under the mutation lock, and `027-L2` identity
+-    bookkeeping that deleted ids never return.
++    bookkeeping ensuring that deleted ids never return.
+   - The miss's honesty (`027-L3`) pinned as a decision table, including the
+     epic (inactive-resolver) and `local/` (never-resolved) postures.
+   - The curation face (`027-C6`): `DELETE /v1/admin/issued/<game_id>` and
+@@ -158,8 +158,8 @@ line prints `registry hosted listening on http://{bound}`.
+   caching-mode rule — a posture change from root mode, which needed none),
+   whose write lock the run then takes (§Concurrency's `write.lock`: finding
+   it held is the named refusal `registry data directory is locked`).
+-- `--upstream <url>` and `--refresh-interval <seconds>` join the named-
+-  refusal family with lines that quote the flag and name the retirement
++- `--upstream <url>` and `--refresh-interval <seconds>` join the
++  named-refusal family with lines that quote the flag and name the retirement
+   (`--upstream is not a flag this registry runs: caching mode retired with
+   ADR-027`), distinct from the unknown-flag refusal; the flags stay in the
+   parser *only* to be refused, so a stale operator invocation explains
+@@ -170,7 +170,7 @@ line prints `registry hosted listening on http://{bound}`.
+   data directory rather than carrying inert state — except at the path
+   `--corpus` names, which is how an operator keeps reading their old entries
+   across the upgrade (§Rollout 6 says whether they are copied or dropped).
+-- New flags: `--no-steam` (serve with the steam resolver inactive; the
++- New flag: `--no-steam` (serve with the steam resolver inactive; the
+   snapshot is never loaded and never pulled). The Web API key arrives only
+   through `BINDFORGE_STEAM_WEB_API_KEY` (`027-C3`); a missing or empty value
+   without `--no-steam` is a named startup refusal — required regardless of
+@@ -184,7 +184,7 @@ line prints `registry hosted listening on http://{bound}`.
+   `/v1/health`) retires with the mode: the hosted instance's only content
+   sources are the corpus file, the issued document, and the snapshot.
+ - `registry query <slug>` survives as the one-shot hosted lookup policy
+-  (§The hosted lookup policy): same startup as `serve` including
++  (§The hosted lookup policy): same startup as `serve`, including
+   load-or-pull, no refresh thread, one lookup with its provenance (`corpus`
+   or `issued`, or the shipped `(no candidates)` line with provenance `none`
+   for the policy's two `200 []` branches), non-zero exit on every named-503
+@@ -198,7 +198,7 @@ line prints `registry hosted listening on http://{bound}`.
+   string `"none"` (the resolver-inactive or no-snapshot spelling, following
+   the retired `upstream: "none"` precedent). `upstream`, `cached_slugs`,
+   and `last_upstream_fetch` are gone — the
+-  caching facts retire with the mode and `steam_snapshot.fetched_at` is
++  caching facts retire with the mode, and `steam_snapshot.fetched_at` is
+   their successor. The issued count is deliberately **not** public health —
+   it lands in `stats` (`027-C6`).
+ 
+@@ -336,12 +336,12 @@ deleting the snapshot file (§Rollout's runbook). `fetched_at` is the wall
+ clock read *before the pull's first page request*, never the publish-time
+ stamp: a stamp later than the data it certifies leaves the next delta's
+ `if_modified_since` above apps the pull never saw, and they stay unseen
+-until the operator deletes the snapshot; overlapping only re-fetches an item
++until the operator deletes the snapshot; an overlap only re-fetches an item
+ the appid merge absorbs.
+ 
+ The refresh thread lives in `main.rs`'s `serve_command` only (never
+ `query`, never under `--no-steam`): sleep `STEAM_SNAPSHOT_REFRESH_SECONDS`
+-(86,400), delta-pull, on success tmp-and-rename then publish the new model
++(86,400), delta-pull, on success tmp-and-rename, then publish the new model
+ under the snapshot `RwLock`; on failure keep the old snapshot and print one
+ escaped warning line, retrying after `STEAM_RETRY_SECONDS` — the only
+ consumer of that constant — until success.
+@@ -443,7 +443,7 @@ whose write breaches that cap, on the rename-buffer measure above, is the
+ named refusal
+ `retired id list full` and mutates nothing; failing open there re-opens a
+ retired id, which is `027-L2` broken
+-by arithmetic. In memory it is ordered insert with membership by binary
++by arithmetic. In memory it is an ordered insert with membership by binary
+ search, and a delete costs two bounded document rewrites, admin-only. The
+ mint's held-set is `games ∪ retired` across both catalog documents; an id in
+ the retired set is never minted again. `stats` does not report the retired
+@@ -530,7 +530,7 @@ spends ≤36 of them with none of that spacing, bounded only by process
+ starts — the runbook's restart policy (§Rollout 6); no separate quota
+ machinery. The four document caps total 144 MiB of JSON (16 corpus + 64
+ issued + 32 retired + 32 snapshot) as the boot load ceiling; on top of it a
+-mint holds one model plus one serialized buffer, and a delta merge the old
++mint holds one model plus one serialized buffer, and a delta merge holds the old
+ snapshot, the merged model, one serialize buffer and the current page body.
+ Rollout 4 records the measured issued-document rewrite at 100k and 200k
+ records beside that figure, so §Deferred's batched writes defer against a
+@@ -589,7 +589,7 @@ non-loopback name):
+    answers `corpus` with the issued copy invisible (`027-L5`).
+ 4. **Mint write path (`027-C4`, `027-B3`):** persist-before-serve (an
+    injected persist failure answers the named `503` with model, `revision`,
+-   and file untouched and nothing served); dedup answers the existing record
++   and file untouched, and nothing served); dedup answers the existing record
+    with zero writes; at `MAX_ISSUED_ENTRIES` a novel key is `503 mint cap
+    reached` while a held key still answers; the octet cap refuses the same
+    way; `revision` bumps per mint; two concurrent mints of one key leave one
+@@ -624,13 +624,13 @@ non-loopback name):
+    value), driven against a loopback TLS listener presenting a self-signed
+    cert *for the name being verified* and one for another name; it refuses
+    both handshakes, so the first case fails on the chain, not the hostname.
+-   Without it a verifier relaxed to accept the fake passes the whole suite
++   Without it, a verifier relaxed to accept the fake passes the whole suite
+    with the key on an unauthenticated link; both cases dial `127.0.0.1`, so
+    #17's no-outbound rule holds.
+ 7. **Issued document:** `026-C3` refusals apply verbatim; absent file = empty
+    document; the `MAX_ISSUED_DOCUMENT_OCTETS` load refusal is metadata-gated.
+ 8. **Flags and startup (`027-C1`):** `--upstream`/`--refresh-interval`
+-   produce the retirement-refusal (quoting the flag, naming ADR-027) before
++   produce the retirement refusal (quoting the flag, naming ADR-027) before
+    any bind; a leftover `cache-v1.json`/`catalog-v1.json` in the registry
+    directory is a named refusal except at the path `--corpus` names; a second
+    process against a `<data>` whose `write.lock` exists refuses before bind
+@@ -727,8 +727,8 @@ Platform:
+    half), #6, #8, #11.
+ 4. Issuance lands: `issued-v1.json`, `retired-ids-v1.json`, `mint.rs`, the
+    persist-before-serve path under §Concurrency's lock scope, the `<data>`
+-   `write.lock` startup discipline, the cap and octet postures, the measured
+-   issued-document rewrite at 100k and 200k records recorded in §Budgets,
++   `write.lock` startup discipline, the cap and octet postures, the issued-document rewrite measured
++   at 100k and 200k records, recorded in §Budgets,
+    `027-L5` suppression, and the amended miss posture — Test
+    strategy #1, #3 (stale half), #4, #5, #7, #12–#15.
+ 5. The curation face lands: the issued delete route, the retired-list append,
+@@ -768,7 +768,7 @@ Platform:
+   (carrying `026-R1`); this design's `rustls` hop does not extend it to
+   clients.
+ - The CLI self-resolution amendment for `local/<dir>` keys — the separate
+-  small ADR the source document's Consequences stands outside its ledger;
++  small ADR the source document's Consequences leaves outside its ledger;
+   nothing here preempts it.
+ - Moving `BINDFORGE_STEAM_WEB_API_KEY` and the admin token from environment
+   to `0600` file custody (CWE-526 mitigation, A14) — no follow-up yet; both

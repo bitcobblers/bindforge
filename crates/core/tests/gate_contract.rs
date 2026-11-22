@@ -11,10 +11,12 @@
 //! same commands once on a Windows contributor machine) are dated rollout checks
 //! recorded in the build notes (Rollout 7). What this suite pins is the
 //! precondition those legs are run against — that `.github/workflows/check.yml`
-//! runs exactly the three gate commands, in a job that needs no database, in two
-//! jobs that cannot break each other, with the pins the design fixes. If these
-//! assertions hold, the rollout checks have a defined thing to verify; if they
-//! fail, the one-gate promise is broken before anyone clones the repo.
+//! runs exactly the three gate commands, in a job that needs no database, in jobs
+//! that cannot break each other, with the pins the design fixes: the job set ADR-027
+//! Test strategy #17 says the cargo job grows (Rollout 3's advisory screen) and the
+//! scope it says the cross-compile leg takes on with it. If these assertions hold,
+//! the rollout checks have a defined thing to verify; if they fail, the one-gate
+//! promise is broken before anyone clones the repo.
 
 mod common;
 
@@ -190,9 +192,11 @@ fn the_rust_gate_runs_exactly_the_three_gate_commands_with_no_database() {
     let names: Vec<&str> = jobs.iter().map(|(name, _)| name.as_str()).collect();
     assert_eq!(
         names,
-        ["rust", "orchestration"],
-        "the design fixes two independent jobs per PR (Test strategy #6); the workflow declares \
-         {names:?}"
+        ["rust", "orchestration", "advisory-gate"],
+        "the PR gate is the cargo job, the orchestration job, and ADR-027 Rollout 3's RUSTSEC \
+         screen beside them — design 027 Test strategy #17 names the advisory screen as one of \
+         the two ways the cargo job changes, so the job set it pins moved with it; the workflow \
+         declares {names:?}"
     );
 
     let rust = job_block(&jobs, "rust");
@@ -247,6 +251,36 @@ fn the_two_gate_jobs_cannot_break_each_other() {
                 .any(|line| line.contains("cargo ")),
         "the `orchestration` job must be npm-only and run the package's own `npm run check`: \
          {orchestration_lines:?}"
+    );
+}
+
+/// proves: Test strategy #16 and #17, read together — "the shipped `cargo check
+/// --target x86_64-pc-windows-msvc` leg … whose scope Rollout 3 narrows so `ring`'s
+/// target build script is never asked of a runner without a target C toolchain, with
+/// `apps/registry` compile-checked on the host instead", and "The cargo job does
+/// change, per Rollout 3: the Windows leg's scope, and the advisory screen". The
+/// narrowed leg and the host leg are one exchange the design makes on purpose: the
+/// crate that carries the store pull keeps its Windows coverage, and a Linux runner is
+/// never asked to build C for a target it cannot link.
+#[test]
+fn the_windows_compile_leg_skips_the_registry_and_the_host_leg_covers_it() {
+    let check = workspace_file(".github/workflows/check.yml");
+    let rust = job_block(&job_blocks(&check), "rust");
+
+    assert!(
+        rust.contains("--target x86_64-pc-windows-msvc"),
+        "the shipped cross-compile leg must survive: it is the only Windows coverage the \
+         workspace has (§Compatibility matrix, A16)"
+    );
+    assert!(
+        rust.contains("--exclude bindforge-registry"),
+        "Rollout 3's narrowing: `ring`'s target build script must not be asked of a runner \
+         with no MSVC C toolchain, so the cross-compile leg excludes `apps/registry`"
+    );
+    assert!(
+        rust.contains("cargo check -p bindforge-registry"),
+        "and the crate's Windows posture is paid for on the host target, which has the C \
+         toolchain — dropped there, the crate would compile nowhere (§Options)"
     );
 }
 

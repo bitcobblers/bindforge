@@ -16,6 +16,19 @@
 //! at startup by name, and every eviction is read back off the file the instance
 //! renames into place. The only upstream is a loopback fake.
 
+//! # Retired by ADR-027
+//!
+//! ADR-027 retires the caching mode, and with it `026-C7`, `026-B1` and `026-B2`, the
+//! `cache-v1.json` document, and the `--upstream` flag every instance here was booted
+//! with (A15; §Hosted mode turns a leftover copy of that document in the registry
+//! directory into a startup refusal, which `hosted_startup.rs` pins). The ADR's own
+//! word is that these suites *retire*, so every leg below is `#[ignore]`d with the
+//! reason rather than rewritten into a posture the design no longer holds — and rather
+//! than deleted, because file deletion belongs to the runner, not to a stage. The
+//! document-and-budget discipline the suite stood for survives for the documents that
+//! are left: `issued_entries.rs` for `issued-v1.json` and `MAX_ISSUED_DOCUMENT_OCTETS`,
+//! `steam.rs` for the snapshot's shape refusals and its octet ceiling.
+
 mod common;
 
 use common::{
@@ -146,6 +159,7 @@ fn read_cache(cache: &std::path::Path) -> (String, serde_json::Value) {
 
 /// proves: Test strategy #4's "absent file ⇒ empty cache" (`026-C7` closes with
 /// "An absent cache file is an empty cache, not an error").
+#[ignore = "caching mode retired with ADR-027 (A15): its document, budgets and eviction rule are gone; suite retired in place pending the runner's deletion"]
 #[test]
 fn an_absent_cache_document_is_an_empty_cache_not_an_error() {
     let data = TempDir::new("cache-absent");
@@ -169,6 +183,7 @@ fn an_absent_cache_document_is_an_empty_cache_not_an_error() {
 
 /// proves: Test strategy #4's "valid load sorted by `slug` byte order" — a write
 /// keeps `026-C7`'s stated order, whatever order the lookups arrived in.
+#[ignore = "caching mode retired with ADR-027 (A15): its document, budgets and eviction rule are gone; suite retired in place pending the runner's deletion"]
 #[test]
 fn the_cache_document_is_kept_sorted_by_slug_byte_order() {
     let data = TempDir::new("cache-order");
@@ -226,6 +241,7 @@ fn the_cache_document_is_kept_sorted_by_slug_byte_order() {
 /// proves: Test strategy #4's refusal set (`026-C7`'s "untrusted input at load and
 /// refused by name outside its shape, bounds, and the `game_id` grammar") — every
 /// poisoned document stops the instance with one named line and is not rewritten.
+#[ignore = "caching mode retired with ADR-027 (A15): its document, budgets and eviction rule are gone; suite retired in place pending the runner's deletion"]
 #[test]
 fn every_out_of_shape_cache_document_is_refused_by_name() {
     let now = common::now_unix();
@@ -334,6 +350,7 @@ fn every_out_of_shape_cache_document_is_refused_by_name() {
 /// proves: Test strategy #5's load half (`026-B2`: "the cache document's load
 /// ceiling, past which the file is refused by name like the match store's") — the
 /// cap gates the read (A22's metadata discipline) and the file is left alone.
+#[ignore = "caching mode retired with ADR-027 (A15): its document, budgets and eviction rule are gone; suite retired in place pending the runner's deletion"]
 #[test]
 fn a_cache_document_over_the_octet_budget_is_refused_by_name() {
     let now = common::now_unix();
@@ -357,6 +374,7 @@ fn a_cache_document_over_the_octet_budget_is_refused_by_name() {
 /// proves: Test strategy #5 (`026-B1`) — with the cache full at `5_000` slugs, the
 /// next write evicts the oldest `fetched_at` (that budget's own key), so the count
 /// never goes over the cap.
+#[ignore = "caching mode retired with ADR-027 (A15): its document, budgets and eviction rule are gone; suite retired in place pending the runner's deletion"]
 #[test]
 fn a_write_past_the_entry_cap_evicts_the_oldest_fetched_at() {
     let now = common::now_unix();
@@ -423,6 +441,7 @@ fn a_write_past_the_entry_cap_evicts_the_oldest_fetched_at() {
 /// brought back inside `1_048_576` octets of **the document that gets renamed**
 /// (§Budgets: "the octet test is the document's exact length and not a sum of
 /// per-entry totals"), evicting the oldest `fetched_at` first.
+#[ignore = "caching mode retired with ADR-027 (A15): its document, budgets and eviction rule are gone; suite retired in place pending the runner's deletion"]
 #[test]
 fn a_write_past_the_octet_budget_evicts_oldest_until_the_document_fits() {
     let now = common::now_unix();
@@ -503,6 +522,7 @@ fn a_write_past_the_octet_budget_evicts_oldest_until_the_document_fits() {
 /// backwards-jumped clock as far as TTL arithmetic can see, and the design treats
 /// it as **expired**, never immortal: with `--refresh-interval 1` a future-dated
 /// entry is refreshed rather than served forever.
+#[ignore = "caching mode retired with ADR-027 (A15): its document, budgets and eviction rule are gone; suite retired in place pending the runner's deletion"]
 #[test]
 fn a_future_dated_entry_is_expired_rather_than_immortal() {
     let _data = TempDir::new("cache-future-guard");

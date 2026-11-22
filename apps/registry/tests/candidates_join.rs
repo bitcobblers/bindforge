@@ -1,14 +1,22 @@
 //! The corpus join: `GET /v1/candidates?slug=…` answers the games whose
-//! `source_keys` hold the queried key, ordered, projected, and truncated — and
-//! answers it identically in both modes.
+//! `source_keys` hold the queried key, ordered, projected, and truncated — the
+//! serving face ADR-027 carries across the mode change byte-for-byte (`027-C1`, A8).
 //!
 //! proves: design 026's Test strategy #2 — "Corpus join: `candidates(slug)`
 //! probes the load-built index and returns the games whose `source_keys` contain
 //! the decoded slug, postings already ordered by `game_id`, projected to
 //! `{game_id, name}` only, truncated to `MAX_CANDIDATES` (A1); a root-mode empty
-//! join answers `200` with `[]`" — read together with `026-C1` (the serving face
-//! is byte-identical between modes), `026-C2` (the response shape) and `026-L6`
-//! (only the queried key and `{game_id, name}` answers ever leave).
+//! join answers `200` with `[]` — read together with `026-C1` as `027-C1` leaves it,
+//! `026-C2` (the response shape) and `026-L6` (only the queried key and
+//! `{game_id, name}` answers ever leave).
+//!
+//! # What ADR-027 changed in this file
+//!
+//! The join itself is untouched by the mode change, so seven of the eight legs are
+//! the shipped pins. Two carry the change: the empty-join leg asks a `local/…` key
+//! now, because a *steam* key the corpus does not hold is the resolver's question in
+//! hosted mode rather than the join's, and the mode-comparison leg retired with the
+//! mode itself (A15).
 //!
 //! Integration over a loopback socket: every corpus is a temp file, every
 //! instance binds an ephemeral `127.0.0.1` port.
@@ -272,11 +280,16 @@ fn the_octet_cap_trims_a_wide_join_to_a_stable_prefix_under_the_response_budget(
     );
 }
 
-/// proves: Test strategy #2's last clause and `026-L4`'s boundary — an empty join
-/// in root mode is a `200` with `[]` ("the catalog has never heard of this key");
-/// the cold `503` belongs to caching mode only.
+/// proves: Test strategy #2's last clause, in the one mode ADR-027 leaves — a join
+/// that finds nothing answers `200` with `[]` ("the catalogue has never heard of this
+/// key"). The question is asked of a `local/…` key, which §The steam snapshot resolver
+/// keeps out of the resolver's hands entirely, so what answers here is the join's own
+/// verdict. A *steam* key nobody holds is the resolver's answer instead — the `200 []`
+/// of a fresh-snapshot miss, or the named `503` when the resolver is inactive — which
+/// `data_layout.rs` and `hosted_lookup_policy.rs` pin; the caching mode's cold `503`
+/// retired with the mode (A15).
 #[test]
-fn an_empty_join_in_root_mode_is_200_with_an_empty_array() {
+fn an_empty_join_is_200_with_an_empty_array() {
     let data = TempDir::new("join-empty");
     let corpus = data.write(
         "corpus.json",
@@ -284,11 +297,11 @@ fn an_empty_join_in_root_mode_is_200_with_an_empty_array() {
     );
     let server = Registry::root("join-empty", &corpus, &[]);
 
-    let answer = server.get(&slug_query("steam/999999"));
+    let answer = server.get(&slug_query("local/Nobody.Here"));
     assert_eq!(
         status_line(&answer),
         "HTTP/1.1 200 OK",
-        "a root-mode empty join is a plain 200: {}",
+        "a join with nothing to answer is a plain 200: {}",
         status_line(&answer)
     );
     assert_eq!(
@@ -299,14 +312,23 @@ fn an_empty_join_in_root_mode_is_200_with_an_empty_array() {
     assert_eq!(json_body(&answer).as_array().expect("[]").len(), 0);
 }
 
-/// proves: `026-C1` (named in Test strategy #2's byte-identical posture) — the
-/// same answered question asked of a root and of a caching instance holding the
-/// same records as local entries gets the same status line, the same body, and
-/// the same header names: the client cannot tell which mode answered. The
-/// absent slug is the one exception the design itself names ("the caching-only
-/// cold `503`" — Chosen design: The serving face; `026-L4`): root answers the
-/// empty join with `200 []`, and a caching instance with an unreachable
-/// upstream answers the named `503` — never `[]`.
+/// Retired by ADR-027 (A15): this leg's whole subject was the *pair* of modes — it
+/// planted the same `026-C3` document as a caching instance's
+/// `<data>/bindforge/registry/catalog-v1.json` and asked both instances the same
+/// question, naming `026-L4`'s cold `503` as the one mode-revealing exception.
+/// `027-C1` retires caching mode and that document name (a leftover copy of it is a
+/// startup refusal now), so there is no second instance to compare against and the
+/// `503` it pinned is unreachable.
+///
+/// Both halves survive, pinned where the design puts them: the byte-exactness of the
+/// serving face for the shipped client is Test strategy #12/A8, which
+/// `hosted_end_to_end::every_hosted_answer_keeps_the_shipped_wire_shape` and
+/// `response_shape.rs` pin against the same routes, and the empty join's own answer is
+/// `an_empty_join_is_200_with_an_empty_array` above. Nothing is restated here, and the
+/// leg is kept — ignored rather than rewritten — so the retirement is visible in the
+/// run's own output; the ADR says these suites retire, and this stage has no delete
+/// right, only the runner does.
+#[ignore = "caching mode and its cold 503 retired with ADR-027 (A15): no second mode to compare"]
 #[test]
 fn the_serving_face_is_byte_identical_between_the_two_modes() {
     let root_home = TempDir::new("identical-root");

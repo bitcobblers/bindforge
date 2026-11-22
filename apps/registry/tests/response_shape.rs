@@ -1,6 +1,6 @@
 //! The byte shape of the serving face: the framing the shipped client pins (A1),
-//! the `404`s and `405`s `026-C2`/`026-C4` name, and the cold `503`'s legible
-//! status line.
+//! the `404`s and `405`s `026-C2`/`026-C4` name, and the empty answer's plain status
+//! line.
 //!
 //! proves: design 026's Test strategy #16's shape clause ("response shape pinned
 //! byte-exact to A1 (single decimal `Content-Length`, no `Transfer-Encoding`,
@@ -11,6 +11,17 @@
 //! exactly `Content-Length` octets") and A2 ("on a non-`200` the client surfaces
 //! only the status line"), plus A23 (one answer per connection, echoing the
 //! client's own `Connection: close`).
+//!
+//! # What ADR-027 changed in this file
+//!
+//! A8 is the reason this suite exists unchanged: the hosted answer is byte-exact to the
+//! shipped candidate contract, so the framing, the `404`/`405` pins and the one-answer
+//! rule are the shipped pins. One leg carried the caching mode's cold `503` as the
+//! status a root instance must never reach; that `503` retired with the mode (A15), and
+//! the leg now pins the half that stands — the empty answer is a `200 []` body, asked of
+//! a `local/…` key so it is the join's verdict and not the resolver's. The `503`s hosted
+//! mode does answer are `027-C5`'s named resolver refusals, which
+//! `hosted_lookup_policy.rs` pins by text.
 
 mod common;
 
@@ -188,16 +199,23 @@ fn a_method_a_route_does_not_carry_is_405_naming_the_methods_it_does() {
     }
 }
 
-/// proves: A2 + `026-L4` as served by root mode's neighbours — the `503` a
-/// caching instance writes for a cold slug is reachable only from caching mode;
-/// root mode's empty join is a plain `200` here, so the two are never confused.
+/// proves: A2's "`503` is never an empty array" boundary as hosted mode serves it —
+/// the *cold* `503` this leg used to keep out of root mode retired with the caching
+/// mode that wrote it (A15), and the empty answer is still a plain `200 []`. It is
+/// asked of a key that is never a resolver candidate, so the answer is the join's own;
+/// the `503`s hosted mode does answer are the resolver's (`steam resolver inactive`,
+/// an `epic/…` key outside the corpus), which `hosted_lookup_policy.rs` pins.
 #[test]
-fn root_mode_never_answers_the_cold_503() {
+fn a_hosted_empty_answer_is_200_and_never_a_503() {
     let (_data, _corpus, server) = root("shape-no-503");
 
-    let answer = server.get("/v1/candidates?slug=steam%2F999999");
+    let answer = server.get("/v1/candidates?slug=local%2F999999");
     assert_eq!(status_code(&answer), Some(200));
-    assert_ne!(status_code(&answer), Some(503));
+    assert_eq!(
+        body_of(&answer),
+        b"[]".as_slice(),
+        "the empty answer is the body the shipped client reads, not a status"
+    );
 }
 
 /// proves: Test strategy #16's shape clause for the error surfaces too — a `404`

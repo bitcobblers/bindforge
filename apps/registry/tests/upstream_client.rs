@@ -17,6 +17,23 @@
 //! response is a byte string the fake writes, and every refusal is observed as the
 //! caching instance's own cold `503` (never `[]`) and its `health.upstream` verdict.
 
+//! # Retired by ADR-027
+//!
+//! The suite is `#[ignore]`d leg by leg, reason on each, because ADR-027 retires the
+//! thing it pins rather than changing it: `027-C1` removes the caching mode, so there
+//! is no `--upstream` instance left to point at a loopback fake (the flag is the named
+//! retirement refusal `hosted_startup.rs` carries), no upstream request to percent-
+//! encode (A19 goes with the mode), and no once-per-TTL reachability probe to count —
+//! `027-C2`'s health document has no `upstream` field at all (Test strategy #9 names
+//! the three retired facts, and `hosted_health_stats.rs` pins their absence).
+//!
+//! What the suite stood for does not go unmeasured: the client-side framing rules A1
+//! fixes are pinned on the face that kept them in `response_shape.rs`, and the store
+//! client that replaced this one — its request targets, page budgets, retry grid, and
+//! the TLS assurance for the one authority it dials — is `steam.rs` (Test strategy #6).
+//! The legs stay in the tree, retired in place, because deleting files belongs to the
+//! runner and not to this stage.
+
 mod common;
 
 use common::{
@@ -42,6 +59,7 @@ fn cold_lookup(label: &str, response: Vec<u8>) -> (TempDir, FakeUpstream, Regist
 /// proves: Test strategy #7's rejection list, one row each — an upstream answer the
 /// copied reader must not accept is an upstream error: a cold lookup therefore
 /// answers `503` (never `[]`, `026-L4`) and reports `upstream: down`.
+#[ignore = "the --upstream client retired with ADR-027 (A15): no upstream client is left to pin; suite retired in place pending the runner's deletion"]
 #[test]
 fn every_ununderstood_upstream_response_is_an_upstream_error() {
     let over_long_body = format!(
@@ -147,6 +165,7 @@ fn persisted_slugs(data: &TempDir) -> Vec<String> {
 /// proves: Test strategy #7's redirect clause — a `3xx` from the configured
 /// endpoint is refused as an upstream error rather than followed, because leaving
 /// the configured endpoint would break `026-L2`'s disclosure model.
+#[ignore = "the --upstream client retired with ADR-027 (A15): no upstream client is left to pin; suite retired in place pending the runner's deletion"]
 #[test]
 fn a_redirect_from_the_upstream_is_refused_as_an_upstream_error() {
     for status in [
@@ -186,6 +205,7 @@ fn a_redirect_from_the_upstream_is_refused_as_an_upstream_error() {
 /// `percent_encode`/`candidates_url`) — the outbound request target is built from
 /// the *decoded* slug through the shipped escape-everything rule, so a space- or
 /// `%`-bearing key travels only as `%20` / `%25`, and a dot stays a dot.
+#[ignore = "the --upstream client retired with ADR-027 (A15): no upstream client is left to pin; suite retired in place pending the runner's deletion"]
 #[test]
 fn the_upstream_request_target_is_built_percent_encoded_from_the_decoded_slug() {
     let data = TempDir::new("up-encoding");
@@ -233,6 +253,7 @@ fn the_upstream_request_target_is_built_percent_encoded_from_the_decoded_slug() 
 /// both checks) — an upstream `game_id` outside the grammar, or a `name` over
 /// `MAX_NATIVE_NAME_OCTETS`, is dropped before the cache write with exactly one
 /// escaped single-line echo each, and the survivors keep their order.
+#[ignore = "the --upstream client retired with ADR-027 (A15): no upstream client is left to pin; suite retired in place pending the runner's deletion"]
 #[test]
 fn invalid_upstream_records_are_dropped_before_the_cache_write() {
     let long_name = "n".repeat(129);
@@ -310,6 +331,7 @@ fn invalid_upstream_records_are_dropped_before_the_cache_write() {
 /// cost exactly one `/v1/health` probe (the first lookup fires it lazily) plus one
 /// candidate request each; there is no second round trip per lookup and no timer
 /// thread probing on its own.
+#[ignore = "the --upstream client retired with ADR-027 (A15): no upstream client is left to pin; suite retired in place pending the runner's deletion"]
 #[test]
 fn the_upstream_health_probe_costs_at_most_one_round_trip_per_ttl() {
     let data = TempDir::new("up-probe");
@@ -357,6 +379,7 @@ fn the_upstream_health_probe_costs_at_most_one_round_trip_per_ttl() {
 /// proves: `026-C6`'s reachability posture with no upstream to reach — an
 /// unreachable endpoint is `down`, a cold lookup is the `503`, and the instance
 /// still answers `200` on health forever (a status document, not a gate).
+#[ignore = "the --upstream client retired with ADR-027 (A15): no upstream client is left to pin; suite retired in place pending the runner's deletion"]
 #[test]
 fn an_unreachable_upstream_is_down_never_empty() {
     let (_data, server) = {

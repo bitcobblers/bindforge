@@ -25,6 +25,19 @@
 //! §Budgets names the three ceilings, all private to `apps/registry`:
 //! `MAX_REQUEST_HEADER_OCTETS` 65,536, `MAX_REQUEST_BODY_OCTETS` = the document cap
 //! ("so no per-record key-count bound"), `MAX_CONCURRENT_CONNECTIONS` 64.
+//!
+//! # What ADR-027 changed in this file
+//!
+//! The persist and admit-and-close discipline crosses the mode change untouched, and it
+//! is still the *corpus* document at the `--corpus` path that these legs watch rename
+//! itself into place — §Hosted mode keeps only the snapshot, the issued entries, the
+//! retired ids and the write lock under `<data>`, which `data_layout.rs` and
+//! `admin_mutations.rs` pin. Two things follow for the legs. An instance now needs a
+//! resolvable `<data>` before it will start at all (`027-C4`), which the harness's
+//! sandboxed default supplies, and the tearing reader races on `local/…` keys: a steam
+//! key under a record that comes and goes would fold §The hosted lookup policy's own
+//! verdicts into the set of states a body may legitimately be in, and a wider state set
+//! says nothing at all about tearing.
 
 mod common;
 
@@ -181,7 +194,10 @@ fn a_stale_tmp_makes_the_next_mutation_fail_loudly_and_writes_through_nothing() 
 /// locked in-memory model)" — with mutations landing under the write lock while
 /// readers hammer the shared lock, every lookup answer is a complete, parseable
 /// candidate array in one of the two states the document can actually be in: never a
-/// truncated body, never a half-applied record set.
+/// truncated body, never a half-applied record set. The racers' keys are `local/…`
+/// ones, which §The steam snapshot resolver never takes on, so the two states are the
+/// join's own `[]` and `[record]`; a steam key below its record would add the resolver
+/// verdicts of §Hosted mode as a third state and say nothing about tearing.
 #[test]
 fn a_reader_never_sees_a_torn_document_while_mutations_land() {
     let (_data, _corpus, server) = root("conc-torn");
@@ -201,7 +217,7 @@ fn a_reader_never_sees_a_torn_document_while_mutations_land() {
                         &record_body(
                             &format!("racer-{index}"),
                             &format!("Racer {index}"),
-                            &[&format!("steam/95010{index}")],
+                            &[&format!("local/95010{index}")],
                         ),
                     );
                     assert!(
@@ -220,7 +236,7 @@ fn a_reader_never_sees_a_torn_document_while_mutations_land() {
                     let mut torn = Vec::new();
                     for round in 0..25 {
                         for index in 0..4 {
-                            let target = format!("/v1/candidates?slug=steam%2F95010{index}");
+                            let target = format!("/v1/candidates?slug=local%2F95010{index}");
                             let answer = server.get(&target);
                             let expected = serde_json::json!({
                                 "game_id": format!("racer-{index}"),

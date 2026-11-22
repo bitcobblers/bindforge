@@ -15,6 +15,19 @@
 //! candidate request on it; the once-per-TTL `/v1/health` reachability probe is a
 //! different route, and these tests say which is which.
 
+//! # Retired by ADR-027
+//!
+//! Every leg below is `#[ignore]`d, with the reason rather than a rewrite: ADR-027
+//! retires the caching mode itself (A15), so these legs drive an instance booted with
+//! the `--upstream` flag that is now the named retirement refusal `hosted_startup.rs`
+//! pins, and they measure a fresh/stale/expired TTL policy over a cache document that
+//! no longer exists. ADR-027's Test strategy #8 replaces their pair of cold/stale
+//! answers with two hosted-mode answers over one snapshot — a snapshot past
+//! `027-B2`'s age bound turns steam misses into the named `503` while corpus and issued
+//! answers keep serving, and `--no-steam` holds the same split with the inactive reason
+//! — which `hosted_lookup_policy.rs` and `health_route.rs` pin. Deletion belongs to the
+//! runner, so the file stays with its legs retired in place.
+
 mod common;
 
 use common::{
@@ -58,6 +71,7 @@ fn persisted_cache(cache: &std::path::Path) -> serde_json::Value {
 /// proves: `026-L5` and Test strategy #6's first clause — a locally registered
 /// entry answers with **zero** upstream candidate requests, and is never merged
 /// with what the upstream would have said.
+#[ignore = "caching mode retired with ADR-027 (A15): its fresh/stale/expired TTL policy and cold 503 are gone; suite retired in place pending the runner's deletion"]
 #[test]
 fn a_local_entry_answers_without_a_single_upstream_lookup() {
     let upstream = FakeUpstream::start(respond_to(
@@ -104,6 +118,7 @@ fn a_local_entry_answers_without_a_single_upstream_lookup() {
 
 /// proves: Test strategy #6 / `026-L5`'s "never expires" half — a local entry wins
 /// over a stale cached answer for the same slug, whatever the TTL says.
+#[ignore = "caching mode retired with ADR-027 (A15): its fresh/stale/expired TTL policy and cold 503 are gone; suite retired in place pending the runner's deletion"]
 #[test]
 fn a_local_entry_wins_over_a_stale_cache_entry_for_the_same_slug() {
     let data = TempDir::new("policy-local-vs-stale");
@@ -152,6 +167,7 @@ fn a_local_entry_wins_over_a_stale_cache_entry_for_the_same_slug() {
 /// honestly do. The freshness subject here is "inside the TTL", so the leg runs on
 /// the default `026-B3` TTL and the stamp is safe; the override stays pinned where
 /// expiry is the subject (the stale and re-timing legs).
+#[ignore = "caching mode retired with ADR-027 (A15): its fresh/stale/expired TTL policy and cold 503 are gone; suite retired in place pending the runner's deletion"]
 #[test]
 fn a_fresh_cache_entry_answers_without_an_upstream_lookup() {
     let data = TempDir::new("policy-fresh");
@@ -181,6 +197,7 @@ fn a_fresh_cache_entry_answers_without_an_upstream_lookup() {
 /// entry whose refresh *fails* is served as-is, and `health.upstream` moves to
 /// `stale`. Run under `--refresh-interval 1`, so it is the override, not the clock,
 /// that makes the entry stale.
+#[ignore = "caching mode retired with ADR-027 (A15): its fresh/stale/expired TTL policy and cold 503 are gone; suite retired in place pending the runner's deletion"]
 #[test]
 fn a_failed_refresh_over_a_stale_entry_answers_stale_and_reports_stale() {
     let data = TempDir::new("policy-stale");
@@ -225,6 +242,7 @@ fn a_failed_refresh_over_a_stale_entry_answers_stale_and_reports_stale() {
 /// proves: `026-L4` and Test strategy #6's last clause — a cold miss with no
 /// reachable upstream is the named `503`, never `[]`, and it never writes a cache
 /// entry.
+#[ignore = "caching mode retired with ADR-027 (A15): its fresh/stale/expired TTL policy and cold 503 are gone; suite retired in place pending the runner's deletion"]
 #[test]
 fn a_cold_miss_with_no_reachable_upstream_is_the_named_503_never_an_empty_array() {
     let (_data, server) = caching("policy-cold", &unreachable_upstream(), &[]);
@@ -264,6 +282,7 @@ fn a_cold_miss_with_no_reachable_upstream_is_the_named_503_never_an_empty_array(
 /// proves: Test strategy #6's fourth clause and `026-C6`'s "caches it with
 /// `fetched_at`" — a cold miss with a reachable upstream fetches, answers, and
 /// persists the entry.
+#[ignore = "caching mode retired with ADR-027 (A15): its fresh/stale/expired TTL policy and cold 503 are gone; suite retired in place pending the runner's deletion"]
 #[test]
 fn a_cold_miss_with_a_reachable_upstream_fetches_then_caches() {
     let data = TempDir::new("policy-fetch");
@@ -329,6 +348,7 @@ fn a_cold_miss_with_a_reachable_upstream_fetches_then_caches() {
 /// and the probe half of the leg's name is now asserted: `lines_for("GET
 /// /v1/health")` must grow by exactly one probe across the wait and the refreshed
 /// lookup.
+#[ignore = "caching mode retired with ADR-027 (A15): its fresh/stale/expired TTL policy and cold 503 are gone; suite retired in place pending the runner's deletion"]
 #[test]
 fn the_refresh_interval_override_ages_a_fresh_entry_and_retimes_the_probe() {
     let data = TempDir::new("policy-ttl");
@@ -415,6 +435,7 @@ fn the_refresh_interval_override_ages_a_fresh_entry_and_retimes_the_probe() {
 /// … is the real policy and **does** write the cache, and it exits non-zero on the
 /// `026-L4` cold case so scripts see failure") — `registry query <slug>` answers,
 /// prints provenance, and persists.
+#[ignore = "caching mode retired with ADR-027 (A15): its fresh/stale/expired TTL policy and cold 503 are gone; suite retired in place pending the runner's deletion"]
 #[test]
 fn the_query_subcommand_runs_the_policy_prints_provenance_and_writes_the_cache() {
     let data = TempDir::new("query-fetch");
@@ -469,6 +490,7 @@ fn the_query_subcommand_runs_the_policy_prints_provenance_and_writes_the_cache()
 /// proves: `026-C6`'s cold-case exit code (open question 12 resolved: non-zero) — a
 /// one-shot `query` with nothing to answer from fails, rather than printing an empty
 /// answer and exiting 0.
+#[ignore = "caching mode retired with ADR-027 (A15): its fresh/stale/expired TTL policy and cold 503 are gone; suite retired in place pending the runner's deletion"]
 #[test]
 fn the_query_subcommand_exits_non_zero_on_the_cold_case() {
     let data = TempDir::new("query-cold");
@@ -498,6 +520,7 @@ fn the_query_subcommand_exits_non_zero_on_the_cold_case() {
 
 /// proves: `026-C6`'s provenance for a locally-owned answer, one-shot: `query` on a
 /// registered entry needs no upstream at all.
+#[ignore = "caching mode retired with ADR-027 (A15): its fresh/stale/expired TTL policy and cold 503 are gone; suite retired in place pending the runner's deletion"]
 #[test]
 fn the_query_subcommand_answers_a_registered_entry_without_an_upstream() {
     let data = TempDir::new("query-local");
@@ -540,6 +563,7 @@ fn the_query_subcommand_answers_a_registered_entry_without_an_upstream() {
 /// proves: `026-L2` as the caching registry's outbound half (Test strategy #6's
 /// injected-fake posture) — the upstream sees the queried key and nothing
 /// identifying: no credential header, no bulk request.
+#[ignore = "caching mode retired with ADR-027 (A15): its fresh/stale/expired TTL policy and cold 503 are gone; suite retired in place pending the runner's deletion"]
 #[test]
 fn the_caching_registry_sends_only_the_queried_key_upstream() {
     let data = TempDir::new("policy-disclosure");

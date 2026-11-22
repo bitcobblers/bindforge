@@ -22,6 +22,22 @@
 //! `127.0.0.5` row is how far "any host" can be pinned from a subprocess without
 //! breaking that rule.
 
+//! # Retired by ADR-027
+//!
+//! `#[ignore]`d leg by leg, because what they pin is gone rather than changed:
+//! `027-C1` retires the caching mode and the `--upstream` flag with it (the flag is now
+//! the named retirement refusal `hosted_startup.rs` carries), and `027-C2` retires the
+//! `upstream`, `cached_slugs` and `last_upstream_fetch` health facts that every verdict
+//! here was read out of (Test strategy #9's field list has no room for them). The gate
+//! that this suite's last live leg exercised — admitting any parseable origin and
+//! refusing every spelling beyond a literal HTTP origin — has no flag left to guard, so
+//! that leg is retired with its siblings rather than left to pass on a refusal that now
+//! says something else.
+//!
+//! The endpoint discipline that survived the change is the store's, and it is pinned in
+//! `steam.rs`: the pinned authority, the parameters a store request may carry, and the
+//! production transport's refusal of an unauthenticated listener (Test strategy #6).
+
 mod common;
 
 use common::{
@@ -33,6 +49,7 @@ use common::{
 /// (plus the two ways a `http://` prefix goes wrong) — the instance never binds, so
 /// the process has exited on its own, and its refusal says which argument it is
 /// about.
+#[ignore = "the --upstream endpoint gate retired with ADR-027 (A15): the flag it gated is a named refusal; suite retired in place pending the runner's deletion"]
 #[test]
 fn the_upstream_gate_refuses_every_spelling_beyond_a_literal_http_origin() {
     let cases: Vec<(&str, &str)> = vec![
@@ -64,6 +81,7 @@ fn the_upstream_gate_refuses_every_spelling_beyond_a_literal_http_origin() {
 /// caching instance has made no request of its upstream at all, so the counted fake
 /// stays at zero through startup and a `/v1/health` read (`026-C2` answers the
 /// verdict from the last-known value, never from a probe fired here).
+#[ignore = "the --upstream endpoint gate retired with ADR-027 (A15): the flag it gated is a named refusal; suite retired in place pending the runner's deletion"]
 #[test]
 fn an_admitted_upstream_origin_is_not_dialled_at_startup() {
     let data = TempDir::new("gate-admit");
@@ -122,6 +140,7 @@ fn an_admitted_upstream_origin_is_not_dialled_at_startup() {
 /// a loopback-range spelling that is not `127.0.0.1`, and the `localhost` spelling,
 /// are both admitted with a parseable port, bind, and serve, while still having
 /// dialled nothing.
+#[ignore = "the --upstream endpoint gate retired with ADR-027 (A15): the flag it gated is a named refusal; suite retired in place pending the runner's deletion"]
 #[test]
 fn the_gate_admits_any_parseable_host_not_only_the_loopback_spelling() {
     for (label, host) in [

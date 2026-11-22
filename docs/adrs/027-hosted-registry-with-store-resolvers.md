@@ -1,6 +1,6 @@
 ---
 doc_type: adr
-status: proposed
+status: accepted
 date: 2026-11-21
 depends-on: [013, 022, 025, 026]
 ledger: yes
@@ -188,7 +188,7 @@ user-hosted caching mode retires.
   that mints `epic/` keys and pins whether `CatalogItemId` is the key) and
   on the absence of any public Epic listing API to snapshot; the resolver
   seam's reserved slot stays inert until both land. Owner: `unassigned`. →
-  `025-R2`
+  025-R2
 - **027-R2** The profile half of `026-R2` this ADR does not fill after
   taking the intake half: profile upload/download/sharing and auth beyond
   the single bearer token. Owner: ADR-028 (reserved). → ADR-028
