@@ -2,7 +2,7 @@
 doc_type: adr
 status: proposed
 date: 2026-11-23
-depends-on: [012, 013, 022, 023, 025]
+depends-on: [012, 013]
 ledger: yes
 ---
 
@@ -168,6 +168,23 @@ private files. The unit ledger follows.
   launcher contexts, with fixture-tree tests in the `codecs` crate and a
   read-only verification pass against two locally installed Unreal-lineage
   titles. → spec: The first family.
+
+### Rollout
+
+1. The `codecs` crate lands with the codec trait, the `Detection` claim
+   payload, and the closed registry iterated in family-id order. `017-C1 017-C5`
+2. The scan hands the codec face its context — parsed lookup key, main
+   root, and library roots — and nothing else. `017-C2`
+3. `schemas/bindings/v1/spec.md` lands with its loader and the three
+   budgets enforced at read and locate time. `017-C3 017-B1 017-B2 017-B3`
+4. The `unreal-ini` family ships with fixture trees and the read-only
+   verification pass, under the never-write discipline. `017-S1 017-L1`
+5. The `bindings` face lands with probe mode, the two named statuses, and
+   `list` untouched and claim-free. `017-C4 017-L2 017-L5`
+6. Determinism and extraction-honesty pins run against the fixtures from
+   the first family onward. `017-L3 017-L4`
+7. The apply face, Windows paths, further families, and routing data ride
+   their reservations; nothing in this run pre-empts their owners. `017-R1 017-R2 017-R3 017-R4`
 
 ## Alternatives considered
 
