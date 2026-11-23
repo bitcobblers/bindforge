@@ -20,7 +20,7 @@ BindForge is an open framework for creating, sharing, and translating game input
 - Orchestration: `tools/orchestration` Node CLI that drives a running OpenCode server via `@opencode/client` SDK.
 - Schemas: `schemas/` versioned specs with `spec.md` per version – profile, manifest, policy, action-ids, reach-classes, keyboard-geometry.
 - Data: `data/profiles/`, `data/manifests/`.
-- Docs: `docs/adrs/`, `docs/designs/`, `docs/workflows.md`.
+- Docs: `docs/adrs/` (all ADRs), `docs/tasks/` (all tasks), `docs/designs/`, `docs/workflows.md`. ADRs and tasks stay in these folders permanently — accepted ADRs and completed tasks are retained as historical record, never removed.
 
 ## Development
 
