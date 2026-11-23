@@ -1,12 +1,12 @@
 {
   "roles": {
-    "coder": "basalt/qwen-flash-next",
-    "code-review": "basalt/qwen-flash-next",
-    "designer": "basalt/qwen-flash-next",
-    "editor": "basalt/qwen-flash-next",
-    "planner": "basalt/qwen-flash-next",
-    "doc-sync": "basalt/qwen-flash-next",
-    "researcher": "basalt/qwen-flash-next",
-    "design-review": "basalt/qwen-flash-next"
+    "coder": "basalt/qwen-flash-next#medium",
+    "code-review": "basalt/qwen-flash-next#high",
+    "designer": "basalt/qwen-flash-next#high",
+    "editor": "basalt/qwen-flash-next#low",
+    "planner": "basalt/qwen-flash-next#high",
+    "doc-sync": "basalt/qwen-flash-next#low",
+    "researcher": "basalt/qwen-flash-next#medium",
+    "design-review": "basalt/qwen-flash-next#high"
   }
 }
