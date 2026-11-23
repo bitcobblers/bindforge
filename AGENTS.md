@@ -27,6 +27,7 @@ BindForge is an open framework for creating, sharing, and translating game input
 - Use worktrees for pipeline work: `pipeline run <source>` and `pipeline resume <slug>` must be issued from the run's worktree.
 - The runner owns commits and file moves. Stage agents do not commit.
 - Stage ownership is enforced by the runner: changed paths outside a stage's ownership are reverted after each stage.
+- Local testing: `scripts/local-registry.sh` runs the registry (`serve --root`) in the background against a sandbox under `target/` and can drive `discovery` against it; see `scripts/local-registry.sh help` for subcommands.
 
 ## Pipeline usage
 
