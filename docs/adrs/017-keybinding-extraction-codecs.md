@@ -171,6 +171,10 @@ private files. The unit ledger follows.
 
 ### Rollout
 
+**Unit handles.** The handles in this ADR sit at the end of the Rollout
+list items: one trailing code span of unit ids governs the line's claim, an
+id anywhere else governs nothing.
+
 1. The `codecs` crate lands with the codec trait, the `Detection` claim
    payload, and the closed registry iterated in family-id order. `017-C1 017-C5`
 2. The scan hands the codec face its context — parsed lookup key, main
