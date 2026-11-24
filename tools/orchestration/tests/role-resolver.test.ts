@@ -195,4 +195,52 @@ describe('RoleResolver', () => {
       expect(result).toBeUndefined();
     });
   });
+
+  describe('resolveAgentModel', () => {
+    const AGENT_PATH = '/repo/.opencode/agents/code/coder.md';
+    const CONFIG_PATH = '/repo/.opencode/roles.json';
+
+    it('carries the roles-map model and variant through an agent declaration', async () => {
+      const declared = new RoleResolver('/repo');
+      mockExistsSync.mockImplementation(
+        (p) => String(p) === AGENT_PATH || String(p) === CONFIG_PATH,
+      );
+      mockReadFile.mockResolvedValue('---\nrole: coder\n---\n# body\n');
+      mockReadFileSync.mockReturnValue(JSON.stringify({ roles: { coder: 'basalt/model-x#high' } }));
+
+      await expect(declared.resolveAgentModel('code/coder')).resolves.toEqual({
+        providerID: 'basalt',
+        id: 'model-x',
+        variant: 'high',
+      });
+    });
+
+    it('gives an agent without a file no model', async () => {
+      const declared = new RoleResolver('/repo');
+      mockExistsSync.mockReturnValue(false);
+
+      await expect(declared.resolveAgentModel('code/coder')).resolves.toBeUndefined();
+    });
+
+    it('never fabricates a model from an agent id that names no agent file', async () => {
+      // 'code/nonexistent' contains a slash — resolveModel's direct-string
+      // fallback would read provider `code` out of it. The agent-only face
+      // must return nothing instead: the server default, not a fake provider.
+      const declared = new RoleResolver('/repo');
+      mockExistsSync.mockReturnValue(false);
+
+      await expect(declared.resolveAgentModel('code/nonexistent')).resolves.toBeUndefined();
+    });
+
+    it('gives a declared role that the roles map omits no model', async () => {
+      const declared = new RoleResolver('/repo');
+      mockExistsSync.mockImplementation(
+        (p) => String(p) === AGENT_PATH || String(p) === CONFIG_PATH,
+      );
+      mockReadFile.mockResolvedValue('---\nrole: ghost\n---\n# body\n');
+      mockReadFileSync.mockReturnValue(JSON.stringify({ roles: { coder: 'basalt/model-x#high' } }));
+
+      await expect(declared.resolveAgentModel('code/coder')).resolves.toBeUndefined();
+    });
+  });
 });

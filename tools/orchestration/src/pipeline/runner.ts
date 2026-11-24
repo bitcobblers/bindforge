@@ -18,6 +18,7 @@ import type { OpenCodeClient, SessionMessageAssistant, SessionMessageInfo } from
 import { z } from 'zod';
 
 import { basicAuthHeader } from '../opencode-runner.js';
+import { RoleResolver } from '../role-resolver.js';
 import { createSemaphore } from './concurrency.js';
 import {
   type Flow,
@@ -1392,13 +1393,21 @@ async function executeInference(
   const minNudgeIntervalMs = cfg.minNudgeIntervalMs ?? DEFAULT_MIN_NUDGE_INTERVAL_MS;
   // No git here at all: the caller captured the window's `headBefore` before
   // this prompt and runs the finalize after it.
-  const sessionID =
-    handle.resume?.sessionID ??
-    (
+  // Every pipeline session — stage lane, review seat, one-shot — is bound at
+  // create time to the model its role carries in the run tree's `.opencode/
+  // roles.json`, variant suffix included: the agent id resolves through the
+  // agent file's `role:` frontmatter to the roles map, and an unmapped role
+  // keeps today's server default. The resolver reads the run's repo root (the
+  // worktree), not the launch directory.
+  let sessionID = handle.resume?.sessionID;
+  if (sessionID === undefined) {
+    const roleModel = await new RoleResolver(opts.repoDir).resolveAgentModel(def.agent);
+    sessionID = (
       await opts.client.session.create(
         {
           title: `pipeline ${state.slug}: ${handle.stageKey}`,
           agent: def.agent,
+          ...(roleModel !== undefined ? { model: roleModel } : {}),
           // Bind the session to the repo worktree so file edits, skills, and
           // agent discovery all happen in the right location.
           location: { directory: opts.repoDir },
@@ -1406,6 +1415,7 @@ async function executeInference(
         { signal: AbortSignal.timeout(requestTimeoutMs) },
       )
     ).id;
+  }
   if (!sessionID) {
     return { ok: false, failure: 'server returned no session id' };
   }

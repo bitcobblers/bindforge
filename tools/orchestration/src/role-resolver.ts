@@ -14,11 +14,19 @@ export type RoleConfig = z.infer<typeof ConfigSchema>;
 
 export class RoleResolver {
   private config: RoleConfig | null = null;
+  private rootDir: string;
   private projectConfigPath: string;
   private globalConfigPath: string;
 
-  constructor() {
-    this.projectConfigPath = join(process.cwd(), '.opencode', 'roles.json');
+  /**
+   * Reads `.opencode/roles.json` and the agent files from `rootDir`, which a
+   * pipeline caller passes as the run's repo root — the launch directory and
+   * the run's worktree are not the same tree there, and reading a role config
+   * from wherever the process happened to start silently resolves to nothing.
+   */
+  constructor(rootDir: string = process.cwd()) {
+    this.rootDir = rootDir;
+    this.projectConfigPath = join(rootDir, '.opencode', 'roles.json');
     this.globalConfigPath = join(homedir(), '.config', 'opencode', 'roles.json');
   }
 
@@ -63,6 +71,47 @@ export class RoleResolver {
   }
 
   /**
+   * Resolves an agent's declared model and nothing else: the agent file's
+   * `role:` frontmatter into the roles map, variant suffix included. No
+   * direct-model-string fallback — an agent id is never a model string, and a
+   * declaration-less agent gets the server's default rather than a fabricated
+   * provider — and no fallthrough to other resolution steps.
+   */
+  async resolveAgentModel(agentId: string): Promise<ModelRef | undefined> {
+    const role = await this.roleForAgent(agentId);
+    if (role === undefined) {
+      return undefined;
+    }
+    try {
+      const cfg = await this.loadConfig();
+      const modelStr = cfg.roles[role];
+      return modelStr === undefined ? undefined : this.parseModelString(modelStr);
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** The `role:` from an agent file's YAML frontmatter, or nothing. */
+  private async roleForAgent(input: string): Promise<string | undefined> {
+    const agentFilePath = join(this.rootDir, '.opencode', 'agents', `${input}.md`);
+    if (!existsSync(agentFilePath)) {
+      return undefined;
+    }
+    try {
+      const content = await readFile(agentFilePath, 'utf8');
+      // Extract YAML frontmatter only
+      const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
+      const fm = fmMatch ? fmMatch[1] : content;
+      // Simple regex for YAML frontmatter 'role: <name>'
+      const match = fm.match(/^role:\s*(.+)$/m);
+      return match?.[1] ? match[1].trim() : undefined;
+    } catch {
+      // If we can't read the file, we treat it as no declaration.
+      return undefined;
+    }
+  }
+
+  /**
    * Resolves an agent ID, a role name, or a direct model string to a model Ref.
    *
    * @param input The agent ID (e.g. 'code/coder'), a role name (e.g. 'security'), or a model string.
@@ -72,28 +121,15 @@ export class RoleResolver {
     // 1. Is it an agent ID that has a role?
     // We check the file first so that agent IDs (e.g. 'code/coder') are
     // not mistakenly parsed as model strings.
-    const agentFilePath = join(process.cwd(), '.opencode', 'agents', `${input}.md`);
-    if (existsSync(agentFilePath)) {
+    const role = await this.roleForAgent(input);
+    if (role !== undefined) {
       try {
-        const content = await readFile(agentFilePath, 'utf8');
-        // Extract YAML frontmatter only
-        const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
-        const fm = fmMatch ? fmMatch[1] : content;
-        // Simple regex for YAML frontmatter 'role: <name>'
-        const match = fm.match(/^role:\s*(.+)$/m);
-        if (match && match[1]) {
-          const role = match[1].trim();
-          try {
-            const cfg = await this.loadConfig();
-            if (cfg.roles[role]) {
-              return this.parseModelString(cfg.roles[role]);
-            }
-          } catch {
-            // Config load failure – fall through to other checks
-          }
+        const cfg = await this.loadConfig();
+        if (cfg.roles[role]) {
+          return this.parseModelString(cfg.roles[role]);
         }
       } catch {
-        // If we can't read the file, we fall through to other checks.
+        // Config load failure – fall through to other checks
       }
     }
 
