@@ -1,0 +1,49 @@
+diff --git a/tmp/bindforge-editorial-keybinding-extraction-codecs-r2.md b/home/mike/repos/bindforge-017-keybinding-v2/docs/designs/017-keybinding-extraction-codecs/02-proposal.md
+index 316ef46c..8621aee8 100644
+--- a/tmp/bindforge-editorial-keybinding-extraction-codecs-r2.md
++++ b/home/mike/repos/bindforge-017-keybinding-v2/docs/designs/017-keybinding-extraction-codecs/02-proposal.md
+@@ -249,7 +249,7 @@ whose parse refused stay three distinct outcomes end to end (`017-C1`);
+ `per_user` is in `user_trees` order and `extract`'s `Vec` is positionally
+ parallel to it — one document per located tree (`017-C3`) as a type-level fact.
+ 
+-**Codec family id (canonical).** A family id is `[a-z][a-z0-9-]*` at most
++**Codec family id (canonical).** A family id is `[a-z][a-z0-9-]*` of at most
+ `bindforge_core::MAX_SLUG_OCTETS` octets — the bound the manifest `codec` entry
+ already rides (A6), which is what makes `unreal-ini` legal in a snapshot and in
+ `data/manifests/…/manifest.toml` at once. The ADR's "013-B4 bounds" is a slip
+@@ -358,7 +358,7 @@ No aggregate constant, one aggregate sentence in `schemas/README.md`'s budget
+ family, in the shape `MAX_CHAIN_DEPTH × MAX_DOCUMENT_BYTES` already uses: one
+ extraction opens at most `(MAX_USER_DIRS_PER_GAME + 1) × MAX_CANDIDATE_FILES`
+ files — the `+1` is the `ProtonPrefix` tree, and since §The first family caps a
+-tree's reads at `MAX_CANDIDATE_FILES` the product also ceilings the *opens*, so
++tree's reads at `MAX_CANDIDATE_FILES` the product also caps the *opens*, so
+ the worst case is `17 × 32 × MAX_BINDING_FILE_OCTETS` (544 MiB) per game,
+ offline, repeating per matching record the face walks; located sets in the
+ fixtures are 1–3 files. `MAX_USER_DIRS_PER_GAME` is the one silent bound — past
+@@ -652,7 +652,7 @@ that output is for whoever is sitting at the machine, not for a public report.
+    `SteamUserdata` enumerates `ctx.roots` in `roots()` order and `<dir>` in byte
+    order, and a root with no `<dir>/<appid>` under it contributes no tree; absent
+    trees are not returned; a non-digit directory name and a digit-named symlink
+-   are skipped and counted; two fixture roots holding 9 and 8 digit directories
++   are skipped and counted; two fixture roots holding 9- and 8-digit directories
+    keep the first 16 in that enumeration order, the 17th being past the cap.
+ 4. Unit: budgets at the seams — `UserCandidates::push` refuses a 33rd file
+    (`017-B3`'s type invariant, behind the walk's skip-and-count);
+@@ -667,7 +667,7 @@ that output is for whoever is sitting at the machine, not for a public report.
+    its UTF-8 twin.
+ 6. Unit: locate walk — the `Saved/Config/<dir>/` grammar is located at
+    ≤ `MAX_LOCATE_DEPTH` tree-relative components and not beyond; a platform
+-   directory name other than the fixtures' others
++   directory name other than those the fixtures use
+    is still found (no constant assumed); out-of-grammar `.ini` files, non-`.ini`
+    files, and `defaults-only` install trees contribute nothing; a symlinked directory, a
+    symlinked `.ini` and a symlinked *tree root* in `symlinked-prefix` are neither
+@@ -736,7 +736,7 @@ that output is for whoever is sitting at the machine, not for a public report.
+ 16. Unit: `zz_api_probe` for `bindforge-codecs` resolves the published surface
+     (`CodecFamily`, `Detection`, `Evidence`, `ExtractionRefusal`, `GameContext`,
+     `ScanRecord`, `user_trees`, `claim`, `family_ids`, the budget constants) in
+-    value or call position, and that the only `Cargo.lock` delta is the
++    value or call position, and pins that the only `Cargo.lock` delta is the
+     `bindforge-codecs` stanza and the `discovery-cli` dependency edge.
+ 17. Platform: the suite runs on the Linux runner only (A22). The `#[cfg(unix)]`
+     link fixtures are the one platform-scoped assertion; the Windows-visible half

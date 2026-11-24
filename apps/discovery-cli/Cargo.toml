@@ -5,6 +5,10 @@ edition = "2024"
 
 [dependencies]
 discovery = { path = "../../crates/discovery" }
+# ADR-017 (`017-C4`): the `bindings` face reads the codec registry, the
+# `GameContext` gate and the snapshot model, and it is the only crate outside
+# `crates/codecs` that does — the one new edge the lockfile gains.
+bindforge-codecs = { path = "../../crates/codecs" }
 # ADR-024: the render seam validates every row against the shared slug grammar and
 # bound, so it reads the predicate and the escaped-echo renderer from the root.
 bindforge-core = { workspace = true }

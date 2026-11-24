@@ -112,6 +112,25 @@ pub fn friendly_name(display_name: &str) -> String {
     normalized[..end].to_string()
 }
 
+/// One discovered row beside the Steam context that owns it (design 017,
+/// §Discovery plumbing): the row itself, the Steam *root* that owns the
+/// library it was found in (the root itself, or the root whose
+/// `libraryfolders.vdf` named it), and the library that was scanned.
+///
+/// This is the additive seam behind `SteamCore::scan()`; `discover()` is the
+/// plain projection of it (`r.game`), so the trait, the row's serde shape and
+/// every pinned `list` rendering are untouched by its existence (`017-L5`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScanRecord {
+    /// The emitted row, unchanged in shape and spelling.
+    pub game: DiscoveredGame,
+    /// The Steam root that owns `library` — the root itself, or the root whose
+    /// `libraryfolders.vdf` named it.
+    pub root: PathBuf,
+    /// The library directory this row's manifests were scanned from.
+    pub library: PathBuf,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DiscoveredGame {
     /// The `<source>/<external-id>` catalog lookup key (`025-C1`).

@@ -53,7 +53,7 @@ one line, and why a `#` inside a quoted array element is data, never a comment.
 | `version` | string | yes | the major this document is written against (`v1`) — `013-C1` |
 | `id` | string | yes | the game slug (`[a-z][a-z0-9-]*`, at most `MAX_SLUG_OCTETS` octets — the shared bound `schemas/README.md` states once), byte-equal to the `data/manifests/<id>/` directory name — `013-L5` `024-B1` |
 | `revision` | integer | yes | the data revision, `>= 1`, monotone per game (see Identity and revision) — `013-L4` |
-| `codec` | string | yes | the codec family id (slug grammar, at most the same shared `MAX_SLUG_OCTETS` bound); the id space is reserved here, implementations are ADR-017 — `013-C3 013-R1` |
+| `codec` | string | yes | the codec family id (slug grammar, at most the same shared `MAX_SLUG_OCTETS` bound); the id space is reserved here, and the shipped implementation set is the closed registry in `crates/codecs/src/registry.rs`, published through `family_ids`/`is_known_family` (ADR-017) — `013-C3 013-R1` |
 | `fingerprint` | string | no | `"sha256-<base64>"`, the digest of the config this manifest was read from; absent means never read against a config — `013-C5` |
 | `actions` | array of strings | yes | each element `"<action-id> <native-name>"`; may be empty — `013-C3 013-C6` |
 | `exclusive-groups` | array of strings | no | each element `"<input-id> <input-id>[ <input-id>…]"`, 2..=16 members; at most 64 groups — `013-C3 013-B2 013-B3` |
@@ -125,8 +125,15 @@ a parse-level refusal, and each well above the baseline it was surveyed for:
 `sha256-` — the closed one-algorithm set; algorithm agility rides a new format
 major — followed by standard base64 (alphabet `A-Za-z0-9+/`, `=` padding at
 the end of the final quartet only) that decodes to exactly 32 octets. Grammar
-only: which bytes are hashed and what a mismatch mean are ADR-017's, and the
-value is provenance data, not a guard. `013-C5 013-R2 013-L7`
+only at this layer: the value is provenance data, never a load-time guard
+(`013-L7`). ADR-017 (design 017) supplies the semantics the grammar deferred:
+the hashed bytes are the located config files' octets concatenated in the
+extracted snapshot's sorted `provenance.files` order, with no separator and no
+path or length octets between them; a mismatch means the config behind the
+manifest is not the config it was read from — a re-curate signal for whoever
+curates the manifest, never a refusal of the manifest. Computing a digest is
+the apply-and-authoring face's work (`017-R1`); this run defines the recipe
+and ships no fingerprint computation. `013-C5 013-R2 013-L7`
 
 ## Identity and revision
 
@@ -154,8 +161,11 @@ them after parsing: `013-C7`
    refusal never echoes a local path; `013-L5`
 2. every action id the document names — each `actions` row and each
    `docked-actions` row — must be in the loaded registry; one that is not is
-   refused naming the id. `codec` and preset ids are not registry-checked: no
-   implementation set exists to check them against until ADR-017. Axis kind
+   refused naming the id. `codec` and preset ids are still not
+   registry-checked: ADR-017 publishes the family-id set
+   (`crates/codecs/src/registry.rs`), while the load-time check on curated
+   manifests rides the routing-data family set (`017-R4`, `013-R3` narrowed —
+   a manifest naming a not-yet-implemented family stays loadable). Axis kind
    is never read from the document: a consumer that wants it asks the
    registry. `013-L1 013-L2 013-R3`
 

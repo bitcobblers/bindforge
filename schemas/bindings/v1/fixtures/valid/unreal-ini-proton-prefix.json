@@ -1,0 +1,15 @@
+{
+  "codec": "unreal-ini",
+  "entries": [
+    { "action": "Interact", "inputs": ["E"] },
+    { "action": "MoveForward", "inputs": ["W"] }
+  ],
+  "format": "bindings",
+  "game": "steam/900002",
+  "provenance": {
+    "evidence": "appid-table",
+    "files": ["Saved/Config/WindowsNoEditor/Game.ini"]
+  },
+  "user": "steamuser",
+  "version": 1
+}

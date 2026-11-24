@@ -101,13 +101,14 @@ fn every_fixture_emitted_slug_is_inside_the_discovery_bound() {
     }
 }
 
-/// `catalog` is the one tree in the contract corpus where a `<source>/<external-id>`
-/// lookup key is legal content (design 026: Catalog document and its spec,
-/// §The seed corpus): `026-C3` documents are built out of source keys, so
-/// `data/catalog/` (the `026-S1` seed) and `schemas/catalog/` (the format's own
-/// fixtures) are the only sweep skips below. Every other tree stays under the
-/// hygiene gate.
-const SOURCE_KEY_TREE: &str = "catalog";
+/// `catalog` and `bindings` are the trees in the contract corpus where a
+/// `<source>/<external-id>` lookup key is legal content (design 026: Catalog
+/// document and its spec, §The seed corpus — `026-C3` documents are built out
+/// of source keys; design 017 §Corpus boundary (canonical) — a `bindings/v1`
+/// document's `game` key *is* the lookup key, which is why the only carve-out
+/// is the format's own fixture tree, no `data/bindings/` ships). Every other
+/// tree stays under the hygiene gate.
+const SOURCE_KEY_TREES: [&str; 2] = ["catalog", "bindings"];
 
 /// proves: design 025's Test strategy #16 (Chosen design: Corpus boundary — the
 /// corpus sweep) — no file under `data/` or `schemas/*/v*/fixtures/valid/` contains
@@ -115,19 +116,25 @@ const SOURCE_KEY_TREE: &str = "catalog";
 /// friendly name reaches a manifest, a profile, or a path" pinned literally against
 /// the shipped corpus (A20 re-asserted as a gate, not an observation). Both roots
 /// stay in the sweep (design 026: the rejected "just don't put it in `schemas/`"
-/// dodge); only files under `data/catalog/` and `schemas/catalog/` are skipped —
-/// `026-S1` mandates source keys as content there (`SOURCE_KEY_TREE` names the
-/// tree) — and the `checked > 0` guard is unchanged.
+/// dodge); only files under `data/catalog/`, `schemas/catalog/` and
+/// `schemas/bindings/` are skipped — `026-S1` mandates source keys as content
+/// there and design 017's `game` key spells one (`SOURCE_KEY_TREES` names the
+/// trees) — and the `checked > 0` guard is unchanged.
 #[test]
 fn the_shipped_corpus_carries_no_source_key_spelling() {
     let root = repo_root();
     let mut checked = 0usize;
     let mut violations: Vec<String> = Vec::new();
 
-    let skipped = [
-        root.join("data").join(SOURCE_KEY_TREE),
-        root.join("schemas").join(SOURCE_KEY_TREE),
-    ];
+    let skipped: Vec<PathBuf> = SOURCE_KEY_TREES
+        .iter()
+        .flat_map(|tree| {
+            [
+                root.join("data").join(tree),
+                root.join("schemas").join(tree),
+            ]
+        })
+        .collect();
 
     let mut dirs: Vec<PathBuf> = vec![root.join("data")];
     let schemas = root.join("schemas");

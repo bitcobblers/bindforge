@@ -1,0 +1,12 @@
+{
+  "codec": "unreal-ini",
+  "entries": [],
+  "format": "bindings",
+  "game": "steam/900001",
+  "provenance": {
+    "evidence": "install-tree-probe",
+    "files": []
+  },
+  "user": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "version": 1
+}

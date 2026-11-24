@@ -1,0 +1,14 @@
+{
+  "codec": "unreal-ini",
+  "entries": [
+    { "action": "MoveForward", "inputs": ["K\u0007"] }
+  ],
+  "format": "bindings",
+  "game": "steam/900001",
+  "provenance": {
+    "evidence": "install-tree-probe",
+    "files": []
+  },
+  "user": "76561197960287930",
+  "version": 1
+}

@@ -1,6 +1,6 @@
 ---
 doc_type: adr
-status: proposed
+status: accepted
 date: 2026-11-23
 depends-on: [012, 013]
 ledger: yes

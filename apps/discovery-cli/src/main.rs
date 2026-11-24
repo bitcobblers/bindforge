@@ -16,6 +16,7 @@
 //! refused; the plugin's failure quotes the `DiscoveryError` Debug shape and
 //! never a row's contents.
 
+mod bindings;
 mod catalog;
 mod matches;
 
@@ -57,6 +58,19 @@ enum Commands {
         #[arg(long = "steam-root")]
         steam_root: Vec<PathBuf>,
     },
+    /// Prints the key bindings the located user config files state for one
+    /// discovered game (ADR-017, `017-C4`). Local only: no catalog, no store.
+    Bindings {
+        /// The discovery lookup key, exactly as `list` printed it (`steam/…`).
+        slug: String,
+        /// Steam root(s) to scan instead of probing this host. Repeatable.
+        #[arg(long = "steam-root")]
+        steam_root: Vec<PathBuf>,
+        /// Prints the codec claim — family, evidence, user and the absolute
+        /// paths it located — and extracts nothing.
+        #[arg(long)]
+        probe: bool,
+    },
 }
 
 /// The table's columns, left to right (ADR-025: the lookup key beside the
@@ -73,11 +87,20 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
     match &cli.command {
         Commands::List { steam_root } => list(cli.json, cli.catalog_url.as_deref(), steam_root),
+        // ADR-017 (`017-C4`): the bindings face shares this binary's failure
+        // voice and table renderer and nothing else — no catalog client, no
+        // gate, no match store, no prompt (`017-L1`, and Options' A13
+        // divergence from "the same scan").
+        Commands::Bindings {
+            slug,
+            steam_root,
+            probe,
+        } => bindings::run(cli.json, slug, steam_root, *probe),
     }
 }
 
 /// The one failure voice: a single named `error: ` line, `ExitCode::FAILURE`.
-fn refused(message: String) -> ExitCode {
+pub(crate) fn refused(message: String) -> ExitCode {
     eprintln!("error: {message}");
     ExitCode::FAILURE
 }
@@ -325,7 +348,7 @@ fn selection(answer: &str, count: usize) -> Option<usize> {
 /// paths) pass the shared control-byte escape before reaching the terminal;
 /// clean values render as themselves (design 025: hostile ACF bytes never
 /// emit a raw control sequence).
-fn cell(value: String) -> String {
+pub(crate) fn cell(value: String) -> String {
     if value.chars().any(char::is_control) {
         bindforge_core::escape_and_truncate(&value)
     } else {
@@ -373,14 +396,11 @@ fn json_row(
     row
 }
 
-/// One rendered table row: the five column cells, in [`COLUMNS`] order.
-type Row = [String; COLUMNS.len()];
+/// One rendered table row: one cell per column, in header order.
+type Row = Vec<String>;
 
-/// The rendered widths of each column, in [`COLUMNS`] order.
-type Widths = [usize; COLUMNS.len()];
-
-/// Renders the table: a header row, a separator row, then one row per game
-/// (T-003 Chosen design §1, re-pinned by ADR-025 to the five columns).
+/// Renders `list`'s table: the five pinned columns through the shared width
+/// algorithm in [`render_grid`].
 ///
 /// A column is as wide as its widest cell measured in characters, every cell is
 /// padded right to that width and framed by one space on each side, and the
@@ -390,10 +410,19 @@ type Widths = [usize; COLUMNS.len()];
 /// store as it was loaded, `-` when the store names no id for the row.
 fn render_table(games: &[DiscoveredGame], resolved: &BTreeMap<String, String>) -> String {
     let rows: Vec<Row> = games.iter().map(|game| row_cells(game, resolved)).collect();
-    let widths = column_widths(&rows);
+    render_grid(&COLUMNS.map(str::to_string), &rows)
+}
+
+/// The shared width algorithm, generalized from `list`'s fixed
+/// `[String; COLUMNS.len()]` rows to any header and any number of columns
+/// (design 017, `017-C4`): `list` renders through it byte-identically, and the
+/// `bindings` and `--probe` faces render the same way without a second
+/// renderer.
+pub(crate) fn render_grid(header: &[String], rows: &[Row]) -> String {
+    let widths = column_widths(header, rows);
 
     let mut lines: Vec<String> = Vec::with_capacity(rows.len() + 2);
-    lines.push(render_row(&COLUMNS.map(str::to_string), &widths));
+    lines.push(render_row(header, &widths));
     lines.push(render_separator(&widths));
     lines.extend(rows.iter().map(|row| render_row(row, &widths)));
     lines.join("\n")
@@ -401,7 +430,7 @@ fn render_table(games: &[DiscoveredGame], resolved: &BTreeMap<String, String>) -
 
 /// The cells of one game's row, in [`COLUMNS`] order.
 fn row_cells(game: &DiscoveredGame, resolved: &BTreeMap<String, String>) -> Row {
-    [
+    vec![
         cell(game.slug.clone()),
         resolved
             .get(&game.slug)
@@ -416,8 +445,8 @@ fn row_cells(game: &DiscoveredGame, resolved: &BTreeMap<String, String>) -> Row 
 
 /// The width of each column: the greatest `chars().count()` of the header cell
 /// and that column's body cells.
-fn column_widths(rows: &[Row]) -> Widths {
-    let mut widths = COLUMNS.map(|column| column.chars().count());
+fn column_widths(header: &[String], rows: &[Row]) -> Vec<usize> {
+    let mut widths: Vec<usize> = header.iter().map(|column| column.chars().count()).collect();
     for row in rows {
         for (width, cell) in widths.iter_mut().zip(row) {
             *width = (*width).max(cell.chars().count());
@@ -430,7 +459,7 @@ fn column_widths(rows: &[Row]) -> Widths {
 /// rendered gap (one space's worth on each side of the column), closed by a
 /// final `|` — which is what keeps the separator's delimiters at the same
 /// offsets as every row's.
-fn render_separator(widths: &Widths) -> String {
+fn render_separator(widths: &[usize]) -> String {
     widths
         .iter()
         .map(|width| format!("|{}", "-".repeat(width + 2)))
@@ -443,7 +472,7 @@ fn render_separator(widths: &Widths) -> String {
 /// column's width, then one trailing space, closed by a final `|`. Every cell
 /// is framed by one space on each side, so no content sits flush against a
 /// delimiter.
-fn render_row(cells: &Row, widths: &Widths) -> String {
+fn render_row(cells: &[String], widths: &[usize]) -> String {
     cells
         .iter()
         .zip(widths)

@@ -1,0 +1,11 @@
+{
+  "codec": "unreal-ini",
+  "entries": [],
+  "format": "bindings",
+  "game": "steam/900003",
+  "provenance": {
+    "evidence": "install-tree-probe",
+    "files": ["Saved/Config/Linux/GameUserSettings.ini"]
+  },
+  "version": 1
+}

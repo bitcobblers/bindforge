@@ -72,6 +72,20 @@ impl SteamLinuxPlugin {
             core: SteamCore::with_roots(roots, LinuxTarget),
         }
     }
+
+    /// The scan with each row's owning root and library beside it (design
+    /// 017, §Discovery plumbing): a thin inherent wrapper over the shared
+    /// core. The `DiscoveryPlugin` trait is not touched — third-party plugins
+    /// keep `discover()` and simply have no bindings face this run.
+    pub fn scan_records(&self) -> Result<Vec<crate::game::ScanRecord>, DiscoveryError> {
+        self.core.scan()
+    }
+
+    /// The selected root set as the core holds it — canonicalized,
+    /// existence-filtered, byte order (§Discovery plumbing).
+    pub fn roots(&self) -> &[PathBuf] {
+        self.core.roots()
+    }
 }
 
 impl DiscoveryPlugin for SteamLinuxPlugin {

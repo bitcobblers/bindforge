@@ -53,6 +53,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bindforge-codecs"
+version = "0.1.0"
+dependencies = [
+ "bindforge-core",
+ "discovery",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "bindforge-core"
 version = "0.1.0"
 
@@ -151,6 +161,7 @@ dependencies = [
 name = "discovery-cli"
 version = "0.1.0"
 dependencies = [
+ "bindforge-codecs",
  "bindforge-core",
  "clap",
  "discovery",

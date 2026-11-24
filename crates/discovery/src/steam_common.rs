@@ -13,7 +13,7 @@
 //! `steam_windows` can use and re-export them, and nothing outside the crate
 //! reaches them.
 
-use crate::game::{DiscoveredGame, Platform, Source, friendly_name};
+use crate::game::{DiscoveredGame, Platform, ScanRecord, Source, friendly_name};
 use crate::keyvalues::{self, Value};
 use crate::plugin::DiscoveryPlugin;
 use crate::registry::DiscoveryError;
@@ -80,25 +80,38 @@ impl<T: SteamTarget> SteamCore<T> {
             target,
         }
     }
-}
 
-impl<T: SteamTarget> DiscoveryPlugin for SteamCore<T> {
-    fn name(&self) -> &'static str {
-        T::NAME
+    /// The selected root set exactly as the core holds it — canonicalized,
+    /// existence-filtered, byte order — which is what `roots()` hands a
+    /// `GameContext` (design 017, §Discovery plumbing).
+    pub(crate) fn roots(&self) -> &[PathBuf] {
+        &self.roots
     }
 
-    fn discover(&self) -> Result<Vec<DiscoveredGame>, DiscoveryError> {
-        let mut games: Vec<DiscoveredGame> = Vec::new();
+    /// The scan behind `discover()` (design 017, §Discovery plumbing): the
+    /// same enumeration as before the refactor — the per-root library
+    /// enumeration and the shared dedupe are kept — with each row now carrying
+    /// the root that *owns* the library it was found in.
+    ///
+    /// A library two roots share is scanned once, owned by the first root in
+    /// `roots()` (canonical byte) order that named it; the `(slug,
+    /// install_path)` sort stays the only ordering, the no-collision decision
+    /// is unchanged, and §7's one error path lives here.
+    pub(crate) fn scan(&self) -> Result<Vec<ScanRecord>, DiscoveryError> {
+        let mut records: Vec<ScanRecord> = Vec::new();
         let mut skipped: usize = 0;
         if !self.roots.is_empty() {
             // The libraries of every selected root are one set, so a library two
-            // roots share is scanned once (Chosen design §2).
-            let mut libraries: Vec<PathBuf> = Vec::new();
+            // roots share is scanned once (Chosen design §2) — now with its
+            // owner kept: the first naming root claims it (design 017).
+            let mut seen: std::collections::BTreeSet<PathBuf> = std::collections::BTreeSet::new();
             for root in &self.roots {
-                libraries.extend(libraries_in_root_with_skips(root, &mut skipped));
-            }
-            for library in canonical_paths(libraries) {
-                scan_library(&library, &self.target, &mut games, &mut skipped);
+                for library in libraries_in_root_with_skips(root, &mut skipped) {
+                    if !seen.insert(library.clone()) {
+                        continue;
+                    }
+                    scan_library(&library, root, &self.target, &mut records, &mut skipped);
+                }
             }
             // No collision pass runs: distinct installs of one Steam source carry
             // distinct AppIDs, so the keys leave this seam unique by construction,
@@ -110,7 +123,7 @@ impl<T: SteamTarget> DiscoveryPlugin for SteamCore<T> {
         // was selected, zero games were emitted, and at least one file was
         // skipped as unreadable or malformed. The message names the selected
         // roots and the count of skipped files and nothing else — no contents.
-        if !self.roots.is_empty() && games.is_empty() && skipped > 0 {
+        if !self.roots.is_empty() && records.is_empty() && skipped > 0 {
             let roots: Vec<String> = self
                 .roots
                 .iter()
@@ -125,8 +138,23 @@ impl<T: SteamTarget> DiscoveryPlugin for SteamCore<T> {
             )));
         }
 
-        games.sort_by(|a, b| (&a.slug, &a.install_path).cmp(&(&b.slug, &b.install_path)));
-        Ok(games)
+        records.sort_by(|a, b| {
+            (&a.game.slug, &a.game.install_path).cmp(&(&b.game.slug, &b.game.install_path))
+        });
+        Ok(records)
+    }
+}
+
+impl<T: SteamTarget> DiscoveryPlugin for SteamCore<T> {
+    fn name(&self) -> &'static str {
+        T::NAME
+    }
+
+    /// `discover()` is exactly the row projection of [`Self::scan`], order
+    /// included (design 017, §Discovery plumbing): the trait, the row and the
+    /// pinned renderings are untouched (`017-L5`).
+    fn discover(&self) -> Result<Vec<DiscoveredGame>, DiscoveryError> {
+        Ok(self.scan()?.into_iter().map(|record| record.game).collect())
     }
 }
 
@@ -185,11 +213,14 @@ fn library_paths(vdf: &Path, skipped: &mut usize) -> Vec<PathBuf> {
 }
 
 /// Reads the `appmanifest_*.acf` files directly inside `<library>/steamapps/`,
-/// adding one game per surviving manifest and counting every skipped file.
+/// adding one record per surviving manifest — the row beside the `library`
+/// scanned and the `root` that owns it (design 017, §Discovery plumbing) —
+/// and counting every skipped file.
 fn scan_library<T: SteamTarget>(
     library: &Path,
+    root: &Path,
     target: &T,
-    games: &mut Vec<DiscoveredGame>,
+    records: &mut Vec<ScanRecord>,
     skipped: &mut usize,
 ) {
     let entries = match std::fs::read_dir(library.join("steamapps")) {
@@ -221,7 +252,11 @@ fn scan_library<T: SteamTarget>(
             // A row whose identity cannot be built is a refusal of this file, so
             // it counts here too (ADR-025): count-only, never echoed per row.
             Some(manifest) => match discovered_game(library, &manifest, target) {
-                Some(game) => games.push(game),
+                Some(game) => records.push(ScanRecord {
+                    game,
+                    root: root.to_path_buf(),
+                    library: library.to_path_buf(),
+                }),
                 None => *skipped += 1,
             },
             None => *skipped += 1,

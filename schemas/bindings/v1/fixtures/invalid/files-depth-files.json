@@ -1,0 +1,14 @@
+{
+  "codec": "unreal-ini",
+  "entries": [
+    { "action": "MoveForward", "inputs": ["Saved/Config/LinuxNoEditor/a/b/c/d/e/f/Engine.ini"] }
+  ],
+  "format": "bindings",
+  "game": "steam/900001",
+  "provenance": {
+    "evidence": "install-tree-probe",
+    "files": ["Saved/Config/LinuxNoEditor/a/b/c/d/e/f/Engine.ini"]
+  },
+  "user": "76561197960287930",
+  "version": 1
+}

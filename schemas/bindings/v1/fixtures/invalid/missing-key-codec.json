@@ -1,0 +1,13 @@
+{
+  "entries": [
+    { "action": "MoveForward", "inputs": ["W"] }
+  ],
+  "format": "bindings",
+  "game": "steam/900001",
+  "provenance": {
+    "evidence": "install-tree-probe",
+    "files": ["Saved/Config/LinuxNoEditor/Engine.ini"]
+  },
+  "user": "76561197960287930",
+  "version": 1
+}

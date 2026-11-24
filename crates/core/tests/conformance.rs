@@ -352,9 +352,10 @@ fn a_rejection_truncates_an_untrusted_value_rather_than_echoing_it() {
 /// directory, which is what keeps the same corpus green on a contributor's
 /// case-insensitive Windows filesystem as on the Linux CI runner. Deliberately
 /// **not** governed by the design 026 core-TOML guard: through the
-/// directory-aware `is_fixture_name` it keeps its rule over the `catalog`
-/// JSON format's `.json` fixtures — the only coverage behind that design's
-/// case-unique-fixture-name claim on a case-insensitive filesystem.
+/// directory-aware `is_fixture_name` it keeps its rule over the JSON formats'
+/// `.json` fixtures (`JSON_FIXTURE_FORMATS`) — the only coverage behind
+/// design 026's case-unique-fixture-name claim on a case-insensitive
+/// filesystem.
 #[test]
 fn fixture_file_names_are_lowercase_ascii_dash_separated_and_case_unique() {
     for dir in &format_dirs() {

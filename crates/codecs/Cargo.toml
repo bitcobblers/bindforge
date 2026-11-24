@@ -1,0 +1,26 @@
+[package]
+name = "bindforge-codecs"
+description = "ADR-017 codec families: the claim trait, the closed registry, the launcher-context resolvers, the size-capped reader, and the bindings/v1 snapshot contract"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+# The third workspace crate (design 017, §`crates/codecs` layout): it reads
+# `bindforge-core`'s bounds and echo renderer, and `discovery` for the
+# `ScanRecord` the `GameContext` is built from (ADR-017's own data-flow
+# sentence — "Discovery feeds the GameContext; codecs read files"). Nothing
+# in it constructs a plugin or scans an install.
+[dependencies]
+bindforge-core = { workspace = true }
+discovery = { path = "../discovery" }
+serde = { workspace = true, features = ["derive"] }
+# The `bindings/v1` loader owns its document grammar (§`bindings/v1`), and a
+# JSON contract's loader reads JSON: the `catalog` posture, so `serde_json` is
+# a load dependency, not a dev one.
+serde_json = "1.0"
+
+# The suites serialize the snapshot documents and the schema fixtures with
+# `serde_json` (design 017, §`bindings/v1`: the contract's serialization) —
+# available through the load edge above.
+[dev-dependencies]

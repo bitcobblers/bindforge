@@ -1,0 +1,9 @@
+{
+  "codec": "unreal-ini",
+  "entries": [{ "action": "MoveForward", "extra": true, "inputs": ["W"] }],
+  "format": "bindings",
+  "game": "steam/900001",
+  "provenance": { "evidence": "install-tree-probe", "files": [] },
+  "user": "76561197960287930",
+  "version": 1
+}

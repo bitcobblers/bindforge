@@ -68,24 +68,34 @@ legal TOML and outside the v1 grammar, and each has an invalid fixture. The
 subset is stated here, in the contract, because a narrowing that only lives
 in one implementation is not a contract.
 
-**One format is JSON, and it is named here so the sentence above is not a
-lie about it.** `catalog` (ADR-026, `026-C3`) is the JSON format: ADR-026 fixes
+**Two formats are JSON, and they are named here so the sentence above is not a
+lie about them.** `catalog` (ADR-026, `026-C3`) and `bindings` (ADR-017,
+`017-C3`) are the JSON formats. ADR-026 fixes
 the on-disk spellings as JSON — `data/catalog/v1/catalog.json` for the seed
 corpus, `<data>/bindforge/registry/catalog-v1.json` for a caching instance's
 local entries, and the bare-integer `version: 1` form no TOML format shares —
 so its fixtures are `.json`, its `spec.md` states a JSON shape rather than a
 TOML subset, and its conformance is exercised by its own loader in
 `apps/registry` (`corpus.rs`), not by core's TOML `parse`/`rejection` sweep.
-The harness's `schemas/*/v*/` walk still picks the directory up for the fixture
+ADR-017 adds `bindings`: the extracted key-binding snapshot, whose only
+loader is `crates/codecs` (`snapshot.rs`) — the same posture, since a JSON
+contract's loader owns its refusals — so its fixtures are `.json` too, and
+the harness's TOML parse and rejection loops skip both formats' trees while
+its fixture-naming and zero-fixture rules keep covering them.
+The harness's `schemas/*/v*/` walk still picks every directory up for the fixture
 naming and zero-fixture rules; it skips only the TOML parse path there. The
 contract's other JSON documents — the match store `matches.json`, the per-slug
 candidate response body, and the `026-C7` cache document
-`<data>/bindforge/registry/cache-v1.json` — join it outside the TOML subset,
+`<data>/bindforge/registry/cache-v1.json` — join them outside the TOML subset,
 with the same "the loader that owns the document states its refusals" posture.
-`catalog` is also the one tree where a discovery lookup key (`steam/…`,
-`epic/…`, `local/…`) is legal *content*: it is what the format stores, so the
+`catalog` and `bindings` are also the trees where a discovery lookup key
+(`steam/…`, `epic/…`, `local/…`) is legal *content*: it is what those formats
+store — the catalog as its corpus, a `bindings` snapshot as the `game` it was
+extracted for — so the
 hygiene sweep that keeps such spellings out of the shipped corpus skips
-`data/catalog/` and `schemas/catalog/` and nothing else.
+`data/catalog/`, `schemas/catalog/` and `schemas/bindings/` and nothing else
+(and *not* `data/bindings/`: ADR-017 ships no snapshot under `data/` —
+snapshots are printed, never written).
 
 The fixtures are the conformance currency — following the JSON Schema Test
 Suite model, every implementer runs the same golden fixtures — and no
@@ -171,6 +181,36 @@ can reach a writer:
   `MAX_NATIVE_NAME_OCTETS = 128` a second, non-schema time: it bounds a
   discovered game's `friendly_name`, display metadata that joins nothing, which
   is what makes clamping that value admissible.
+
+- ADR-017 adds seven budgets for keybinding extraction, exported by
+  `bindforge-codecs` (`crates/codecs`) rather than by core — core's thirteen
+  constants below stay core's:
+  `MAX_BINDING_FILE_OCTETS = 1_048_576` bounds one file a codec opens
+  (`017-B1`, checked on the file's length before allocation),
+  `MAX_SNAPSHOT_ENTRIES = 4096` one snapshot's distinct (`action`,
+  input-token) pairs *as admitted* (`017-B2` — a removal frees no room),
+  `MAX_CANDIDATE_FILES = 32` one user tree's located candidate set
+  (`017-B3`), `MAX_USER_DIRS_PER_GAME = 16` the `SteamUserdata` trees kept
+  per game across every resolved root, `MAX_LOCATE_DEPTH = 8` the components
+  in a located file's tree-relative path, `MAX_LOCATE_ENTRIES_PER_TREE =
+  16384` the entries one locate walk examines below one tree root, and
+  `MAX_SNAPSHOT_OCTETS = 4_194_304` one snapshot document the loader reads
+  (checked on the file's length before the read). `MAX_USER_DIRS_PER_GAME`
+  is the one silent bound: past the 16th located tree a game's remaining
+  local users are simply absent from the output, and no refusal names it.
+  ADR-017 ships no aggregate constant, one sentence here in the shape
+  `MAX_CHAIN_DEPTH × MAX_DOCUMENT_BYTES` already uses: one extraction opens
+  at most `(MAX_USER_DIRS_PER_GAME + 1) × MAX_CANDIDATE_FILES` files per
+  pass — the `+1` is the Proton prefix tree, and because each tree's *opens*
+  are capped at `MAX_CANDIDATE_FILES` independently of how many of them
+  locate, the product caps the opens too — and the claim pass reads the
+  opened files for its content test while the extraction pass re-reads each
+  located file to fold it, so the worst case is
+  `2 × (MAX_USER_DIRS_PER_GAME + 1) × MAX_CANDIDATE_FILES ×
+  MAX_BINDING_FILE_OCTETS` (1,088 MiB) read per game, offline: `--probe`
+  pays one pass, the extracting face two, repeating per matching record the
+  face walks. `schemas/bindings/v1/spec.md` states the composite the same
+  way.
 
 The reference implementation exports all thirteen constants as the public names
 for these limits, so an implementer never has to guess which number a

@@ -1,0 +1,19 @@
+{
+  "codec": "unreal-ini",
+  "entries": [],
+  "format": "bindings",
+  "game": "steam/900001",
+  "provenance": {
+    "evidence": "install-tree-probe",
+    "files": [
+      "f00.ini", "f01.ini", "f02.ini", "f03.ini", "f04.ini", "f05.ini",
+      "f06.ini", "f07.ini", "f08.ini", "f09.ini", "f10.ini", "f11.ini",
+      "f12.ini", "f13.ini", "f14.ini", "f15.ini", "f16.ini", "f17.ini",
+      "f18.ini", "f19.ini", "f20.ini", "f21.ini", "f22.ini", "f23.ini",
+      "f24.ini", "f25.ini", "f26.ini", "f27.ini", "f28.ini", "f29.ini",
+      "f30.ini", "f31.ini", "f32.ini"
+    ]
+  },
+  "user": "76561197960287930",
+  "version": 1
+}

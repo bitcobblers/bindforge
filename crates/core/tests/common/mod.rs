@@ -416,29 +416,31 @@ fn is_major_dir(name: &str) -> bool {
     }
 }
 
-/// `catalog` is the contract tree's one JSON format (design 026: Catalog
-/// document and its spec — a documented exception to `schemas/README.md`'s
-/// "Formats are TOML"). Its conformance is exercised by its own loader in
-/// `apps/registry`, not by core's TOML parse path, so this `const` is the one
-/// name every harness skip site reads: the TOML parse/rejection loops in
-/// `conformance.rs` skip it, while the zero-fixture rule and the fixture-name
-/// rule still cover it (they count and name files, not parses).
-pub const JSON_FIXTURE_FORMAT: &str = "catalog";
+/// `catalog` and `bindings` are the contract tree's two JSON formats (design
+/// 026: Catalog document and its spec; design 017: `bindings/v1` snapshots —
+/// documented exceptions to `schemas/README.md`'s "Formats are TOML", named in
+/// its two-format passage). Their conformance is exercised by the loaders that
+/// own the documents — core's TOML parse path and `apps/registry` are not
+/// their conformance surface — so this `const` is the one name every harness
+/// skip site reads: the TOML parse/rejection loops in `conformance.rs` skip
+/// them, while the zero-fixture rule and the fixture-name rule still cover
+/// them (they count and name files, not parses).
+pub const JSON_FIXTURE_FORMATS: [&str; 2] = ["catalog", "bindings"];
 
 /// Whether core's TOML parse path is the format's conformance surface. The
-/// JSON format named above is the one that says no.
+/// JSON formats named above are the ones that say no.
 pub fn is_core_toml_format(format: &str) -> bool {
-    format != JSON_FIXTURE_FORMAT
+    !JSON_FIXTURE_FORMATS.contains(&format)
 }
 
 /// proves: Formats contract → versioning rule — fixture file names are
-/// lowercase ASCII, `-`-separated. Directory-aware (design 026): a fixture of
-/// the JSON format named by `JSON_FIXTURE_FORMAT` carries a `.json` suffix,
-/// every core TOML format's fixture a `.toml` one; the name rule itself is
-/// identical for both, which is what keeps design 026's case-unique-fixture
-/// claim true on a case-insensitive filesystem.
+/// lowercase ASCII, `-`-separated. Directory-aware (design 026, widened by
+/// design 017): a fixture of a JSON format named by `JSON_FIXTURE_FORMATS`
+/// carries a `.json` suffix, every core TOML format's fixture a `.toml` one;
+/// the name rule itself is identical for both, which is what keeps design
+/// 026's case-unique-fixture claim true on a case-insensitive filesystem.
 pub fn is_fixture_name(name: &str, format: &str) -> bool {
-    let suffix = if format == JSON_FIXTURE_FORMAT {
+    let suffix = if JSON_FIXTURE_FORMATS.contains(&format) {
         ".json"
     } else {
         ".toml"
